@@ -2974,6 +2974,28 @@ class AppLocalizationsEn extends AppLocalizations {
       'The path contains archived intentions or relations.';
 
   @override
+  String get dailyChoiceSheetDescriptionTitle => 'Description';
+
+  @override
+  String get dailyChoiceSheetDescriptionBack => 'Back to the daily choice';
+
+  @override
+  String get dailyChoiceSheetDescriptionSave => 'Save';
+
+  @override
+  String get dailyChoiceSheetDescriptionDiscardTitle => 'Discard changes?';
+
+  @override
+  String get dailyChoiceSheetDescriptionDiscardMessage =>
+      'Your changes to the description won’t be saved.';
+
+  @override
+  String get dailyChoiceSheetDescriptionDiscardAction => 'Discard';
+
+  @override
+  String get dailyChoiceSheetDescriptionContinueAction => 'Keep editing';
+
+  @override
   String get dailyChoiceFieldDate => 'Date';
 
   @override

@@ -30,6 +30,7 @@ import 'package:doable/src/design_system/components/reason_chain.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/components/tabs.dart';
 import 'package:doable/src/design_system/components/time_dial.dart';
+import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_priority.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
@@ -389,7 +390,7 @@ void main() {
   });
 
   testWidgets('у выполненного выбора шапка зачёркнута, цепочка серая, а без '
-      'описания над полями ничего нет', (tester) async {
+      'описания над полями стоит подсказка', (tester) async {
     final harness = await _openSheet(tester);
 
     harness.repository.emit(_details(isCompleted: true, description: ''));
@@ -400,12 +401,11 @@ void main() {
       TextDecoration.lineThrough,
     );
     expect(tester.widget<ReasonChain>(find.byType(ReasonChain)).off, isTrue);
-    expect(
-      tester.getRect(find.text('Дата')).top,
-      greaterThan(tester.getRect(_tabs).bottom),
-    );
     expect(find.text('Пояснение'), findsNothing);
-    expect(find.text('Добавить описание'), findsNothing);
+    expect(
+      tester.getRect(find.text('Добавить описание')).bottom,
+      lessThan(tester.getRect(find.text('Дата')).top),
+    );
   });
 
   testWidgets('архивированные исходное намерение и действие несут отметку, а '
@@ -1018,6 +1018,186 @@ void main() {
     expect(find.textContaining(_commandFailure), findsOneWidget);
     semantics.dispose();
   });
+
+  testWidgets('описание добавляется под полосой: панель раскрыта на весь экран '
+      'и не следует за пальцем, а сохранение — запись одного описания без '
+      'сообщения', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final harness = await _openSheet(tester);
+    final repository = harness.repository;
+    repository.emit(_details(description: ''));
+    await tester.pumpAndSettle();
+    expect(_sheetRect(tester), isNot(_fullScreen(tester)));
+
+    await tester.tap(find.text('Добавить описание'));
+    await tester.pumpAndSettle();
+
+    expect(_sheetRect(tester), _fullScreen(tester));
+    expect(find.widgetWithText(TopBar, 'Описание'), findsOneWidget);
+    expect(find.bySemanticsLabel(_collapse), findsNothing);
+    expect(find.bySemanticsLabel(_expand), findsNothing);
+    expect(_head(tester).options, isA<ChoiceHeadOptionsNone>());
+    expect(_tabs, findsNothing);
+    expect(
+      tester.getRect(find.byType(ChoiceHead)).bottom,
+      lessThanOrEqualTo(tester.getRect(find.byType(EditableText)).top),
+    );
+    expect(tester.getSemantics(_save), isSemantics(isEnabled: false));
+
+    await tester.fling(find.text('Действие'), const Offset(0, 300), 1000);
+    await tester.pumpAndSettle();
+    expect(_sheetRect(tester), _fullScreen(tester));
+
+    const text = '  Первая строка\nвторая  ';
+    await tester.enterText(find.byType(EditableText), text);
+    await tester.pump();
+    await tester.tap(_save);
+    await tester.pump();
+
+    final description = _onlyField(repository.sentPatches.single);
+    expect(description.$1, 'description');
+    expect((description.$2 as DailyChoiceDescriptionSet).value.value, text);
+    expect(tester.getSemantics(_save), isSemantics(isEnabled: false));
+
+    repository.succeedUpdate();
+    repository.emit(_details(description: text));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TopBar), findsNothing);
+    expect(find.text(text), findsOneWidget);
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('Обзор')),
+      isSemantics(hasSelectedState: true, isSelected: true),
+    );
+    expect(find.byType(SnackBar), findsNothing);
+    semantics.dispose();
+  });
+
+  testWidgets('после выхода стрелкой без правок панель остаётся на весь экран, '
+      'а ручка на месте полосы сворачивает её', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final harness = await _openSheet(tester);
+    harness.repository.emit(_details());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Пояснение'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(_back);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.byType(TopBar), findsNothing);
+    expect(_sheetRect(tester), _fullScreen(tester));
+    expect(_head(tester).options, isA<ChoiceHeadOptionsAvailable>());
+
+    await tester.tap(find.bySemanticsLabel(_collapse));
+    await tester.pumpAndSettle();
+    expect(_sheetRect(tester).top, greaterThan(_fullScreen(tester).top));
+    expect(harness.repository.sentPatches, isEmpty);
+    semantics.dispose();
+  });
+
+  testWidgets('выход стрелкой с несохранёнными правками спрашивает '
+      'подтверждение, а отказ от правок возвращает «Обзор» с прежним '
+      'описанием', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final harness = await _openSheet(tester);
+    harness.repository.emit(_details());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Пояснение'));
+    await tester.pumpAndSettle();
+    expect(_editedText(tester), 'Пояснение');
+
+    await tester.enterText(find.byType(EditableText), 'Новое');
+    await tester.pump();
+    await tester.tap(_back);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Продолжить правку'));
+    await tester.pumpAndSettle();
+    expect(_editedText(tester), 'Новое');
+
+    await tester.tap(_back);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Отменить'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TopBar), findsNothing);
+    expect(find.text('Пояснение'), findsOneWidget);
+    expect(find.text('Новое'), findsNothing);
+    expect(harness.repository.sentPatches, isEmpty);
+    semantics.dispose();
+  });
+
+  testWidgets('системное «назад» с несохранёнными правками спрашивает '
+      'подтверждение, а отказ от правок закрывает панель без записи', (
+    tester,
+  ) async {
+    final harness = await _openSheet(tester);
+    harness.repository.emit(_details());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Пояснение'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(EditableText), 'Новое');
+    await tester.pump();
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Продолжить правку'));
+    await tester.pumpAndSettle();
+    expect(_editedText(tester), 'Новое');
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Отменить'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Sheet), findsNothing);
+    expect(harness.repository.sentPatches, isEmpty);
+  });
+
+  testWidgets('описание длиннее предела показано отказом у поля без записи, '
+      'а текст остаётся в поле', (tester) async {
+    final harness = await _openSheet(tester);
+    harness.repository.emit(_details());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Пояснение'));
+    await tester.pumpAndSettle();
+    final tooLong = 'я' * (DailyChoiceDescription.maxGraphemeClusters + 1);
+
+    await tester.enterText(find.byType(EditableText), tooLong);
+    await tester.pump();
+    await tester.tap(_save);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Используйте не более 4096 символов.'), findsOneWidget);
+    expect(_editedText(tester), tooLong);
+    expect(harness.repository.sentPatches, isEmpty);
+  });
+
+  testWidgets('отказ записи описания выполненного выбора остаётся в панели '
+      'с введённым текстом, и сохранение снова доступно', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final harness = await _openSheet(tester);
+    final repository = harness.repository;
+    repository.emit(_details(isCompleted: true));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Пояснение'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(EditableText), 'Новое');
+    await tester.pump();
+    await tester.tap(_save);
+    await tester.pump();
+    repository.failCommand(const DailyChoiceUnavailableFailure());
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TopBar), findsOneWidget);
+    expect(find.text(_commandFailure), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
+    expect(_editedText(tester), 'Новое');
+    expect(tester.getSemantics(_save), isSemantics(isEnabled: true));
+    semantics.dispose();
+  });
 }
 
 const _commandFailure =
@@ -1116,6 +1296,19 @@ Finder _fieldButton(String label) => find.descendant(
 ].single;
 
 final _check = find.bySemanticsLabel(RegExp('^Выполнение выбора'));
+final _save = find.bySemanticsLabel('Сохранить');
+final _back = find.bySemanticsLabel('Назад к дневному выбору');
+const _expand = 'Раскрыть панель дневного выбора';
+const _collapse = 'Свернуть панель дневного выбора';
+
+Rect _sheetRect(WidgetTester tester) => tester.getRect(find.byType(Sheet));
+
+/// Весь экран теста: строки состояния в нём нет.
+Rect _fullScreen(WidgetTester tester) =>
+    Offset.zero & tester.view.physicalSize / tester.view.devicePixelRatio;
+
+String _editedText(WidgetTester tester) =>
+    tester.widget<EditableText>(find.byType(EditableText)).controller.text;
 final _options = find.bySemanticsLabel('Параметры дневного выбора');
 
 TextDecoration? _actionDecoration(WidgetTester tester) =>

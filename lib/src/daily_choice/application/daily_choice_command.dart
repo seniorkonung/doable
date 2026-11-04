@@ -84,6 +84,16 @@ final class DailyChoiceFieldSet<T extends Object>
 
 sealed class DailyChoiceDescriptionPatch {
   const DailyChoiceDescriptionPatch();
+
+  /// Полностью пробельный ввод очищает описание, а остальной сохраняется
+  /// целиком. Недопустимый ввод бросает
+  /// [DailyChoiceDescriptionValidationException].
+  static DailyChoiceDescriptionPatch fromInput(String input) {
+    final description = DailyChoiceDescription.fromInput(input);
+    return description == null
+        ? const DailyChoiceDescriptionCleared()
+        : DailyChoiceDescriptionSet(description);
+  }
 }
 
 final class DailyChoiceDescriptionUnchanged

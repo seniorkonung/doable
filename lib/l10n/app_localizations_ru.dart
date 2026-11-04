@@ -3003,6 +3003,28 @@ class AppLocalizationsRu extends AppLocalizations {
       'В пути есть архивированные намерения или связи.';
 
   @override
+  String get dailyChoiceSheetDescriptionTitle => 'Описание';
+
+  @override
+  String get dailyChoiceSheetDescriptionBack => 'Назад к дневному выбору';
+
+  @override
+  String get dailyChoiceSheetDescriptionSave => 'Сохранить';
+
+  @override
+  String get dailyChoiceSheetDescriptionDiscardTitle => 'Отменить изменения?';
+
+  @override
+  String get dailyChoiceSheetDescriptionDiscardMessage =>
+      'Изменения описания не сохранятся.';
+
+  @override
+  String get dailyChoiceSheetDescriptionDiscardAction => 'Отменить';
+
+  @override
+  String get dailyChoiceSheetDescriptionContinueAction => 'Продолжить правку';
+
+  @override
   String get dailyChoiceFieldDate => 'Дата';
 
   @override

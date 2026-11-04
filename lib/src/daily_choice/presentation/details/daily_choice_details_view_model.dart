@@ -39,16 +39,21 @@ final class DailyChoiceDetailsViewModel extends ChangeNotifier {
     _observe();
   }
 
-  void change(DailyChoiceFieldsPatch patch) {
-    if (!_canStartOperation) return;
-    unawaited(
-      _run(
-        _coordinator.acceptDailyChoiceUpdate(
-          UpdateDailyChoiceFields(choiceId: _id, patch: patch),
-        ),
-        _Change.new,
+  /// Возвращает успех только собственной подтверждённой записи; новое значение
+  /// приходит из подписки.
+  Future<bool> change(DailyChoiceFieldsPatch patch) async {
+    if (!_canStartOperation) return false;
+    final completion = await _run(
+      _coordinator.acceptDailyChoiceUpdate(
+        UpdateDailyChoiceFields(choiceId: _id, patch: patch),
       ),
+      _Change.new,
     );
+    return switch (completion?.result) {
+      GraphResultSuccess(value: DailyChoiceFieldsUpdated(:final choice)) =>
+        choice.id == _id,
+      _ => false,
+    };
   }
 
   /// Возвращает успех только собственной принятой команды удаления.

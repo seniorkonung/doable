@@ -4582,6 +4582,48 @@ abstract class AppLocalizations {
   /// **'The path contains archived intentions or relations.'**
   String get dailyChoiceSheetPathArchivedNote;
 
+  /// Заголовок полосы изменения описания дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get dailyChoiceSheetDescriptionTitle;
+
+  /// Доступное название стрелки назад из изменения описания дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the daily choice'**
+  String get dailyChoiceSheetDescriptionBack;
+
+  /// Кнопка сохранения описания дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get dailyChoiceSheetDescriptionSave;
+
+  /// Вопрос перед уходом с несохранённым описанием дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Discard changes?'**
+  String get dailyChoiceSheetDescriptionDiscardTitle;
+
+  /// Пояснение вопроса перед уходом с несохранённым описанием дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Your changes to the description won’t be saved.'**
+  String get dailyChoiceSheetDescriptionDiscardMessage;
+
+  /// Действие, которое отменяет изменение описания дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get dailyChoiceSheetDescriptionDiscardAction;
+
+  /// Действие, которое возвращает к изменению описания дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get dailyChoiceSheetDescriptionContinueAction;
+
   /// Название поля даты дневного выбора
   ///
   /// In en, this message translates to:

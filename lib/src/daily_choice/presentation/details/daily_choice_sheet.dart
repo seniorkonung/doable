@@ -9,6 +9,7 @@ import '../../../app/routing/app_router.gr.dart';
 import '../../../design_system/components/badge.dart';
 import '../../../design_system/components/choice_head.dart';
 import '../../../design_system/components/choice_path.dart';
+import '../../../design_system/components/confirm_dialog.dart';
 import '../../../design_system/components/half_pinned_sliver.dart';
 import '../../../design_system/components/list_state.dart';
 import '../../../design_system/components/notice.dart';
@@ -18,6 +19,7 @@ import '../../../design_system/components/reason_chain.dart';
 import '../../../design_system/components/sheet.dart';
 import '../../../design_system/components/tabs.dart';
 import '../../../design_system/components/text_field.dart';
+import '../../../design_system/components/top_bar.dart';
 import '../../../design_system/doable_colors.dart';
 import '../../../design_system/doable_icon.dart';
 import '../../../design_system/doable_metrics.dart';
@@ -30,6 +32,7 @@ import '../../../long_term_relation/domain/long_term_relation.dart';
 import '../../../long_term_relation/presentation/details/relation_details_sheet.dart';
 import '../../application/daily_choice_command.dart';
 import '../../application/daily_choice_details.dart';
+import '../../domain/daily_choice_description.dart';
 import '../../domain/daily_choice_id.dart';
 import '../daily_choice_command_failure_message.dart';
 import 'daily_choice_delete_confirmation.dart';
@@ -53,6 +56,11 @@ import 'daily_choice_field_labels.dart';
 /// полю за запись. Отказ стоит над содержимым обеих вкладок и остаётся за
 /// панелью, пока она открыта, даже перекрытая страницей.
 ///
+/// Описание меняется под полосой: вместо вкладок над полем стоит шапка выбора
+/// без параметров, а сохранение — отдельная запись одного описания. Уход с
+/// несохранёнными правками, в том числе закрытие панели, спрашивает
+/// подтверждение.
+///
 /// Подтверждённое удаление из меню закрывает панель, и до конца закрытия она
 /// показывает прежнее содержимое с выключенными флажком и параметрами. Панель,
 /// перекрытая в этот момент, остаётся открытой и показывает, что выбора нет.
@@ -69,6 +77,13 @@ enum _ChoiceTab { overview, path }
 
 enum _ChoiceOption { edit, delete }
 
+/// Открытое изменение описания: текст при открытии и отказ проверки введённого
+/// текста, который живёт до следующего ввода.
+typedef _DescriptionEdit = ({
+  String opened,
+  DailyChoiceDescriptionValidationReason? invalid,
+});
+
 /// Содержимое панели выбора; показывает его [showDailyChoiceSheet].
 final class DailyChoiceSheet extends ConsumerStatefulWidget {
   const DailyChoiceSheet(this.sheet, {required this.choiceId, super.key});
@@ -82,8 +97,14 @@ final class DailyChoiceSheet extends ConsumerStatefulWidget {
 
 final class _DailyChoiceSheetState extends ConsumerState<DailyChoiceSheet> {
   late final DailyChoiceDetailsViewModel _model;
+  final _descriptionController = TextEditingController();
+  final _descriptionFocus = FocusNode();
+
+  /// Поле описания вместе с отказом проверки под ним.
+  final _descriptionKey = GlobalKey();
 
   var _tab = _ChoiceTab.overview;
+  _DescriptionEdit? _edit;
 
   /// Собственное удаление подтвердилось, когда панель была перекрыта, и она
   /// осталась открытой без выбора.
@@ -101,8 +122,92 @@ final class _DailyChoiceSheetState extends ConsumerState<DailyChoiceSheet> {
 
   @override
   void dispose() {
+    _descriptionController.dispose();
+    _descriptionFocus.dispose();
     _model.dispose();
     super.dispose();
+  }
+
+  void _openDescription(String text) {
+    _descriptionController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    setState(() => _edit = (opened: text, invalid: null));
+  }
+
+  /// Возвращает «Обзор», с какой бы вкладки ни началось изменение.
+  void _closeDescription() => setState(() {
+    _edit = null;
+    _tab = _ChoiceTab.overview;
+  });
+
+  void _changeDescription(_DescriptionEdit edit) =>
+      setState(() => _edit = (opened: edit.opened, invalid: null));
+
+  bool _isChanged(_DescriptionEdit edit) =>
+      _descriptionController.text != edit.opened;
+
+  /// Неверный ввод и отказ записи оставляют текст в поле: первый показан у
+  /// поля, второй — отказом панели.
+  Future<void> _saveDescription(_DescriptionEdit edit) async {
+    final DailyChoiceDescriptionPatch description;
+    try {
+      description = DailyChoiceDescriptionPatch.fromInput(
+        _descriptionController.text,
+      );
+    } on DailyChoiceDescriptionValidationException catch (exception) {
+      setState(
+        () => _edit = (opened: edit.opened, invalid: exception.failure.reason),
+      );
+      _revealInvalid();
+      return;
+    }
+    final saved = await _model.change(
+      DailyChoiceFieldsPatch(description: description),
+    );
+    if (saved && mounted) _closeDescription();
+  }
+
+  /// Прокручивает к отказу проверки после его кадра: под длинным текстом или
+  /// над клавиатурой он оказался бы вне видимой части.
+  ///
+  /// Фокус снимается, иначе вернувшаяся клавиатура прокрутит обратно к каретке.
+  void _revealInvalid() {
+    _descriptionFocus.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final field = _descriptionKey.currentContext;
+      if (!mounted || field == null) return;
+      unawaited(
+        Scrollable.ensureVisible(
+          field,
+          alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+        ),
+      );
+    });
+  }
+
+  Future<bool> _confirmDiscard() {
+    final localizations = AppLocalizations.of(context);
+    return showDiscardDialog(
+      context: context,
+      title: localizations.dailyChoiceSheetDescriptionDiscardTitle,
+      text: localizations.dailyChoiceSheetDescriptionDiscardMessage,
+      discardLabel: localizations.dailyChoiceSheetDescriptionDiscardAction,
+      keepLabel: localizations.dailyChoiceSheetDescriptionContinueAction,
+    );
+  }
+
+  /// Стрелка возвращает «Обзор», а изменённый текст уходит только после ответа.
+  Future<void> _leaveDescription(_DescriptionEdit edit) async {
+    if (_isChanged(edit) && !await _confirmDiscard()) return;
+    if (mounted) _closeDescription();
+  }
+
+  Future<void> _closeSheetAfterDiscard() async {
+    if (await _confirmDiscard() && mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
   Future<void> _showOptions() async {
@@ -162,12 +267,46 @@ final class _DailyChoiceSheetState extends ConsumerState<DailyChoiceSheet> {
     final localizations = AppLocalizations.of(context);
     return ListenableBuilder(
       listenable: _model,
-      builder: (context, _) => Sheet.expandableUntitled(
+      builder: (context, _) => _buildSheet(localizations),
+    );
+  }
+
+  Widget _buildSheet(AppLocalizations localizations) {
+    final state = _model.state;
+    // Выбор, которого больше нет или который не прочитан, изменять нечего.
+    final edit =
+        state is DailyChoiceDetailsLoaded && state.details.path.isNotEmpty
+        ? _edit
+        : null;
+    final isRunning = _model.operation is DailyChoiceDetailsOperationWriting;
+    final isChanged = edit != null && _isChanged(edit);
+    return PopScope<void>(
+      // Во время сохранения запись продолжится и без панели, а её отказ
+      // предъявит общая поверхность.
+      canPop: !isChanged || isRunning,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) unawaited(_closeSheetAfterDiscard());
+      },
+      child: Sheet.expandableUntitled(
         widget.sheet,
         label: localizations.dailyChoiceDetailsTitle,
         expandLabel: localizations.dailyChoiceSheetExpand,
         collapseLabel: localizations.dailyChoiceSheetCollapse,
-        slivers: switch (_model.state) {
+        bar: edit == null
+            ? null
+            : TopBar.withButton(
+                context,
+                title: localizations.dailyChoiceSheetDescriptionTitle,
+                backLabel: localizations.dailyChoiceSheetDescriptionBack,
+                onBack: isRunning
+                    ? null
+                    : () => unawaited(_leaveDescription(edit)),
+                buttonLabel: localizations.dailyChoiceSheetDescriptionSave,
+                onButtonPressed: isChanged && !isRunning
+                    ? () => unawaited(_saveDescription(edit))
+                    : null,
+              ),
+        slivers: switch (state) {
           DailyChoiceDetailsLoading() => [
             _StateSliver(
               ListState.loading(text: localizations.dailyChoiceDetailsLoading),
@@ -201,10 +340,12 @@ final class _DailyChoiceSheetState extends ConsumerState<DailyChoiceSheet> {
             ),
           ],
           DailyChoiceDetailsCorruption() => [_corruption(localizations)],
+          DailyChoiceDetailsLoaded(:final details) when edit != null =>
+            _description(localizations, details, edit, isRunning: isRunning),
           DailyChoiceDetailsLoaded(:final details) => _choice(
             localizations,
             details,
-            writable: _model.operation is! DailyChoiceDetailsOperationWriting,
+            writable: !isRunning,
           ),
         },
       ),
@@ -223,9 +364,11 @@ final class _DailyChoiceSheetState extends ConsumerState<DailyChoiceSheet> {
       HalfPinnedSliver(
         child: _ChoiceHeader(
           details: details,
-          tab: _tab,
-          onTabChange: (tab) => setState(() => _tab = tab),
-          onOptions: writable ? () => unawaited(_showOptions()) : null,
+          browsing: (
+            tab: _tab,
+            onTabChange: (tab) => setState(() => _tab = tab),
+            onOptions: writable ? () => unawaited(_showOptions()) : null,
+          ),
           onToggle: writable
               ? () => _model.change(
                   DailyChoiceFieldsPatch(
@@ -246,12 +389,66 @@ final class _DailyChoiceSheetState extends ConsumerState<DailyChoiceSheet> {
             details: details,
             enabled: writable,
             onChange: _model.change,
+            onOpenDescription: _openDescription,
           ),
         ],
         _ChoiceTab.path => [_Path(details: details)],
       },
     ];
   }
+
+  /// Шапка без вкладок и параметров над полем описания; флажок выключен, пока
+  /// изменение занимает панель.
+  List<Widget> _description(
+    AppLocalizations localizations,
+    DailyChoiceDetails details,
+    _DescriptionEdit edit, {
+    required bool isRunning,
+  }) => [
+    HalfPinnedSliver(
+      child: _ChoiceHeader(details: details, browsing: null, onToggle: null),
+    ),
+    if (_model.operation case final DailyChoiceDetailsOperationFailed operation)
+      _OperationFailureNotice(operation),
+    SliverPadding(
+      padding: const EdgeInsets.fromLTRB(
+        DoableMetrics.space5,
+        DoableMetrics.space3,
+        DoableMetrics.space5,
+        0,
+      ),
+      sliver: SliverToBoxAdapter(
+        child: KeyedSubtree(
+          key: _descriptionKey,
+          child: TextField.multiline(
+            controller: _descriptionController,
+            focusNode: _descriptionFocus,
+            placeholder: localizations.detailsAddDescription,
+            label: localizations.dailyChoiceSheetDescriptionTitle,
+            minLines: _descriptionMinLines,
+            maxLines: _descriptionMaxLines,
+            autofocus: true,
+            readOnly: isRunning,
+            onChanged: (_) => _changeDescription(edit),
+            error: switch (edit.invalid) {
+              DailyChoiceDescriptionValidationReason.tooLong => Text(
+                localizations.editorDescriptionTooLong,
+              ),
+              DailyChoiceDescriptionValidationReason.invalidUnicodeRepertoire =>
+                Text(localizations.editorDescriptionInvalidUnicode),
+              DailyChoiceDescriptionValidationReason.absent => Text(
+                localizations.dailyChoiceDescriptionInvalid,
+              ),
+              null => null,
+            },
+          ),
+        ),
+      ),
+    ),
+  ];
+
+  static const _descriptionMinLines = 5;
+  static const _descriptionMaxLines = 13;
 
   Widget _notFound(AppLocalizations localizations) => _StateSliver(
     ListState.error(message: localizations.dailyChoiceDetailsNotFound),
@@ -332,24 +529,29 @@ final class _OperationFailureNoticeState
   );
 }
 
+/// Вкладки под шапкой и параметры в ней; без [onOptions] параметры выключены.
+typedef _Browsing = ({
+  _ChoiceTab tab,
+  ValueChanged<_ChoiceTab> onTabChange,
+  VoidCallback? onOptions,
+});
+
 /// Шапка выбора и вкладки. Тело проходит под закреплённым срезом, поэтому фон
 /// непрозрачный.
 final class _ChoiceHeader extends StatelessWidget {
   const _ChoiceHeader({
     required this.details,
-    required this.tab,
-    required this.onTabChange,
+    required this.browsing,
     required this.onToggle,
-    required this.onOptions,
   });
 
   final DailyChoiceDetails details;
-  final _ChoiceTab tab;
-  final ValueChanged<_ChoiceTab> onTabChange;
+
+  /// Без него шапка стоит над полем описания: без вкладок и параметров.
+  final _Browsing? browsing;
 
   /// Переключает выполнение; без него флажок выключен.
   final VoidCallback? onToggle;
-  final VoidCallback? onOptions;
 
   @override
   Widget build(BuildContext context) {
@@ -359,6 +561,7 @@ final class _ChoiceHeader extends StatelessWidget {
     final priority = dailyChoiceDesignPriority(choice.priority);
     final steps = details.path.length;
     final hasArchive = _hasArchive(details);
+    final browsing = this.browsing;
     return ColoredBox(
       color: colors.raised,
       child: Column(
@@ -392,38 +595,44 @@ final class _ChoiceHeader extends StatelessWidget {
                     )
                   : null,
               actionBadge: _archiveBadge(localizations, details.selected),
-              options: onOptions == null
-                  ? ChoiceHeadOptions.unavailable(
-                      label: localizations.dailyChoiceSheetOptionsLabel,
-                    )
-                  : ChoiceHeadOptions.available(
-                      label: localizations.dailyChoiceSheetOptionsLabel,
-                      onOpen: onOptions!,
-                    ),
+              options: browsing == null
+                  ? const ChoiceHeadOptions.none()
+                  : switch (browsing.onOptions) {
+                      final onOpen? => ChoiceHeadOptions.available(
+                        label: localizations.dailyChoiceSheetOptionsLabel,
+                        onOpen: onOpen,
+                      ),
+                      null => ChoiceHeadOptions.unavailable(
+                        label: localizations.dailyChoiceSheetOptionsLabel,
+                      ),
+                    },
             ),
           ),
-          Tabs(
-            plane: TabsPlane.sheet,
-            label: localizations.dailyChoiceSheetTabsLabel,
-            value: tab,
-            onChange: onTabChange,
-            items: [
-              TabItem(
-                id: _ChoiceTab.overview,
-                label: localizations.detailsOverviewTab,
-                semanticLabel: localizations.detailsOverviewTab,
-              ),
-              TabItem(
-                id: _ChoiceTab.path,
-                label: localizations.dailyChoiceSheetPathTab,
-                semanticLabel: hasArchive
-                    ? localizations.dailyChoiceSheetPathTabArchivedLabel(steps)
-                    : localizations.dailyChoiceSheetPathTabLabel(steps),
-                count: steps,
-                icon: hasArchive ? DoableIconData.archive : null,
-              ),
-            ],
-          ),
+          if (browsing != null)
+            Tabs(
+              plane: TabsPlane.sheet,
+              label: localizations.dailyChoiceSheetTabsLabel,
+              value: browsing.tab,
+              onChange: browsing.onTabChange,
+              items: [
+                TabItem(
+                  id: _ChoiceTab.overview,
+                  label: localizations.detailsOverviewTab,
+                  semanticLabel: localizations.detailsOverviewTab,
+                ),
+                TabItem(
+                  id: _ChoiceTab.path,
+                  label: localizations.dailyChoiceSheetPathTab,
+                  semanticLabel: hasArchive
+                      ? localizations.dailyChoiceSheetPathTabArchivedLabel(
+                          steps,
+                        )
+                      : localizations.dailyChoiceSheetPathTabLabel(steps),
+                  count: steps,
+                  icon: hasArchive ? DoableIconData.archive : null,
+                ),
+              ],
+            ),
         ],
       ),
     );
@@ -546,6 +755,7 @@ final class _Overview extends StatelessWidget {
     required this.details,
     required this.enabled,
     required this.onChange,
+    required this.onOpenDescription,
   });
 
   final DailyChoiceDetails details;
@@ -556,6 +766,9 @@ final class _Overview extends StatelessWidget {
   /// Каждый выбор значения — отдельная запись одного поля.
   final ValueChanged<DailyChoiceFieldsPatch> onChange;
 
+  /// Открывает изменение описания с сохранённым текстом.
+  final ValueChanged<String> onOpenDescription;
+
   /// Вместе с нижним полем полосы вкладок даёт 6 под областью их нажатия.
   static const double _top = 2;
 
@@ -563,6 +776,7 @@ final class _Overview extends StatelessWidget {
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final choice = details.choice;
+    final description = choice.description?.value;
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(
         DoableMetrics.space5,
@@ -574,15 +788,20 @@ final class _Overview extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (choice.description case final description?) ...[
-              TextField.saved(
-                value: description.value,
-                placeholder: localizations.detailsAddDescription,
-                label: description.value,
-                onOpen: null,
-              ),
-              const SizedBox(height: DoableMetrics.space2),
-            ],
+            TextField.saved(
+              value: description ?? '',
+              placeholder: localizations.detailsAddDescription,
+              label: switch (description) {
+                final description? => localizations.detailsEditDescriptionLabel(
+                  description,
+                ),
+                null => localizations.detailsAddDescription,
+              },
+              onOpen: enabled
+                  ? () => onOpenDescription(description ?? '')
+                  : null,
+            ),
+            const SizedBox(height: DoableMetrics.space2),
             DailyChoiceDetailFields(
               date: choice.date,
               schedule: choice.schedule,
