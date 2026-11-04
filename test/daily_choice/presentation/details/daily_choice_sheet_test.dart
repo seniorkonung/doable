@@ -797,14 +797,19 @@ void main() {
     semantics.dispose();
   });
 
-  for (final use24HourFormat in [false, true]) {
-    testWidgets('час на циферблате ${use24HourFormat ? "24" : "12"}-часового '
-        'устройства записывается временем без минут, а панель остаётся '
-        'открытой', (tester) async {
-      tester.platformDispatcher.alwaysUse24HourFormatTestValue =
-          use24HourFormat;
-      addTearDown(tester.platformDispatcher.clearAlwaysUse24HourTestValue);
-      final harness = await _openSheet(tester);
+  for (final (locale, use24HourFormat, clock, shown) in [
+    (const Locale('ru'), false, '24-часовом', '18:00'),
+    (const Locale('en'), false, '12-часовом', '6:00 PM'),
+    (const Locale('en'), true, '24-часовом', '18:00'),
+  ]) {
+    testWidgets('час на $clock циферблате (локаль $locale, 24-часовое время '
+        '${use24HourFormat ? "включено" : "выключено"}) записывается временем '
+        'без минут, а панель остаётся открытой', (tester) async {
+      final harness = await _openSheet(
+        tester,
+        locale: locale,
+        use24HourFormat: use24HourFormat,
+      );
       final repository = harness.repository;
       repository.emit(_details());
       await tester.pumpAndSettle();
@@ -820,7 +825,7 @@ void main() {
       repository.emit(_details(schedule: DailyChoiceTime(hour: 18, minute: 0)));
       await tester.pumpAndSettle();
 
-      expect(find.text('18:00'), findsOneWidget);
+      expect(find.text(shown), findsOneWidget);
       expect(find.byType(Sheet), findsOneWidget);
       expect(find.byType(SnackBar), findsNothing);
     });
@@ -1439,6 +1444,7 @@ final class _Harness {
 Future<_Harness> _openSheet(
   WidgetTester tester, {
   Locale locale = const Locale('ru'),
+  bool use24HourFormat = false,
 }) async {
   final repository = _Repository();
   addTearDown(repository.dispose);
@@ -1453,8 +1459,13 @@ Future<_Harness> _openSheet(
       ],
       child: OrdinaryPageTestApp(
         locale: locale,
-        builder: (_, child) =>
-            GraphOperationPresenter(child: child ?? const SizedBox.shrink()),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(alwaysUse24HourFormat: use24HourFormat),
+          child: GraphOperationPresenter(
+            child: child ?? const SizedBox.shrink(),
+          ),
+        ),
         home: Scaffold(
           body: Builder(
             builder: (context) => TextButton(

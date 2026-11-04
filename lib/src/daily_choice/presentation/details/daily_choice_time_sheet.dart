@@ -57,10 +57,10 @@ final class _DailyChoiceTimeSheet extends StatelessWidget {
     );
   }
 
-  /// Формат циферблата следует настройке 24-часового времени устройства, а
+  /// Формат циферблата следует итоговому формату часов устройства и локали, а
   /// 12-часовой открывается на половине суток текущего времени.
   TimeDialClock _clock(BuildContext context, AppLocalizations localizations) {
-    if (MediaQuery.alwaysUse24HourFormatOf(context)) {
+    if (!dailyChoiceUsesTwelveHourClock(context)) {
       return const TimeDialClock24();
     }
     final material = MaterialLocalizations.of(context);

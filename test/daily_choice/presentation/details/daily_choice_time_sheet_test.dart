@@ -124,22 +124,32 @@ void main() {
     expect(app.result, DailyChoiceTime(hour: 18, minute: 0));
   });
 
-  testWidgets('на 12-часовом устройстве доступные названия часов собирает та '
-      'же функция подписи, что и поле «Время»', (tester) async {
-    final handle = tester.ensureSemantics();
-    final app = await _pump(
-      tester,
-      DailyChoiceTime(hour: 18, minute: 0),
-      use24HourFormat: false,
-      language: 'en',
-    );
-    await app.open(tester);
+  for (final (language, isTwelveHour, selected, other, allDay) in [
+    ('ru', false, '18:00', '19:00', 'Весь день'),
+    ('en', true, '6:00 PM', '7:00 PM', 'All day'),
+  ]) {
+    testWidgets('при выключенном 24-часовом времени формат циферблата в '
+        'локали $language совпадает с подписями часов, которые собирает та же '
+        'функция, что и поле «Время»', (tester) async {
+      final handle = tester.ensureSemantics();
+      final app = await _pump(
+        tester,
+        DailyChoiceTime(hour: 18, minute: 0),
+        use24HourFormat: false,
+        language: language,
+      );
+      await app.open(tester);
 
-    expect(_isSelected(tester, '6:00 PM'), Tristate.isTrue);
-    expect(_isSelected(tester, '7:00 PM'), Tristate.isFalse);
-    expect(_isSelected(tester, 'All day'), Tristate.isFalse);
-    handle.dispose();
-  });
+      expect(
+        tester.widget<TimeDial>(find.byType(TimeDial)).clock,
+        isTwelveHour ? isA<TimeDialClock12>() : isA<TimeDialClock24>(),
+      );
+      expect(_isSelected(tester, selected), Tristate.isTrue);
+      expect(_isSelected(tester, other), Tristate.isFalse);
+      expect(_isSelected(tester, allDay), Tristate.isFalse);
+      handle.dispose();
+    });
+  }
 }
 
 Tristate _isSelected(WidgetTester tester, String label) => tester

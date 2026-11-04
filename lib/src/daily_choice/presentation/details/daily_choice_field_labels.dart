@@ -45,6 +45,19 @@ String dailyChoiceTimeValue(
   ).format(context),
 };
 
+/// Показывает ли формат часов дневных выборов половину суток.
+///
+/// Единственное место выбора формата: итоговый формат складывается из
+/// настройки 24-часового времени устройства и шаблона локали, как у
+/// [TimeOfDay.format], на котором стоят поле «Время» и все подписи часов.
+bool dailyChoiceUsesTwelveHourClock(BuildContext context) =>
+    hourFormat(
+      of: MaterialLocalizations.of(context).timeOfDayFormat(
+        alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+      ),
+    ) ==
+    HourFormat.h;
+
 DoablePriority dailyChoiceDesignPriority(DailyChoicePriority priority) =>
     switch (priority) {
       DailyChoicePriority.p1 => DoablePriority.p1,
