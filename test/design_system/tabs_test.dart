@@ -329,6 +329,73 @@ void main() {
     });
   }
 
+  testWidgets('переключатель — ряд равных пилюль без полосы: наименьшая '
+      'ширина, подпись по центру, нажатая кнопка объявлена включённой', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    var half = 'am';
+    await tester.pumpWidget(
+      _app(
+        Brightness.light,
+        StatefulBuilder(
+          builder: (context, setState) => Tabs(
+            semantics: TabsSemantics.toggle,
+            minWidth: 64,
+            label: 'До или после полудня',
+            value: half,
+            items: const [
+              TabItem(id: 'am', label: 'AM', semanticLabel: 'До полудня'),
+              TabItem(id: 'pm', label: 'PM', semanticLabel: 'После полудня'),
+            ],
+            onChange: (next) => setState(() => half = next),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(SingleChildScrollView), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(Tabs<String>),
+        matching: find.byType(DecoratedBox),
+      ),
+      findsNothing,
+    );
+    expect(tester.getSize(find.byType(Tabs<String>)).height, 44);
+    expect(
+      tester.getRect(_pill('PM')).right - tester.getRect(_pill('AM')).left,
+      132,
+    );
+    for (final label in ['AM', 'PM']) {
+      expect(tester.getSize(_pill(label)), const Size(64, 36));
+      expect(
+        tester.getCenter(find.text(label)),
+        tester.getCenter(_pill(label)),
+      );
+    }
+    void expectToggle(String label, {required bool on}) {
+      final data = tester
+          .getSemantics(find.bySemanticsLabel(label))
+          .getSemanticsData();
+      expect(data.role, isNot(SemanticsRole.tab));
+      expect(data.flagsCollection.isButton, isTrue);
+      expect(
+        data.flagsCollection.isToggled,
+        on ? Tristate.isTrue : Tristate.isFalse,
+      );
+      expect(data.flagsCollection.isSelected, Tristate.none);
+    }
+
+    expectToggle('До полудня', on: true);
+    expectToggle('После полудня', on: false);
+    await tester.tap(find.text('PM'));
+    await tester.pumpAndSettle();
+    expectToggle('До полудня', on: false);
+    expectToggle('После полудня', on: true);
+    semantics.dispose();
+  });
+
   testWidgets('показ выбранной вкладки не сдвигает вертикальную прокрутку '
       'страницы при открытии и смене вкладки', (tester) async {
     final pageScroll = ScrollController(initialScrollOffset: 40);
