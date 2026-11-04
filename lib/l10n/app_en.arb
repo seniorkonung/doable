@@ -2226,6 +2226,8 @@
   "@dailyChoiceFieldTime": {"description": "Название поля времени дневного выбора"},
   "dailyChoiceFieldDateLabel": "Date: {date}",
   "@dailyChoiceFieldDateLabel": {"description": "Доступное название поля даты с полным значением", "placeholders": {"date": {"type": "String"}}},
+  "dailyChoiceDateSheetLabel": "Daily choice date",
+  "@dailyChoiceDateSheetLabel": {"description": "Доступное название листа даты дневного выбора"},
   "dailyChoiceTimeSheetLabel": "Daily choice time",
   "@dailyChoiceTimeSheetLabel": {"description": "Доступное название листа времени дневного выбора"},
   "dailyChoiceTimeHalfSwitchLabel": "Half of the day",

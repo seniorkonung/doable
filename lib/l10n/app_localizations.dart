@@ -4600,6 +4600,12 @@ abstract class AppLocalizations {
   /// **'Date: {date}'**
   String dailyChoiceFieldDateLabel(String date);
 
+  /// Доступное название листа даты дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice date'**
+  String get dailyChoiceDateSheetLabel;
+
   /// Доступное название листа времени дневного выбора
   ///
   /// In en, this message translates to:

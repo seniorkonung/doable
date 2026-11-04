@@ -3014,6 +3014,9 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get dailyChoiceDateSheetLabel => 'Дата дневного выбора';
+
+  @override
   String get dailyChoiceTimeSheetLabel => 'Время дневного выбора';
 
   @override

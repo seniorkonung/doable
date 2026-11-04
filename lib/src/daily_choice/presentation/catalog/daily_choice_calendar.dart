@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../../../l10n/app_localizations.dart';
@@ -13,6 +12,7 @@ import '../../application/daily_choice_day_statuses.dart';
 import '../../domain/calendar_date.dart';
 import 'daily_choice_calendar_day.dart';
 import 'daily_choice_calendar_expansion.dart';
+import 'daily_choice_calendar_labels.dart';
 import 'daily_choice_calendar_paging.dart';
 import 'daily_choice_calendar_period_picker.dart';
 import 'daily_choice_calendar_viewport.dart';
@@ -207,7 +207,7 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           CalendarHeader(
-            title: _monthTitle(context, viewport.focusedDate),
+            title: dailyChoiceCalendarMonthTitle(context, viewport.focusedDate),
             previousLabel: localizations.dailyChoiceCalendarPreviousMonth,
             nextLabel: localizations.dailyChoiceCalendarNextMonth,
             onPrevious: _hasPreviousMonth(viewport.focusedDate)
@@ -494,7 +494,9 @@ final class _DailyChoiceCalendarState extends State<DailyChoiceCalendar>
   /// свой день недели, поэтому подпись колонки не читается отдельно.
   Widget _buildWeekday(BuildContext context, DateTime day) {
     return ExcludeSemantics(
-      child: MonthGridWeekday(text: _weekdayLabel(context, day)),
+      child: MonthGridWeekday(
+        text: dailyChoiceCalendarWeekdayLabel(context, day),
+      ),
     );
   }
 
@@ -565,12 +567,6 @@ const _unavailableDay = SizedBox.expand(
 double _columnWidth(double width) =>
     (width / DateTime.daysPerWeek).floorToDouble();
 
-String _weekdayLabel(BuildContext context, DateTime day) {
-  final label = DateFormat.E(Localizations.localeOf(context).toLanguageTag())
-      .format(day);
-  return label[0].toUpperCase() + label.substring(1);
-}
-
 /// Высота строки названий дней недели, в которую каждое название при ширине
 /// колонки [columnWidth] помещается целиком, при необходимости с переносом.
 double _weekdayHeight(BuildContext context, {required double columnWidth}) {
@@ -580,7 +576,7 @@ double _weekdayHeight(BuildContext context, {required double columnWidth}) {
     context,
     texts: [
       for (var offset = 0; offset < DateTime.daysPerWeek; offset++)
-        _weekdayLabel(
+        dailyChoiceCalendarWeekdayLabel(
           context,
           DateTime.utc(monday.year, monday.month, monday.day + offset),
         ),
@@ -616,13 +612,3 @@ bool _hasPreviousMonth(CalendarDate focusedDate) =>
 
 bool _hasNextMonth(CalendarDate focusedDate) =>
     _lastDay.isAfter(DateTime.utc(focusedDate.year, focusedDate.month + 1, 0));
-
-String _monthTitle(BuildContext context, CalendarDate date) {
-  // L — самостоятельная форма названия месяца, без суффикса года:
-  // https://pub.dev/documentation/intl/latest/intl/DateFormat-class.html
-  final title = DateFormat(
-    'LLLL y',
-    Localizations.localeOf(context).toLanguageTag(),
-  ).format(_technicalDate(date));
-  return title[0].toUpperCase() + title.substring(1);
-}

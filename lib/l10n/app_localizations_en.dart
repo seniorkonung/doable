@@ -2985,6 +2985,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get dailyChoiceDateSheetLabel => 'Daily choice date';
+
+  @override
   String get dailyChoiceTimeSheetLabel => 'Daily choice time';
 
   @override

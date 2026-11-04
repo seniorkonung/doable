@@ -864,6 +864,7 @@
   "dailyChoiceFieldDate": "Дата",
   "dailyChoiceFieldTime": "Время",
   "dailyChoiceFieldDateLabel": "Дата: {date}",
+  "dailyChoiceDateSheetLabel": "Дата дневного выбора",
   "dailyChoiceTimeSheetLabel": "Время дневного выбора",
   "dailyChoiceTimeHalfSwitchLabel": "Половина суток",
   "dailyChoiceTimeAmLabel": "До полудня",
