@@ -14,6 +14,7 @@ import 'package:doable/src/daily_choice/presentation/details/daily_choice_sheet.
 import 'package:doable/src/design_system/components/choice_head.dart';
 import 'package:doable/src/design_system/components/choice_path.dart' as ui;
 import 'package:doable/src/design_system/components/detail_row.dart';
+import 'package:doable/src/design_system/components/half_pinned_sliver.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/components/tabs.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -177,7 +178,120 @@ void main() {
     expect(find.byType(DetailRow), findsNothing);
     semantics.dispose();
   });
+
+  testWidgets('поле описания с кареткой видно над клавиатурой под высокой '
+      'шапкой, а шапка уходит вместе с полем и достижима целиком', (
+    tester,
+  ) async {
+    await _useExtremeScreen(tester);
+    final semantics = tester.ensureSemantics();
+    await _openSheet(
+      tester,
+      _details(
+        sourceTitle: _maxTitle('основа'),
+        middleTitle: _maxTitle('середина'),
+        actionTitle: _maxTitle('действие'),
+        archived: true,
+      ),
+    );
+    await _openDescription(tester, 'Пояснение');
+    _openKeyboard(tester);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(EditableText), _enteredDescription);
+    await tester.pumpAndSettle();
+
+    expect(_headerHeight(tester), greaterThan(_list(tester).height / 2));
+    _expectCaretVisible(tester);
+    _expectFieldKept(tester);
+    for (final pixels in [0.0, 120.0]) {
+      _body(tester).jumpTo(pixels);
+      await tester.pump();
+      expect(
+        tester.getTopLeft(_head).dy,
+        closeTo(_list(tester).top - pixels, 0.01),
+      );
+    }
+    await _expectWholeTextReachable(tester, [
+      _maxTitle('основа'),
+      _maxTitle('действие'),
+      'Архив',
+    ]);
+    _expectFieldKept(tester);
+    semantics.dispose();
+  });
+
+  testWidgets('открытие и закрытие клавиатуры переводят шапку через порог '
+      'закрепления в обе стороны, а текст и фокус поля остаются', (
+    tester,
+  ) async {
+    _useScreen(tester, const Size(390, 844));
+    final semantics = tester.ensureSemantics();
+    await _openSheet(
+      tester,
+      _details(
+        sourceTitle: _maxTitle('основа'),
+        actionTitle: _maxTitle('действие'),
+      ),
+    );
+    await _openDescription(tester, 'Пояснение');
+    await tester.enterText(find.byType(EditableText), _enteredDescription);
+    await tester.pumpAndSettle();
+    expect(_headerHeight(tester), lessThan(_list(tester).height / 2));
+    expect(_pinnedExtent(tester), _headerHeight(tester));
+
+    _openKeyboard(tester);
+    await tester.pumpAndSettle();
+
+    expect(_headerHeight(tester), greaterThan(_list(tester).height / 2));
+    expect(_pinnedExtent(tester), 0);
+    _expectCaretVisible(tester);
+    _expectFieldKept(tester);
+
+    tester.view.resetViewInsets();
+    await tester.pumpAndSettle();
+
+    expect(_headerHeight(tester), lessThan(_list(tester).height / 2));
+    expect(_pinnedExtent(tester), _headerHeight(tester));
+    _expectCaretVisible(tester);
+    _expectFieldKept(tester);
+    semantics.dispose();
+  });
+
+  testWidgets('шапка не выше порога закреплена над полем и не закрывает '
+      'каретку в начале прокрученного текста', (tester) async {
+    _useScreen(tester, const Size(360, 720));
+    final semantics = tester.ensureSemantics();
+    await _openSheet(tester, _details());
+    await tester.tap(find.text('Пояснение'));
+    await tester.pumpAndSettle();
+    _openKeyboard(tester);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(EditableText), _manyLines);
+    await tester.pumpAndSettle();
+    final head = tester.getTopLeft(_head);
+    expect(_headerHeight(tester), lessThan(_list(tester).height / 2));
+    expect(_body(tester).pixels, greaterThan(0));
+
+    tester.testTextInput.updateEditingValue(
+      TextEditingValue(
+        text: _manyLines,
+        selection: TextSelection.collapsed(offset: 0),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.getTopLeft(_head), head);
+    _expectCaretVisible(tester);
+    semantics.dispose();
+  });
 }
+
+const _keyboard = 300.0;
+
+const _enteredDescription = 'Новое описание';
+
+final _manyLines = List.generate(20, (line) => 'строка $line').join('\n');
 
 const _statusBar = 24.0;
 
@@ -200,9 +314,12 @@ final _tabs = find.byWidgetPredicate(
 final _expand = find.bySemanticsLabel('Раскрыть панель дневного выбора');
 final _collapse = find.bySemanticsLabel('Свернуть панель дневного выбора');
 
-Rect _list(WidgetTester tester) => tester.getRect(
-  find.descendant(of: _sheet, matching: find.byType(CustomScrollView)),
+final _listFinder = find.descendant(
+  of: _sheet,
+  matching: find.byType(CustomScrollView),
 );
+
+Rect _list(WidgetTester tester) => tester.getRect(_listFinder);
 
 ScrollPosition _body(WidgetTester tester) => tester
     .state<ScrollableState>(
@@ -210,8 +327,60 @@ ScrollPosition _body(WidgetTester tester) => tester
     )
     .position;
 
+/// Шапка вместе с вкладками, а при изменении описания вкладок нет.
 double _headerHeight(WidgetTester tester) =>
-    tester.getBottomLeft(_tabs).dy - tester.getTopLeft(_head).dy;
+    _headerBottom(tester) - tester.getTopLeft(_head).dy;
+
+double _headerBottom(WidgetTester tester) =>
+    tester.getBottomLeft(_tabs.evaluate().isEmpty ? _head : _tabs).dy;
+
+/// Высота, которую закреплённая шапка закрывает над телом; 0, пока шапка
+/// прокручивается вместе с ним.
+double _pinnedExtent(WidgetTester tester) => tester
+    .renderObject<RenderHalfPinnedSliver>(find.byType(HalfPinnedSliver))
+    .geometry!
+    .maxScrollObstructionExtent;
+
+/// Под высокой шапкой описание сначала нужно прокрутить в видимую часть.
+Future<void> _openDescription(WidgetTester tester, String description) async {
+  final text = find.text(description, skipOffstage: false);
+  await tester.ensureVisible(text);
+  await tester.pumpAndSettle();
+  await tester.tap(text);
+  await tester.pumpAndSettle();
+}
+
+void _openKeyboard(WidgetTester tester) =>
+    tester.view.viewInsets = const FakeViewPadding(bottom: _keyboard);
+
+/// Каретка видна в списке над клавиатурой и не стоит под шапкой.
+void _expectCaretVisible(WidgetTester tester) {
+  final editable = tester
+      .state<EditableTextState>(find.byType(EditableText))
+      .renderEditable;
+  final caret = MatrixUtils.transformRect(
+    editable.getTransformTo(null),
+    editable.getLocalRectForCaret(editable.selection!.extent),
+  );
+  final list = _list(tester);
+  final keyboardTop =
+      tester.view.physicalSize.height / tester.view.devicePixelRatio -
+      tester.view.viewInsets.bottom / tester.view.devicePixelRatio;
+  expect(list.bottom, lessThanOrEqualTo(keyboardTop));
+  expect(
+    caret.top,
+    greaterThanOrEqualTo(math.max(list.top, _headerBottom(tester))),
+  );
+  expect(caret.bottom, lessThanOrEqualTo(list.bottom));
+}
+
+void _expectFieldKept(WidgetTester tester) {
+  final field = tester.widget<EditableText>(
+    find.byType(EditableText, skipOffstage: false),
+  );
+  expect(field.controller.text, _enteredDescription);
+  expect(field.focusNode.hasFocus, isTrue);
+}
 
 /// Экран ниже границы поддержки 360×720, но выше компактного предела, поэтому
 /// у панели остаются оба размера. Шрифт — наибольший системный на Android.
@@ -259,7 +428,7 @@ Rect _rectOf(RenderParagraph paragraph) => MatrixUtils.transformRect(
 
 /// Прокручивает тело шагами, не больше видимой части, и проверяет, что каждый
 /// текст открылся по всей высоте. Текст в шапке виден в области списка, а
-/// текст тела — только под вкладками: закреплённая шапка его закрывает.
+/// текст тела — только под шапкой с вкладками: закреплённая шапка его закрывает.
 Future<void> _expectWholeTextReachable(
   WidgetTester tester,
   List<String> texts,
@@ -267,7 +436,7 @@ Future<void> _expectWholeTextReachable(
   final body = _body(tester);
   body.jumpTo(0);
   await tester.pump();
-  final paragraphs = _paragraphs(tester, _sheet);
+  final paragraphs = _paragraphs(tester, _listFinder);
   expect(
     paragraphs.map((paragraph) => paragraph.text.toPlainText()),
     containsAll(texts),
@@ -283,7 +452,7 @@ Future<void> _expectWholeTextReachable(
     body.jumpTo(math.min(pixels, body.maxScrollExtent));
     await tester.pump();
     final list = _list(tester);
-    final tabsBottom = tester.getBottomLeft(_tabs).dy;
+    final headerBottom = _headerBottom(tester);
     for (final paragraph in paragraphs) {
       final rect = _rectOf(paragraph);
       if (!inTabs.contains(paragraph)) {
@@ -295,7 +464,7 @@ Future<void> _expectWholeTextReachable(
         rect.top,
         inHeader.contains(paragraph)
             ? list.top
-            : math.max(list.top, tabsBottom),
+            : math.max(list.top, headerBottom),
       );
       final bottom = math.min(rect.bottom, list.bottom);
       if (bottom > top && top - rect.top <= reached[paragraph]!) {
