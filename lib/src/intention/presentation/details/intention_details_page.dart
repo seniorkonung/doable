@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/navigation/ordinary_page_scaffold.dart';
-import '../../../app/navigation/relation_picker_position.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../daily_choice/application/choice_path_draft.dart';
 import '../../../daily_choice/domain/calendar_date.dart';
@@ -32,7 +31,6 @@ import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
 import '../edit/intention_edit_page.dart';
 import '../../../long_term_relation/application/relation_counts.dart';
-import '../../../long_term_relation/presentation/batch_picker/relation_batch_page_footer.dart';
 import '../../../long_term_relation/presentation/details/relation_details_sheet.dart';
 import '../../../long_term_relation/presentation/intention_relations/intention_relations_sliver.dart';
 import '../../../long_term_relation/presentation/intention_relations/intention_relations_state.dart';
@@ -54,15 +52,11 @@ final class IntentionDetailsPage extends ConsumerStatefulWidget {
   const IntentionDetailsPage({
     required this.intentionId,
     this.target = const OverviewTarget(),
-    this.batchRow,
     super.key,
   });
 
   final IntentionId intentionId;
   final IntentionPageTarget target;
-
-  /// Есть только у страницы, открытой стрелкой поиска участника.
-  final RelationBatchRowContext? batchRow;
 
   @override
   ConsumerState<IntentionDetailsPage> createState() =>
@@ -486,16 +480,6 @@ final class _IntentionDetailsPageState
           ],
         ),
       ),
-      pickerFooter: switch (widget.batchRow) {
-        null => null,
-        final row => RelationBatchPageFooter(
-          row: row,
-          intentionId: intentionId,
-          intention: details is IntentionDetailsLoaded
-              ? details.intention
-              : null,
-        ),
-      },
     );
   }
 }
@@ -674,7 +658,6 @@ final class _LoadedDetails extends StatelessWidget {
     final localizations = AppLocalizations.of(context);
     final intention = state.intention;
     final isActive = intention.archiveState == IntentionArchiveState.active;
-    final canStartNewFlow = !isAboveRelationPicker(context);
     return CustomScrollView(
       controller: scrollController,
       slivers: [
@@ -793,16 +776,14 @@ final class _LoadedDetails extends StatelessWidget {
                 // Создание дневного выбора не изменяет намерение, поэтому
                 // изменяющая операция его не выключает: недопустимое начало
                 // отклоняет модель пути.
-                onAddAsSource: isActive && canStartNewFlow
+                onAddAsSource: isActive
                     ? () => _startChoicePath(
                         context,
                         ChoicePathDraftDirection.topDown,
                       )
                     : null,
                 onAddAsSelected:
-                    isActive &&
-                        canStartNewFlow &&
-                        intention.readiness == IntentionReadiness.ready
+                    isActive && intention.readiness == IntentionReadiness.ready
                     ? () => _startChoicePath(
                         context,
                         ChoicePathDraftDirection.bottomUp,
@@ -825,17 +806,15 @@ final class _LoadedDetails extends StatelessWidget {
                     ),
                   ),
                 ),
-                onAdd: !canStartNewFlow
-                    ? null
-                    : (group) => unawaited(
-                        context.router.push(
-                          RelationBatchPickerRoute(
-                            pageIntentionId: intention.id,
-                            pageTitle: intention.title,
-                            group: group,
-                          ),
-                        ),
-                      ),
+                onAdd: (group) => unawaited(
+                  context.router.push(
+                    RelationBatchPickerRoute(
+                      pageIntentionId: intention.id,
+                      pageTitle: intention.title,
+                      group: group,
+                    ),
+                  ),
+                ),
               ),
           ],
         ),

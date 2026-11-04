@@ -3185,13 +3185,4 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get batchContinueAction => 'Continue selecting';
-
-  @override
-  String get batchPageAdd => 'Add to selected';
-
-  @override
-  String get batchPageRemove => 'Remove from selected';
-
-  @override
-  String get batchPageArchived => 'Intention is archived';
 }

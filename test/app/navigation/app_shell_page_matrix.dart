@@ -80,7 +80,7 @@ enum _MatrixEntry {
 }
 
 void _registerPageMatrixTests() {
-  testWidgets('страницы над поиском сохраняют отметку и скрывают действия', (
+  testWidgets('страницы над поиском показывают панель и сохраняют отметку', (
     tester,
   ) async {
     await _start(tester);
@@ -115,22 +115,25 @@ void _registerPageMatrixTests() {
     );
     await _until(tester, find.byType(IntentionDetailsPage));
     await tester.pumpAndSettle();
-    expect(find.byType(AppNavigationBar), findsNothing);
-    expect(find.byType(DockedFooter), findsOneWidget);
+    expect(find.byType(AppNavigationBar), findsOneWidget);
+    expect(find.byType(DockedFooter), findsNothing);
     await openIntentionChoicesTab(tester, waitFor: _until, tap: _tap);
-    expect(intentionChoicesAdd, findsNothing);
+    expect(intentionChoicesAdd, findsOneWidget);
     await _tap(
       tester,
       find.byKey(const ValueKey('intention-choices-role-selected')),
     );
-    expect(intentionChoicesAdd, findsNothing);
+    expect(intentionChoicesAdd, findsOneWidget);
     await _tap(tester, find.text('Relations').first);
     await _tap(
       tester,
       find.byKey(const ValueKey('intention-relations-group-neededFor')),
     );
     await _until(tester, _relationRow);
-    expect(find.byKey(const ValueKey('intention-relations-add')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('intention-relations-add')),
+      findsOneWidget,
+    );
     await _tap(
       tester,
       find.descendant(
@@ -143,12 +146,15 @@ void _registerPageMatrixTests() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byType(AppNavigationBar), findsNothing);
+    expect(find.byType(AppNavigationBar), findsOneWidget);
     expect(find.byType(DockedFooter), findsNothing);
-    expect(find.byKey(const ValueKey('intention-relations-add')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('intention-relations-add')),
+      findsOneWidget,
+    );
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.byType(AppNavigationBar), findsNothing);
+    expect(find.byType(AppNavigationBar), findsOneWidget);
     await tester.binding.handlePopRoute();
     await _until(tester, find.byType(RelationBatchPickerPage));
     expect(find.text('Add 1 relation'), findsOneWidget);
@@ -163,7 +169,7 @@ void _registerPageMatrixTests() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('дневной выбор и каталог на дату над поиском скрывают панель', (
+  testWidgets('дневной выбор и каталог на дату над поиском показывают панель', (
     tester,
   ) async {
     final router = await _start(tester);
@@ -183,14 +189,14 @@ void _registerPageMatrixTests() {
     unawaited(router.push(DailyChoiceDetailsRoute(choiceId: choiceId)));
     await _until(tester, find.byType(DailyChoiceDetailsPage));
     await tester.pumpAndSettle();
-    expect(find.byType(AppNavigationBar), findsNothing);
+    expect(find.byType(AppNavigationBar), findsOneWidget);
     unawaited(router.push(DailyChoiceDateCatalogRoute(date: _choiceDate)));
     await _until(tester, find.byType(DailyChoiceDateCatalogPage));
     await tester.pumpAndSettle();
-    expect(find.byType(AppNavigationBar), findsNothing);
+    expect(find.byType(AppNavigationBar), findsOneWidget);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.byType(AppNavigationBar), findsNothing);
+    expect(find.byType(AppNavigationBar), findsOneWidget);
     await tester.binding.handlePopRoute();
     await _until(tester, find.byType(RelationBatchPickerPage));
     await _tap(tester, find.byKey(const ValueKey('participant-picker-cancel')));

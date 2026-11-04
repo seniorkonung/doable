@@ -28,6 +28,7 @@ import 'package:doable/src/intention/presentation/details/intention_options.dart
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_row.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter/material.dart';
@@ -456,6 +457,176 @@ void main() {
     },
   );
 
+  for (final complete in [true, false]) {
+    testWidgets(
+      complete
+          ? 'вложенная связь сохраняется при добавлении оставшихся отметок'
+          : 'вложенная связь сохраняется при сбросе первоначальных отметок',
+      (tester) async {
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        tester.binding.platformDispatcher.localesTestValue = const [
+          Locale('ru'),
+        ];
+        addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+        tester.view.physicalSize = const Size(1200, 6000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final l10n = lookupAppLocalizations(const Locale('ru'));
+        final storage = (await tester.runAsync(
+          LocalDatabaseHarness.fileBacked,
+        ))!;
+        await tester.runAsync(() async {
+          final db = await storage.openReadyDatabase();
+          await seedGraph(db, () async {
+            for (final (id, title) in [
+              (1, _healthy),
+              (2, _walk),
+              (3, _swim),
+              (4, _sleep),
+            ]) {
+              await db.customStatement(
+                'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, ?, ?)',
+                [_id(id), title, id, id],
+              );
+            }
+            await db.customStatement(
+              'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, 4, 0, 0, 0)',
+              [_id(101), _id(2), _id(1), 'need'],
+            );
+          });
+          await storage.closePersistenceObjectGraph();
+        });
+        final runtime = _fileRuntime(
+          storage,
+          diagnostics: InMemoryDiagnosticsSink(),
+        );
+        addTearDown(() async {
+          await tester.pumpWidget(const SizedBox.shrink());
+          await runtime.shutdown();
+          await storage.dispose();
+        });
+        await tester.pumpWidget(MainApp(runtime: runtime));
+        await openIntentionGraph(tester, waitFor: _pumpUntilFound);
+        final repository = (await runtime.bootstrap() as AppRuntimeReady)
+            .container
+            .read(personalGraphRepositoryProvider);
+        await _pumpUntilFound(tester, find.text(_healthy));
+        await _openIntention(tester, _healthy);
+        await _chooseDetailsTab(tester, l10n.detailsRelationsTab);
+        await _tapWhenFound(
+          tester,
+          find.byKey(const ValueKey('intention-relations-add')),
+        );
+        for (final title in [_sleep, _swim, _walk]) {
+          await _tapWhenFound(
+            tester,
+            find.descendant(of: _pickerRow(title), matching: find.text(title)),
+          );
+        }
+        await _pumpUntilFound(tester, find.text(l10n.batchAddCount(3)));
+        final filter = find.byKey(const ValueKey('participant-picker-filter'));
+        await tester.enterText(filter, _walk);
+        await tester.pumpAndSettle();
+        expect(_pickerRow(_swim), findsNothing);
+        await _tapPickerArrow(tester, _walk);
+        await _pumpUntilDetailsTitle(tester, _walk);
+        await _chooseDetailsTab(tester, l10n.detailsRelationsTab);
+        await _tapWhenFound(
+          tester,
+          _relationRow(l10n.relationNeighborhoodNeedPhrase(_walk, _healthy)),
+        );
+        await _pumpUntilRelationSheet(
+          tester,
+          l10n.relationNeighborhoodNeedPhrase(_walk, _healthy),
+        );
+        await _tapWhenFound(
+          tester,
+          _inRelationSheet(
+            find.bySemanticsLabel(l10n.relationSheetOpenParticipant(_healthy)),
+          ),
+        );
+        await _pumpUntilDetailsTitle(tester, _healthy);
+        await _chooseDetailsTab(tester, l10n.detailsRelationsTab);
+        await _tapWhenFound(
+          tester,
+          find.byKey(const ValueKey('intention-relations-add')),
+        );
+        await _tapWhenFound(
+          tester,
+          find.descendant(of: _pickerRow(_swim), matching: find.text(_swim)),
+        );
+        await _tapWhenFound(tester, find.text(l10n.batchAddCount(1)));
+        await _pumpUntilDetailsTitle(tester, _healthy);
+        await tester.binding.handlePopRoute();
+        await _pumpUntilRelationSheet(
+          tester,
+          l10n.relationNeighborhoodNeedPhrase(_walk, _healthy),
+        );
+        await _closeRelationSheet(tester);
+        await tester.binding.handlePopRoute();
+        await _pumpUntilFound(tester, find.text(l10n.batchAddCount(2)));
+
+        expect(find.text('Добавить в "Нужно" · выбрано 2'), findsOneWidget);
+        await tester.tap(find.text('Добавить в "Нужно" · выбрано 2'));
+        await tester.pumpAndSettle();
+        expect(find.byTooltip('Снять отметку: $_swim'), findsNothing);
+        final sleepMark = find.byTooltip('Снять отметку: $_sleep');
+        final walkMark = find.byTooltip('Снять отметку: $_walk');
+        expect(sleepMark, findsOneWidget);
+        expect(walkMark, findsOneWidget);
+        expect(
+          tester.getTopLeft(sleepMark).dy,
+          lessThan(tester.getTopLeft(walkMark).dy),
+        );
+        await tester.tap(find.text('Вернуться к списку'));
+        await tester.pumpAndSettle();
+        await tester.enterText(filter, '');
+        await _pumpUntilFound(tester, _pickerRow(_swim));
+        expect(_pickerMarks(tester, l10n, _swim), [
+          l10n.relationPairAlreadyAdded,
+        ]);
+
+        if (complete) {
+          await _tapWhenFound(tester, find.text(l10n.batchAddCount(2)));
+        } else {
+          await _tapWhenFound(
+            tester,
+            find.byKey(const ValueKey('participant-picker-cancel')),
+          );
+          await _pumpUntilFound(
+            tester,
+            find.text('Сбросить выбранные намерения?'),
+          );
+          await _tapWhenFound(tester, find.text('Сбросить'));
+        }
+        await _pumpUntilAbsent(tester, find.byType(RelationBatchPickerPage));
+        final ownerId =
+            (IntentionId.decode(_id(1)) as IntentionIdDecodingSuccess).id;
+        final result = await tester.runAsync(
+          () => repository.getRelationGroupPage(
+            RelationGroupQuery(
+              intentionId: ownerId,
+              type: LongTermRelationType.need,
+              direction: RelationDirection.outgoing,
+              scope: RelationScope.active,
+              pageSize: 10,
+            ),
+          ),
+        );
+        expect(result, isA<RelationGroupPageSuccess>());
+        final page =
+            (result as RelationGroupPageSuccess).value
+                as RelationGroupFirstPage;
+        expect(
+          page.items.map((item) => item.neighbor.title),
+          complete ? [_swim, _sleep, _walk] : [_swim],
+        );
+      },
+    );
+  }
+
   testWidgets('пачка из исходящей и входящей групп сохраняет порядок, '
       'обновляет участников и переживает повторное открытие', (tester) async {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
@@ -690,22 +861,20 @@ void main() {
       await _pumpUntilFound(tester, find.text(l10n.batchAddCount(1)));
       await _tapPickerArrow(tester, _sleep);
       await _pumpUntilDetailsTitle(tester, _sleep);
-      await _pumpUntilFound(tester, find.text(l10n.batchPageRemove));
 
       await _chooseIntentionOption(tester, IntentionOption.archive);
-      await _pumpUntilFound(tester, find.text(l10n.batchPageArchived));
-      final disabled = find.ancestor(
-        of: find.text(l10n.batchPageArchived),
-        matching: find.byType(FilledButton),
-      );
-      expect(tester.widget<FilledButton>(disabled).onPressed, isNull);
-
+      await _pumpUntilFound(tester, intentionHeadRestore);
       await _dismissOperationMessage(tester);
       await _tapWhenFound(tester, intentionHeadRestore);
-      await _pumpUntilFound(tester, find.text(l10n.batchPageAdd));
+      await _pumpUntilAbsent(tester, intentionHeadRestore);
       await _dismissOperationMessage(tester);
-      await _tapWhenFound(tester, find.text(l10n.batchPageAdd));
+      await tester.binding.handlePopRoute();
       await _pumpUntilAbsent(tester, find.byType(IntentionDetailsPage));
+      await _pumpUntilFound(tester, find.text(l10n.batchAddNone));
+      await _tapWhenFound(
+        tester,
+        find.descendant(of: _pickerRow(_sleep), matching: find.text(_sleep)),
+      );
       await _pumpUntilFound(tester, find.text(l10n.batchAddCount(1)));
     },
   );

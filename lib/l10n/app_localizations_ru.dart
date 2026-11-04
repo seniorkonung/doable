@@ -3213,13 +3213,4 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get batchContinueAction => 'Продолжить выбор';
-
-  @override
-  String get batchPageAdd => 'Добавить к выбранным';
-
-  @override
-  String get batchPageRemove => 'Убрать из выбранных';
-
-  @override
-  String get batchPageArchived => 'Намерение в архиве';
 }
