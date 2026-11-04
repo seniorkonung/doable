@@ -1,36 +1,38 @@
 /// Общие шаги подтверждения создания дневного выбора.
 ///
 /// Сценарий называет намерение человека: дождаться готового подтверждения,
-/// задать дату или приоритет, прочитать показанные значения. Какими полями
-/// страница их показывает, знает только этот файл, поэтому смена полей
-/// страницы не меняет сценарии.
+/// задать дату или приоритет, прочитать показанные значения. Подтверждение
+/// показывает общий блок полей, поэтому шаги идут через шаги этого блока.
 library;
 
-import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
-import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
-import 'package:flutter/material.dart';
+import 'package:doable/src/daily_choice/presentation/details/daily_choice_detail_fields.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'app_root_pages.dart';
-
-/// Поле даты: пока оно не показано, подтверждение не готово к вводу.
-Finder get _dateField => find.byKey(const ValueKey('daily-choice-date'));
+import 'daily_choice_detail_fields_controls.dart';
 
 /// Дожидается готового подтверждения создания.
 ///
+/// Подтверждение готово, когда его поля показаны и страница завершила
+/// переход: пока страница въезжает, нажатие по её полям не попадает в них.
 /// [waitFor] — ожидание сценария; по умолчанию [pumpUntilFound].
 Future<void> awaitDailyChoiceConfirmation(
   WidgetTester tester, {
   RootPageWait waitFor = pumpUntilFound,
-}) => waitFor(tester, _dateField);
+}) async {
+  await waitFor(tester, dailyChoiceDetailFields);
+  await tester.pumpAndSettle();
+}
 
-/// Задаёт создаваемому выбору [date]. Подтверждение уже готово.
+/// Задаёт создаваемому выбору [date]. Подтверждение уже готово. [tap]
+/// нажимает поле «Дата».
 Future<void> setDailyChoiceCreationDate(
   WidgetTester tester,
-  CalendarDate date,
-) => tester.enterText(_dateField, date.toCanonicalString());
+  CalendarDate date, {
+  RootPageTap tap = tapWhenFound,
+}) => setDailyChoiceDate(tester, date, tap: tap);
 
 /// Задаёт создаваемому выбору [priority]. Подтверждение уже готово. [tap]
 /// нажимает выбранный вариант.
@@ -38,27 +40,14 @@ Future<void> setDailyChoiceCreationPriority(
   WidgetTester tester,
   DailyChoicePriority priority, {
   RootPageTap tap = tapWhenFound,
-}) => tap(tester, _priorityOption(tester, priority));
+}) => setDailyChoicePriority(tester, priority, tap: tap);
 
 /// Дата и приоритет, которые подтверждение показывает сейчас.
 ({CalendarDate date, DailyChoicePriority priority}) shownDailyChoiceCreation(
   WidgetTester tester,
-) => (
-  date: CalendarDate.parseCanonical(
-    tester.widget<TextField>(_dateField).controller!.text,
-  ),
-  priority: DailyChoicePriority.values.singleWhere(
-    (priority) =>
-        tester.widget<ChoiceChip>(_priorityOption(tester, priority)).selected,
-  ),
-);
-
-Finder _priorityOption(WidgetTester tester, DailyChoicePriority priority) {
-  final l10n = AppLocalizations.of(
-    tester.element(find.byType(DailyChoiceCreationPage)),
+) {
+  final fields = tester.widget<DailyChoiceDetailFields>(
+    dailyChoiceDetailFields,
   );
-  return find.widgetWithText(
-    ChoiceChip,
-    l10n.dailyChoicePriorityOption(priority.name.toUpperCase()),
-  );
+  return (date: fields.date, priority: fields.priority);
 }

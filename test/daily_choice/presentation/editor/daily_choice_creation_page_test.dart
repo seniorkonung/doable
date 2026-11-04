@@ -6,6 +6,7 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
@@ -13,10 +14,14 @@ import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
+import 'package:doable/src/daily_choice/presentation/details/daily_choice_detail_fields.dart';
 import 'package:doable/src/daily_choice/presentation/daily_choice_creation_flow_session.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_view_model.dart';
+import 'package:doable/src/design_system/components/button.dart';
+import 'package:doable/src/design_system/components/detail_row.dart';
+import 'package:doable/src/design_system/components/time_dial.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -32,6 +37,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/daily_choice_creation_controls.dart';
+import '../../../support/daily_choice_detail_fields_controls.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 
@@ -42,47 +49,49 @@ void main() {
     );
   });
 
-  testWidgets('неполное время и отмена сохраняют весь день и P4', (
-    tester,
-  ) async {
-    final repository = _Repository();
-    await _pump(tester, repository);
-    await _tapVisible(tester, find.text('Указать время'));
-    await _enterTime(tester, '18', '');
-    await _closeTimePicker(tester, confirm: true);
-    expect(find.byType(AlertDialog), findsOneWidget);
-    await _enterTime(tester, '-1', '60');
-    await _closeTimePicker(tester, confirm: true);
-    expect(find.byType(AlertDialog), findsOneWidget);
-    await _enterTime(tester, '24', '-1');
-    await _closeTimePicker(tester, confirm: true);
-    expect(find.byType(AlertDialog), findsOneWidget);
-    await _closeTimePicker(tester, confirm: false);
-    expect(find.text('Весь день'), findsOneWidget);
-
-    await _tapVisible(
-      tester,
-      find.byKey(const ValueKey('daily-choice-submit')),
-    );
-    expect(repository.commands.single.schedule, const DailyChoiceAllDay());
-    expect(repository.commands.single.priority, DailyChoicePriority.p4);
-  });
-
   testWidgets(
-    'подтверждённые время и приоритет сохраняются при отмене правки',
+    'новый выбор начинается с даты входа, «Весь день» и P4, а закрытие листа '
+    'времени без выбора их не меняет',
     (tester) async {
       final repository = _Repository();
       await _pump(tester, repository);
-      await _tapVisible(tester, find.text('Указать время'));
-      await _enterTime(tester, '18', '00');
-      await _closeTimePicker(tester, confirm: true);
-      await _tapVisible(tester, find.text('Приоритет P2'));
+      expect(shownDailyChoiceCreation(tester), (
+        date: CalendarDate.fromParts(2026, 9, 24),
+        priority: DailyChoicePriority.p4,
+      ));
 
-      await _tapVisible(tester, find.text('Время: 18:00'));
-      await _enterTime(tester, '19', '30');
-      await _closeTimePicker(tester, confirm: false);
-      expect(find.text('Время: 18:00'), findsOneWidget);
-      expect(find.text('Время: 19:30'), findsNothing);
+      await _tapVisible(tester, _timeField);
+      expect(find.byType(TimeDial), findsOneWidget);
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+      expect(find.byType(TimeDial), findsNothing);
+      expect(find.text('Весь день'), findsOneWidget);
+
+      await _tapVisible(
+        tester,
+        find.byKey(const ValueKey('daily-choice-submit')),
+      );
+      expect(
+        repository.commands.single.date,
+        CalendarDate.fromParts(2026, 9, 24),
+      );
+      expect(repository.commands.single.schedule, const DailyChoiceAllDay());
+      expect(repository.commands.single.priority, DailyChoicePriority.p4);
+    },
+  );
+
+  testWidgets(
+    'подтверждённые время и приоритет сохраняются при закрытии листа времени',
+    (tester) async {
+      final repository = _Repository();
+      await _pump(tester, repository);
+      await setDailyChoiceHour(tester, 18);
+      await setDailyChoicePriority(tester, DailyChoicePriority.p2);
+
+      await _tapVisible(tester, _timeField);
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+      expect(find.text('18:00'), findsOneWidget);
       await _tapVisible(
         tester,
         find.byKey(const ValueKey('daily-choice-submit')),
@@ -95,83 +104,32 @@ void main() {
     },
   );
 
-  testWidgets('крупный текст и смена локали сохраняют доступный черновик', (
-    tester,
-  ) async {
-    tester.view
-      ..physicalSize = const Size(360, 720)
-      ..devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    final semantics = tester.ensureSemantics();
+  testWidgets('смена локали сохраняет выбранные поля', (tester) async {
     final locale = ValueNotifier(const Locale('ru'));
     addTearDown(locale.dispose);
     final repository = _Repository();
-    await _pump(tester, repository, localeChanges: locale, textScale: 2);
+    await _pump(tester, repository, localeChanges: locale);
 
-    await _tapVisible(tester, find.text('Указать время'));
-    tester.view.viewInsets = const FakeViewPadding(bottom: 280);
-    addTearDown(tester.view.resetViewInsets);
-    await tester.pumpAndSettle();
-    await _enterTime(tester, '', '');
-    await _closeTimePicker(tester, confirm: true);
-    expect(find.byType(AlertDialog), findsOneWidget);
-    await _enterTime(tester, '18', '00');
-    await _closeTimePicker(tester, confirm: true);
-    tester.view.resetViewInsets();
-    await tester.pumpAndSettle();
-    await _reveal(tester, find.text('Время: 18:00'));
-    expect(
-      tester.getSemantics(find.text('Время: 18:00')),
-      matchesSemantics(
-        label: 'Время: 18:00',
-        isButton: true,
-        hasEnabledState: true,
-        isEnabled: true,
-        hasSelectedState: true,
-        isSelected: true,
-        isFocusable: true,
-        hasTapAction: true,
-        hasFocusAction: true,
-      ),
-    );
-    await _tapVisible(tester, find.text('Приоритет P1'));
-    expect(tester.takeException(), isNull);
+    await setDailyChoiceHour(tester, 18);
+    await setDailyChoicePriority(tester, DailyChoicePriority.p1);
 
     locale.value = const Locale('en');
     await tester.pumpAndSettle();
-    await _reveal(tester, find.text('Priority P1'));
-    expect(
-      tester.getSemantics(find.text('Priority P1')),
-      matchesSemantics(
-        label: 'Priority P1',
-        isButton: true,
-        hasEnabledState: true,
-        isEnabled: true,
-        hasSelectedState: true,
-        isSelected: true,
-        isFocusable: true,
-        hasTapAction: true,
-        hasFocusAction: true,
-      ),
-    );
-    await _tapVisible(tester, find.text('Time: 18:00'));
-    await _closeTimePicker(tester, confirm: false);
-    expect(tester.takeException(), isNull);
+    expect(shownDailyChoiceCreation(tester), (
+      date: CalendarDate.fromParts(2026, 9, 24),
+      priority: DailyChoicePriority.p1,
+    ));
+    await _reveal(tester, find.text('18:00'));
+    expect(find.text('18:00'), findsOneWidget);
     await _tapVisible(
       tester,
       find.byKey(const ValueKey('daily-choice-submit')),
-    );
-    expect(
-      repository.commands.single.date,
-      CalendarDate.fromParts(2026, 9, 24),
     );
     expect(
       repository.commands.single.schedule,
       DailyChoiceTime(hour: 18, minute: 0),
     );
     expect(repository.commands.single.priority, DailyChoicePriority.p1);
-    semantics.dispose();
   });
 
   // Исход и состояние формы при позднем результате независимы: диагональ
@@ -228,13 +186,12 @@ void main() {
       await _reveal(tester, find.byKey(const ValueKey('daily-choice-submit')));
       await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
       await tester.pump();
-      await _reveal(tester, find.byKey(const ValueKey('daily-choice-date')));
-      expect(find.byKey(const ValueKey('daily-choice-date')), findsOneWidget);
+      expect(dailyChoiceDetailFields, findsOneWidget);
       expect(find.text('Домашний экран'), findsNothing);
       expect(repository.commands, hasLength(1));
       repository.succeed(0);
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('daily-choice-date')), findsNothing);
+      expect(dailyChoiceDetailFields, findsNothing);
       expect(find.text('Домашний экран'), findsOneWidget);
       expect(find.textContaining('Дневной выбор создан'), findsOneWidget);
     },
@@ -326,17 +283,14 @@ void main() {
     await _pump(tester, repository, navigatorKey: navigatorKey);
     const descriptionKey = ValueKey('daily-choice-description');
     const submitKey = ValueKey('daily-choice-submit');
-    final semantics = tester.ensureSemantics();
 
-    await tester.enterText(
-      find.byKey(const ValueKey('daily-choice-date')),
-      '2026-09-25',
+    await setDailyChoiceCreationDate(
+      tester,
+      CalendarDate.fromParts(2026, 9, 25),
     );
     await tester.enterText(find.byKey(descriptionKey), 'Первый текст');
-    await _tapVisible(tester, find.text('Указать время'));
-    await _enterTime(tester, '00', '00');
-    await _closeTimePicker(tester, confirm: true);
-    await _tapVisible(tester, find.text('Приоритет P2'));
+    await setDailyChoiceHour(tester, 0);
+    await setDailyChoiceCreationPriority(tester, DailyChoicePriority.p2);
     await _reveal(tester, find.byKey(const ValueKey('daily-choice-completed')));
     await _tapVisible(
       tester,
@@ -358,19 +312,12 @@ void main() {
       DailyChoiceTime(hour: 0, minute: 0),
     );
     expect(repository.commands.single.priority, DailyChoicePriority.p2);
-    await _tapVisible(tester, find.textContaining('0:00'));
-    expect(find.byType(AlertDialog), findsNothing);
-    await _tapVisible(tester, find.text('Весь день'));
-    await _tapVisible(tester, find.text('Приоритет P3'));
     expect(
-      tester.getSemantics(find.text('Приоритет P3')),
-      matchesSemantics(
-        label: 'Приоритет P3',
-        isButton: true,
-        hasEnabledState: true,
-        hasSelectedState: true,
-      ),
+      tester.widget<DailyChoiceDetailFields>(dailyChoiceDetailFields).enabled,
+      isFalse,
     );
+    await _tapVisible(tester, _timeField);
+    expect(find.byType(TimeDial), findsNothing);
     expect(
       tester.widget<TextField>(find.byKey(descriptionKey)).enabled,
       isFalse,
@@ -387,6 +334,10 @@ void main() {
     repository.fail(0, const DailyChoiceUnavailableFailure());
     await tester.pumpAndSettle();
     expect(
+      tester.widget<DailyChoiceDetailFields>(dailyChoiceDetailFields).enabled,
+      isTrue,
+    );
+    expect(
       tester.widget<TextField>(find.byKey(descriptionKey)).enabled,
       isTrue,
     );
@@ -394,10 +345,14 @@ void main() {
       tester.widget<TextField>(find.byKey(descriptionKey)).controller!.text,
       'Первый текст',
     );
+    expect(shownDailyChoiceCreation(tester), (
+      date: CalendarDate.fromParts(2026, 9, 25),
+      priority: DailyChoicePriority.p2,
+    ));
 
     await tester.enterText(find.byKey(descriptionKey), 'Исправленный текст');
-    await _tapVisible(tester, find.text('Весь день'));
-    await _tapVisible(tester, find.text('Приоритет P3'));
+    await setDailyChoiceAllDay(tester);
+    await setDailyChoiceCreationPriority(tester, DailyChoicePriority.p3);
     await _reveal(tester, find.byKey(submitKey));
     await tester.tap(find.byKey(submitKey));
     await tester.pump();
@@ -415,7 +370,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Домашний экран'), findsOneWidget);
     expect(find.textContaining('Дневной выбор создан'), findsOneWidget);
-    semantics.dispose();
   });
 
   testWidgets('подтверждение явно сохраняет показанный путь и поля', (
@@ -426,10 +380,17 @@ void main() {
     expect(repository.commands, isEmpty);
     expect(find.textContaining('Основание'), findsWidgets);
     expect(find.textContaining('Действие'), findsWidgets);
-    await tester.enterText(
-      find.byKey(const ValueKey('daily-choice-date')),
-      '0001-01-01',
+    await setDailyChoiceCreationDate(
+      tester,
+      CalendarDate.fromParts(2026, 10, 2),
     );
+    await setDailyChoiceHour(tester, 18);
+    expect(
+      shownDailyChoiceCreation(tester).date,
+      CalendarDate.fromParts(2026, 10, 2),
+    );
+    expect(find.text('18:00'), findsOneWidget);
+    expect(repository.commands, isEmpty);
     await tester.enterText(
       find.byKey(const ValueKey('daily-choice-description')),
       'Мой текст',
@@ -442,30 +403,47 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
     await tester.pump();
     expect(repository.commands, hasLength(1));
-    expect(repository.commands.single.date, CalendarDate.fromParts(1, 1, 1));
+    expect(
+      repository.commands.single.date,
+      CalendarDate.fromParts(2026, 10, 2),
+    );
+    expect(
+      repository.commands.single.schedule,
+      DailyChoiceTime(hour: 18, minute: 0),
+    );
     expect(repository.commands.single.description?.value, 'Мой текст');
     expect(repository.commands.single.isCompleted, isTrue);
     expect(repository.commands.single.path.steps.length, 1);
   });
 
-  testWidgets('неверную дату и описание можно исправить без потери ввода', (
+  testWidgets('отказ по полю даты показан уведомлением отказа страницы', (
+    tester,
+  ) async {
+    final repository = _Repository();
+    await _pump(tester, repository);
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('daily-choice-submit')),
+    );
+    repository.fail(
+      0,
+      const DailyChoiceValidationFailure(DailyChoiceValidationField.date),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('daily-choice-failure')),
+        matching: find.text('Проверьте дату дневного выбора.'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('неверное описание можно исправить без потери ввода', (
     tester,
   ) async {
     final repository = _Repository();
     await _pump(tester, repository, locale: const Locale('en'));
-    await tester.enterText(
-      find.byKey(const ValueKey('daily-choice-date')),
-      '9999-02-30',
-    );
-    await _reveal(tester, find.byKey(const ValueKey('daily-choice-submit')));
-    await tester.tap(find.byKey(const ValueKey('daily-choice-submit')));
-    await tester.pump();
-    expect(repository.commands, isEmpty);
-    await _reveal(tester, find.byKey(const ValueKey('daily-choice-date')));
-    await tester.enterText(
-      find.byKey(const ValueKey('daily-choice-date')),
-      '9999-12-31',
-    );
     await tester.enterText(
       find.byKey(const ValueKey('daily-choice-description')),
       'x' * 4097,
@@ -486,7 +464,7 @@ void main() {
     await tester.pump();
     expect(
       repository.commands.single.date,
-      CalendarDate.fromParts(9999, 12, 31),
+      CalendarDate.fromParts(2026, 9, 24),
     );
     expect(repository.commands.single.description?.value, 'corrected');
   });
@@ -504,9 +482,9 @@ void main() {
         navigatorObserver: observer,
         direction: ChoicePathDraftDirection.bottomUp,
       );
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-date')),
-        '2026-09-25',
+      await setDailyChoiceCreationDate(
+        tester,
+        CalendarDate.fromParts(2026, 9, 25),
       );
       await tester.enterText(
         find.byKey(const ValueKey('daily-choice-description')),
@@ -542,13 +520,9 @@ void main() {
 
       navigatorKey.currentState!.removeRoute(observer.routes.last);
       await tester.pumpAndSettle();
-      await _reveal(tester, find.byKey(const ValueKey('daily-choice-date')));
       expect(
-        tester
-            .widget<TextField>(find.byKey(const ValueKey('daily-choice-date')))
-            .controller!
-            .text,
-        '2026-09-25',
+        shownDailyChoiceCreation(tester).date,
+        CalendarDate.fromParts(2026, 9, 25),
       );
       expect(
         tester
@@ -584,9 +558,9 @@ void main() {
           navigatorKey: navigatorKey,
           navigatorObserver: observer,
         );
-        await tester.enterText(
-          find.byKey(const ValueKey('daily-choice-date')),
-          '2026-09-25',
+        await setDailyChoiceCreationDate(
+          tester,
+          CalendarDate.fromParts(2026, 9, 25),
         );
         await tester.enterText(
           find.byKey(const ValueKey('daily-choice-description')),
@@ -699,9 +673,9 @@ void main() {
           navigatorObserver: observer,
           direction: ChoicePathDraftDirection.bottomUp,
         );
-        await tester.enterText(
-          find.byKey(const ValueKey('daily-choice-date')),
-          '2026-09-25',
+        await setDailyChoiceCreationDate(
+          tester,
+          CalendarDate.fromParts(2026, 9, 25),
         );
         await tester.enterText(
           find.byKey(const ValueKey('daily-choice-description')),
@@ -831,7 +805,6 @@ Future<void> _pump(
   _Repository repository, {
   Locale locale = const Locale('ru'),
   ValueNotifier<Locale>? localeChanges,
-  double textScale = 1,
   GlobalKey<NavigatorState>? navigatorKey,
   NavigatorObserver? navigatorObserver,
   ChoicePathDraftDirection direction = ChoicePathDraftDirection.topDown,
@@ -872,10 +845,7 @@ Future<void> _pump(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              textScaler: TextScaler.linear(textScale),
-              alwaysUse24HourFormat: true,
-            ),
+            data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
             child: GraphOperationPresenter(child: child!),
           ),
         ),
@@ -944,28 +914,11 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
-Future<void> _enterTime(WidgetTester tester, String hour, String minute) async {
-  final fields = find.descendant(
-    of: find.byType(AlertDialog),
-    matching: find.byType(TextField),
-  );
-  await tester.enterText(fields.at(0), hour);
-  await tester.ensureVisible(fields.at(1));
-  await tester.enterText(fields.at(1), minute);
-}
-
-Future<void> _closeTimePicker(
-  WidgetTester tester, {
-  required bool confirm,
-}) async {
-  final l10n = MaterialLocalizations.of(
-    tester.element(find.byType(AlertDialog)),
-  );
-  await tester.tap(
-    find.text(confirm ? l10n.okButtonLabel : l10n.cancelButtonLabel),
-  );
-  await tester.pumpAndSettle();
-}
+/// Кнопка поля «Время» подтверждения.
+Finder get _timeField => find.descendant(
+  of: find.widgetWithText(DetailRow, 'Время'),
+  matching: find.byType(Button),
+);
 
 final class _Repository
     with TagReadContractTestFallback
@@ -1011,6 +964,13 @@ final class _Repository
       ),
     );
   }
+
+  @override
+  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
+    DailyChoiceDayStatusQuery query,
+  ) async => const DailyChoiceDayStatusesReadError(
+    DailyChoiceDayStatusesReadFailure(),
+  );
 
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<

@@ -17,11 +17,11 @@ import '../daily_choice_creation_flow_session.dart';
 import '../daily_choice_creation_exit_action.dart';
 import '../daily_choice_creation_completion.dart';
 import '../daily_choice_command_failure_message.dart';
+import '../details/daily_choice_detail_fields.dart';
 import '../path/choice_path_page.dart';
 import '../path/choice_path_view_model.dart';
 import 'daily_choice_creation_state.dart';
 import 'daily_choice_creation_view_model.dart';
-import 'daily_choice_planning_fields.dart';
 
 /// Данные шага, которые нужны форме для показа подтверждаемого маршрута.
 final class DailyChoiceCreationStep {
@@ -72,17 +72,14 @@ final class DailyChoiceCreationPageState
   /// https://pub.dev/documentation/auto_route/11.1.0/auto_route/RouteData/matchId.html
   LocalKey get routeMatchId => context.routeData.matchId;
 
-  final _dateController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _scrollController = ScrollController();
   late List<DailyChoiceCreationStep> _visibleSteps;
   var _pathRefreshGeneration = 0;
-  var _dateInvalid = false;
 
   @override
   void initState() {
     super.initState();
-    _dateController.text = widget.initialDate.toCanonicalString();
     _visibleSteps = widget.steps;
     widget.session.changes.addListener(_creationChanged);
   }
@@ -110,32 +107,9 @@ final class DailyChoiceCreationPageState
   @override
   void dispose() {
     widget.session.changes.removeListener(_creationChanged);
-    _dateController.dispose();
     _descriptionController.dispose();
     _scrollController.dispose();
     super.dispose();
-  }
-
-  void _changeDate(String text, DailyChoiceCreationViewModel model) {
-    if (!mounted || !widget.session.canContinue) return;
-    try {
-      model.changeDate(CalendarDate.parseCanonical(text));
-      if (_dateInvalid) setState(() => _dateInvalid = false);
-    } on CalendarDateValidationException {
-      // Исправимый ввод остаётся в поле до следующего подтверждения.
-    }
-  }
-
-  void _submit(DailyChoiceCreationViewModel model) {
-    if (!mounted || !widget.session.canContinue) return;
-    try {
-      model.changeDate(CalendarDate.parseCanonical(_dateController.text));
-      setState(() => _dateInvalid = false);
-      model.submit();
-    } on CalendarDateValidationException {
-      setState(() => _dateInvalid = true);
-      _revealFailure();
-    }
   }
 
   Future<void> _refreshPath(DailyChoiceCreationViewModel model) async {
@@ -213,12 +187,7 @@ final class DailyChoiceCreationPageState
     });
 
     final descriptionFailure = _descriptionFailure(l10n, state);
-    final dateFailure = _dateFailure(l10n, state);
-    final generalFailure = _generalFailure(l10n, state);
-    final failureMessage =
-        (_dateInvalid ? l10n.dailyChoiceDateInvalid : dateFailure) ??
-        descriptionFailure ??
-        generalFailure;
+    final failureMessage = descriptionFailure ?? _generalFailure(l10n, state);
     final steps = _visibleSteps;
     return Scaffold(
       appBar: AppBar(title: Text(l10n.dailyChoiceCreationTitle)),
@@ -247,26 +216,12 @@ final class DailyChoiceCreationPageState
               ),
             Text(l10n.dailyChoiceCreationAction(steps.last.relatedTitle)),
             const SizedBox(height: 24),
-            TextField(
-              key: const ValueKey('daily-choice-date'),
-              enabled: canEdit,
-              controller: _dateController,
-              keyboardType: TextInputType.datetime,
-              decoration: InputDecoration(
-                labelText: l10n.dailyChoiceCreationDate,
-                hintText: 'YYYY-MM-DD',
-                helperText: l10n.dailyChoiceCreationDateHint,
-                errorText: _dateInvalid || dateFailure != null
-                    ? dateFailure ?? l10n.dailyChoiceDateInvalid
-                    : null,
-              ),
-              onChanged: (text) => _changeDate(text, model),
-            ),
-            const SizedBox(height: 16),
-            DailyChoicePlanningFields(
+            DailyChoiceDetailFields(
+              date: state.date,
               schedule: state.schedule,
               priority: state.priority,
               enabled: canEdit,
+              onDateChanged: model.changeDate,
               onScheduleChanged: model.changeSchedule,
               onPriorityChanged: model.changePriority,
             ),
@@ -296,7 +251,7 @@ final class DailyChoiceCreationPageState
             if (failureMessage != null) ...[
               const SizedBox(height: 12),
               OperationFailurePresentation(
-                claim: _dateInvalid ? null : state.failurePresentation,
+                claim: state.failurePresentation,
                 message: failureMessage,
                 messageKey: const ValueKey('daily-choice-failure'),
               ),
@@ -309,9 +264,7 @@ final class DailyChoiceCreationPageState
             const SizedBox(height: 24),
             FilledButton(
               key: const ValueKey('daily-choice-submit'),
-              onPressed: canEdit && state.canSubmit
-                  ? () => _submit(model)
-                  : null,
+              onPressed: canEdit && state.canSubmit ? model.submit : null,
               child: Text(switch (state.operation) {
                 DailyChoiceCreationSubmitting() =>
                   l10n.dailyChoiceCreationSaving,
@@ -364,19 +317,6 @@ String? _descriptionFailure(
   _ => null,
 };
 
-String? _dateFailure(AppLocalizations l10n, DailyChoiceCreationState state) =>
-    switch (state.operation) {
-      DailyChoiceCreationFailed(
-        failure: DailyChoiceCreationCommandRejected(
-          failure: DailyChoiceValidationFailure(
-            field: DailyChoiceValidationField.date,
-          ),
-        ),
-      ) =>
-        l10n.dailyChoiceDateInvalid,
-      _ => null,
-    };
-
 String? _generalFailure(
   AppLocalizations l10n,
   DailyChoiceCreationState state,
@@ -385,8 +325,7 @@ String? _generalFailure(
     failure: DailyChoiceCreationCommandRejected(failure: final failure),
   )
       when failure is! DailyChoiceValidationFailure ||
-          (failure.field != DailyChoiceValidationField.date &&
-              failure.field != DailyChoiceValidationField.description) =>
+          failure.field != DailyChoiceValidationField.description =>
     dailyChoiceCommandFailureMessage(l10n, failure),
   _ => null,
 };

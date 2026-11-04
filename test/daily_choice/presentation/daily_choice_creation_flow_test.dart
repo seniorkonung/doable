@@ -33,6 +33,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'daily_choice_picker_launch_test_support.dart'
     show TestDailyChoicePickerLaunch;
 import '../../support/daily_choice_creation_controls.dart';
+import '../../support/daily_choice_detail_fields_controls.dart';
 import '../../support/daily_choice_details_controls.dart';
 
 import '../../support/app_root_pages.dart';
@@ -99,15 +100,7 @@ Future<void> _openConfirmation(WidgetTester tester) async {
     tester,
     find.byKey(const ValueKey('choice-path-open-confirmation')),
   );
-  await _settleConfirmation(tester);
-}
-
-/// Видимое сообщение прежнего создания перелетает на новую страницу вместе со
-/// своим `Hero`. Отправка дожидается конца перехода, как и человек, иначе снятие
-/// потока прервёт этот перелёт и сработает проверка Flutter.
-Future<void> _settleConfirmation(WidgetTester tester) async {
   await awaitDailyChoiceConfirmation(tester, waitFor: _waitFor);
-  await tester.pumpAndSettle();
 }
 
 Future<void> _save(WidgetTester tester, {bool doubleTap = false}) async {
@@ -367,7 +360,6 @@ void main() {
       );
       expect(find.text('Перейти к подтверждению выбора'), findsNothing);
       await _openConfirmation(tester);
-      await _waitFor(tester, find.byType(DailyChoiceCreationPage));
       expect(
         find.descendant(
           of: find.byType(DailyChoiceCreationPage),
@@ -408,22 +400,7 @@ void main() {
       );
       expect(_savedIds(harness), hasLength(1));
 
-      await _tap(tester, find.text('Указать время'));
-      await tester.pumpAndSettle();
-      final timeFields = find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.byType(TextField),
-      );
-      await tester.enterText(timeFields.at(0), '18');
-      await tester.enterText(timeFields.at(1), '00');
-      await _tap(
-        tester,
-        find.text(
-          MaterialLocalizations.of(tester.element(find.byType(AlertDialog)))
-              .okButtonLabel,
-        ),
-      );
-      await tester.pumpAndSettle();
+      await setDailyChoiceHour(tester, 18, tap: _tap);
       await setDailyChoiceCreationPriority(
         tester,
         DailyChoicePriority.p2,
@@ -579,7 +556,7 @@ void main() {
         tester,
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
-      await _waitFor(tester, find.byType(DailyChoiceCreationPage));
+      await awaitDailyChoiceConfirmation(tester, waitFor: _waitFor);
       final firstStep = find.descendant(
         of: find.byType(DailyChoiceCreationPage),
         matching: find.text('Чтобы Основание, нужно Действие в середине'),
@@ -660,7 +637,7 @@ void main() {
         tester,
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
-      await _settleConfirmation(tester);
+      await awaitDailyChoiceConfirmation(tester, waitFor: _waitFor);
       await setDailyChoiceCreationDate(
         tester,
         CalendarDate.fromParts(2030, 9, 24),
@@ -691,7 +668,7 @@ void main() {
         tester,
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
-      await _settleConfirmation(tester);
+      await awaitDailyChoiceConfirmation(tester, waitFor: _waitFor);
       expect(
         find.descendant(
           of: find.byType(DailyChoiceCreationPage),
@@ -740,7 +717,7 @@ void main() {
         tester,
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
-      await _settleConfirmation(tester);
+      await awaitDailyChoiceConfirmation(tester, waitFor: _waitFor);
       await setDailyChoiceCreationDate(
         tester,
         CalendarDate.fromParts(2030, 9, 24),
@@ -842,7 +819,7 @@ void main() {
         tester,
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
-      await _waitFor(tester, find.byType(DailyChoiceCreationPage));
+      await awaitDailyChoiceConfirmation(tester, waitFor: _waitFor);
       await setDailyChoiceCreationDate(
         tester,
         CalendarDate.fromParts(2026, 9, 25),
@@ -1113,7 +1090,6 @@ void main() {
       await _continue(tester, 101);
       await _continue(tester, 102);
       await _openConfirmation(tester);
-      await _waitFor(tester, find.byType(DailyChoiceCreationPage));
       await setDailyChoiceCreationDate(
         tester,
         CalendarDate.fromParts(2026, 9, 25),
@@ -1234,12 +1210,6 @@ void main() {
       await _waitFor(tester, find.bySemanticsLabel(RegExp('Step 1:')));
       expect(find.bySemanticsLabel(RegExp('Step 1:')), findsOneWidget);
       await _openConfirmation(tester);
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-date')),
-        '2026-02-30',
-      );
-      await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-      expect(find.textContaining('Check the daily choice date.'), findsWidgets);
       expect(_savedIds(harness), isEmpty);
       await setDailyChoiceCreationDate(
         tester,
