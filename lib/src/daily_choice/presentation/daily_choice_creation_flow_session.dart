@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../graph/application/graph_command_coordinator.dart';
 import '../../graph/application/graph_command_result.dart';
 import '../application/daily_choice_result.dart';
+import 'path/choice_path_view_model.dart';
 
 /// Идентичность одного входа в создание, независимая от участников и пути.
 final class DailyChoiceCreationFlowId {
@@ -57,10 +58,12 @@ final class DailyChoiceCreationFlowSession {
   DailyChoiceCreationFlowSession({
     required this.rootMatchId,
     required Iterable<LocalKey> originalHistory,
+    required this.pathInstance,
   }) : originalHistory = List.unmodifiable(originalHistory);
 
   final DailyChoiceCreationFlowId flowId = DailyChoiceCreationFlowId._();
   final LocalKey rootMatchId;
+  final ChoicePathPageInstance pathInstance;
   final List<LocalKey> originalHistory;
   final DailyChoiceCreationFormKey _formKey = DailyChoiceCreationFormKey();
 

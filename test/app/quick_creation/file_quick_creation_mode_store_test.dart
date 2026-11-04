@@ -48,7 +48,6 @@ void main() {
 
   for (final (mode, key) in [
     (QuickCreationMode.intention, 'intention'),
-    (QuickCreationMode.relation, 'relation'),
     (QuickCreationMode.dailyChoice, 'daily-choice'),
   ]) {
     test('сохраняет ключ $key и читает режим новым хранилищем', () async {
@@ -89,6 +88,7 @@ void main() {
 
   for (final contents in [
     [0xff, 0xfe],
+    'relation'.codeUnits,
     'relation\n'.codeUnits,
     'daily-choice-from-intention'.codeUnits,
     'daily-choice-from-action'.codeUnits,
@@ -139,8 +139,8 @@ void main() {
         '${step.label}: исходы А=${failFirst ? 'отказ' : 'успех'}, '
         'Б=${failSecond ? 'отказ' : 'успех'} сохраняют последний успех',
         () async {
-          const initial = QuickCreationMode.intention;
-          const firstMode = QuickCreationMode.relation;
+          const initial = QuickCreationMode.dailyChoice;
+          const firstMode = QuickCreationMode.intention;
           const secondMode = QuickCreationMode.dailyChoice;
           await modeFile.parent.create();
           await modeFile.writeAsString(initial.storageKey);
@@ -239,9 +239,9 @@ void main() {
     );
     final io = ControlledModeIo(modeFile, attempts);
     const modes = [
-      QuickCreationMode.relation,
       QuickCreationMode.dailyChoice,
-      QuickCreationMode.relation,
+      QuickCreationMode.intention,
+      QuickCreationMode.dailyChoice,
     ];
 
     await io.run(() async {
@@ -287,7 +287,7 @@ void main() {
         final controller = container.read(
           quickCreationModeControllerProvider.notifier,
         );
-        final savingFirst = controller.select(QuickCreationMode.relation);
+        final savingFirst = controller.select(QuickCreationMode.intention);
         final savingSecond = controller.select(QuickCreationMode.dailyChoice);
         await _waitUntilHeld(first, savingFirst);
         expect(
@@ -326,7 +326,7 @@ void main() {
         final controller = container.read(
           quickCreationModeControllerProvider.notifier,
         );
-        final savingFirst = controller.select(QuickCreationMode.relation);
+        final savingFirst = controller.select(QuickCreationMode.intention);
         final savingSecond = controller.select(QuickCreationMode.dailyChoice);
         await _waitUntilHeld(first, savingFirst);
         expect(

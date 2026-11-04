@@ -441,7 +441,7 @@ String _intentionMessage(
   final target =
       completion.presentationTitle ??
       switch (completion.target) {
-        CreatingIntentionOperationTarget() =>
+        IntentionCreationOperationTarget() =>
           localizations.graphOperationNewIntention,
         ExistingIntentionOperationTarget() =>
           localizations.graphOperationIntention,
@@ -460,15 +460,15 @@ String _relationMessage(
   LongTermRelationPresentableCompletion completion,
 ) {
   final operation = switch (completion.kind) {
-    LongTermRelationCommandKind.create => localizations.graphOperationCreate,
+    LongTermRelationCommandKind.add => localizations.graphOperationAddRelations,
     LongTermRelationCommandKind.update => localizations.graphOperationUpdate,
     LongTermRelationCommandKind.archive => localizations.graphOperationArchive,
     LongTermRelationCommandKind.restore => localizations.graphOperationRestore,
     LongTermRelationCommandKind.delete => localizations.graphOperationDelete,
   };
   final target = switch (completion.target) {
-    CreatingLongTermRelationOperationTarget() =>
-      localizations.graphOperationNewRelation,
+    AddingLongTermRelationsOperationTarget() =>
+      localizations.graphOperationRelations,
     ExistingLongTermRelationOperationTarget() =>
       localizations.graphOperationRelation,
   };
@@ -484,31 +484,28 @@ String _relationOutcomeFor(
   LongTermRelationPresentableCompletion completion,
 ) => switch (completion.result) {
   GraphResultSuccess(:final value) => switch ((completion.kind, value)) {
-    (LongTermRelationCommandKind.create, LongTermRelationCreated()) =>
-      localizations.relationEditorCreated,
-    (LongTermRelationCommandKind.create, LongTermRelationUpdated()) =>
-      localizations.relationEditorCreateUnexpected,
-    (LongTermRelationCommandKind.create, LongTermRelationDeleted()) =>
-      localizations.relationEditorCreateUnexpected,
     (
-      LongTermRelationCommandKind.update || LongTermRelationCommandKind.archive,
+      LongTermRelationCommandKind.add,
+      LongTermRelationsAdded(:final relations),
+    ) =>
+      localizations.relationsAdded(relations.length),
+    (LongTermRelationCommandKind.add, _) =>
+      localizations.relationsAdditionUnexpected,
+    (
+      LongTermRelationCommandKind.update ||
+          LongTermRelationCommandKind.archive ||
+          LongTermRelationCommandKind.restore,
       _,
     ) =>
       throw StateError(
         'Успех этой операции связи не образует права предъявления.',
       ),
-    (LongTermRelationCommandKind.restore, LongTermRelationUpdated()) =>
-      localizations.relationRestored,
-    (LongTermRelationCommandKind.restore, LongTermRelationCreated()) =>
-      localizations.relationRestoreUnexpected,
-    (LongTermRelationCommandKind.restore, LongTermRelationDeleted()) =>
-      localizations.relationRestoreUnexpected,
     (LongTermRelationCommandKind.delete, LongTermRelationDeleted()) =>
       localizations.relationDeleted,
-    (LongTermRelationCommandKind.delete, LongTermRelationCreated()) ||
+    (LongTermRelationCommandKind.delete, LongTermRelationUpdated()) ||
     (
       LongTermRelationCommandKind.delete,
-      LongTermRelationUpdated(),
+      LongTermRelationsAdded(),
     ) => localizations.relationDeleteUnexpected,
   },
   GraphResultFailure(:final failure) => longTermRelationCommandFailureMessage(
@@ -526,6 +523,7 @@ String _intentionOutcomeFor(
     localizations,
     completion.kind,
     value,
+    completion.target,
   ),
   ResultFailure(:final failure) => _failureFor(
     localizations,
@@ -538,9 +536,14 @@ String _successFor(
   AppLocalizations localizations,
   IntentionCommandKind kind,
   IntentionCommandSuccess success,
+  IntentionOperationTarget target,
 ) => switch ((kind, success)) {
-  (IntentionCommandKind.create, IntentionSaved()) =>
-    localizations.editorCreated,
+  (IntentionCommandKind.create, IntentionSaved()) => switch (target) {
+    CreatingIntentionForSearchOperationTarget() =>
+      localizations.editorCreatedAndChosen,
+    CreatingIntentionOperationTarget() ||
+    ExistingIntentionOperationTarget() => localizations.editorCreated,
+  },
   (
     IntentionCommandKind.update ||
         IntentionCommandKind.enableReadiness ||

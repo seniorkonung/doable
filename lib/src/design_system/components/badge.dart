@@ -35,12 +35,6 @@ sealed class Badge extends StatelessWidget {
   /// размере шрифта.
   const factory Badge.archivedInline({required String word, Key? key}) =
       BadgeArchived.inline;
-
-  /// Метка-слово строки списка: только слово [word] цвета `ink` на заливке
-  /// `bg`, как у значковых меток строки, и оформленное одинаково при любом
-  /// слове. Узла экранного диктора у метки нет: слово называет доступное
-  /// название строки.
-  const factory Badge.word({required String word, Key? key}) = BadgeWord;
 }
 
 /// Метка-значок: плитка 22×20 со значком [icon] тона [tone].
@@ -114,36 +108,6 @@ final class BadgeArchived extends Badge {
               style: DoableType.caption.copyWith(color: colors.muted),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Метка-слово: только слово [word], без значка.
-final class BadgeWord extends Badge {
-  const BadgeWord({required this.word, super.key}) : super._();
-
-  final String word;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).extension<DoableColors>()!;
-
-    return ExcludeSemantics(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colors.bg,
-          borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
-          child: Text(
-            word,
-            maxLines: 1,
-            softWrap: false,
-            style: DoableType.caption.copyWith(color: colors.ink),
-          ),
         ),
       ),
     );

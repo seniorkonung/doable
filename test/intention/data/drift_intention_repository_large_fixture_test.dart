@@ -87,7 +87,12 @@ void main() {
         ) as IntentionCatalogFirstPage;
         expect(first.totalCount, matchCount);
         expect(first.items, hasLength(pageSize));
-        _expectJointPage(first, trace, isFirst: true);
+        _expectJointPage(
+          first,
+          trace,
+          isFirst: true,
+          hasTitleFilter: titleFilter != null,
+        );
       }
 
       for (final (titleFilter, matches) in [
@@ -142,7 +147,7 @@ void main() {
         ) as IntentionCatalogFirstPage;
         expect(first.totalCount, matchCount, reason: label);
         expect(first.items, hasLength(_pageSize), reason: label);
-        _expectJointPage(first, trace, isFirst: true);
+        _expectJointPage(first, trace, isFirst: true, hasTitleFilter: false);
       }
     },
   );
@@ -221,7 +226,7 @@ void main() {
           );
         }
         expect(page.nextCursor, isA<IntentionCatalogCursor>(), reason: label);
-        _expectJointPage(page, trace, isFirst: isFirst);
+        _expectJointPage(page, trace, isFirst: isFirst, hasTitleFilter: false);
         cursor = page.nextCursor;
       }
     }
@@ -278,7 +283,12 @@ Future<void> _expectJointTraversal(
         _jointQuery(titleFilter: titleFilter, cursor: cursor),
       ),
     );
-    _expectJointPage(page, trace, isFirst: pageNumber == 0);
+    _expectJointPage(
+      page,
+      trace,
+      isFirst: pageNumber == 0,
+      hasTitleFilter: titleFilter != null,
+    );
     if (pageNumber == 0) {
       expect((page as IntentionCatalogFirstPage).totalCount, matches.length);
     }
@@ -405,15 +415,19 @@ int _selectedRows(_SelectTrace trace) =>
     trace.rowCounts.fold(0, (sum, rows) => sum + rows);
 
 /// Предел строк, которые запрос может прочитать для порции [items]:
-/// количество (только первая порция), сама порция и теги именно этих
-/// намерений.
+/// количество (только первая порция), необязательное число точных названий,
+/// сама порция и теги именно этих намерений.
 int _readVolumeLimit(
   List<IntentionSummary> items, {
   required bool isFirst,
+  required bool hasExactTitleCount,
   required int portionRows,
 }) {
   final tagRows = items.fold(0, (sum, item) => sum + item.tags.length);
-  return (isFirst ? 1 : 0) + portionRows + tagRows;
+  return (isFirst ? 1 : 0) +
+      (hasExactTitleCount ? 1 : 0) +
+      portionRows +
+      tagRows;
 }
 
 /// Запрос порции не читает строк сверх порции и её данных, как бы ни были
@@ -422,12 +436,18 @@ void _expectBoundedReadVolume(
   _SelectTrace trace,
   List<IntentionSummary> items, {
   required bool isFirst,
+  required bool hasExactTitleCount,
   required int portionRows,
 }) {
   expect(
     _selectedRows(trace),
     lessThanOrEqualTo(
-      _readVolumeLimit(items, isFirst: isFirst, portionRows: portionRows),
+      _readVolumeLimit(
+        items,
+        isFirst: isFirst,
+        hasExactTitleCount: hasExactTitleCount,
+        portionRows: portionRows,
+      ),
     ),
   );
   expect(trace.writes, isEmpty);
@@ -572,12 +592,14 @@ void _expectJointPage(
   IntentionCatalogPage page,
   _SelectTrace trace, {
   required bool isFirst,
+  required bool hasTitleFilter,
 }) {
   _expectFixtureTags(page.items);
   _expectBoundedReadVolume(
     trace,
     page.items,
     isFirst: isFirst,
+    hasExactTitleCount: isFirst && hasTitleFilter,
     portionRows: page.items.length + (page.nextCursor == null ? 0 : 1),
   );
 }
@@ -624,6 +646,7 @@ Future<void> _expectFirstPageCounts(
       trace,
       page.items,
       isFirst: true,
+      hasExactTitleCount: false,
       portionRows: page.items.length + (page.nextCursor == null ? 0 : 1),
     );
   }

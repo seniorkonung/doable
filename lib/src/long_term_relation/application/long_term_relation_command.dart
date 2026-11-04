@@ -4,6 +4,7 @@ import '../../intention/domain/intention_id.dart';
 import '../domain/long_term_relation.dart';
 import '../domain/long_term_relation_description.dart';
 import '../domain/long_term_relation_id.dart';
+import 'intention_relation_group.dart';
 import 'long_term_relation_permissions.dart';
 
 sealed class LongTermRelationCommand
@@ -15,49 +16,62 @@ sealed class LongTermRelationCommand
   const LongTermRelationCommand();
 }
 
-enum CreateLongTermRelationValidationFailure { sameIntention }
-
-final class CreateLongTermRelationValidationException implements Exception {
-  const CreateLongTermRelationValidationException(this.failure);
-
-  final CreateLongTermRelationValidationFailure failure;
+enum AddLongTermRelationsValidationFailure {
+  noCandidates,
+  duplicateCandidates,
+  pageIntentionAmongCandidates,
 }
 
-final class CreateLongTermRelation extends LongTermRelationCommand {
-  factory CreateLongTermRelation({
-    required IntentionId sourceIntentionId,
-    required IntentionId relatedIntentionId,
-    required LongTermRelationType type,
-    required RelationPriority priority,
-    required LongTermRelationDescription? description,
+final class AddLongTermRelationsValidationException implements Exception {
+  const AddLongTermRelationsValidationException(this.failure);
+
+  final AddLongTermRelationsValidationFailure failure;
+}
+
+/// Добавляет в группу страницы намерения связи с упорядоченным набором
+/// намерений.
+///
+/// Группа задаёт тип и направление, поэтому приоритет и описание команда не
+/// принимает: каждая связь получает P4 и не имеет описания. Порядок набора
+/// становится порядком последовательности создания.
+final class AddLongTermRelations extends LongTermRelationCommand {
+  factory AddLongTermRelations({
+    required IntentionId pageIntentionId,
+    required IntentionRelationGroup group,
+    required Iterable<IntentionId> candidateIds,
   }) {
-    if (sourceIntentionId == relatedIntentionId) {
-      throw const CreateLongTermRelationValidationException(
-        CreateLongTermRelationValidationFailure.sameIntention,
+    final candidates = List<IntentionId>.unmodifiable(candidateIds);
+    if (candidates.isEmpty) {
+      throw const AddLongTermRelationsValidationException(
+        AddLongTermRelationsValidationFailure.noCandidates,
       );
     }
-    return CreateLongTermRelation._(
-      sourceIntentionId: sourceIntentionId,
-      relatedIntentionId: relatedIntentionId,
-      type: type,
-      priority: priority,
-      description: description,
+    if (candidates.toSet().length != candidates.length) {
+      throw const AddLongTermRelationsValidationException(
+        AddLongTermRelationsValidationFailure.duplicateCandidates,
+      );
+    }
+    if (candidates.contains(pageIntentionId)) {
+      throw const AddLongTermRelationsValidationException(
+        AddLongTermRelationsValidationFailure.pageIntentionAmongCandidates,
+      );
+    }
+    return AddLongTermRelations._(
+      pageIntentionId: pageIntentionId,
+      group: group,
+      candidateIds: candidates,
     );
   }
 
-  const CreateLongTermRelation._({
-    required this.sourceIntentionId,
-    required this.relatedIntentionId,
-    required this.type,
-    required this.priority,
-    required this.description,
+  const AddLongTermRelations._({
+    required this.pageIntentionId,
+    required this.group,
+    required this.candidateIds,
   });
 
-  final IntentionId sourceIntentionId;
-  final IntentionId relatedIntentionId;
-  final LongTermRelationType type;
-  final RelationPriority priority;
-  final LongTermRelationDescription? description;
+  final IntentionId pageIntentionId;
+  final IntentionRelationGroup group;
+  final List<IntentionId> candidateIds;
 }
 
 sealed class LongTermRelationFieldPatch<T extends Object> {
@@ -251,17 +265,14 @@ sealed class LongTermRelationCommandSuccess implements GraphCommandOutcome {
   final List<GraphChange> changes;
 }
 
-final class LongTermRelationCreated extends LongTermRelationCommandSuccess {
-  LongTermRelationCreated({
-    required this.relation,
-    required this.description,
-    this.permissions = const LongTermRelationPermissions.unknown(),
+/// Связи пачки в порядке набора команды.
+final class LongTermRelationsAdded extends LongTermRelationCommandSuccess {
+  LongTermRelationsAdded({
+    required Iterable<LongTermRelation> relations,
     required super.changes,
-  });
+  }) : relations = List.unmodifiable(relations);
 
-  final LongTermRelation relation;
-  final LongTermRelationDescription? description;
-  final LongTermRelationPermissions permissions;
+  final List<LongTermRelation> relations;
 }
 
 final class LongTermRelationUpdated extends LongTermRelationCommandSuccess {

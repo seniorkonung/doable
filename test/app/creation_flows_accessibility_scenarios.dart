@@ -8,7 +8,7 @@ void _registerAccessibilityTests() {
   ];
   // Дневной выбор от намерения подтверждается той же страницей, что и от
   // действия; системные строки читаются из локализаций одного языка.
-  for (final flow in const [_Flow.intention, _Flow.relation, _Flow.bottomUp]) {
+  for (final flow in const [_Flow.intention, _Flow.bottomUp]) {
     for (final locale in [const Locale('ru')]) {
       for (final device in devices) {
         testWidgets(

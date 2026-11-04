@@ -70,24 +70,24 @@ void main() {
         quickCreationModeControllerProvider.notifier,
       );
       expect(
-        await controller.select(QuickCreationMode.relation),
+        await controller.select(QuickCreationMode.dailyChoice),
         isA<QuickCreationModeSaveFailed>(),
       );
       expect(
         ready.container.read(quickCreationModeControllerProvider),
-        QuickCreationMode.relation,
+        QuickCreationMode.dailyChoice,
       );
 
       directoryAvailable = true;
       expect(
-        await controller.select(QuickCreationMode.dailyChoice),
+        await controller.select(QuickCreationMode.intention),
         isA<QuickCreationModeSaved>(),
       );
       await first.shutdown();
       final restored = await runtime(store()).bootstrap() as AppRuntimeReady;
       expect(
         restored.container.read(quickCreationModeControllerProvider),
-        QuickCreationMode.dailyChoice,
+        QuickCreationMode.intention,
       );
       expect(_modeFailures(diagnostics).map((event) => event.stage), [
         QuickCreationModeDiagnosticsStage.read,
@@ -160,17 +160,17 @@ void main() {
       });
 
       expect(await runtime.bootstrap(), isA<AppRuntimeRetryableFailure>());
-      modeStore.completeRead(QuickCreationMode.relation);
+      modeStore.completeRead(QuickCreationMode.dailyChoice);
       final ready = await runtime.bootstrap() as AppRuntimeReady;
 
       expect(
         ready.container.read(quickCreationModeControllerProvider),
-        QuickCreationMode.relation,
+        QuickCreationMode.dailyChoice,
       );
       await ready.container
           .read(quickCreationModeControllerProvider.notifier)
-          .select(QuickCreationMode.dailyChoice);
-      expect(modeStore.savedModes, [QuickCreationMode.dailyChoice]);
+          .select(QuickCreationMode.intention);
+      expect(modeStore.savedModes, [QuickCreationMode.intention]);
     },
   );
 
@@ -201,7 +201,7 @@ void main() {
     // Готовая база ещё не означает, что загружен режим или создан контейнер.
     await runtime.shutdown();
     expect(graphOpening.closeCalls, 1);
-    modeStore.completeRead(QuickCreationMode.relation);
+    modeStore.completeRead(QuickCreationMode.intention);
     await rejected;
 
     expect(repositoryCreations, 0);
@@ -239,7 +239,7 @@ void main() {
     test('поздний ${fails ? 'отказ' : 'успех'} записи не использует '
         'освобождённый контейнер и не считается сохранённым заранее', () async {
       await modeFile.parent.create();
-      await modeFile.writeAsString(QuickCreationMode.relation.storageKey);
+      await modeFile.writeAsString(QuickCreationMode.dailyChoice.storageKey);
       final attempt = ModeWriteAttempt(
         holdAt: ModeWriteStep.rename,
         failAt: fails ? ModeWriteStep.rename : null,
@@ -251,7 +251,7 @@ void main() {
         final ready = await first.bootstrap() as AppRuntimeReady;
         final saving = ready.container
             .read(quickCreationModeControllerProvider.notifier)
-            .select(QuickCreationMode.dailyChoice);
+            .select(QuickCreationMode.intention);
         addTearDown(() async {
           if (!attempt.release.isCompleted) attempt.release.complete();
           await saving;
@@ -267,7 +267,7 @@ void main() {
         final before = await beforeRuntime.bootstrap() as AppRuntimeReady;
         expect(
           before.container.read(quickCreationModeControllerProvider),
-          QuickCreationMode.relation,
+          QuickCreationMode.dailyChoice,
         );
         attempt.release.complete();
         expect(
@@ -278,14 +278,14 @@ void main() {
         );
         expect(
           before.container.read(quickCreationModeControllerProvider),
-          QuickCreationMode.relation,
+          QuickCreationMode.dailyChoice,
         );
         await beforeRuntime.shutdown();
 
         final after = await runtime(store()).bootstrap() as AppRuntimeReady;
         expect(
           after.container.read(quickCreationModeControllerProvider),
-          fails ? QuickCreationMode.relation : QuickCreationMode.dailyChoice,
+          fails ? QuickCreationMode.dailyChoice : QuickCreationMode.intention,
         );
       });
     });

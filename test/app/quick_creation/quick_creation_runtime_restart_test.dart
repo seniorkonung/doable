@@ -20,7 +20,6 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_c
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
-import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/design_system/components/option_row.dart';
@@ -56,7 +55,6 @@ void main() {
   // Новый ключ дневного выбора восстанавливает режим с листом выбора начала.
   for (final mode in <QuickCreationMode?>[
     null,
-    QuickCreationMode.relation,
     QuickCreationMode.dailyChoice,
   ]) {
     final title =
@@ -124,8 +122,8 @@ void main() {
         'показывают последний выбор; свежий runtime получает последний успех', (
       tester,
     ) async {
-      const initial = QuickCreationMode.intention;
-      const a = QuickCreationMode.relation;
+      const initial = QuickCreationMode.dailyChoice;
+      const a = QuickCreationMode.intention;
       const b = QuickCreationMode.dailyChoice;
       await tester.runAsync(() => store().save(initial));
       final modes = [a, b, if (outcomes.length == 3) a];
@@ -357,7 +355,6 @@ Future<void> _expectLaunch(
   expect(
     find.byType(switch (mode) {
       QuickCreationMode.intention => IntentionEditorPage,
-      QuickCreationMode.relation => RelationEditorPage,
       QuickCreationMode.dailyChoice => QuickCreationDailyChoiceStartSheet,
     }),
     findsOneWidget,

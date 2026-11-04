@@ -22,7 +22,12 @@ final class ChoicePathViewModelProvider
   /// черновика, экранной сессией и ревизией подтверждённого снимка.
   ChoicePathViewModelProvider._({
     required ChoicePathViewModelFamily super.from,
-    required (IntentionId, {ChoicePathDraftDirection direction}) super.argument,
+    required (
+      IntentionId,
+      ChoicePathPageInstance, {
+      ChoicePathDraftDirection direction,
+    })
+    super.argument,
   }) : super(
          retry: null,
          name: r'choicePathViewModelProvider',
@@ -65,7 +70,7 @@ final class ChoicePathViewModelProvider
 }
 
 String _$choicePathViewModelHash() =>
-    r'14c74e5d9e572397fa2c45b2efb6e9870e8b8bab';
+    r'ba5b15d54bb70dd0913e2bd38ceba7a625237400';
 
 /// Управляет одним обходом. Ответы принимаются только поколением текущего
 /// черновика, экранной сессией и ревизией подтверждённого снимка.
@@ -77,7 +82,11 @@ final class ChoicePathViewModelFamily extends $Family
           ChoicePathState,
           ChoicePathState,
           ChoicePathState,
-          (IntentionId, {ChoicePathDraftDirection direction})
+          (
+            IntentionId,
+            ChoicePathPageInstance, {
+            ChoicePathDraftDirection direction,
+          })
         > {
   ChoicePathViewModelFamily._()
     : super(
@@ -92,10 +101,11 @@ final class ChoicePathViewModelFamily extends $Family
   /// черновика, экранной сессией и ревизией подтверждённого снимка.
 
   ChoicePathViewModelProvider call(
-    IntentionId startingIntentionId, {
+    IntentionId startingIntentionId,
+    ChoicePathPageInstance pageInstance, {
     ChoicePathDraftDirection direction = ChoicePathDraftDirection.topDown,
   }) => ChoicePathViewModelProvider._(
-    argument: (startingIntentionId, direction: direction),
+    argument: (startingIntentionId, pageInstance, direction: direction),
     from: this,
   );
 
@@ -108,12 +118,19 @@ final class ChoicePathViewModelFamily extends $Family
 
 abstract class _$ChoicePathViewModel extends $Notifier<ChoicePathState> {
   late final _$args =
-      ref.$arg as (IntentionId, {ChoicePathDraftDirection direction});
+      ref.$arg
+          as (
+            IntentionId,
+            ChoicePathPageInstance, {
+            ChoicePathDraftDirection direction,
+          });
   IntentionId get startingIntentionId => _$args.$1;
+  ChoicePathPageInstance get pageInstance => _$args.$2;
   ChoicePathDraftDirection get direction => _$args.direction;
 
   ChoicePathState build(
-    IntentionId startingIntentionId, {
+    IntentionId startingIntentionId,
+    ChoicePathPageInstance pageInstance, {
     ChoicePathDraftDirection direction = ChoicePathDraftDirection.topDown,
   });
   @$mustCallSuper
@@ -130,7 +147,7 @@ abstract class _$ChoicePathViewModel extends $Notifier<ChoicePathState> {
             >;
     return element.handleCreate(
       ref,
-      () => build(_$args.$1, direction: _$args.direction),
+      () => build(_$args.$1, _$args.$2, direction: _$args.direction),
     );
   }
 }

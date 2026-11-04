@@ -164,14 +164,6 @@
   "@quickCreationModeIntentionHint": {
     "description": "Пояснение режима создания намерения"
   },
-  "quickCreationModeRelation": "New relation",
-  "@quickCreationModeRelation": {
-    "description": "Название режима создания долговременной связи"
-  },
-  "quickCreationModeRelationHint": "To …, you need or can …",
-  "@quickCreationModeRelationHint": {
-    "description": "Пояснение режима создания долговременной связи"
-  },
   "quickCreationModeDailyChoice": "New daily choice",
   "@quickCreationModeDailyChoice": {
     "description": "Название режима и заголовок листа нового дневного выбора"
@@ -389,6 +381,14 @@
   "@detailsRelationsTab": {"description": "Вкладка соседства намерения"},
   "detailsRelationsTabSemantic": "Relations: {active} active, {archived} archived",
   "@detailsRelationsTabSemantic": {"description": "Числа долговременных связей на вкладке для диктора", "placeholders": {"active": {"type": "int"}, "archived": {"type": "int"}}},
+  "relationPairAlreadyAdded": "Already added",
+  "@relationPairAlreadyAdded": {"description": "Причина занятости пары в поиске участника"},
+  "relationPairAlreadyAddedArchived": "Already added, archived",
+  "@relationPairAlreadyAddedArchived": {"description": "Причина занятости пары в поиске участника"},
+  "relationPairOtherGroup": "Already in group \"{group}\"",
+  "@relationPairOtherGroup": {"description": "Причина занятости пары в поиске участника", "placeholders": {"group": {"type": "String"}}},
+  "relationPairOtherGroupArchived": "Already in group \"{group}\", archived",
+  "@relationPairOtherGroupArchived": {"description": "Причина занятости пары в поиске участника", "placeholders": {"group": {"type": "String"}}},
   "detailsRelationsGroupsLabel": "Relation groups",
   "@detailsRelationsGroupsLabel": {"description": "Доступное название плиток групп связей на вкладке «Связи»"},
   "detailsRelationsGroupNeeds": "Needs",
@@ -625,10 +625,6 @@
   "@detailsOperationRunning": {
     "description": "Сохраняющаяся между экранами выполняющаяся операция намерения"
   },
-  "detailsActive": "Active",
-  "@detailsActive": {
-    "description": "Активное состояние намерения в подробных данных"
-  },
   "detailsArchived": "Archived",
   "@detailsArchived": {
     "description": "Архивное состояние намерения в подробных данных"
@@ -757,6 +753,10 @@
   "@editorTitle": {
     "description": "Заголовок формы создания намерения"
   },
+  "editorSearchSubtitle": "Selected right away for new relations",
+  "@editorSearchSubtitle": {
+    "description": "Пояснение панели создания намерения из поиска участника"
+  },
   "editorCreateAction": "Create intention",
   "@editorCreateAction": {
     "description": "Действие создания намерения"
@@ -818,6 +818,10 @@
     "description": "Терминальная непредвиденная ошибка создания намерения"
   },
   "editorCreated": "Intention created.",
+  "editorCreatedAndChosen": "Intention created and selected.",
+  "@editorCreatedAndChosen": {
+    "description": "Успех создания намерения для поиска участника"
+  },
   "@editorCreated": {
     "description": "Подтверждение успешного создания намерения"
   },
@@ -998,10 +1002,6 @@
         "type": "int"
       }
     }
-  },
-  "graphOperationNewRelation": "new relation",
-  "@graphOperationNewRelation": {
-    "description": "Безопасное обозначение создаваемой связи до подтверждения"
   },
   "graphOperationRelation": "relation",
   "graphOperationDailyChoice": "daily choice",
@@ -1387,34 +1387,24 @@
   "@graphOperationRelation": {
     "description": "Безопасное обозначение существующей связи"
   },
-  "relationEditorCreated": "Relation created.",
-  "@relationEditorCreated": {
-    "description": "Подтверждение успешного создания долговременной связи"
-  },
-  "relationEditorCreatePairOccupied": "A relation with this direction already exists between the selected intentions.",
-  "@relationEditorCreatePairOccupied": {
-    "description": "Конфликт занятой направленной пары при создании связи"
-  },
-  "relationEditorCreateParticipantNotFound": "One of the selected intentions no longer exists.",
-  "@relationEditorCreateParticipantNotFound": {
-    "description": "Отсутствие участника при создании связи"
-  },
-  "relationEditorCreateParticipantArchived": "Only active intentions can be linked.",
-  "@relationEditorCreateParticipantArchived": {
-    "description": "Конфликт архивного состояния участника при создании связи"
-  },
-  "relationEditorCreateUnavailable": "The relation couldn’t be created. Try again.",
-  "@relationEditorCreateUnavailable": {
-    "description": "Устранимая недоступность создания связи"
-  },
-  "relationEditorCreateCorruption": "Stored data is damaged. The relation wasn’t created.",
-  "@relationEditorCreateCorruption": {
-    "description": "Терминальное повреждение данных при создании связи"
-  },
-  "relationEditorCreateUnexpected": "The relation couldn’t be created because of an unexpected error.",
-  "@relationEditorCreateUnexpected": {
-    "description": "Терминальная непредвиденная ошибка создания связи"
-  },
+  "graphOperationAddRelations": "Add",
+  "@graphOperationAddRelations": {"description": "Вид операции добавления связей"},
+  "graphOperationRelations": "relations",
+  "@graphOperationRelations": {"description": "Обозначение добавляемой пачки связей"},
+  "relationsAdded": "{count, plural, one{{count} relation added.} other{{count} relations added.}}",
+  "@relationsAdded": {"description": "Число добавленных связей", "placeholders": {"count": {"type": "int"}}},
+  "relationsAdditionPairOccupied": "Some selected intentions are already linked to this intention. No relations were created.",
+  "@relationsAdditionPairOccupied": {"description": "Занятая пара при добавлении связей"},
+  "relationsAdditionParticipantNotFound": "A selected intention no longer exists. No relations were created.",
+  "@relationsAdditionParticipantNotFound": {"description": "Отсутствующий участник при добавлении связей"},
+  "relationsAdditionParticipantArchived": "Only active intentions can be linked. No relations were created.",
+  "@relationsAdditionParticipantArchived": {"description": "Архивированный участник при добавлении связей"},
+  "relationsAdditionUnavailable": "No relations were created. Try again.",
+  "@relationsAdditionUnavailable": {"description": "Недоступность добавления связей"},
+  "relationsAdditionCorruption": "Stored data is damaged. No relations were created.",
+  "@relationsAdditionCorruption": {"description": "Повреждение данных при добавлении связей"},
+  "relationsAdditionUnexpected": "No relations were created because of an unexpected error.",
+  "@relationsAdditionUnexpected": {"description": "Неожиданный отказ добавления связей"},
   "relationEditorUpdateNotFound": "This relation no longer exists.",
   "@relationEditorUpdateNotFound": {
     "description": "Отсутствие изменяемой связи"
@@ -1454,10 +1444,6 @@
   "relationArchiveUnexpected": "The relation couldn’t be archived because of an unexpected error.",
   "@relationArchiveUnexpected": {
     "description": "Терминальная непредвиденная ошибка архивирования связи"
-  },
-  "relationRestored": "Relation restored.",
-  "@relationRestored": {
-    "description": "Подтверждение успешного восстановления долговременной связи"
   },
   "relationRestoreNotFound": "This relation no longer exists.",
   "@relationRestoreNotFound": {
@@ -1720,22 +1706,6 @@
   "@intentionPickerKindIntention": {
     "description": "Вид намерения без готовности к действию в доступном названии строки экрана выбора"
   },
-  "intentionPickerPairLinked": "Already linked",
-  "@intentionPickerPairLinked": {
-    "description": "Метка строки поиска участника связи, пару которой занимает активная связь; она же стоит в доступном названии строки"
-  },
-  "intentionPickerPairArchived": "Archived relation",
-  "@intentionPickerPairArchived": {
-    "description": "Метка строки поиска участника связи, пару которой занимает архивированная связь; она же стоит в доступном названии строки"
-  },
-  "intentionPickerPairOpensRelation": "tapping opens the existing relation",
-  "@intentionPickerPairOpensRelation": {
-    "description": "Действие нажатия на текст строки поиска участника с отметкой занятой пары в доступном названии строки"
-  },
-  "intentionPickerPairOffersRestore": "tapping offers to restore the relation",
-  "@intentionPickerPairOffersRestore": {
-    "description": "Действие нажатия на текст строки поиска участника, когда при создании связи архивную занимающую связь можно восстановить, в доступном названии строки"
-  },
   "intentionPickerOpenActionPage": "Open the page of action {title}",
   "@intentionPickerOpenActionPage": {
     "description": "Доступное название стрелки строки экрана выбора, которая открывает страницу действия",
@@ -1958,6 +1928,10 @@
     "description": "Заголовок шапки экрана выбора действия"
   },
   "intentionPickerIntentionTitle": "Choose an intention",
+  "participantPickerTitle": "Choose intentions",
+  "@participantPickerTitle": {
+    "description": "Заголовок поиска участников связи"
+  },
   "@intentionPickerIntentionTitle": {
     "description": "Заголовок шапки экрана выбора намерения"
   },
@@ -1968,6 +1942,15 @@
   "intentionPickerClearSearch": "Clear the name",
   "@intentionPickerClearSearch": {
     "description": "Доступное название крестика очистки поля поиска на экране выбора"
+  },
+  "intentionPickerCreateIntention": "Create intention",
+  "@intentionPickerCreateIntention": {
+    "description": "Доступное название плюса в шапке поиска участника"
+  },
+  "intentionPickerCreateNamed": "Create “{title}”",
+  "@intentionPickerCreateNamed": {
+    "description": "Строка над выдачей поиска участника, которая создаёт намерение с названием из подстроки",
+    "placeholders": {"title": {"type": "String"}}
   },
   "intentionPickerFilterLabel": "{count, plural, =0{Filter by tags} =1{Filter by tags, 1 condition} other{Filter by tags, {count} conditions}}",
   "@intentionPickerFilterLabel": {
@@ -2022,125 +2005,6 @@
   "@participantPickerEmpty": {
     "description": "Отсутствие намерений, доступных для выбора участником"
   },
-  "participantPickerRestoreTitle": "Restore this relation?",
-  "@participantPickerRestoreTitle": {
-    "description": "Заголовок подтверждения восстановления занимающей связи из поиска участника"
-  },
-  "participantPickerRestoreTextBefore": "The relation “",
-  "@participantPickerRestoreTextBefore": {
-    "description": "Текст подтверждения восстановления до выделенной формулировки связи"
-  },
-  "participantPickerRestoreTextAfter": "” returns with priority {priority}.",
-  "@participantPickerRestoreTextAfter": {
-    "description": "Текст подтверждения восстановления после выделенной формулировки связи",
-    "placeholders": {"priority": {"type": "String"}}
-  },
-  "participantPickerRestoreWarning": "What you set in the form won’t be kept: {changes}.",
-  "@participantPickerRestoreWarning": {
-    "description": "Предупреждение в подтверждении восстановления: данные черновика формы, которые не сохранятся; changes — перечень отличающихся данных через запятую",
-    "placeholders": {"changes": {"type": "String"}}
-  },
-  "participantPickerRestoreWarningNeedType": "type “need”",
-  "@participantPickerRestoreWarningNeedType": {
-    "description": "Перечень предупреждения о восстановлении: выбранный в форме тип «нужно» не сохранится"
-  },
-  "participantPickerRestoreWarningCanType": "type “can”",
-  "@participantPickerRestoreWarningCanType": {
-    "description": "Перечень предупреждения о восстановлении: выбранный в форме тип «можно» не сохранится"
-  },
-  "participantPickerRestoreWarningPriority": "priority",
-  "@participantPickerRestoreWarningPriority": {
-    "description": "Перечень предупреждения о восстановлении: выбранный в форме приоритет не сохранится"
-  },
-  "participantPickerRestoreWarningDescription": "description",
-  "@participantPickerRestoreWarningDescription": {
-    "description": "Перечень предупреждения о восстановлении: введённое в форме описание не сохранится"
-  },
-  "participantPickerRestoreCancel": "Cancel",
-  "@participantPickerRestoreCancel": {
-    "description": "Отмена восстановления занимающей связи из поиска участника"
-  },
-  "participantPickerRestoreConfirm": "Restore",
-  "@participantPickerRestoreConfirm": {
-    "description": "Подтверждение восстановления занимающей связи из поиска участника"
-  },
-  "participantPickerOpenDetails": "Open intention details",
-  "@participantPickerOpenDetails": {
-    "description": "Назначение перехода к подробным данным намерения из выбора"
-  },
-  "participantPickerPurposeCreationSource": "New relation: source intention",
-  "@participantPickerPurposeCreationSource": {"description": "Подзаголовок поиска исходного намерения при создании связи"},
-  "participantPickerPurposeCreationRelated": "New relation: related intention",
-  "@participantPickerPurposeCreationRelated": {"description": "Подзаголовок поиска связанного намерения при создании связи"},
-  "participantPickerFlowCreation": "New relation",
-  "@participantPickerFlowCreation": {"description": "Строка листа назначения: создание связи"},
-  "participantPickerRoleSourceNote": "The source intention is what the related intention is needed for or can be used for.",
-  "@participantPickerRoleSourceNote": {"description": "Пояснение выбираемой роли исходного намерения в листе назначения"},
-  "participantPickerRoleRelatedNeedNote": "The related intention is what the source intention needs.",
-  "@participantPickerRoleRelatedNeedNote": {"description": "Пояснение выбираемой роли связанного намерения при виде «нужно»"},
-  "participantPickerRoleRelatedCanNote": "The related intention is what the source intention can use.",
-  "@participantPickerRoleRelatedCanNote": {"description": "Пояснение выбираемой роли связанного намерения при виде «можно»"},
-  "participantPickerRoleRelatedUndeterminedNote": "The related intention is what the source intention needs or can use.",
-  "@participantPickerRoleRelatedUndeterminedNote": {"description": "Пояснение выбираемой роли связанного намерения до выбора вида"},
-  "participantPickerFieldChoosing": "Choosing now",
-  "@participantPickerFieldChoosing": {"description": "Подпись поля связи, участника которого выбирают сейчас"},
-  "participantPickerFieldFromList": "From this list",
-  "@participantPickerFieldFromList": {"description": "Текст выбираемого поля связи без прежнего участника"},
-  "participantPickerFieldReplacing": "Instead of: {title}",
-  "@participantPickerFieldReplacing": {
-    "description": "Текст выбираемого поля связи с прежним участником этой роли",
-    "placeholders": {"title": {"type": "String"}}
-  },
-  "participantPickerFieldNotChosen": "Not chosen yet",
-  "@participantPickerFieldNotChosen": {"description": "Текст пустого поля связи"},
-  "participantPickerFieldArchived": "Archived",
-  "@participantPickerFieldArchived": {"description": "Признак архивного участника связи для экранного диктора"},
-  "participantPickerKindUndetermined": "Need or can: not chosen yet",
-  "@participantPickerKindUndetermined": {"description": "Вид связи в листе назначения, пока он не выбран"},
-  "relationEditorTitle": "New relation",
-  "@relationEditorTitle": {
-    "description": "Заголовок формы создания долговременной связи"
-  },
-  "relationEditorPhraseLabel": "Relation phrase",
-  "@relationEditorPhraseLabel": {
-    "description": "Доступная подпись текущей формулировки связи"
-  },
-  "relationEditorSourceLabel": "Source intention",
-  "@relationEditorSourceLabel": {
-    "description": "Подпись исходного участника в форме создания связи"
-  },
-  "relationEditorRelatedLabel": "Related intention",
-  "@relationEditorRelatedLabel": {
-    "description": "Подпись связанного участника в форме создания связи"
-  },
-  "relationEditorParticipantSelected": "Selected",
-  "@relationEditorParticipantSelected": {
-    "description": "Состояние выбранного участника связи"
-  },
-  "relationEditorParticipantNotSelected": "Not selected",
-  "@relationEditorParticipantNotSelected": {
-    "description": "Состояние невыбранного участника связи"
-  },
-  "relationEditorSelectSourceAction": "Select the source intention",
-  "@relationEditorSelectSourceAction": {
-    "description": "Переход к выбору исходного участника"
-  },
-  "relationEditorChangeSourceAction": "Change the source intention",
-  "@relationEditorChangeSourceAction": {
-    "description": "Замена выбранного исходного участника"
-  },
-  "relationEditorSelectRelatedAction": "Select the related intention",
-  "@relationEditorSelectRelatedAction": {
-    "description": "Переход к выбору связанного участника"
-  },
-  "relationEditorChangeRelatedAction": "Change the related intention",
-  "@relationEditorChangeRelatedAction": {
-    "description": "Замена выбранного связанного участника"
-  },
-  "relationEditorTypeLabel": "Relation type",
-  "@relationEditorTypeLabel": {
-    "description": "Подпись выбора типа связи в форме создания"
-  },
   "relationEditorTypeNeed": "Need",
   "@relationEditorTypeNeed": {
     "description": "Тип связи «нужно» в форме создания"
@@ -2149,14 +2013,6 @@
   "@relationEditorTypeCan": {
     "description": "Тип связи «можно» в форме создания"
   },
-  "relationEditorPriorityLabel": "Priority",
-  "@relationEditorPriorityLabel": {
-    "description": "Подпись выбора приоритета связи"
-  },
-  "relationEditorDescriptionLabel": "Description (optional)",
-  "@relationEditorDescriptionLabel": {
-    "description": "Подпись описания создаваемой связи"
-  },
   "relationEditorDescriptionTooLong": "Use no more than 4096 characters.",
   "@relationEditorDescriptionTooLong": {
     "description": "Превышение предела описания связи"
@@ -2164,51 +2020,6 @@
   "relationEditorDescriptionInvalidUnicode": "Enter valid Unicode text without NUL.",
   "@relationEditorDescriptionInvalidUnicode": {
     "description": "Недопустимый Unicode в описании связи"
-  },
-  "relationEditorCreateSameParticipants": "An intention can’t be related to itself.",
-  "@relationEditorCreateSameParticipants": {
-    "description": "Отказ создания связи намерения с самим собой"
-  },
-  "relationEditorMissingTitle": "To create the relation, provide:",
-  "@relationEditorMissingTitle": {
-    "description": "Объяснение недостающего обязательного выбора"
-  },
-  "relationEditorMissingSource": "the source intention",
-  "@relationEditorMissingSource": {
-    "description": "Недостающий исходный участник связи"
-  },
-  "relationEditorMissingRelated": "the related intention",
-  "@relationEditorMissingRelated": {
-    "description": "Недостающий связанный участник связи"
-  },
-  "relationEditorMissingType": "the relation type",
-  "@relationEditorMissingType": {
-    "description": "Недостающий тип связи"
-  },
-  "relationEditorMissingPriority": "a priority from P1 to P4",
-  "@relationEditorMissingPriority": {
-    "description": "Недостающий приоритет связи"
-  },
-  "relationEditorOpenExistingRelation": "Open the existing relation",
-  "@relationEditorOpenExistingRelation": {
-    "description": "Переход к связи, занявшей направленную пару"
-  },
-  "relationEditorSubmitAction": "Create relation",
-  "@relationEditorSubmitAction": {
-    "description": "Команда создания долговременной связи"
-  },
-  "relationEditorCreating": "Creating…",
-  "@relationEditorCreating": {
-    "description": "Выполняемое создание долговременной связи"
-  },
-  "relationEditorPriorityOption": "Priority {priority}",
-  "@relationEditorPriorityOption": {
-    "description": "Вариант приоритета P1–P4 в форме создания связи",
-    "placeholders": {
-      "priority": {
-        "type": "String"
-      }
-    }
   },
   "choicePathTitle": "Choose a path to an action",
   "@choicePathTitle": {"description": "Заголовок верхнего обхода"},
@@ -2250,10 +2061,14 @@
   "@choicePathContinuations": {"description": "Заголовок допустимых продолжений"},
   "choicePathLoading": "Checking available continuations…",
   "@choicePathLoading": {"description": "Загрузка допустимых продолжений"},
-  "choicePathNoPath": "There is no valid path from this intention to another action right now.",
+  "choicePathNoPath": "There is no valid path from this intention to another action right now. Only relations leading to a ready action become continuations. Mark an intention as ready or link it to an action.",
   "@choicePathNoPath": {"description": "Из исходного намерения нет допустимого пути"},
   "choicePathNoFurtherPath": "There are no further valid continuations.",
   "@choicePathNoFurtherPath": {"description": "У достигнутого шага нет продолжений"},
+  "choicePathTopNoFurtherPath": "There are no further valid continuations. Only relations leading to a ready action become continuations. Mark an intention as ready or link it to an action.",
+  "@choicePathTopNoFurtherPath": {"description": "У достигнутого шага сверху вниз нет продолжений"},
+  "choicePathOpenRelations": "Open relations",
+  "@choicePathOpenRelations": {"description": "Переход к связям из тупика выбора"},
   "choicePathConflict": "The graph has changed. Refresh the path before continuing.",
   "@choicePathConflict": {"description": "Устаревший префикс пути"},
   "choicePathRefresh": "Refresh path",
@@ -2449,5 +2264,49 @@
   "creationLeaveAction": "Leave creation",
   "@creationLeaveAction": {"description": "Выход из создания после принятия команды или завершения потока без обещания отменить запись"},
   "creationSavingContinues": "Saving will continue after you leave creation.",
-  "@creationSavingContinues": {"description": "Объяснение выхода из создания во время принятой записи"}
+  "@creationSavingContinues": {"description": "Объяснение выхода из создания во время принятой записи"},
+  "batchSubtitle": "Add to \"{group}\"",
+  "@batchSubtitle": {"placeholders": {"group": {"type": "String"}}},
+  "batchSubtitleSelected": "Add to \"{group}\" · selected {count}",
+  "@batchSubtitleSelected": {"placeholders": {"group": {"type": "String"}, "count": {"type": "int"}}},
+  "batchSheetLine": "New relations in \"{group}\"",
+  "@batchSheetLine": {"placeholders": {"group": {"type": "String"}}},
+  "batchNoteNeeds": "Each selected intention will become a relation: this intention needs it",
+  "@batchNoteNeeds": {"description": "Текст поиска участников группы"},
+  "batchNoteCanUse": "Each selected intention will become a relation: this intention can use it",
+  "@batchNoteCanUse": {"description": "Текст поиска участников группы"},
+  "batchNoteNeededFor": "Each selected intention will become a relation: it needs this intention",
+  "@batchNoteNeededFor": {"description": "Текст поиска участников группы"},
+  "batchNoteCanBeUsedFor": "Each selected intention will become a relation: it can use this intention",
+  "@batchNoteCanBeUsedFor": {"description": "Текст поиска участников группы"},
+  "batchDefaults": "Relations will have priority P4 and no description; both can be changed on the page",
+  "@batchDefaults": {"description": "Текст поиска участников группы"},
+  "batchAnchorNote": "The intention whose page you came from",
+  "@batchAnchorNote": {"description": "Текст поиска участников группы"},
+  "batchEmpty": "Nothing selected yet",
+  "@batchEmpty": {"description": "Текст поиска участников группы"},
+  "batchSelected": "Selected intentions",
+  "@batchSelected": {"description": "Текст поиска участников группы"},
+  "batchSourceSemantic": "Source intention: {name}",
+  "@batchSourceSemantic": {"placeholders": {"name": {"type": "String"}}},
+  "batchRelatedSemantic": "Related intention: {name}",
+  "@batchRelatedSemantic": {"placeholders": {"name": {"type": "String"}}},
+  "batchRemove": "Remove selection: {name}",
+  "@batchRemove": {"placeholders": {"name": {"type": "String"}}},
+  "batchAddCount": "{count, plural, one{Add {count} relation} other{Add {count} relations}}",
+  "@batchAddCount": {"description": "Кнопка внизу поиска участника группы", "placeholders": {"count": {"type": "int"}}},
+  "batchAddNone": "Add relations",
+  "@batchAddNone": {"description": "Недоступная кнопка поиска участника группы без отметок"},
+  "batchAdding": "Adding…",
+  "@batchAdding": {"description": "Кнопка поиска участника группы во время добавления"},
+  "batchDiscardTitle": "Discard selected intentions?",
+  "@batchDiscardTitle": {"description": "Вопрос перед сбросом отметок поиска"},
+  "batchDiscardMessage": "{count, plural, one{{count} relation will not be added.} other{{count} relations will not be added.}}",
+  "@batchDiscardMessage": {"description": "Число связей при сбросе отметок поиска", "placeholders": {"count": {"type": "int"}}},
+  "batchCreatedRemain": "Created intentions will remain in the catalog.",
+  "@batchCreatedRemain": {"description": "При сбросе отметок созданные намерения сохраняются"},
+  "batchDiscardAction": "Discard",
+  "@batchDiscardAction": {"description": "Сбросить отметки поиска"},
+  "batchContinueAction": "Continue selecting",
+  "@batchContinueAction": {"description": "Продолжить отмечать намерения"}
 }

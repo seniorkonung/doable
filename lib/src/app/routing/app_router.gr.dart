@@ -49,15 +49,13 @@ import 'package:doable/src/intention/presentation/details/intention_page_target.
     as _i12;
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart'
     as _i13;
+import 'package:doable/src/intention/presentation/editor/intention_creation_launch.dart'
+    as _i15;
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart'
     as _i14;
-import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart'
-    as _i15;
-import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart'
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart'
     as _i30;
-import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_choice.dart'
-    as _i31;
-import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart'
+import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart'
     as _i16;
 import 'package:flutter/foundation.dart' as _i29;
 import 'package:flutter/material.dart' as _i21;
@@ -617,119 +615,132 @@ class IntentionEditRouteArgs {
 
 /// generated route for
 /// [_i14.IntentionEditorPage]
-class IntentionEditorRoute extends _i18.PageRouteInfo<void> {
-  const IntentionEditorRoute({List<_i18.PageRouteInfo>? children})
-    : super(IntentionEditorRoute.name, initialChildren: children);
+class IntentionEditorRoute
+    extends _i18.PageRouteInfo<IntentionEditorRouteArgs> {
+  IntentionEditorRoute({
+    _i21.Key? key,
+    _i15.IntentionCreationLaunch launch =
+        const _i15.IntentionCreationStandalone(),
+    List<_i18.PageRouteInfo>? children,
+  }) : super(
+         IntentionEditorRoute.name,
+         args: IntentionEditorRouteArgs(key: key, launch: launch),
+         initialChildren: children,
+       );
 
   static const String name = 'IntentionEditorRoute';
 
   static _i18.PageInfo page = _i18.PageInfo(
     name,
     builder: (data) {
-      return const _i14.IntentionEditorPage();
-    },
-  );
-}
-
-/// generated route for
-/// [_i15.RelationEditorPage]
-class RelationEditorRoute extends _i18.PageRouteInfo<RelationEditorRouteArgs> {
-  RelationEditorRoute({
-    required _i30.RelationEditorContext editorContext,
-    _i21.Key? key,
-    List<_i18.PageRouteInfo>? children,
-  }) : super(
-         RelationEditorRoute.name,
-         args: RelationEditorRouteArgs(editorContext: editorContext, key: key),
-         initialChildren: children,
-       );
-
-  static const String name = 'RelationEditorRoute';
-
-  static _i18.PageInfo page = _i18.PageInfo(
-    name,
-    builder: (data) {
-      final args = data.argsAs<RelationEditorRouteArgs>();
-      return _i15.RelationEditorPage(
-        editorContext: args.editorContext,
-        key: args.key,
+      final args = data.argsAs<IntentionEditorRouteArgs>(
+        orElse: () => const IntentionEditorRouteArgs(),
       );
+      return _i14.IntentionEditorPage(key: args.key, launch: args.launch);
     },
   );
 }
 
-class RelationEditorRouteArgs {
-  const RelationEditorRouteArgs({required this.editorContext, this.key});
-
-  final _i30.RelationEditorContext editorContext;
+class IntentionEditorRouteArgs {
+  const IntentionEditorRouteArgs({
+    this.key,
+    this.launch = const _i15.IntentionCreationStandalone(),
+  });
 
   final _i21.Key? key;
 
+  final _i15.IntentionCreationLaunch launch;
+
   @override
   String toString() {
-    return 'RelationEditorRouteArgs{editorContext: $editorContext, key: $key}';
+    return 'IntentionEditorRouteArgs{key: $key, launch: $launch}';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    if (other is! RelationEditorRouteArgs) return false;
-    return editorContext == other.editorContext && key == other.key;
+    if (other is! IntentionEditorRouteArgs) return false;
+    return key == other.key && launch == other.launch;
   }
 
   @override
-  int get hashCode => editorContext.hashCode ^ key.hashCode;
+  int get hashCode => key.hashCode ^ launch.hashCode;
 }
 
 /// generated route for
-/// [_i16.RelationParticipantPickerPage]
-class RelationParticipantPickerRoute
-    extends _i18.PageRouteInfo<RelationParticipantPickerRouteArgs> {
-  RelationParticipantPickerRoute({
-    required _i31.RelationParticipantChoice choice,
+/// [_i16.RelationBatchPickerPage]
+class RelationBatchPickerRoute
+    extends _i18.PageRouteInfo<RelationBatchPickerRouteArgs> {
+  RelationBatchPickerRoute({
+    required _i19.IntentionId pageIntentionId,
+    required String pageTitle,
+    required _i30.IntentionRelationGroup group,
     _i23.Key? key,
     List<_i18.PageRouteInfo>? children,
   }) : super(
-         RelationParticipantPickerRoute.name,
-         args: RelationParticipantPickerRouteArgs(choice: choice, key: key),
+         RelationBatchPickerRoute.name,
+         args: RelationBatchPickerRouteArgs(
+           pageIntentionId: pageIntentionId,
+           pageTitle: pageTitle,
+           group: group,
+           key: key,
+         ),
          initialChildren: children,
        );
 
-  static const String name = 'RelationParticipantPickerRoute';
+  static const String name = 'RelationBatchPickerRoute';
 
   static _i18.PageInfo page = _i18.PageInfo(
     name,
     builder: (data) {
-      final args = data.argsAs<RelationParticipantPickerRouteArgs>();
-      return _i16.RelationParticipantPickerPage(
-        choice: args.choice,
+      final args = data.argsAs<RelationBatchPickerRouteArgs>();
+      return _i16.RelationBatchPickerPage(
+        pageIntentionId: args.pageIntentionId,
+        pageTitle: args.pageTitle,
+        group: args.group,
         key: args.key,
       );
     },
   );
 }
 
-class RelationParticipantPickerRouteArgs {
-  const RelationParticipantPickerRouteArgs({required this.choice, this.key});
+class RelationBatchPickerRouteArgs {
+  const RelationBatchPickerRouteArgs({
+    required this.pageIntentionId,
+    required this.pageTitle,
+    required this.group,
+    this.key,
+  });
 
-  final _i31.RelationParticipantChoice choice;
+  final _i19.IntentionId pageIntentionId;
+
+  final String pageTitle;
+
+  final _i30.IntentionRelationGroup group;
 
   final _i23.Key? key;
 
   @override
   String toString() {
-    return 'RelationParticipantPickerRouteArgs{choice: $choice, key: $key}';
+    return 'RelationBatchPickerRouteArgs{pageIntentionId: $pageIntentionId, pageTitle: $pageTitle, group: $group, key: $key}';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    if (other is! RelationParticipantPickerRouteArgs) return false;
-    return choice == other.choice && key == other.key;
+    if (other is! RelationBatchPickerRouteArgs) return false;
+    return pageIntentionId == other.pageIntentionId &&
+        pageTitle == other.pageTitle &&
+        group == other.group &&
+        key == other.key;
   }
 
   @override
-  int get hashCode => choice.hashCode ^ key.hashCode;
+  int get hashCode =>
+      pageIntentionId.hashCode ^
+      pageTitle.hashCode ^
+      group.hashCode ^
+      key.hashCode;
 }
 
 /// generated route for

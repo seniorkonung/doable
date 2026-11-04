@@ -89,6 +89,7 @@ void main() {
     final page = ChoicePathContinuationsPage(
       draft: ChoicePathDraftStart(_intention(1)),
       current: _current(_intention(1), IntentionReadiness.ready),
+      steps: const [],
       items: items,
       nextCursor: null,
       revision: const _Revision(),
@@ -116,12 +117,40 @@ void main() {
         ChoicePathContinuationsPage(
           draft: draft,
           current: _current(_intention(2), readiness),
+          steps: [
+            _summary(1, LongTermRelationType.need, RelationPriority.p1, 1),
+          ],
           items: const [],
           nextCursor: null,
           revision: const _Revision(),
         );
     expect(page(IntentionReadiness.ready).canConfirm, isTrue);
     expect(page(IntentionReadiness.notReady).canConfirm, isFalse);
+  });
+
+  test('страница отвергает сводки, не совпадающие с шагами черновика', () {
+    final draft = ChoicePathDraftProgress(_intention(1), [_step(1, 1, 2)]);
+    ChoicePathContinuationsPage page(List<LongTermRelationSummary> steps) =>
+        ChoicePathContinuationsPage(
+          draft: draft,
+          current: _current(_intention(2), IntentionReadiness.ready),
+          steps: steps,
+          items: const [],
+          nextCursor: null,
+          revision: const _Revision(),
+        );
+    final own = _summary(1, LongTermRelationType.need, RelationPriority.p1, 1);
+    final other = _summary(
+      2,
+      LongTermRelationType.need,
+      RelationPriority.p1,
+      2,
+    );
+
+    expect(page([own]).steps.single.relation.id, _relation(1));
+    expect(() => page(const []), throwsArgumentError);
+    expect(() => page([own, other]), throwsArgumentError);
+    expect(() => page([other]), throwsArgumentError);
   });
 
   test('нижний черновик различает действие и достигнутое основание', () {
@@ -134,6 +163,7 @@ void main() {
     final page = ChoicePathContinuationsPage(
       draft: draft,
       current: _current(_intention(3), IntentionReadiness.ready),
+      steps: const [],
       items: const [],
       nextCursor: null,
       revision: const _Revision(),
@@ -155,6 +185,7 @@ void main() {
     final page = ChoicePathContinuationsPage(
       draft: draft,
       current: _current(_intention(2), IntentionReadiness.notReady),
+      steps: [_summary(2, LongTermRelationType.need, RelationPriority.p1, 1)],
       items: const [],
       nextCursor: null,
       revision: const _Revision(),

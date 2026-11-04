@@ -335,43 +335,6 @@ void main() {
       expect((subtitleRect.left + chevronRect.right) / 2, 195);
       expect(find.byType(PathGlyph), findsNothing);
     });
-
-    for (final (mark, shape) in [
-      (TopBarPurposeMark.sourceField, PathGlyphShape.diamond),
-      (TopBarPurposeMark.relatedField, PathGlyphShape.ring),
-    ]) {
-      testWidgets('в $themeName теме отметка ${mark.name} — пунктирный '
-          '${shape.name} 12 цвета muted в 5 перед подзаголовком, а высота '
-          'панели и кнопки остаётся 44', (tester) async {
-        await _pump(
-          tester,
-          _app(
-            brightness: brightness,
-            bar: _purposeBar(subtitle: 'Для чего', mark: mark),
-          ),
-        );
-
-        final glyph = tester.widget<PathGlyph>(find.byType(PathGlyph));
-        expect(glyph.shape, shape);
-        expect(glyph.outline, PathGlyphOutline.dashed);
-        expect(glyph.size, 12);
-        expect(glyph.color, colors.muted);
-
-        expect(tester.getTopLeft(find.byKey(_body)).dy, 54 + 44);
-        expect(
-          tester.getRect(_purposeButton()),
-          const Rect.fromLTWH(56, 54, 278, 44),
-        );
-        final glyphRect = tester.getRect(find.byType(PathGlyph));
-        final subtitleRect = tester.getRect(find.text('Для чего'));
-        final chevronRect = tester.getRect(_chevron());
-        expect(glyphRect.size, const Size.square(12));
-        expect(subtitleRect.left - glyphRect.right, 5);
-        expect(glyphRect.center.dy, subtitleRect.center.dy);
-        expect(chevronRect.left - subtitleRect.right, 5);
-        expect((glyphRect.left + chevronRect.right) / 2, 195);
-      });
-    }
   }
 
   testWidgets('панель экрана правки: компактная основная кнопка стоит в '
@@ -581,52 +544,6 @@ void main() {
     }
   }
 
-  testWidgets('длинный подзаголовок с отметкой обрезается многоточием, '
-      'отметка и шеврон видны внутри кнопки высотой 44, а отметка не '
-      'озвучивается отдельно', (tester) async {
-    final semantics = tester.ensureSemantics();
-    const subtitle = 'Изменение связи: связанное намерение';
-
-    await _pump(
-      tester,
-      _app(
-        bar: _purposeBar(
-          title: 'Выбор намерения',
-          subtitle: subtitle,
-          label: 'Выбор намерения. $subtitle',
-          mark: TopBarPurposeMark.relatedField,
-        ),
-      ),
-      width: 360,
-    );
-
-    final paragraph = tester.renderObject<RenderParagraph>(find.text(subtitle));
-    expect(paragraph.didExceedMaxLines, isTrue);
-    final button = tester.getRect(_purposeButton());
-    expect(button.height, 44);
-    final glyph = tester.getRect(find.byType(PathGlyph));
-    final line = tester.getRect(find.text(subtitle));
-    final chevron = tester.getRect(_chevron());
-    expect(glyph.size, const Size.square(12));
-    expect(glyph.left, greaterThanOrEqualTo(button.left));
-    expect(line.left - glyph.right, 5);
-    expect(chevron.left - line.right, 5);
-    expect(chevron.size, const Size.square(12));
-    expect(chevron.right, lessThanOrEqualTo(button.right));
-    expect(
-      tester.getSemantics(_purposeButton()),
-      isSemantics(
-        label: 'Выбор намерения. $subtitle',
-        isButton: true,
-        hasTapAction: true,
-        hasExpandedState: true,
-        namesRoute: true,
-        children: const [],
-      ),
-    );
-    semantics.dispose();
-  });
-
   testWidgets('крестик — кнопка с названием от потребителя и вызывает его '
       'обработчик, а заголовок объявляется заголовком и называет маршрут', (
     tester,
@@ -702,6 +619,57 @@ void main() {
       semantics.dispose();
     });
   }
+
+  testWidgets('плюс с мини-значком стоит на панели со строкой назначения в '
+      'области 44, а заголовок и строка назначения не сдвигаются', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    var opens = 0;
+    await _pump(tester, _app(bar: _purposeBar()));
+    final titleRect = tester.getRect(find.text('Выбор'));
+    final subtitleRect = tester.getRect(find.text('Для чего'));
+
+    await _pump(
+      tester,
+      _app(
+        bar: _purposeBar(
+          action: TopBarAction(
+            icon: DoableIconData.plus,
+            miniIcon: DoableIconData.intentionMini,
+            label: 'Создать намерение',
+            onPressed: () => opens++,
+          ),
+        ),
+      ),
+    );
+
+    final plus = _icon(DoableIconData.plus);
+    final mini = _icon(DoableIconData.intentionMini);
+    final area = find.ancestor(of: plus, matching: find.byType(InkResponse));
+    expect(tester.widget<DoableIcon>(plus).size, 24);
+    expect(tester.widget<DoableIcon>(mini).size, 14);
+    expect(tester.getRect(area), const Rect.fromLTWH(390 - 8 - 44, 54, 44, 44));
+    expect(tester.getCenter(plus), const Offset(390 - 30, 76));
+    // Мини-значок выходит за плюс настолько же, как у кнопки NavBar.
+    expect(tester.getRect(mini).right, tester.getRect(plus).right + 8);
+    expect(tester.getRect(mini).bottom, tester.getRect(plus).bottom + 4);
+    expect(tester.getRect(find.text('Выбор')), titleRect);
+    expect(tester.getRect(find.text('Для чего')), subtitleRect);
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('Создать намерение')),
+      isSemantics(
+        label: 'Создать намерение',
+        isButton: true,
+        hasTapAction: true,
+        children: const [],
+      ),
+    );
+
+    await tester.tap(area);
+    expect(opens, 1);
+    semantics.dispose();
+  });
 
   testWidgets('при тексте масштаба 2 заголовок по-прежнему вмещается в '
       'панель по центру', (tester) async {
@@ -790,19 +758,19 @@ TopBar Function(BuildContext) _purposeBar({
   String label = 'Выбор. Для чего. Показать, что выбирается',
   bool expanded = false,
   VoidCallback? onOpen,
-  TopBarPurposeMark? mark,
+  TopBarAction? action,
 }) =>
     (context) => TopBar.withPurpose(
       context,
       title: title,
       closeLabel: 'Закрыть выбор',
       onClose: () {},
+      action: action,
       purpose: TopBarPurpose(
         subtitle: subtitle,
         label: label,
         expanded: expanded,
         onOpen: onOpen ?? () {},
-        mark: mark,
       ),
     );
 

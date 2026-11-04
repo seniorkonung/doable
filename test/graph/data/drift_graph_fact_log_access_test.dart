@@ -16,8 +16,8 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -304,15 +304,13 @@ void main() {
       );
     }
     for (final intention in related) {
-      final relation = (await confirm<LongTermRelationCreated>(
-        CreateLongTermRelation(
-          sourceIntentionId: root.id,
-          relatedIntentionId: intention.id,
-          type: LongTermRelationType.need,
-          priority: RelationPriority.p2,
-          description: null,
+      final relation = (await confirm<LongTermRelationsAdded>(
+        AddLongTermRelations(
+          pageIntentionId: root.id,
+          group: IntentionRelationGroup.needs,
+          candidateIds: [intention.id],
         ),
-      )).relation;
+      )).relations.single;
       await confirm(
         CreateDailyChoice(
           sourceIntentionId: root.id,

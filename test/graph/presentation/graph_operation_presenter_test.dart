@@ -21,6 +21,8 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
+import 'package:doable/src/long_term_relation/presentation/relation_command_failure_message.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
@@ -383,6 +385,36 @@ void main() {
       expect(find.byType(SnackBar), findsNothing);
     },
   );
+
+  for (final (locale, live, late) in [
+    (
+      const Locale('ru'),
+      'Создание — «Полное намерение»: Намерение создано и отмечено.',
+      'Создание — «Полное намерение»: Намерение создано.',
+    ),
+    (
+      const Locale('en'),
+      'Create — “Полное намерение”: Intention created and selected.',
+      'Create — “Полное намерение”: Intention created.',
+    ),
+  ]) {
+    for (final released in [false, true]) {
+      testWidgets('создание для поиска сообщает исход с учётом ухода, '
+          '${locale.languageCode}, освобождено: $released', (tester) async {
+        final harness = await _pumpPresenterApp(tester, locale: locale);
+        final creation = harness.startFullCreation(
+          releaseInitiator: released,
+          target: const CreatingIntentionForSearchOperationTarget(),
+        );
+        harness.completeFullCreated(creation);
+        await tester.pumpAndSettle();
+
+        expect(find.text(released ? late : live), findsOneWidget);
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+      });
+    }
+  }
 
   // Язык не меняет путь предъявления, поэтому достаточно русского.
   const fullCreation = (
@@ -1185,36 +1217,114 @@ void main() {
     );
   });
 
-  testWidgets('успех создания связи сразу предъявляется общей поверхностью', (
-    tester,
-  ) async {
-    final harness = await _pumpPresenterApp(tester);
-    final relation = harness.startRelationCreation(releaseInitiator: false);
-    harness.completeRelationCreated(relation);
-    await tester.pumpAndSettle();
-
-    expect(find.text(_relationCreated), findsOneWidget);
-
-    await _closeMessage(tester);
-    expect(find.byType(SnackBar), findsNothing);
-  });
-
-  for (final scenario in _relationFailures) {
+  for (final scenario in [
+    (
+      locale: 'ru',
+      count: 1,
+      message: 'Добавление — «связи»: Добавлена 1 связь.',
+    ),
+    (
+      locale: 'ru',
+      count: 3,
+      message: 'Добавление — «связи»: Добавлено 3 связи.',
+    ),
+    (
+      locale: 'ru',
+      count: 5,
+      message: 'Добавление — «связи»: Добавлено 5 связей.',
+    ),
+    (locale: 'en', count: 1, message: 'Add — “relations”: 1 relation added.'),
+    (locale: 'en', count: 3, message: 'Add — “relations”: 3 relations added.'),
+  ]) {
     testWidgets(
-      'переданная ошибка создания связи «${scenario.name}» предъявляется безопасным текстом',
+      'успех добавления называет число из результата: ${scenario.locale} ${scenario.count}',
       (tester) async {
-        final harness = await _pumpPresenterApp(tester);
-        final relation = harness.startRelationCreation();
-        harness.completeRelationFailure(relation, scenario.failure);
+        final harness = await _pumpPresenterApp(
+          tester,
+          locale: Locale(scenario.locale),
+        );
+        final accepted = harness.startRelationsAddition(
+          count: scenario.count,
+          releaseInitiator: false,
+        );
+        harness.completeRelationsAdded(accepted, scenario.count);
         await tester.pumpAndSettle();
-
-        expect(find.text(_relationOutcome(scenario.outcome)), findsOneWidget);
-
-        await _closeMessage(tester);
-        expect(find.byType(SnackBar), findsNothing);
+        expect(find.text(scenario.message), findsOneWidget);
       },
     );
   }
+
+  testWidgets(
+    'поздний отказ добавления появляется один раз после ухода поиска',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final accepted = harness.startRelationsAddition();
+      harness.completeRelationFailure(
+        accepted,
+        const LongTermRelationUnavailableFailure(),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Add — “relations”: No relations were created. Try again.'),
+        findsOneWidget,
+      );
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
+
+  test('отказы добавления объясняют отсутствие всех связей на обоих языках', () {
+    final scenarios = [
+      (
+        failure: LongTermRelationPairOccupiedFailure(_relationId),
+        ru: 'Некоторые выбранные намерения уже связаны с этим намерением. Связи не созданы.',
+        en: 'Some selected intentions are already linked to this intention. No relations were created.',
+      ),
+      (
+        failure: LongTermRelationParticipantNotFoundFailure(
+          role: RelationParticipantRole.related,
+          intentionId: testDetailsIntentionId(2),
+        ),
+        ru: 'Одно из выбранных намерений больше не существует. Связи не созданы.',
+        en: 'A selected intention no longer exists. No relations were created.',
+      ),
+      (
+        failure: LongTermRelationParticipantArchivedFailure(
+          role: RelationParticipantRole.source,
+          intentionId: testDetailsIntentionId(1),
+        ),
+        ru: 'Связать можно только активные намерения. Связи не созданы.',
+        en: 'Only active intentions can be linked. No relations were created.',
+      ),
+      (
+        failure: const LongTermRelationUnavailableFailure(),
+        ru: 'Связи не созданы. Повторите попытку.',
+        en: 'No relations were created. Try again.',
+      ),
+      (
+        failure: const LongTermRelationCorruptionFailure(),
+        ru: 'Сохранённые данные повреждены. Связи не созданы.',
+        en: 'Stored data is damaged. No relations were created.',
+      ),
+      (
+        failure: const LongTermRelationUnexpectedFailure(),
+        ru: 'Связи не созданы из-за непредвиденной ошибки.',
+        en: 'No relations were created because of an unexpected error.',
+      ),
+    ];
+    for (final scenario in scenarios) {
+      for (final locale in [const Locale('ru'), const Locale('en')]) {
+        expect(
+          longTermRelationCommandFailureMessage(
+            lookupAppLocalizations(locale),
+            LongTermRelationCommandKind.add,
+            scenario.failure,
+          ),
+          locale.languageCode == 'ru' ? scenario.ru : scenario.en,
+        );
+      }
+    }
+  });
 
   for (final scenario in _relationUpdateFailures) {
     testWidgets(
@@ -1604,10 +1714,6 @@ String _linkedNotDeleted(String title) =>
     'block deletion. Archived relations and relations that aren’t loaded yet '
     'block it too.';
 
-String _relationOutcome(String outcome) => 'Create — “new relation”: $outcome';
-
-final _relationCreated = _relationOutcome('Relation created.');
-
 String _relationUpdateOutcome(String outcome) => 'Edit — “relation”: $outcome';
 
 String _relationRestoreOutcome(String outcome) =>
@@ -1615,50 +1721,6 @@ String _relationRestoreOutcome(String outcome) =>
 
 String _relationDeleteOutcome(String outcome) =>
     'Delete — “relation”: $outcome';
-
-final _relationFailures =
-    <({String name, LongTermRelationCommandFailure failure, String outcome})>[
-      (
-        name: 'conflict',
-        failure: LongTermRelationPairOccupiedFailure(_relationId),
-        outcome:
-            'A relation with this direction already exists between the '
-            'selected intentions.',
-      ),
-      (
-        name: 'notFound',
-        failure: LongTermRelationParticipantNotFoundFailure(
-          role: RelationParticipantRole.related,
-          intentionId: testDetailsIntentionId(2),
-        ),
-        outcome: 'One of the selected intentions no longer exists.',
-      ),
-      (
-        name: 'archived',
-        failure: LongTermRelationParticipantArchivedFailure(
-          role: RelationParticipantRole.source,
-          intentionId: testDetailsIntentionId(1),
-        ),
-        outcome: 'Only active intentions can be linked.',
-      ),
-      (
-        name: 'unavailable',
-        failure: const LongTermRelationUnavailableFailure(),
-        outcome: 'The relation couldn’t be created. Try again.',
-      ),
-      (
-        name: 'corruption',
-        failure: const LongTermRelationCorruptionFailure(),
-        outcome: 'Stored data is damaged. The relation wasn’t created.',
-      ),
-      (
-        name: 'unexpected',
-        failure: const LongTermRelationUnexpectedFailure(),
-        outcome:
-            'The relation couldn’t be created because of an unexpected '
-            'error.',
-      ),
-    ];
 
 const _relationUpdateUnexpected =
     'The relation couldn’t be updated because of an unexpected error.';
@@ -2093,7 +2155,11 @@ final class _PresenterHarness {
   }
 
   /// Создание с готовностью и двумя тегами из отдельной формы.
-  IntentionCommandAccepted startFullCreation({required bool releaseInitiator}) {
+  IntentionCommandAccepted startFullCreation({
+    required bool releaseInitiator,
+    IntentionCreationOperationTarget target =
+        const CreatingIntentionOperationTarget(),
+  }) {
     final commandIndex = repository.commands.length;
     final accepted = _coordinator.acceptCreation(
       IntentionCreationFormKey(),
@@ -2103,6 +2169,7 @@ final class _PresenterHarness {
         readiness: IntentionReadiness.ready,
         tagIds: [_tagId, _otherTagId],
       ),
+      target: target,
     ) as IntentionCommandAccepted;
     if (releaseInitiator) {
       _coordinator.releaseInitiatorPresentation(accepted.token);
@@ -2171,18 +2238,19 @@ final class _PresenterHarness {
     );
   }
 
-  LongTermRelationCommandAccepted startRelationCreation({
+  LongTermRelationCommandAccepted startRelationsAddition({
+    int count = 1,
     bool releaseInitiator = true,
   }) {
     final commandIndex = repository.relationCommands.length;
-    final accepted = _coordinator.acceptRelationCreation(
-      LongTermRelationCreationFormKey(),
-      CreateLongTermRelation(
-        sourceIntentionId: testDetailsIntentionId(1),
-        relatedIntentionId: testDetailsIntentionId(2),
-        type: LongTermRelationType.need,
-        priority: RelationPriority.p2,
-        description: null,
+    final accepted = _coordinator.acceptRelationsAddition(
+      RelationsAdditionSearchKey(),
+      AddLongTermRelations(
+        pageIntentionId: testDetailsIntentionId(1),
+        group: IntentionRelationGroup.needs,
+        candidateIds: [
+          for (var i = 0; i < count; i++) testDetailsIntentionId(i + 2),
+        ],
       ),
     ) as LongTermRelationCommandAccepted;
     if (releaseInitiator) {
@@ -2190,6 +2258,39 @@ final class _PresenterHarness {
     }
     _relationIndexes[accepted] = commandIndex;
     return accepted;
+  }
+
+  void completeRelationsAdded(
+    LongTermRelationCommandAccepted accepted,
+    int count,
+  ) {
+    const revision = TestDetailsRevision(1);
+    final relations = [
+      for (var i = 0; i < count; i++)
+        testDetailsRelationRow(
+          ownerId: testDetailsIntentionId(1),
+          index: i + 1,
+          neighborId: testDetailsIntentionId(i + 2),
+        ).relation,
+    ];
+    repository.completeRelationCommand(
+      _relationIndexes[accepted]!,
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: LongTermRelationsAdded(
+            relations: relations,
+            changes: [
+              for (final relation in relations)
+                LongTermRelationCreatedChange(
+                  revision: revision,
+                  relation: relation,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   LongTermRelationCommandAccepted startRelationUpdate({
@@ -2260,39 +2361,6 @@ final class _PresenterHarness {
   /// Подтверждает кадр инлайн-renderer, который владеет [claim].
   void confirmPresentation(GraphInitiatorPresentationClaim claim) =>
       _coordinator.confirmPresentation(claim);
-
-  void completeRelationCreated(LongTermRelationCommandAccepted accepted) {
-    const revision = TestDetailsRevision(1);
-    final relation = LongTermRelation(
-      id: _relationId,
-      sourceIntentionId: testDetailsIntentionId(1),
-      relatedIntentionId: testDetailsIntentionId(2),
-      type: LongTermRelationType.need,
-      priority: RelationPriority.p2,
-      scope: RelationScope.active,
-      creationSequence: RelationCreationSequence(1),
-      createdAt: RelationTimestamp(DateTime.utc(2026)),
-      updatedAt: RelationTimestamp(DateTime.utc(2026)),
-    );
-    repository.completeRelationCommand(
-      _relationIndexes[accepted]!,
-      GraphCommandSucceeded(
-        ConfirmedGraphResult(
-          revision: revision,
-          value: LongTermRelationCreated(
-            relation: relation,
-            description: null,
-            changes: <GraphChange>[
-              LongTermRelationCreatedChange(
-                revision: revision,
-                relation: relation,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   void completeRelationUpdated(LongTermRelationCommandAccepted accepted) {
     const revision = TestDetailsRevision(2);

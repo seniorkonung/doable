@@ -18,9 +18,9 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -138,16 +138,14 @@ void main() {
   Future<LongTermRelation> relate(
     Intention source,
     Intention related, {
-    LongTermRelationType type = LongTermRelationType.need,
-  }) async => (await confirm<LongTermRelationCreated>(
-    CreateLongTermRelation(
-      sourceIntentionId: source.id,
-      relatedIntentionId: related.id,
-      type: type,
-      priority: RelationPriority.p2,
-      description: null,
+    IntentionRelationGroup group = IntentionRelationGroup.needs,
+  }) async => (await confirm<LongTermRelationsAdded>(
+    AddLongTermRelations(
+      pageIntentionId: source.id,
+      group: group,
+      candidateIds: [related.id],
     ),
-  )).relation;
+  )).relations.single;
 
   test('команды тегов: создание цветного и бесцветного тегов, '
       'переименование, правка только цвета, возврат к «Без цвета», '
@@ -218,7 +216,7 @@ void main() {
     final running = await createIntention('Бегать');
     final swimming = await createIntention('Плавать');
     await relate(health, running);
-    await relate(swimming, health, type: LongTermRelationType.can);
+    await relate(swimming, health, group: IntentionRelationGroup.canUse);
     final reading = (await confirm<IntentionSaved>(
       CreateIntention.withInitialState(
         title: 'Читать',
@@ -265,15 +263,18 @@ void main() {
     final health = await createIntention('Здоровье');
     final running = await createIntention('Бегать');
     final swimming = await createIntention('Плавать');
-    final relation = (await confirm<LongTermRelationCreated>(
-      CreateLongTermRelation(
-        sourceIntentionId: health.id,
-        relatedIntentionId: running.id,
-        type: LongTermRelationType.need,
-        priority: RelationPriority.p2,
-        description: LongTermRelationDescription.fromInput('Сначала разминка'),
+    final relation = await relate(health, running);
+    await confirm(
+      UpdateLongTermRelation(
+        relationId: relation.id,
+        patch: LongTermRelationPatch(
+          priority: const LongTermRelationFieldSet(RelationPriority.p2),
+          description: LongTermRelationDescriptionPatch.fromInput(
+            'Сначала разминка',
+          ),
+        ),
       ),
-    )).relation;
+    );
     await relate(health, swimming);
 
     await confirm(

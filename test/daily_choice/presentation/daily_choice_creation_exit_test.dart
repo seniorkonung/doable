@@ -21,6 +21,7 @@ import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -34,6 +35,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'daily_choice_picker_launch_test_support.dart'
+    show TestDailyChoicePickerLaunch;
 import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
@@ -127,27 +130,26 @@ void main() {
     (ChoicePathDraftDirection.topDown, _Step.path),
     (ChoicePathDraftDirection.bottomUp, _Step.confirmation),
   ]) {
-    testWidgets(
-      'отмена $direction из $step сохраняет историю и чужой черновик',
-      (tester) async {
-        final app = await _launch(tester, direction, step);
-        final exit = find.byType(CreationExitAction);
-        expect(exit, findsOneWidget);
-        await tester.ensureVisible(exit);
-        await tester.tap(
-          find.descendant(of: exit, matching: find.byType(TextButton)),
-        );
-        await tester.pumpAndSettle();
-        await _expectOriginalHistory(tester, app);
-        expect(app.completions, isEmpty);
-        expect(app.repository.commands, 0);
-        expect(
-          await app.database.customSelect('SELECT id FROM daily_choices').get(),
-          hasLength(1),
-        );
-        expect(tester.takeException(), isNull);
-      },
-    );
+    testWidgets('отмена $direction из $step сохраняет историю и чужой поиск', (
+      tester,
+    ) async {
+      final app = await _launch(tester, direction, step);
+      final exit = find.byType(CreationExitAction);
+      expect(exit, findsOneWidget);
+      await tester.ensureVisible(exit);
+      await tester.tap(
+        find.descendant(of: exit, matching: find.byType(TextButton)),
+      );
+      await tester.pumpAndSettle();
+      await _expectOriginalHistory(tester, app);
+      expect(app.completions, isEmpty);
+      expect(app.repository.commands, 0);
+      expect(
+        await app.database.customSelect('SELECT id FROM daily_choices').get(),
+        hasLength(1),
+      );
+      expect(tester.takeException(), isNull);
+    });
   }
   for (final (direction, cancelFirst) in [
     (ChoicePathDraftDirection.topDown, true),
@@ -346,12 +348,15 @@ Future<_App> _launch(
     router.push(IntentionDetailsRoute(intentionId: durabilityIntention(1))),
   );
   await tester.pumpAndSettle();
-  await tester.tap(find.text('Связи'));
+  unawaited(
+    router.push(
+      DailyChoiceActionPickerRoute(launch: TestDailyChoicePickerLaunch()),
+    ),
+  );
   await tester.pumpAndSettle();
-  await _tap(tester, 'intention-relations-add');
   await tester.enterText(
-    find.byKey(const ValueKey('relation-editor-description')),
-    'Чужой черновик',
+    find.byKey(const ValueKey('daily-choice-action-filter')),
+    'Намерение 3',
   );
   unawaited(
     router.push(IntentionDetailsRoute(intentionId: durabilityIntention(2))),
@@ -413,12 +418,19 @@ Future<void> _expectOriginalHistory(WidgetTester tester, _App app) async {
   await tester.pumpAndSettle();
   expect(
     tester
-        .widget<TextField>(
-          find.byKey(const ValueKey('relation-editor-description')),
+        .widget<EditableText>(
+          find.descendant(
+            of: find.byKey(const ValueKey('daily-choice-action-filter')),
+            matching: find.byType(EditableText),
+          ),
         )
-        .controller!
+        .controller
         .text,
-    'Чужой черновик',
+    'Намерение 3',
+  );
+  expect(
+    find.byKey(ValueKey('daily-choice-action-${durabilityUuid(3)}')),
+    findsOneWidget,
   );
 }
 
@@ -475,6 +487,10 @@ final class _Repository implements PersonalGraphRepository {
   Stream<Result<GraphSnapshot<IntentionDetails?>>> watchIntention(
     IntentionId id,
   ) => delegate.watchIntention(id);
+  @override
+  Future<Result<IntentionCatalogPage>> getCatalogPage(
+    IntentionCatalogQuery query,
+  ) => delegate.getCatalogPage(query);
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
     RelationGroupPageQuery query,

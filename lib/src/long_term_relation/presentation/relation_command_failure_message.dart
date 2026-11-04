@@ -8,24 +8,22 @@ String longTermRelationCommandFailureMessage(
   LongTermRelationCommandKind kind,
   LongTermRelationCommandFailure failure,
 ) => switch (kind) {
-  LongTermRelationCommandKind.create => switch (failure) {
+  LongTermRelationCommandKind.add => switch (failure) {
     LongTermRelationPairOccupiedFailure() =>
-      localizations.relationEditorCreatePairOccupied,
-    LongTermRelationNotFoundFailure() =>
-      localizations.relationEditorCreateUnexpected,
-    LongTermRelationReferencedByDailyPathFailure() ||
-    LongTermRelationArchivedTypeChangeFailure() =>
-      localizations.relationEditorCreateUnexpected,
+      localizations.relationsAdditionPairOccupied,
     LongTermRelationParticipantNotFoundFailure() =>
-      localizations.relationEditorCreateParticipantNotFound,
+      localizations.relationsAdditionParticipantNotFound,
     LongTermRelationParticipantArchivedFailure() =>
-      localizations.relationEditorCreateParticipantArchived,
+      localizations.relationsAdditionParticipantArchived,
     LongTermRelationUnavailableFailure() =>
-      localizations.relationEditorCreateUnavailable,
+      localizations.relationsAdditionUnavailable,
     LongTermRelationCorruptionFailure() =>
-      localizations.relationEditorCreateCorruption,
+      localizations.relationsAdditionCorruption,
+    LongTermRelationNotFoundFailure() ||
+    LongTermRelationReferencedByDailyPathFailure() ||
+    LongTermRelationArchivedTypeChangeFailure() ||
     LongTermRelationUnexpectedFailure() =>
-      localizations.relationEditorCreateUnexpected,
+      localizations.relationsAdditionUnexpected,
   },
   LongTermRelationCommandKind.update => switch (failure) {
     LongTermRelationNotFoundFailure() =>

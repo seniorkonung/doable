@@ -5,9 +5,12 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
+import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/app/quick_creation/quick_creation_button.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
@@ -24,16 +27,14 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_options.dart';
-import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
-import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_page.dart';
-import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
-import 'package:doable/src/long_term_relation/presentation/participant_picker/relation_participant_picker_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../daily_choice/presentation/daily_choice_picker_launch_test_support.dart'
+    show TestDailyChoicePickerLaunch;
 import '../../intention/presentation/details/details_test_support.dart';
 import '../../intention/presentation/picker/intention_picker_test_support.dart';
 import '../../long_term_relation/presentation/details/relation_details_test_support.dart'
@@ -52,7 +53,6 @@ const _deleteSuccess = 'Удаление — «Намерение»: Намер�
 const _deleteFailure =
     'Удаление — «Намерение»: Не удалось удалить намерение. Повторите попытку.';
 const _relationDeleteSuccess = 'Удаление — «связь»: Связь удалена.';
-const _description = ValueKey('relation-editor-description');
 
 void main() {
   setUp(() {
@@ -164,98 +164,65 @@ void main() {
     _expectRoot(tester, app.router, destination);
   });
 
-  testWidgets('позднее удаление связи после сброса к другому пункту '
-      'сохраняет новую форму и её ввод до освобождения прежней страницы', (
-    tester,
-  ) async {
-    final app = await _ControlledApp.start(tester);
-    await app.openRelationSourceDetails(tester);
-    await app.openRelationDetails(tester);
-    await app.deleteRelation(tester);
-    await app.openParticipantAbovePanel(tester);
+  testWidgets(
+    'позднее удаление связи после сброса к другому пункту '
+    'сохраняет новый поиск действия и его подстроку до освобождения прежней страницы',
+    (tester) async {
+      final app = await _ControlledApp.start(tester);
+      await app.openRelationSourceDetails(tester);
+      await app.openRelationDetails(tester);
+      await app.deleteRelation(tester);
+      await app.openParticipantAbovePanel(tester);
 
-    await _select(tester, destination, settle: false);
-    await app.openRelationSourceDetails(tester);
-    unawaited(
-      app.router.push(
-        RelationEditorRoute(
-          editorContext: RelationCreationContext(
-            participant: RelationParticipantSummary(
-              id: testDetailsIntentionId(3),
-              title: 'Независимый участник',
-              archiveState: IntentionArchiveState.active,
-            ),
-            group: IntentionRelationGroup.needs,
-          ),
-        ),
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
-    const text = 'Несохранённое описание после сброса просмотра связи';
-    await tester.pump();
-    await tester.enterText(find.byKey(_description), text);
-    expect(find.text(text), findsOneWidget);
+      await _select(tester, destination, settle: false);
+      await app.openRelationSourceDetails(tester);
+      const text = 'Подстрока после удаления связи';
+      await _openActionSearch(tester, app.router, text);
 
-    app.completeRelationDelete();
-    await _until(
-      tester,
-      () => !app.coordinator.isRelationRunning(app.relationDetails.relation.id),
-    );
-    await tester.pumpAndSettle();
+      app.completeRelationDelete();
+      await _until(
+        tester,
+        () =>
+            !app.coordinator.isRelationRunning(app.relationDetails.relation.id),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text(text), findsOneWidget);
-    expect(app.router.stack.map((page) => page.name), [
-      AppShellRoute.name,
-      IntentionDetailsRoute.name,
-      RelationEditorRoute.name,
-    ]);
-    expect(find.text(_relationDeleteSuccess), findsOneWidget);
-    await _expireMessages(tester);
-    expect(
-      app.repository.relationCommands.single,
-      isA<DeleteLongTermRelation>(),
-    );
-    expect(app.repository.commands, isEmpty);
+      expect(find.text(text), findsOneWidget);
+      expect(app.router.stack.map((page) => page.name), [
+        AppShellRoute.name,
+        IntentionDetailsRoute.name,
+        DailyChoiceActionPickerRoute.name,
+      ]);
+      expect(find.text(_relationDeleteSuccess), findsOneWidget);
+      await _expireMessages(tester);
+      expect(
+        app.repository.relationCommands.single,
+        isA<DeleteLongTermRelation>(),
+      );
+      expect(app.repository.commands, isEmpty);
 
-    unawaited(app.router.maybePop());
-    await tester.pumpAndSettle();
-    expect(find.byType(Sheet, skipOffstage: false), findsNothing);
-    await app.answerSourceReread(tester);
-    await _expectSourceActiveRelationCount(tester, 0);
-    unawaited(app.router.maybePop());
-    await tester.pumpAndSettle();
-    _expectRoot(tester, app.router, destination);
-  });
+      unawaited(app.router.maybePop());
+      await tester.pumpAndSettle();
+      expect(find.byType(Sheet, skipOffstage: false), findsNothing);
+      await app.answerSourceReread(tester);
+      await _expectSourceActiveRelationCount(tester, 0);
+      unawaited(app.router.maybePop());
+      await tester.pumpAndSettle();
+      _expectRoot(tester, app.router, destination);
+    },
+  );
 
   testWidgets(
     'позднее удаление намерения после сброса к другому пункту '
-    'сохраняет новую форму связи и её ввод до освобождения прежней страницы',
+    'сохраняет новый поиск действия и его подстроку до освобождения прежней страницы',
     (tester) async {
       final app = await _ControlledApp.start(tester);
       await app.openDetails(tester);
       await app.delete(tester);
 
       await _select(tester, destination, settle: false);
-      unawaited(
-        app.router.push(
-          RelationEditorRoute(
-            editorContext: RelationCreationContext(
-              participant: RelationParticipantSummary(
-                id: testDetailsIntentionId(2),
-                title: 'Независимый участник',
-                archiveState: IntentionArchiveState.active,
-              ),
-              group: IntentionRelationGroup.needs,
-            ),
-          ),
-        ),
-      );
-      await tester.pump();
-      await tester.pump();
-      const text = 'Несохранённое описание новой связи';
-      await tester.enterText(find.byKey(_description), text);
-      expect(find.text(text), findsOneWidget);
+      const text = 'Подстрока после удаления намерения';
+      await _openActionSearch(tester, app.router, text);
 
       app.complete(
         testDetailsDeletedResult(
@@ -269,7 +236,7 @@ void main() {
       expect(find.text(text), findsOneWidget);
       expect(app.router.stack.map((page) => page.name), [
         AppShellRoute.name,
-        RelationEditorRoute.name,
+        DailyChoiceActionPickerRoute.name,
       ]);
       expect(find.text(_deleteSuccess), findsOneWidget);
       await _expireMessages(tester);
@@ -372,6 +339,53 @@ void main() {
     expect(find.text(app.intention.title), findsNothing);
   });
 
+  testWidgets('позднее удаление намерения сохраняет панель создания с '
+      'несохранённым описанием, открытую после сброса истории', (tester) async {
+    const draft = 'Несохранённое описание';
+    final app = await _ControlledApp.start(tester);
+    await app.openDetails(tester);
+    await app.delete(tester);
+
+    await _select(tester, AppDestination.intentionGraph, settle: false);
+    // Панель навигации принимает нажатие только после перелёта общего Hero,
+    // поэтому кнопку нажимаем в первый же доступный момент.
+    final quickCreation = find.byType(QuickCreationButton).hitTestable();
+    await _until(tester, () => quickCreation.evaluate().isNotEmpty);
+    await tester.tap(quickCreation.first);
+    await tester.pump();
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const ValueKey('intention-editor-description')),
+      draft,
+    );
+    await tester.pump();
+
+    app.complete(
+      testDetailsDeletedResult(
+        app.intention,
+        revision: const TestDetailsRevision(1),
+      ),
+    );
+    await _until(tester, () => !app.coordinator.isRunning(app.intention.id));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(IntentionEditorPage), findsOneWidget);
+    expect(find.text(draft), findsOneWidget);
+    expect(
+      find.byType(IntentionDetailsPage, skipOffstage: false),
+      findsNothing,
+    );
+    expect(
+      tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
+      AppDestination.intentionGraph,
+    );
+    // Одно сообщение рисуется в каждом корневом `Scaffold`.
+    expect(find.text(_deleteSuccess), findsWidgets);
+    await _expireMessages(tester);
+    expect(find.text(draft), findsOneWidget);
+    expect(app.repository.commands.single, isA<DeleteIntention>());
+  });
+
   testWidgets('успешный повтор удаления после отказа закрывает только '
       'принявшую повтор страницу', (tester) async {
     final app = await _ControlledApp.start(tester);
@@ -471,46 +485,70 @@ void main() {
     expect(app.repository.commands, hasLength(1));
   });
 
-  testWidgets('сброс над поиском участника возвращает отмену и освобождает '
-      'ожидающую форму без продолжения потока', (tester) async {
-    final app = await _ControlledApp.start(tester);
-    unawaited(
-      app.router.push(
-        RelationEditorRoute(
-          editorContext: RelationCreationContext(
-            participant: RelationParticipantSummary(
-              id: testDetailsIntentionId(2),
-              title: 'Исходное намерение',
-              archiveState: IntentionArchiveState.active,
-            ),
-            group: IntentionRelationGroup.needs,
+  testWidgets(
+    'сброс над поиском действия закрывает поиск и страницу без команды',
+    (tester) async {
+      final app = await _ControlledApp.start(tester);
+      await _openActionSearch(tester, app.router, 'Намерение');
+      await _until(tester, () => intentionPickerRows.evaluate().isNotEmpty);
+      final latePick = intentionPickerPick(tester, intentionPickerRows.first);
+      await tester.tap(intentionPickerArrow(intentionPickerRows.first));
+      await tester.pump();
+      await tester.pump();
+      app.repository.detailRequests.single.add(ResultSuccess(app.intention));
+      await tester.pumpAndSettle();
+
+      await _select(tester, AppDestination.home);
+
+      expect(
+        find.byType(DailyChoiceActionPickerPage, skipOffstage: false),
+        findsNothing,
+      );
+      expect(find.byType(AlertDialog), findsNothing);
+      _expectRoot(tester, app.router, AppDestination.home);
+      latePick();
+      await tester.pumpAndSettle();
+      _expectRoot(tester, app.router, AppDestination.home);
+      expect(app.repository.commands, isEmpty);
+      expect(app.repository.relationCommands, isEmpty);
+    },
+  );
+}
+
+Future<void> _openActionSearch(
+  WidgetTester tester,
+  AppRouter router,
+  String text,
+) async {
+  unawaited(
+    router.push(
+      DailyChoiceActionPickerRoute(launch: TestDailyChoicePickerLaunch()),
+    ),
+  );
+  await _until(
+    tester,
+    () => find
+        .byKey(const ValueKey('daily-choice-action-filter'))
+        .evaluate()
+        .isNotEmpty,
+  );
+  await tester.enterText(
+    find.byKey(const ValueKey('daily-choice-action-filter')),
+    text,
+  );
+  await tester.pump();
+  expect(
+    tester
+        .widget<EditableText>(
+          find.descendant(
+            of: find.byKey(const ValueKey('daily-choice-action-filter')),
+            matching: find.byType(EditableText),
           ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('relation-editor-select-related')),
-    );
-    await tester.pumpAndSettle();
-    final picker = find.byType(RelationParticipantPickerPage);
-    await tester.tap(intentionPickerArrow(intentionPickerRows.first));
-    await tester.pump();
-    await tester.pump();
-    app.repository.detailRequests.single.add(ResultSuccess(app.intention));
-    await tester.pumpAndSettle();
-
-    await _select(tester, AppDestination.home);
-
-    expect(find.byType(RelationEditorPage, skipOffstage: false), findsNothing);
-    expect(picker, findsNothing);
-    _expectRoot(tester, app.router, AppDestination.home);
-    await tester.pump(const Duration(seconds: 1));
-    await tester.pumpAndSettle();
-    _expectRoot(tester, app.router, AppDestination.home);
-    expect(app.repository.commands, isEmpty);
-    expect(app.repository.relationCommands, isEmpty);
-  });
+        )
+        .controller
+        .text,
+    text,
+  );
 }
 
 /// Кнопка параметров в шапке панели связи.

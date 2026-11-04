@@ -8,6 +8,7 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_id_generator.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -63,14 +64,10 @@ void main() {
         );
         final result = switch (operation) {
           _GraphOperation.create => await repository.execute(
-            CreateLongTermRelation(
-              sourceIntentionId: _intentionId(_sourceIdValue),
-              relatedIntentionId: _intentionId(_firstNeighborIdValue),
-              type: LongTermRelationType.need,
-              priority: RelationPriority.p2,
-              description: LongTermRelationDescription.fromInput(
-                'Создано дочерним процессом',
-              ),
+            AddLongTermRelations(
+              pageIntentionId: _intentionId(_sourceIdValue),
+              group: IntentionRelationGroup.needs,
+              candidateIds: [_intentionId(_firstNeighborIdValue)],
             ),
           ),
           _GraphOperation.cascade => await repository.execute(

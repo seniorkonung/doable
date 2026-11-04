@@ -12,6 +12,7 @@ import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/daily_choice_creation_flow_session.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_state.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_view_model.dart';
+import 'package:doable/src/daily_choice/presentation/path/choice_path_view_model.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -386,4 +387,5 @@ ChoicePathStepId _stepId(int index) => switch (ChoicePathStepId.decode(
 DailyChoiceCreationFlowSession _session() => DailyChoiceCreationFlowSession(
   rootMatchId: UniqueKey(),
   originalHistory: const [],
+  pathInstance: ChoicePathPageInstance(),
 );

@@ -1111,6 +1111,7 @@ void main() {
     final row = _summary(id: '00000000-0000-4000-8000-000000000001');
     final occupant = PairOccupant(
       relationId: _relationId('00000000-0000-4000-8000-0000000000a1'),
+      type: LongTermRelationType.need,
       scope: RelationScope.archived,
     );
 

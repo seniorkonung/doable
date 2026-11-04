@@ -9,6 +9,7 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -306,6 +307,49 @@ void main() {
         (archived as ChoicePathContinuationError).failure,
         isA<ChoicePathContinuationSnapshotExpired>(),
       );
+    },
+  );
+
+  test(
+    'сводки шагов несут новые название и приоритет в обоих направлениях',
+    () async {
+      fixture.intention(1);
+      fixture.intention(2);
+      fixture.intention(3, ready: true);
+      fixture.relation(101, 1, 2);
+      fixture.relation(102, 2, 3);
+      seedRawGraph(fixture.raw, () {
+        fixture.raw.execute('UPDATE intentions SET title = ? WHERE id = ?', [
+          'Новое название',
+          _uuid(2),
+        ]);
+        fixture.raw.execute(
+          'UPDATE long_term_relations SET priority = ? WHERE id = ?',
+          [4, _uuid(102)],
+        );
+      });
+
+      final topDown = await fixture.page(
+        fixture.progress(1, [(101, 1, 2), (102, 2, 3)]),
+      );
+      final bottomUp = await fixture.page(
+        fixture.bottomProgress(3, [(102, 2, 3), (101, 1, 2)]),
+      );
+
+      expect(topDown.steps.map((step) => step.relation.id), [
+        _relation(101),
+        _relation(102),
+      ]);
+      expect(topDown.steps.first.related.title, 'Новое название');
+      expect(topDown.steps.last.source.title, 'Новое название');
+      expect(topDown.steps.last.relation.priority, RelationPriority.p4);
+      expect(bottomUp.steps.map((step) => step.relation.id), [
+        _relation(102),
+        _relation(101),
+      ]);
+      expect(bottomUp.steps.first.source.title, 'Новое название');
+      expect(bottomUp.steps.first.relation.priority, RelationPriority.p4);
+      expect(bottomUp.steps.last.related.title, 'Новое название');
     },
   );
 
@@ -636,12 +680,10 @@ void main() {
     final draft = ChoicePathDraftStart(_intention(1));
     final first = await fixture.page(draft, pageSize: 1);
     final mutation = await fixture.repository.execute(
-      CreateLongTermRelation(
-        sourceIntentionId: _intention(1),
-        relatedIntentionId: _intention(4),
-        type: LongTermRelationType.can,
-        priority: RelationPriority.p1,
-        description: null,
+      AddLongTermRelations(
+        pageIntentionId: _intention(1),
+        group: IntentionRelationGroup.canUse,
+        candidateIds: [_intention(4)],
       ),
     );
     expect(mutation, isA<GraphCommandSucceeded>());

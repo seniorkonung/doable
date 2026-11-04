@@ -34,8 +34,8 @@ enum IntentionSearchKind {
   String title(AppLocalizations l10n) => switch (this) {
     catalog => l10n.appDestinationIntentionGraph,
     dailyChoiceAction => l10n.intentionPickerActionTitle,
-    dailyChoiceSource ||
-    relationParticipant => l10n.intentionPickerIntentionTitle,
+    dailyChoiceSource => l10n.intentionPickerIntentionTitle,
+    relationParticipant => l10n.participantPickerTitle,
   };
 
   String loading(AppLocalizations l10n) => switch (this) {

@@ -18,6 +18,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'daily_choice_picker_launch_test_support.dart'
+    show TestDailyChoicePickerLaunch;
 import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
@@ -56,12 +58,15 @@ void main() {
         await tester.pumpAndSettle();
         expect(
           tester
-              .widget<TextField>(
-                find.byKey(const ValueKey('relation-editor-description')),
+              .widget<EditableText>(
+                find.descendant(
+                  of: find.byKey(const ValueKey('daily-choice-action-filter')),
+                  matching: find.byType(EditableText),
+                ),
               )
-              .controller!
+              .controller
               .text,
-          'Чужой черновик',
+          'Намерение 3',
         );
         expect(app.completions, hasLength(1));
         await tester.pump(const Duration(seconds: 8));
@@ -186,16 +191,15 @@ Future<_App> _launch(
     router.push(IntentionDetailsRoute(intentionId: durabilityIntention(1))),
   );
   await tester.pumpAndSettle();
-  await tester.tap(find.text('Связи'));
-  await tester.pumpAndSettle();
-  await tester.ensureVisible(
-    find.byKey(const ValueKey('intention-relations-add')).first,
+  unawaited(
+    router.push(
+      DailyChoiceActionPickerRoute(launch: TestDailyChoicePickerLaunch()),
+    ),
   );
-  await tester.tap(find.byKey(const ValueKey('intention-relations-add')).first);
   await tester.pumpAndSettle();
   await tester.enterText(
-    find.byKey(const ValueKey('relation-editor-description')),
-    'Чужой черновик',
+    find.byKey(const ValueKey('daily-choice-action-filter')),
+    'Намерение 3',
   );
   unawaited(
     router.push(IntentionDetailsRoute(intentionId: durabilityIntention(2))),

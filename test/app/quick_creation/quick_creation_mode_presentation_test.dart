@@ -9,7 +9,6 @@ void main() {
   const russianMessages = [
     'Быстрое создание',
     'Новое намерение',
-    'Новая связь',
     'Новый дневной выбор',
     'Сменить режим',
     'Что создаёт кнопка',
@@ -18,7 +17,6 @@ void main() {
   const englishMessages = [
     'Quick create',
     'New intention',
-    'New relation',
     'New daily choice',
     'Change mode',
     'What the button creates',

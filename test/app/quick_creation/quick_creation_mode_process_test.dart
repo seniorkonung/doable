@@ -10,8 +10,8 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import 'controlled_mode_io.dart';
 
-const _initial = QuickCreationMode.intention;
-const _a = QuickCreationMode.relation;
+const _initial = QuickCreationMode.dailyChoice;
+const _a = QuickCreationMode.intention;
 const _b = QuickCreationMode.dailyChoice;
 
 void main() {

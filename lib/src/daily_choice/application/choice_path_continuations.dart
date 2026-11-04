@@ -51,20 +51,33 @@ final class ChoicePathContinuationsPage {
   ChoicePathContinuationsPage({
     required this.draft,
     required this.current,
+    required Iterable<LongTermRelationSummary> steps,
     required Iterable<LongTermRelationSummary> items,
     required this.nextCursor,
     required this.revision,
-  }) : items = List<LongTermRelationSummary>.unmodifiable(
+  }) : steps = List<LongTermRelationSummary>.unmodifiable(steps),
+       items = List<LongTermRelationSummary>.unmodifiable(
          List<LongTermRelationSummary>.of(items)..sort(_compareContinuations),
        ) {
     if (current.id != draft.currentIntentionId ||
         current.archiveState != IntentionArchiveState.active) {
       throw ArgumentError.value(current, 'current');
     }
+    if (this.steps.length != draft.steps.length) {
+      throw ArgumentError.value(steps, 'steps');
+    }
+    for (var index = 0; index < draft.steps.length; index++) {
+      if (this.steps[index].relation.id != draft.steps[index].relationId) {
+        throw ArgumentError.value(steps, 'steps');
+      }
+    }
   }
 
   final ChoicePathDraft draft;
   final Intention current;
+
+  /// Текущее содержание шагов черновика в порядке `draft.steps`.
+  final List<LongTermRelationSummary> steps;
   final List<LongTermRelationSummary> items;
   final ChoicePathContinuationCursor? nextCursor;
   final GraphRevision revision;

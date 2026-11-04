@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:ui' show CheckedState, Tristate;
 
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_daily_choice_start_sheet.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
+import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
@@ -19,18 +22,23 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
-    show IntentionCatalogOrder, IntentionTagFilter;
+    show IntentionCatalogOrder, IntentionTagFilter, IntentionScope;
+import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
+import 'package:doable/src/intention/presentation/picker/intention_picker_row.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/daily_choice_catalog_provider.dart';
+import '../support/daily_choice_catalog_controls.dart';
 import '../support/daily_choice_durability_fixture.dart';
 import '../support/daily_choice_local_date.dart';
 import '../support/graph_seed.dart';
@@ -43,6 +51,7 @@ import '../support/tag_positions.dart';
 
 part 'creation_flows_test_support.dart';
 part 'creation_flows_accessibility_scenarios.dart';
+part 'creation_flows_relation_picker_scenarios.dart';
 part 'quick_creation/quick_creation_flow_scenarios.dart';
 
 void main() {
@@ -54,6 +63,100 @@ void main() {
   _registerAccessibilityTests();
   _registerQuickCreationFlowTests();
   _registerNestedQuickCreationTests();
+  _registerRelationPickerDailyChoiceTests();
+  _registerRelationPickerIntentionTest();
+  testWidgets('охват «Все» остаётся в каталоге при переходе к связям', (
+    tester,
+  ) async {
+    final app = await _start(tester);
+    await IntentionCreationOrigin.graph.open(
+      tester,
+      app.router,
+      participantId: durabilityIntention(1),
+      waitFor: (tester, finder) =>
+          _until(tester, () => finder.evaluate().isNotEmpty),
+    );
+    await selectIntentionCatalogScope(tester, IntentionScope.all);
+    await _until(
+      tester,
+      () => intentionCatalogRow('Намерение 1').evaluate().isNotEmpty,
+    );
+    expect(shownIntentionCatalogParameters(tester).scope, IntentionScope.all);
+    await _tap(tester, intentionCatalogRow('Намерение 1'));
+    await _until(
+      tester,
+      () => _key('intention-details-title').evaluate().isNotEmpty,
+    );
+    await _tap(tester, find.text(app.l10n.detailsRelationsTab).first);
+    expect(find.text(app.l10n.detailsRelationsNeedsHint), findsOneWidget);
+    expect(find.text(app.l10n.intentionPickerScopeAll), findsNothing);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(shownIntentionCatalogParameters(tester).scope, IntentionScope.all);
+  });
+
+  testWidgets(
+    'закрытие чистой панели возвращает дату, фильтр и прокрутку каталога дневных выборов',
+    (tester) async {
+      final app = await _start(tester, seed: _seedDailyChoicesForReturn);
+      final date = CalendarDate.fromParts(2026, 10, 7);
+      await selectDailyChoiceCatalogDate(tester, date);
+      await _until(
+        tester,
+        () => _key('daily-choice-section-false').evaluate().isNotEmpty,
+      );
+      await showDailyChoiceCatalogSection(tester, false);
+      await showDailyChoiceCatalogSection(tester, true);
+      final semantics = tester.ensureSemantics();
+      void expectSections() {
+        expect(
+          tester
+              .getSemantics(_key('daily-choice-section-false'))
+              .flagsCollection
+              .isExpanded,
+          Tristate.isFalse,
+        );
+        expect(
+          tester
+              .getSemantics(_key('daily-choice-section-true'))
+              .flagsCollection
+              .isExpanded,
+          Tristate.isTrue,
+        );
+      }
+
+      expectSections();
+      final position = _dailyChoiceScrollPosition(tester);
+      position.jumpTo(position.maxScrollExtent / 2);
+      await tester.pumpAndSettle();
+      expect(position.pixels, greaterThan(0));
+      final offset = position.pixels;
+      expect(shownDailyChoiceCatalogDate(tester), date);
+      await _Flow.intention.open(
+        tester,
+        app,
+        IntentionCreationOrigin.dailyChoices,
+      );
+      await tester.tap(_key('intention-editor-close'));
+      await _until(
+        tester,
+        () => _key('intention-editor-title').evaluate().isEmpty,
+      );
+      await tester.pumpAndSettle();
+      expect(shownDailyChoiceCatalogDate(tester), date);
+      final restored = _dailyChoiceScrollPosition(tester);
+      expect(restored.pixels, offset);
+      expect(
+        tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
+        AppDestination.dailyChoices,
+      );
+      // Заголовок невыполненных над прокрученной выдачей не построен.
+      restored.jumpTo(0);
+      await tester.pumpAndSettle();
+      expectSections();
+      semantics.dispose();
+    },
+  );
   testWidgets('создание при занятой поверхности закрывает форму и обновляет '
       'каталог до сообщения, а возвращение не повторяет результат', (
     tester,
@@ -176,7 +279,7 @@ void main() {
     flow.expectStored(rows.last);
     expect(find.textContaining('Дневной выбор создан'), findsOneWidget);
     expect(app.catalogs, catalogs);
-    await history.expectUnderlyingDraft(tester, app.router);
+    await history.expectUnderlyingTask(tester, app.router);
     expect(tester.takeException(), isNull);
   });
 
@@ -226,7 +329,7 @@ void main() {
       await tester.pumpAndSettle();
       history.expectRestored(tester, app.router);
       expect(app.catalogs, catalogs);
-      await history.expectUnderlyingDraft(tester, app.router);
+      await history.expectUnderlyingTask(tester, app.router);
       expect(tester.takeException(), isNull);
     });
   }
@@ -270,7 +373,7 @@ void main() {
           expect(rows, hasLength(flow.initialRows + (leave ? 1 : 0)));
           expect(app.observer.attempts, leave ? 1 : 0);
           if (leave) flow.expectStored(rows.last);
-          await history.expectUnderlyingDraft(tester, app.router);
+          await history.expectUnderlyingTask(tester, app.router);
           expect(tester.takeException(), isNull);
         },
       );

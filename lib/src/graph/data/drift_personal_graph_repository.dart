@@ -1131,6 +1131,18 @@ final class DriftPersonalGraphRepository
     final intentions = _database.intentions;
     final condition = _catalogCondition(query);
     final (totalCount, counts) = await _countCatalog(query);
+    final titleFilter = query.titleFilter;
+    int? exactTitleCount;
+    if (query.pairProbe != null && titleFilter != null) {
+      final count = countAll();
+      final countQuery = _database.selectOnly(intentions)
+        ..addColumns([count])
+        ..where(
+          intentions.isArchived.equals(false) &
+              intentions.titleSearchKey.equals(titleFilter.map(titleSearchKey)),
+        );
+      exactTitleCount = (await countQuery.getSingle()).read(count)!;
+    }
     final rowsQuery = _database.selectOnly(intentions)
       ..addColumns([
         intentions.id,
@@ -1158,6 +1170,7 @@ final class DriftPersonalGraphRepository
       items: items,
       totalCount: totalCount,
       counts: counts,
+      exactTitleCount: exactTitleCount,
       nextCursor: nextCursor,
       revision: _currentRevision,
       pairOccupants: pairOccupants,
@@ -1428,7 +1441,7 @@ final class DriftPersonalGraphRepository
     };
     rowsQuery
       ..join([leftOuterJoin(relations, occupiesPair)])
-      ..addColumns([relations.id, relations.isArchived]);
+      ..addColumns([relations.id, relations.type, relations.isArchived]);
   }
 
   /// Занимающая связь строки порции; `null` — пара строки свободна.
@@ -1438,6 +1451,11 @@ final class DriftPersonalGraphRepository
     if (relationId == null) return null;
     return PairOccupant(
       relationId: decodeStoredRelationId(relationId),
+      type: switch (row.read(relations.type)) {
+        'need' => relation_domain.LongTermRelationType.need,
+        'can' => relation_domain.LongTermRelationType.can,
+        _ => throw const StoredGraphCorruption(),
+      },
       scope: row.read(relations.isArchived)!
           ? relation_domain.RelationScope.archived
           : relation_domain.RelationScope.active,

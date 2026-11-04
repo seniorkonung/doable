@@ -512,18 +512,6 @@ abstract class AppLocalizations {
   /// **'Something you want to do or change'**
   String get quickCreationModeIntentionHint;
 
-  /// Название режима создания долговременной связи
-  ///
-  /// In en, this message translates to:
-  /// **'New relation'**
-  String get quickCreationModeRelation;
-
-  /// Пояснение режима создания долговременной связи
-  ///
-  /// In en, this message translates to:
-  /// **'To …, you need or can …'**
-  String get quickCreationModeRelationHint;
-
   /// Название режима и заголовок листа нового дневного выбора
   ///
   /// In en, this message translates to:
@@ -853,6 +841,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Relations: {active} active, {archived} archived'**
   String detailsRelationsTabSemantic(int active, int archived);
+
+  /// Причина занятости пары в поиске участника
+  ///
+  /// In en, this message translates to:
+  /// **'Already added'**
+  String get relationPairAlreadyAdded;
+
+  /// Причина занятости пары в поиске участника
+  ///
+  /// In en, this message translates to:
+  /// **'Already added, archived'**
+  String get relationPairAlreadyAddedArchived;
+
+  /// Причина занятости пары в поиске участника
+  ///
+  /// In en, this message translates to:
+  /// **'Already in group \"{group}\"'**
+  String relationPairOtherGroup(String group);
+
+  /// Причина занятости пары в поиске участника
+  ///
+  /// In en, this message translates to:
+  /// **'Already in group \"{group}\", archived'**
+  String relationPairOtherGroupArchived(String group);
 
   /// Доступное название плиток групп связей на вкладке «Связи»
   ///
@@ -1322,12 +1334,6 @@ abstract class AppLocalizations {
   /// **'Saving changes…'**
   String get detailsOperationRunning;
 
-  /// Активное состояние намерения в подробных данных
-  ///
-  /// In en, this message translates to:
-  /// **'Active'**
-  String get detailsActive;
-
   /// Архивное состояние намерения в подробных данных
   ///
   /// In en, this message translates to:
@@ -1520,6 +1526,12 @@ abstract class AppLocalizations {
   /// **'Create intention'**
   String get editorTitle;
 
+  /// Пояснение панели создания намерения из поиска участника
+  ///
+  /// In en, this message translates to:
+  /// **'Selected right away for new relations'**
+  String get editorSearchSubtitle;
+
   /// Действие создания намерения
   ///
   /// In en, this message translates to:
@@ -1615,6 +1627,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Intention created.'**
   String get editorCreated;
+
+  /// Успех создания намерения для поиска участника
+  ///
+  /// In en, this message translates to:
+  /// **'Intention created and selected.'**
+  String get editorCreatedAndChosen;
 
   /// Заголовок подтверждения закрытия изменённого черновика создания до отправки
   ///
@@ -1831,12 +1849,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{message} · {count} more'**
   String graphOperationMessageWithOthers(String message, int count);
-
-  /// Безопасное обозначение создаваемой связи до подтверждения
-  ///
-  /// In en, this message translates to:
-  /// **'new relation'**
-  String get graphOperationNewRelation;
 
   /// Безопасное обозначение существующей связи
   ///
@@ -2911,47 +2923,59 @@ abstract class AppLocalizations {
   /// **'The daily choice operation failed because of an unexpected error.'**
   String get dailyChoiceOperationUnexpected;
 
-  /// Подтверждение успешного создания долговременной связи
+  /// Вид операции добавления связей
   ///
   /// In en, this message translates to:
-  /// **'Relation created.'**
-  String get relationEditorCreated;
+  /// **'Add'**
+  String get graphOperationAddRelations;
 
-  /// Конфликт занятой направленной пары при создании связи
+  /// Обозначение добавляемой пачки связей
   ///
   /// In en, this message translates to:
-  /// **'A relation with this direction already exists between the selected intentions.'**
-  String get relationEditorCreatePairOccupied;
+  /// **'relations'**
+  String get graphOperationRelations;
 
-  /// Отсутствие участника при создании связи
+  /// Число добавленных связей
   ///
   /// In en, this message translates to:
-  /// **'One of the selected intentions no longer exists.'**
-  String get relationEditorCreateParticipantNotFound;
+  /// **'{count, plural, one{{count} relation added.} other{{count} relations added.}}'**
+  String relationsAdded(int count);
 
-  /// Конфликт архивного состояния участника при создании связи
+  /// Занятая пара при добавлении связей
   ///
   /// In en, this message translates to:
-  /// **'Only active intentions can be linked.'**
-  String get relationEditorCreateParticipantArchived;
+  /// **'Some selected intentions are already linked to this intention. No relations were created.'**
+  String get relationsAdditionPairOccupied;
 
-  /// Устранимая недоступность создания связи
+  /// Отсутствующий участник при добавлении связей
   ///
   /// In en, this message translates to:
-  /// **'The relation couldn’t be created. Try again.'**
-  String get relationEditorCreateUnavailable;
+  /// **'A selected intention no longer exists. No relations were created.'**
+  String get relationsAdditionParticipantNotFound;
 
-  /// Терминальное повреждение данных при создании связи
+  /// Архивированный участник при добавлении связей
   ///
   /// In en, this message translates to:
-  /// **'Stored data is damaged. The relation wasn’t created.'**
-  String get relationEditorCreateCorruption;
+  /// **'Only active intentions can be linked. No relations were created.'**
+  String get relationsAdditionParticipantArchived;
 
-  /// Терминальная непредвиденная ошибка создания связи
+  /// Недоступность добавления связей
   ///
   /// In en, this message translates to:
-  /// **'The relation couldn’t be created because of an unexpected error.'**
-  String get relationEditorCreateUnexpected;
+  /// **'No relations were created. Try again.'**
+  String get relationsAdditionUnavailable;
+
+  /// Повреждение данных при добавлении связей
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. No relations were created.'**
+  String get relationsAdditionCorruption;
+
+  /// Неожиданный отказ добавления связей
+  ///
+  /// In en, this message translates to:
+  /// **'No relations were created because of an unexpected error.'**
+  String get relationsAdditionUnexpected;
 
   /// Отсутствие изменяемой связи
   ///
@@ -3012,12 +3036,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The relation couldn’t be archived because of an unexpected error.'**
   String get relationArchiveUnexpected;
-
-  /// Подтверждение успешного восстановления долговременной связи
-  ///
-  /// In en, this message translates to:
-  /// **'Relation restored.'**
-  String get relationRestored;
 
   /// Отсутствие восстанавливаемой связи
   ///
@@ -3463,30 +3481,6 @@ abstract class AppLocalizations {
   /// **'intention'**
   String get intentionPickerKindIntention;
 
-  /// Метка строки поиска участника связи, пару которой занимает активная связь; она же стоит в доступном названии строки
-  ///
-  /// In en, this message translates to:
-  /// **'Already linked'**
-  String get intentionPickerPairLinked;
-
-  /// Метка строки поиска участника связи, пару которой занимает архивированная связь; она же стоит в доступном названии строки
-  ///
-  /// In en, this message translates to:
-  /// **'Archived relation'**
-  String get intentionPickerPairArchived;
-
-  /// Действие нажатия на текст строки поиска участника с отметкой занятой пары в доступном названии строки
-  ///
-  /// In en, this message translates to:
-  /// **'tapping opens the existing relation'**
-  String get intentionPickerPairOpensRelation;
-
-  /// Действие нажатия на текст строки поиска участника, когда при создании связи архивную занимающую связь можно восстановить, в доступном названии строки
-  ///
-  /// In en, this message translates to:
-  /// **'tapping offers to restore the relation'**
-  String get intentionPickerPairOffersRestore;
-
   /// Доступное название стрелки строки экрана выбора, которая открывает страницу действия
   ///
   /// In en, this message translates to:
@@ -3846,6 +3840,12 @@ abstract class AppLocalizations {
   /// **'Choose an intention'**
   String get intentionPickerIntentionTitle;
 
+  /// Заголовок поиска участников связи
+  ///
+  /// In en, this message translates to:
+  /// **'Choose intentions'**
+  String get participantPickerTitle;
+
   /// Заполнитель и доступное название поля поиска по названию на экране выбора
   ///
   /// In en, this message translates to:
@@ -3857,6 +3857,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clear the name'**
   String get intentionPickerClearSearch;
+
+  /// Доступное название плюса в шапке поиска участника
+  ///
+  /// In en, this message translates to:
+  /// **'Create intention'**
+  String get intentionPickerCreateIntention;
+
+  /// Строка над выдачей поиска участника, которая создаёт намерение с названием из подстроки
+  ///
+  /// In en, this message translates to:
+  /// **'Create “{title}”'**
+  String intentionPickerCreateNamed(String title);
 
   /// Доступное название кнопки фильтра по тегам на экране выбора с числом условий
   ///
@@ -3936,216 +3948,6 @@ abstract class AppLocalizations {
   /// **'No other intentions are available to select.'**
   String get participantPickerEmpty;
 
-  /// Заголовок подтверждения восстановления занимающей связи из поиска участника
-  ///
-  /// In en, this message translates to:
-  /// **'Restore this relation?'**
-  String get participantPickerRestoreTitle;
-
-  /// Текст подтверждения восстановления до выделенной формулировки связи
-  ///
-  /// In en, this message translates to:
-  /// **'The relation “'**
-  String get participantPickerRestoreTextBefore;
-
-  /// Текст подтверждения восстановления после выделенной формулировки связи
-  ///
-  /// In en, this message translates to:
-  /// **'” returns with priority {priority}.'**
-  String participantPickerRestoreTextAfter(String priority);
-
-  /// Предупреждение в подтверждении восстановления: данные черновика формы, которые не сохранятся; changes — перечень отличающихся данных через запятую
-  ///
-  /// In en, this message translates to:
-  /// **'What you set in the form won’t be kept: {changes}.'**
-  String participantPickerRestoreWarning(String changes);
-
-  /// Перечень предупреждения о восстановлении: выбранный в форме тип «нужно» не сохранится
-  ///
-  /// In en, this message translates to:
-  /// **'type “need”'**
-  String get participantPickerRestoreWarningNeedType;
-
-  /// Перечень предупреждения о восстановлении: выбранный в форме тип «можно» не сохранится
-  ///
-  /// In en, this message translates to:
-  /// **'type “can”'**
-  String get participantPickerRestoreWarningCanType;
-
-  /// Перечень предупреждения о восстановлении: выбранный в форме приоритет не сохранится
-  ///
-  /// In en, this message translates to:
-  /// **'priority'**
-  String get participantPickerRestoreWarningPriority;
-
-  /// Перечень предупреждения о восстановлении: введённое в форме описание не сохранится
-  ///
-  /// In en, this message translates to:
-  /// **'description'**
-  String get participantPickerRestoreWarningDescription;
-
-  /// Отмена восстановления занимающей связи из поиска участника
-  ///
-  /// In en, this message translates to:
-  /// **'Cancel'**
-  String get participantPickerRestoreCancel;
-
-  /// Подтверждение восстановления занимающей связи из поиска участника
-  ///
-  /// In en, this message translates to:
-  /// **'Restore'**
-  String get participantPickerRestoreConfirm;
-
-  /// Назначение перехода к подробным данным намерения из выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Open intention details'**
-  String get participantPickerOpenDetails;
-
-  /// Подзаголовок поиска исходного намерения при создании связи
-  ///
-  /// In en, this message translates to:
-  /// **'New relation: source intention'**
-  String get participantPickerPurposeCreationSource;
-
-  /// Подзаголовок поиска связанного намерения при создании связи
-  ///
-  /// In en, this message translates to:
-  /// **'New relation: related intention'**
-  String get participantPickerPurposeCreationRelated;
-
-  /// Строка листа назначения: создание связи
-  ///
-  /// In en, this message translates to:
-  /// **'New relation'**
-  String get participantPickerFlowCreation;
-
-  /// Пояснение выбираемой роли исходного намерения в листе назначения
-  ///
-  /// In en, this message translates to:
-  /// **'The source intention is what the related intention is needed for or can be used for.'**
-  String get participantPickerRoleSourceNote;
-
-  /// Пояснение выбираемой роли связанного намерения при виде «нужно»
-  ///
-  /// In en, this message translates to:
-  /// **'The related intention is what the source intention needs.'**
-  String get participantPickerRoleRelatedNeedNote;
-
-  /// Пояснение выбираемой роли связанного намерения при виде «можно»
-  ///
-  /// In en, this message translates to:
-  /// **'The related intention is what the source intention can use.'**
-  String get participantPickerRoleRelatedCanNote;
-
-  /// Пояснение выбираемой роли связанного намерения до выбора вида
-  ///
-  /// In en, this message translates to:
-  /// **'The related intention is what the source intention needs or can use.'**
-  String get participantPickerRoleRelatedUndeterminedNote;
-
-  /// Подпись поля связи, участника которого выбирают сейчас
-  ///
-  /// In en, this message translates to:
-  /// **'Choosing now'**
-  String get participantPickerFieldChoosing;
-
-  /// Текст выбираемого поля связи без прежнего участника
-  ///
-  /// In en, this message translates to:
-  /// **'From this list'**
-  String get participantPickerFieldFromList;
-
-  /// Текст выбираемого поля связи с прежним участником этой роли
-  ///
-  /// In en, this message translates to:
-  /// **'Instead of: {title}'**
-  String participantPickerFieldReplacing(String title);
-
-  /// Текст пустого поля связи
-  ///
-  /// In en, this message translates to:
-  /// **'Not chosen yet'**
-  String get participantPickerFieldNotChosen;
-
-  /// Признак архивного участника связи для экранного диктора
-  ///
-  /// In en, this message translates to:
-  /// **'Archived'**
-  String get participantPickerFieldArchived;
-
-  /// Вид связи в листе назначения, пока он не выбран
-  ///
-  /// In en, this message translates to:
-  /// **'Need or can: not chosen yet'**
-  String get participantPickerKindUndetermined;
-
-  /// Заголовок формы создания долговременной связи
-  ///
-  /// In en, this message translates to:
-  /// **'New relation'**
-  String get relationEditorTitle;
-
-  /// Доступная подпись текущей формулировки связи
-  ///
-  /// In en, this message translates to:
-  /// **'Relation phrase'**
-  String get relationEditorPhraseLabel;
-
-  /// Подпись исходного участника в форме создания связи
-  ///
-  /// In en, this message translates to:
-  /// **'Source intention'**
-  String get relationEditorSourceLabel;
-
-  /// Подпись связанного участника в форме создания связи
-  ///
-  /// In en, this message translates to:
-  /// **'Related intention'**
-  String get relationEditorRelatedLabel;
-
-  /// Состояние выбранного участника связи
-  ///
-  /// In en, this message translates to:
-  /// **'Selected'**
-  String get relationEditorParticipantSelected;
-
-  /// Состояние невыбранного участника связи
-  ///
-  /// In en, this message translates to:
-  /// **'Not selected'**
-  String get relationEditorParticipantNotSelected;
-
-  /// Переход к выбору исходного участника
-  ///
-  /// In en, this message translates to:
-  /// **'Select the source intention'**
-  String get relationEditorSelectSourceAction;
-
-  /// Замена выбранного исходного участника
-  ///
-  /// In en, this message translates to:
-  /// **'Change the source intention'**
-  String get relationEditorChangeSourceAction;
-
-  /// Переход к выбору связанного участника
-  ///
-  /// In en, this message translates to:
-  /// **'Select the related intention'**
-  String get relationEditorSelectRelatedAction;
-
-  /// Замена выбранного связанного участника
-  ///
-  /// In en, this message translates to:
-  /// **'Change the related intention'**
-  String get relationEditorChangeRelatedAction;
-
-  /// Подпись выбора типа связи в форме создания
-  ///
-  /// In en, this message translates to:
-  /// **'Relation type'**
-  String get relationEditorTypeLabel;
-
   /// Тип связи «нужно» в форме создания
   ///
   /// In en, this message translates to:
@@ -4158,18 +3960,6 @@ abstract class AppLocalizations {
   /// **'Can'**
   String get relationEditorTypeCan;
 
-  /// Подпись выбора приоритета связи
-  ///
-  /// In en, this message translates to:
-  /// **'Priority'**
-  String get relationEditorPriorityLabel;
-
-  /// Подпись описания создаваемой связи
-  ///
-  /// In en, this message translates to:
-  /// **'Description (optional)'**
-  String get relationEditorDescriptionLabel;
-
   /// Превышение предела описания связи
   ///
   /// In en, this message translates to:
@@ -4181,66 +3971,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter valid Unicode text without NUL.'**
   String get relationEditorDescriptionInvalidUnicode;
-
-  /// Отказ создания связи намерения с самим собой
-  ///
-  /// In en, this message translates to:
-  /// **'An intention can’t be related to itself.'**
-  String get relationEditorCreateSameParticipants;
-
-  /// Объяснение недостающего обязательного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'To create the relation, provide:'**
-  String get relationEditorMissingTitle;
-
-  /// Недостающий исходный участник связи
-  ///
-  /// In en, this message translates to:
-  /// **'the source intention'**
-  String get relationEditorMissingSource;
-
-  /// Недостающий связанный участник связи
-  ///
-  /// In en, this message translates to:
-  /// **'the related intention'**
-  String get relationEditorMissingRelated;
-
-  /// Недостающий тип связи
-  ///
-  /// In en, this message translates to:
-  /// **'the relation type'**
-  String get relationEditorMissingType;
-
-  /// Недостающий приоритет связи
-  ///
-  /// In en, this message translates to:
-  /// **'a priority from P1 to P4'**
-  String get relationEditorMissingPriority;
-
-  /// Переход к связи, занявшей направленную пару
-  ///
-  /// In en, this message translates to:
-  /// **'Open the existing relation'**
-  String get relationEditorOpenExistingRelation;
-
-  /// Команда создания долговременной связи
-  ///
-  /// In en, this message translates to:
-  /// **'Create relation'**
-  String get relationEditorSubmitAction;
-
-  /// Выполняемое создание долговременной связи
-  ///
-  /// In en, this message translates to:
-  /// **'Creating…'**
-  String get relationEditorCreating;
-
-  /// Вариант приоритета P1–P4 в форме создания связи
-  ///
-  /// In en, this message translates to:
-  /// **'Priority {priority}'**
-  String relationEditorPriorityOption(String priority);
 
   /// Заголовок верхнего обхода
   ///
@@ -4365,7 +4095,7 @@ abstract class AppLocalizations {
   /// Из исходного намерения нет допустимого пути
   ///
   /// In en, this message translates to:
-  /// **'There is no valid path from this intention to another action right now.'**
+  /// **'There is no valid path from this intention to another action right now. Only relations leading to a ready action become continuations. Mark an intention as ready or link it to an action.'**
   String get choicePathNoPath;
 
   /// У достигнутого шага нет продолжений
@@ -4373,6 +4103,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'There are no further valid continuations.'**
   String get choicePathNoFurtherPath;
+
+  /// У достигнутого шага сверху вниз нет продолжений
+  ///
+  /// In en, this message translates to:
+  /// **'There are no further valid continuations. Only relations leading to a ready action become continuations. Mark an intention as ready or link it to an action.'**
+  String get choicePathTopNoFurtherPath;
+
+  /// Переход к связям из тупика выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Open relations'**
+  String get choicePathOpenRelations;
 
   /// Устаревший префикс пути
   ///
@@ -4965,6 +4707,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Saving will continue after you leave creation.'**
   String get creationSavingContinues;
+
+  /// No description provided for @batchSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to \"{group}\"'**
+  String batchSubtitle(String group);
+
+  /// No description provided for @batchSubtitleSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to \"{group}\" · selected {count}'**
+  String batchSubtitleSelected(String group, int count);
+
+  /// No description provided for @batchSheetLine.
+  ///
+  /// In en, this message translates to:
+  /// **'New relations in \"{group}\"'**
+  String batchSheetLine(String group);
+
+  /// Текст поиска участников группы
+  ///
+  /// In en, this message translates to:
+  /// **'Each selected intention will become a relation: this intention needs it'**
+  String get batchNoteNeeds;
+
+  /// Текст поиска участников группы
+  ///
+  /// In en, this message translates to:
+  /// **'Each selected intention will become a relation: this intention can use it'**
+  String get batchNoteCanUse;
+
+  /// Текст поиска участников группы
+  ///
+  /// In en, this message translates to:
+  /// **'Each selected intention will become a relation: it needs this intention'**
+  String get batchNoteNeededFor;
+
+  /// Текст поиска участников группы
+  ///
+  /// In en, this message translates to:
+  /// **'Each selected intention will become a relation: it can use this intention'**
+  String get batchNoteCanBeUsedFor;
+
+  /// Текст поиска участников группы
+  ///
+  /// In en, this message translates to:
+  /// **'Relations will have priority P4 and no description; both can be changed on the page'**
+  String get batchDefaults;
+
+  /// Текст поиска участников группы
+  ///
+  /// In en, this message translates to:
+  /// **'The intention whose page you came from'**
+  String get batchAnchorNote;
+
+  /// Текст поиска участников группы
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing selected yet'**
+  String get batchEmpty;
+
+  /// Текст поиска участников группы
+  ///
+  /// In en, this message translates to:
+  /// **'Selected intentions'**
+  String get batchSelected;
+
+  /// No description provided for @batchSourceSemantic.
+  ///
+  /// In en, this message translates to:
+  /// **'Source intention: {name}'**
+  String batchSourceSemantic(String name);
+
+  /// No description provided for @batchRelatedSemantic.
+  ///
+  /// In en, this message translates to:
+  /// **'Related intention: {name}'**
+  String batchRelatedSemantic(String name);
+
+  /// No description provided for @batchRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove selection: {name}'**
+  String batchRemove(String name);
+
+  /// Кнопка внизу поиска участника группы
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Add {count} relation} other{Add {count} relations}}'**
+  String batchAddCount(int count);
+
+  /// Недоступная кнопка поиска участника группы без отметок
+  ///
+  /// In en, this message translates to:
+  /// **'Add relations'**
+  String get batchAddNone;
+
+  /// Кнопка поиска участника группы во время добавления
+  ///
+  /// In en, this message translates to:
+  /// **'Adding…'**
+  String get batchAdding;
+
+  /// Вопрос перед сбросом отметок поиска
+  ///
+  /// In en, this message translates to:
+  /// **'Discard selected intentions?'**
+  String get batchDiscardTitle;
+
+  /// Число связей при сбросе отметок поиска
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{{count} relation will not be added.} other{{count} relations will not be added.}}'**
+  String batchDiscardMessage(int count);
+
+  /// При сбросе отметок созданные намерения сохраняются
+  ///
+  /// In en, this message translates to:
+  /// **'Created intentions will remain in the catalog.'**
+  String get batchCreatedRemain;
+
+  /// Сбросить отметки поиска
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get batchDiscardAction;
+
+  /// Продолжить отмечать намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Continue selecting'**
+  String get batchContinueAction;
 }
 
 class _AppLocalizationsDelegate

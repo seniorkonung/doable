@@ -14,11 +14,12 @@ import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
-import 'package:doable/src/long_term_relation/presentation/editor/relation_editor_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../daily_choice/presentation/daily_choice_picker_launch_test_support.dart'
+    show TestDailyChoicePickerLaunch;
 import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/quick_creation.dart';
@@ -53,7 +54,6 @@ void main() {
 
   for (final (mode, direction) in [
     (QuickCreationMode.intention, null),
-    (QuickCreationMode.relation, null),
     for (final direction in ChoicePathDraftDirection.values)
       (QuickCreationMode.dailyChoice, direction),
   ]) {
@@ -90,13 +90,6 @@ void main() {
             case QuickCreationMode.intention:
               expect(finished, isTrue);
               await tester.tap(_key('intention-editor-close'));
-            case QuickCreationMode.relation:
-              expect(finished, isTrue);
-              expect(
-                router.current.argsAs<RelationEditorRouteArgs>().editorContext,
-                isA<RelationBlankCreationContext>(),
-              );
-              await tester.tap(find.text('Отменить создание'));
             case QuickCreationMode.dailyChoice:
               expect(finished, isFalse);
               await _choose(tester, direction!);
@@ -121,11 +114,8 @@ void main() {
             await router.maybePop();
             await tester.pumpAndSettle();
             expect(
-              tester
-                  .widget<TextField>(_key('relation-editor-description'))
-                  .controller!
-                  .text,
-              'Чужой черновик',
+              _filterText(tester, ChoicePathDraftDirection.bottomUp),
+              _foreignFilter,
             );
           }
           expect(tester.takeException(), isNull);
@@ -211,6 +201,7 @@ void main() {
           final router = _DelayedPickerRouter();
           await _openApp(tester, router: router);
           final source = await _source(tester, router, origin);
+          router.holdNextPicker();
           final first = QuickCreationLauncher().launch(
             sourceContext: source,
             mode: mode,

@@ -344,12 +344,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Something you want to do or change';
 
   @override
-  String get quickCreationModeRelation => 'New relation';
-
-  @override
-  String get quickCreationModeRelationHint => 'To …, you need or can …';
-
-  @override
   String get quickCreationModeDailyChoice => 'New daily choice';
 
   @override
@@ -550,6 +544,22 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String detailsRelationsTabSemantic(int active, int archived) {
     return 'Relations: $active active, $archived archived';
+  }
+
+  @override
+  String get relationPairAlreadyAdded => 'Already added';
+
+  @override
+  String get relationPairAlreadyAddedArchived => 'Already added, archived';
+
+  @override
+  String relationPairOtherGroup(String group) {
+    return 'Already in group \"$group\"';
+  }
+
+  @override
+  String relationPairOtherGroupArchived(String group) {
+    return 'Already in group \"$group\", archived';
   }
 
   @override
@@ -834,9 +844,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailsOperationRunning => 'Saving changes…';
 
   @override
-  String get detailsActive => 'Active';
-
-  @override
   String get detailsArchived => 'Archived';
 
   @override
@@ -951,6 +958,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editorTitle => 'Create intention';
 
   @override
+  String get editorSearchSubtitle => 'Selected right away for new relations';
+
+  @override
   String get editorCreateAction => 'Create intention';
 
   @override
@@ -1003,6 +1013,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get editorCreated => 'Intention created.';
+
+  @override
+  String get editorCreatedAndChosen => 'Intention created and selected.';
 
   @override
   String get editorCloseDiscardTitle => 'Discard the draft?';
@@ -1137,9 +1150,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String graphOperationMessageWithOthers(String message, int count) {
     return '$message · $count more';
   }
-
-  @override
-  String get graphOperationNewRelation => 'new relation';
 
   @override
   String get graphOperationRelation => 'relation';
@@ -1882,31 +1892,45 @@ class AppLocalizationsEn extends AppLocalizations {
       'The daily choice operation failed because of an unexpected error.';
 
   @override
-  String get relationEditorCreated => 'Relation created.';
+  String get graphOperationAddRelations => 'Add';
 
   @override
-  String get relationEditorCreatePairOccupied =>
-      'A relation with this direction already exists between the selected intentions.';
+  String get graphOperationRelations => 'relations';
 
   @override
-  String get relationEditorCreateParticipantNotFound =>
-      'One of the selected intentions no longer exists.';
+  String relationsAdded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count relations added.',
+      one: '$count relation added.',
+    );
+    return '$_temp0';
+  }
 
   @override
-  String get relationEditorCreateParticipantArchived =>
-      'Only active intentions can be linked.';
+  String get relationsAdditionPairOccupied =>
+      'Some selected intentions are already linked to this intention. No relations were created.';
 
   @override
-  String get relationEditorCreateUnavailable =>
-      'The relation couldn’t be created. Try again.';
+  String get relationsAdditionParticipantNotFound =>
+      'A selected intention no longer exists. No relations were created.';
 
   @override
-  String get relationEditorCreateCorruption =>
-      'Stored data is damaged. The relation wasn’t created.';
+  String get relationsAdditionParticipantArchived =>
+      'Only active intentions can be linked. No relations were created.';
 
   @override
-  String get relationEditorCreateUnexpected =>
-      'The relation couldn’t be created because of an unexpected error.';
+  String get relationsAdditionUnavailable =>
+      'No relations were created. Try again.';
+
+  @override
+  String get relationsAdditionCorruption =>
+      'Stored data is damaged. No relations were created.';
+
+  @override
+  String get relationsAdditionUnexpected =>
+      'No relations were created because of an unexpected error.';
 
   @override
   String get relationEditorUpdateNotFound => 'This relation no longer exists.';
@@ -1945,9 +1969,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get relationArchiveUnexpected =>
       'The relation couldn’t be archived because of an unexpected error.';
-
-  @override
-  String get relationRestored => 'Relation restored.';
 
   @override
   String get relationRestoreNotFound => 'This relation no longer exists.';
@@ -2217,20 +2238,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerKindIntention => 'intention';
 
   @override
-  String get intentionPickerPairLinked => 'Already linked';
-
-  @override
-  String get intentionPickerPairArchived => 'Archived relation';
-
-  @override
-  String get intentionPickerPairOpensRelation =>
-      'tapping opens the existing relation';
-
-  @override
-  String get intentionPickerPairOffersRestore =>
-      'tapping offers to restore the relation';
-
-  @override
   String intentionPickerOpenActionPage(String title) {
     return 'Open the page of action $title';
   }
@@ -2490,10 +2497,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerIntentionTitle => 'Choose an intention';
 
   @override
+  String get participantPickerTitle => 'Choose intentions';
+
+  @override
   String get intentionPickerSearchPlaceholder => 'Search by name';
 
   @override
   String get intentionPickerClearSearch => 'Clear the name';
+
+  @override
+  String get intentionPickerCreateIntention => 'Create intention';
+
+  @override
+  String intentionPickerCreateNamed(String title) {
+    return 'Create “$title”';
+  }
 
   @override
   String intentionPickerFilterLabel(int count) {
@@ -2549,135 +2567,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'No other intentions are available to select.';
 
   @override
-  String get participantPickerRestoreTitle => 'Restore this relation?';
-
-  @override
-  String get participantPickerRestoreTextBefore => 'The relation “';
-
-  @override
-  String participantPickerRestoreTextAfter(String priority) {
-    return '” returns with priority $priority.';
-  }
-
-  @override
-  String participantPickerRestoreWarning(String changes) {
-    return 'What you set in the form won’t be kept: $changes.';
-  }
-
-  @override
-  String get participantPickerRestoreWarningNeedType => 'type “need”';
-
-  @override
-  String get participantPickerRestoreWarningCanType => 'type “can”';
-
-  @override
-  String get participantPickerRestoreWarningPriority => 'priority';
-
-  @override
-  String get participantPickerRestoreWarningDescription => 'description';
-
-  @override
-  String get participantPickerRestoreCancel => 'Cancel';
-
-  @override
-  String get participantPickerRestoreConfirm => 'Restore';
-
-  @override
-  String get participantPickerOpenDetails => 'Open intention details';
-
-  @override
-  String get participantPickerPurposeCreationSource =>
-      'New relation: source intention';
-
-  @override
-  String get participantPickerPurposeCreationRelated =>
-      'New relation: related intention';
-
-  @override
-  String get participantPickerFlowCreation => 'New relation';
-
-  @override
-  String get participantPickerRoleSourceNote =>
-      'The source intention is what the related intention is needed for or can be used for.';
-
-  @override
-  String get participantPickerRoleRelatedNeedNote =>
-      'The related intention is what the source intention needs.';
-
-  @override
-  String get participantPickerRoleRelatedCanNote =>
-      'The related intention is what the source intention can use.';
-
-  @override
-  String get participantPickerRoleRelatedUndeterminedNote =>
-      'The related intention is what the source intention needs or can use.';
-
-  @override
-  String get participantPickerFieldChoosing => 'Choosing now';
-
-  @override
-  String get participantPickerFieldFromList => 'From this list';
-
-  @override
-  String participantPickerFieldReplacing(String title) {
-    return 'Instead of: $title';
-  }
-
-  @override
-  String get participantPickerFieldNotChosen => 'Not chosen yet';
-
-  @override
-  String get participantPickerFieldArchived => 'Archived';
-
-  @override
-  String get participantPickerKindUndetermined => 'Need or can: not chosen yet';
-
-  @override
-  String get relationEditorTitle => 'New relation';
-
-  @override
-  String get relationEditorPhraseLabel => 'Relation phrase';
-
-  @override
-  String get relationEditorSourceLabel => 'Source intention';
-
-  @override
-  String get relationEditorRelatedLabel => 'Related intention';
-
-  @override
-  String get relationEditorParticipantSelected => 'Selected';
-
-  @override
-  String get relationEditorParticipantNotSelected => 'Not selected';
-
-  @override
-  String get relationEditorSelectSourceAction => 'Select the source intention';
-
-  @override
-  String get relationEditorChangeSourceAction => 'Change the source intention';
-
-  @override
-  String get relationEditorSelectRelatedAction =>
-      'Select the related intention';
-
-  @override
-  String get relationEditorChangeRelatedAction =>
-      'Change the related intention';
-
-  @override
-  String get relationEditorTypeLabel => 'Relation type';
-
-  @override
   String get relationEditorTypeNeed => 'Need';
 
   @override
   String get relationEditorTypeCan => 'Can';
-
-  @override
-  String get relationEditorPriorityLabel => 'Priority';
-
-  @override
-  String get relationEditorDescriptionLabel => 'Description (optional)';
 
   @override
   String get relationEditorDescriptionTooLong =>
@@ -2686,39 +2579,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get relationEditorDescriptionInvalidUnicode =>
       'Enter valid Unicode text without NUL.';
-
-  @override
-  String get relationEditorCreateSameParticipants =>
-      'An intention can’t be related to itself.';
-
-  @override
-  String get relationEditorMissingTitle => 'To create the relation, provide:';
-
-  @override
-  String get relationEditorMissingSource => 'the source intention';
-
-  @override
-  String get relationEditorMissingRelated => 'the related intention';
-
-  @override
-  String get relationEditorMissingType => 'the relation type';
-
-  @override
-  String get relationEditorMissingPriority => 'a priority from P1 to P4';
-
-  @override
-  String get relationEditorOpenExistingRelation => 'Open the existing relation';
-
-  @override
-  String get relationEditorSubmitAction => 'Create relation';
-
-  @override
-  String get relationEditorCreating => 'Creating…';
-
-  @override
-  String relationEditorPriorityOption(String priority) {
-    return 'Priority $priority';
-  }
 
   @override
   String get choicePathTitle => 'Choose a path to an action';
@@ -2801,11 +2661,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get choicePathNoPath =>
-      'There is no valid path from this intention to another action right now.';
+      'There is no valid path from this intention to another action right now. Only relations leading to a ready action become continuations. Mark an intention as ready or link it to an action.';
 
   @override
   String get choicePathNoFurtherPath =>
       'There are no further valid continuations.';
+
+  @override
+  String get choicePathTopNoFurtherPath =>
+      'There are no further valid continuations. Only relations leading to a ready action become continuations. Mark an intention as ready or link it to an action.';
+
+  @override
+  String get choicePathOpenRelations => 'Open relations';
 
   @override
   String get choicePathConflict =>
@@ -3175,4 +3042,104 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get creationSavingContinues =>
       'Saving will continue after you leave creation.';
+
+  @override
+  String batchSubtitle(String group) {
+    return 'Add to \"$group\"';
+  }
+
+  @override
+  String batchSubtitleSelected(String group, int count) {
+    return 'Add to \"$group\" · selected $count';
+  }
+
+  @override
+  String batchSheetLine(String group) {
+    return 'New relations in \"$group\"';
+  }
+
+  @override
+  String get batchNoteNeeds =>
+      'Each selected intention will become a relation: this intention needs it';
+
+  @override
+  String get batchNoteCanUse =>
+      'Each selected intention will become a relation: this intention can use it';
+
+  @override
+  String get batchNoteNeededFor =>
+      'Each selected intention will become a relation: it needs this intention';
+
+  @override
+  String get batchNoteCanBeUsedFor =>
+      'Each selected intention will become a relation: it can use this intention';
+
+  @override
+  String get batchDefaults =>
+      'Relations will have priority P4 and no description; both can be changed on the page';
+
+  @override
+  String get batchAnchorNote => 'The intention whose page you came from';
+
+  @override
+  String get batchEmpty => 'Nothing selected yet';
+
+  @override
+  String get batchSelected => 'Selected intentions';
+
+  @override
+  String batchSourceSemantic(String name) {
+    return 'Source intention: $name';
+  }
+
+  @override
+  String batchRelatedSemantic(String name) {
+    return 'Related intention: $name';
+  }
+
+  @override
+  String batchRemove(String name) {
+    return 'Remove selection: $name';
+  }
+
+  @override
+  String batchAddCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Add $count relations',
+      one: 'Add $count relation',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get batchAddNone => 'Add relations';
+
+  @override
+  String get batchAdding => 'Adding…';
+
+  @override
+  String get batchDiscardTitle => 'Discard selected intentions?';
+
+  @override
+  String batchDiscardMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count relations will not be added.',
+      one: '$count relation will not be added.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get batchCreatedRemain =>
+      'Created intentions will remain in the catalog.';
+
+  @override
+  String get batchDiscardAction => 'Discard';
+
+  @override
+  String get batchContinueAction => 'Continue selecting';
 }

@@ -8,6 +8,7 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/contribution_reachability.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
@@ -35,12 +36,10 @@ void main() {
   for (final (name, command) in <(String, LongTermRelationCommand)>[
     (
       'создание',
-      CreateLongTermRelation(
-        sourceIntentionId: durabilityIntention(5),
-        relatedIntentionId: durabilityIntention(1),
-        type: LongTermRelationType.can,
-        priority: RelationPriority.p2,
-        description: null,
+      AddLongTermRelations(
+        pageIntentionId: durabilityIntention(5),
+        group: IntentionRelationGroup.canUse,
+        candidateIds: [durabilityIntention(1)],
       ),
     ),
     (

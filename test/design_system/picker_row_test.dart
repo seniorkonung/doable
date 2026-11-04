@@ -230,6 +230,120 @@ void main() {
       Offset(row.right - 26, row.center.dy),
     );
   });
+  testWidgets(
+    'отметка переключается нажатием на текст без сдвига и сообщает состояние',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      var chosen = false;
+      await tester.pumpWidget(
+        _app(
+          row: StatefulBuilder(
+            builder: (context, setState) {
+              return PickerRow.checkable(
+                name: 'Бег',
+                label: 'Бег',
+                chosen: chosen,
+                onPick: () => setState(() => chosen = !chosen),
+                pageLabel: _pageLabel,
+                onOpenPage: () {},
+              );
+            },
+          ),
+        ),
+      );
+      final row = tester.getRect(find.byType(PickerRow));
+      final namePosition = tester.getTopLeft(find.text('Бег'));
+      expect(namePosition, row.topLeft + const Offset(48, 11));
+      final circle = find.byWidgetPredicate(
+        (widget) =>
+            widget is DecoratedBox &&
+            widget.decoration is BoxDecoration &&
+            (widget.decoration as BoxDecoration).shape == BoxShape.circle,
+      );
+      var decoration =
+          tester.widget<DecoratedBox>(circle).decoration as BoxDecoration;
+      expect(tester.getSize(circle), const Size.square(22));
+      expect(
+        decoration.border,
+        Border.all(color: DoableColors.light.grip, width: 2),
+      );
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Бег')),
+        isSemantics(
+          label: 'Бег',
+          hasCheckedState: true,
+          isChecked: false,
+          hasTapAction: true,
+        ),
+      );
+      await tester.tap(find.text('Бег'));
+      await tester.pump();
+      expect(tester.getTopLeft(find.text('Бег')), namePosition);
+      decoration =
+          tester.widget<DecoratedBox>(circle).decoration as BoxDecoration;
+      expect(decoration.color, DoableColors.light.accent);
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Бег')),
+        isSemantics(
+          label: 'Бег',
+          hasCheckedState: true,
+          isChecked: true,
+          hasTapAction: true,
+        ),
+      );
+      semantics.dispose();
+    },
+  );
+
+  testWidgets(
+    'занятая строка показывает причину и открывает страницу только стрелкой',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      var openings = 0;
+      await tester.pumpWidget(
+        _app(
+          row: PickerRow.occupied(
+            name: 'Бег',
+            reason: 'Уже добавлено',
+            pageLabel: _pageLabel,
+            onOpenPage: () => openings++,
+          ),
+        ),
+      );
+      final colors = DoableColors.light;
+      final card = tester.widget<Material>(
+        find
+            .descendant(
+              of: find.byType(PickerRow),
+              matching: find.byType(Material),
+            )
+            .first,
+      );
+      expect(card.color, Colors.transparent);
+      final shape = card.shape! as RoundedRectangleBorder;
+      expect(shape.side, BorderSide(color: colors.hairline));
+      expect(tester.widget<Text>(find.text('Бег')).style!.color, colors.muted);
+      final reason = tester.widget<Text>(find.text('Уже добавлено')).style!;
+      expect(reason.color, colors.muted);
+      expect(reason.fontSize, DoableType.label.fontSize);
+      final mark = tester.widget<DoableIcon>(find.byType(DoableIcon).first);
+      expect(
+        (mark.icon, mark.size, mark.color),
+        (DoableIconData.relation, 18, colors.grip),
+      );
+      final nameSemantics = tester.getSemantics(find.text('Бег'));
+      expect(nameSemantics, isSemantics(label: 'Бег\nУже добавлено'));
+      expect(
+        tester.getSemantics(find.bySemanticsLabel(_pageLabel)),
+        isSemantics(label: _pageLabel, isButton: true, hasTapAction: true),
+      );
+      await tester.tap(find.text('Бег'));
+      expect(openings, 0);
+      await tester.tap(_arrowArea());
+      expect(openings, 1);
+      semantics.dispose();
+    },
+  );
 }
 
 const _label = 'Выбрать: Бег, действие. Утро. Теги: Дом';
@@ -261,7 +375,7 @@ Finder _arrowArea() => find.ancestor(
 );
 
 Widget _app({
-  required PickerRow row,
+  required Widget row,
   Brightness brightness = Brightness.light,
   double textScale = 1,
 }) => MaterialApp(

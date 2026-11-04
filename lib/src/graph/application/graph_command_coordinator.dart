@@ -54,8 +54,9 @@ final class ExistingIntentionKey extends GraphCommandKey {
   int get hashCode => intentionId.hashCode;
 }
 
-final class LongTermRelationCreationFormKey extends GraphCommandKey {
-  LongTermRelationCreationFormKey();
+/// Ключ отдельного экземпляра поиска участников.
+final class RelationsAdditionSearchKey extends GraphCommandKey {
+  RelationsAdditionSearchKey();
 }
 
 final class ExistingLongTermRelationKey extends GraphCommandKey {
@@ -227,7 +228,7 @@ sealed class IntentionCommandCompletion extends GraphCommandCompletion {
     ResultSuccess(value: IntentionDeleted()) ||
     ResultFailure() => switch (target) {
       ExistingIntentionOperationTarget(:final title) => title,
-      CreatingIntentionOperationTarget() => null,
+      IntentionCreationOperationTarget() => null,
     },
   };
 }
@@ -259,7 +260,7 @@ final class IntentionUnannouncedSuccessCompletion
   }) : super._(confirmedResult: result);
 }
 
-enum LongTermRelationCommandKind { create, update, archive, restore, delete }
+enum LongTermRelationCommandKind { add, update, archive, restore, delete }
 
 sealed class LongTermRelationCommandCompletion extends GraphCommandCompletion {
   const LongTermRelationCommandCompletion._({
@@ -656,8 +657,18 @@ sealed class IntentionOperationTarget {
   const IntentionOperationTarget();
 }
 
-final class CreatingIntentionOperationTarget extends IntentionOperationTarget {
+sealed class IntentionCreationOperationTarget extends IntentionOperationTarget {
+  const IntentionCreationOperationTarget();
+}
+
+final class CreatingIntentionOperationTarget
+    extends IntentionCreationOperationTarget {
   const CreatingIntentionOperationTarget();
+}
+
+final class CreatingIntentionForSearchOperationTarget
+    extends IntentionCreationOperationTarget {
+  const CreatingIntentionForSearchOperationTarget();
 }
 
 final class ExistingIntentionOperationTarget extends IntentionOperationTarget {
@@ -674,9 +685,9 @@ sealed class LongTermRelationOperationTarget {
   const LongTermRelationOperationTarget();
 }
 
-final class CreatingLongTermRelationOperationTarget
+final class AddingLongTermRelationsOperationTarget
     extends LongTermRelationOperationTarget {
-  const CreatingLongTermRelationOperationTarget();
+  const AddingLongTermRelationsOperationTarget();
 }
 
 final class ExistingLongTermRelationOperationTarget
@@ -948,8 +959,10 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   /// отказ — сначала живой форме по ADR-0012.
   IntentionCommandStart acceptCreation(
     IntentionCreationFormKey formKey,
-    CreateIntention command,
-  ) => _accept(formKey, command, const CreatingIntentionOperationTarget());
+    CreateIntention command, {
+    IntentionCreationOperationTarget target =
+        const CreatingIntentionOperationTarget(),
+  }) => _accept(formKey, command, target);
 
   /// Принимает команду существующего намерения.
   ///
@@ -968,14 +981,15 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     ),
   );
 
-  LongTermRelationCommandStart acceptRelationCreation(
-    LongTermRelationCreationFormKey formKey,
-    CreateLongTermRelation command,
+  LongTermRelationCommandStart acceptRelationsAddition(
+    RelationsAdditionSearchKey searchKey,
+    AddLongTermRelations command,
   ) => _acceptRelation(
-    keys: {formKey},
+    keys: {searchKey},
     command: command,
-    kind: LongTermRelationCommandKind.create,
-    target: const CreatingLongTermRelationOperationTarget(),
+    kind: LongTermRelationCommandKind.add,
+    target: const AddingLongTermRelationsOperationTarget(),
+    policy: _PresentationPolicy.standard,
   );
 
   /// Принимает изменение связи с политикой «успех без сообщения» по ADR-0046.
@@ -986,7 +1000,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     command: command,
     kind: LongTermRelationCommandKind.update,
     target: ExistingLongTermRelationOperationTarget(command.relationId),
-    announcesSuccess: false,
+    policy: _PresentationPolicy.silentSuccess,
   );
 
   /// Принимает архивирование связи с политикой «успех без сообщения» по
@@ -998,7 +1012,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     command: command,
     kind: LongTermRelationCommandKind.archive,
     target: ExistingLongTermRelationOperationTarget(command.relationId),
-    announcesSuccess: false,
+    policy: _PresentationPolicy.silentSuccess,
   );
 
   /// Принимает восстановление связи с политикой «успех без сообщения» по
@@ -1010,26 +1024,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     command: command,
     kind: LongTermRelationCommandKind.restore,
     target: ExistingLongTermRelationOperationTarget(command.relationId),
-    announcesSuccess: false,
-  );
-
-  /// Принимает восстановление связи из поиска участника как отправку формы
-  /// создания [formKey].
-  ///
-  /// Пока команда выполняется, заняты ключ формы и ключ восстанавливаемой
-  /// связи: повторная отправка формы и любая операция этой связи не
-  /// принимаются и не ставятся в очередь. Успех принадлежит оболочке, как у
-  /// создания из формы. У поиска нет собственного renderer, поэтому отказ
-  /// сразу принадлежит оболочке: скрытая форма удержала бы его до возвращения.
-  LongTermRelationCommandStart acceptRelationRestoreFromCreation(
-    LongTermRelationCreationFormKey formKey,
-    RestoreLongTermRelation command,
-  ) => _acceptRelation(
-    keys: {formKey, ExistingLongTermRelationKey(command.relationId)},
-    command: command,
-    kind: LongTermRelationCommandKind.restore,
-    target: ExistingLongTermRelationOperationTarget(command.relationId),
-    initiatorReleased: true,
+    policy: _PresentationPolicy.silentSuccess,
   );
 
   LongTermRelationCommandStart acceptRelationDelete(
@@ -1039,6 +1034,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     command: command,
     kind: LongTermRelationCommandKind.delete,
     target: ExistingLongTermRelationOperationTarget(command.relationId),
+    policy: _PresentationPolicy.standard,
   );
 
   DailyChoiceCommandStart acceptDailyChoiceCreation(
@@ -1163,16 +1159,16 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     required LongTermRelationCommand command,
     required LongTermRelationCommandKind kind,
     required LongTermRelationOperationTarget target,
-    bool announcesSuccess = true,
-    bool initiatorReleased = false,
+    required _PresentationPolicy policy,
   }) {
     final token = LongTermRelationOperationToken._();
     final acceptance = _acceptOperation(
       keys: keys,
-      entry: _PresentationEntry(token)..initiatorReleased = initiatorReleased,
+      entry: _PresentationEntry(token)
+        ..initiatorReleased = policy == _PresentationPolicy.failureOnly,
       execute: () async {
         final result = await _executeLongTermRelation(command);
-        if (!announcesSuccess &&
+        if (policy != _PresentationPolicy.standard &&
             result
                 is GraphCommandSucceeded<
                   LongTermRelationCommandSuccess,
@@ -1214,14 +1210,20 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     final token = IntentionOperationToken._();
     final kind = _kindOf(command);
     final policy = _intentionPresentationPolicyOf(kind);
+    final entry = _PresentationEntry(token)
+      ..initiatorReleased = policy == _PresentationPolicy.failureOnly;
     final acceptance = _acceptOperation(
       keys: {key},
       // Права инициатора у операций «только отказ» нет: отказ сразу
       // принадлежит оболочке.
-      entry: _PresentationEntry(token)
-        ..initiatorReleased = policy == _PresentationPolicy.failureOnly,
+      entry: entry,
       execute: () async {
         final result = await _executeIntention(command);
+        final completionTarget =
+            target is CreatingIntentionForSearchOperationTarget &&
+                entry.initiatorReleased
+            ? const CreatingIntentionOperationTarget()
+            : target;
         if (policy != _PresentationPolicy.standard &&
             result
                 is ResultSuccess<
@@ -1230,14 +1232,14 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
           return IntentionUnannouncedSuccessCompletion._(
             token: token,
             kind: kind,
-            target: target,
+            target: completionTarget,
             result: result,
           );
         }
         return IntentionPresentableCompletion._(
           token: token,
           kind: kind,
-          target: target,
+          target: completionTarget,
           confirmedResult: result,
         );
       },

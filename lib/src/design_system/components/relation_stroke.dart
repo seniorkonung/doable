@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../doable_colors.dart';
 import '../doable_metrics.dart';
 
 /// Вид связи, который передаёт линия: узор несёт вид, а цвет выбранного
@@ -13,9 +12,6 @@ sealed class RelationStrokeKind {
 
   /// Можно — пунктирная линия `stroke-can`.
   const factory RelationStrokeKind.can(Color color) = RelationStrokeCan;
-
-  /// Вид ещё не выбран — сплошная линия 2 цвета `hairline` темы.
-  const factory RelationStrokeKind.undetermined() = RelationStrokeUndetermined;
 }
 
 final class RelationStrokeNeed extends RelationStrokeKind {
@@ -28,10 +24,6 @@ final class RelationStrokeCan extends RelationStrokeKind {
   const RelationStrokeCan(this.color);
 
   final Color color;
-}
-
-final class RelationStrokeUndetermined extends RelationStrokeKind {
-  const RelationStrokeUndetermined();
 }
 
 /// Направление линии: вертикальная — на рейке пути, горизонтальная —
@@ -59,7 +51,6 @@ final class RelationStroke extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).extension<DoableColors>()!;
     final (color, width, dashed) = switch (kind) {
       RelationStrokeNeed(:final color) => (
         color,
@@ -67,7 +58,6 @@ final class RelationStroke extends StatelessWidget {
         false,
       ),
       RelationStrokeCan(:final color) => (color, DoableMetrics.strokeCan, true),
-      RelationStrokeUndetermined() => (colors.hairline, 2.0, false),
     };
     return CustomPaint(
       size: switch (axis) {

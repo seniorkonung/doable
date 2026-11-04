@@ -20,7 +20,7 @@ void main() {
   // Режим меняет лишь название и значок, а язык — лишь название: берём по
   // одной паре на язык.
   for (final (locale, mode) in [
-    (const Locale('ru'), QuickCreationMode.relation),
+    (const Locale('ru'), QuickCreationMode.dailyChoice),
     (const Locale('en'), QuickCreationMode.intention),
   ]) {
     testWidgets('нажатие запускает только текущий режим, долгое нажатие '
@@ -80,7 +80,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(BottomSheet), findsOneWidget);
       expect(launches, [mode]);
-      final next = QuickCreationMode.values[(mode.index + 1) % 4];
+      final next = QuickCreationMode
+          .values[(mode.index + 1) % QuickCreationMode.values.length];
       final nextTitle = find.text(next.title(localizations));
       await tester.ensureVisible(nextTitle);
       await tester.tap(nextTitle);
@@ -101,7 +102,6 @@ void main() {
   const locale = Locale('ru');
   for (final (mode, miniIcon) in [
     (QuickCreationMode.intention, DoableIconData.intentionMini),
-    (QuickCreationMode.relation, DoableIconData.relationMini),
     (QuickCreationMode.dailyChoice, DoableIconData.calendarMini),
   ]) {
     testWidgets('исходный плюс и мини-значок режима доступны без подписи, '
@@ -168,17 +168,17 @@ void main() {
     final launches = await _pumpButton(
       tester,
       locale: const Locale('ru'),
-      mode: QuickCreationMode.relation,
+      mode: QuickCreationMode.dailyChoice,
     );
     final node = tester.getSemantics(find.byType(QuickCreationButton));
     tester.semantics.tap(find.semantics.byLabel(node.label));
     await tester.pumpAndSettle();
-    expect(launches, [QuickCreationMode.relation]);
+    expect(launches, [QuickCreationMode.dailyChoice]);
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.pump();
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
-    expect(launches, List.filled(2, QuickCreationMode.relation));
+    expect(launches, List.filled(2, QuickCreationMode.dailyChoice));
     expect(find.byType(BottomSheet), findsNothing);
     expect(tester.takeException(), isNull);
   });

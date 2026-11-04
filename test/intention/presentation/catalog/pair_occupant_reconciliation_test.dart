@@ -30,15 +30,20 @@ void main() {
     required IntentionId related,
     int index = 1,
     RelationScope scope = RelationScope.active,
+    LongTermRelationType type = LongTermRelationType.need,
   }) => testRelation(
     sourceIntentionId: source,
     relatedIntentionId: related,
     index: index,
     scope: scope,
+    type: type,
   );
 
-  PairOccupant occupantOf(LongTermRelation relation) =>
-      PairOccupant(relationId: relation.id, scope: relation.scope);
+  PairOccupant occupantOf(LongTermRelation relation) => PairOccupant(
+    relationId: relation.id,
+    type: relation.type,
+    scope: relation.scope,
+  );
 
   Map<IntentionId, PairOccupant> reconcile(
     Iterable<LongTermRelationChange> changes, {
@@ -140,6 +145,29 @@ void main() {
       source: counterpart,
       related: row,
       scope: RelationScope.archived,
+    );
+
+    expect(
+      reconcile(
+        [
+          LongTermRelationUpdatedChange(
+            revision: revision,
+            before: before,
+            after: after,
+          ),
+        ],
+        occupants: {row: occupantOf(before)},
+      ),
+      {row: occupantOf(after)},
+    );
+  });
+
+  test('изменение типа обновляет занимающую связь', () {
+    final before = relation(source: counterpart, related: row);
+    final after = relation(
+      source: counterpart,
+      related: row,
+      type: LongTermRelationType.can,
     );
 
     expect(

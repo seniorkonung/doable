@@ -524,17 +524,18 @@ void main() {
         LongTermRelationType type,
       ) async {
         final result = await repository.execute(
-          CreateLongTermRelation(
-            sourceIntentionId: source,
-            relatedIntentionId: related,
-            type: type,
-            priority: RelationPriority.p2,
-            description: null,
+          AddLongTermRelations(
+            pageIntentionId: source,
+            candidateIds: [related],
+            group: (type == LongTermRelationType.need
+                ? IntentionRelationGroup.needs
+                : IntentionRelationGroup.canUse),
           ),
         );
         return ((result as GraphCommandSucceeded).value.value
-                as LongTermRelationCreated)
-            .relation
+                as LongTermRelationsAdded)
+            .relations
+            .single
             .id;
       }
 
@@ -1620,16 +1621,15 @@ final class _CheckpointHarness {
       sourceIntentionId: ownerId,
       relatedIntentionId: relatedIntentionId,
       index: relationIndex,
+      priority: RelationPriority.p4,
     );
     final commandIndex = repository.relationCommands.length;
-    final start = coordinator.acceptRelationCreation(
-      LongTermRelationCreationFormKey(),
-      CreateLongTermRelation(
-        sourceIntentionId: ownerId,
-        relatedIntentionId: relatedIntentionId,
-        type: LongTermRelationType.need,
-        priority: RelationPriority.p2,
-        description: null,
+    final start = coordinator.acceptRelationsAddition(
+      RelationsAdditionSearchKey(),
+      AddLongTermRelations(
+        pageIntentionId: ownerId,
+        candidateIds: [relatedIntentionId],
+        group: IntentionRelationGroup.needs,
       ),
     );
     expect(start, isA<LongTermRelationCommandAccepted>());
@@ -1641,9 +1641,8 @@ final class _CheckpointHarness {
       >(
         ConfirmedGraphResult(
           revision: revision,
-          value: LongTermRelationCreated(
-            relation: relation,
-            description: null,
+          value: LongTermRelationsAdded(
+            relations: [relation],
             changes: [
               for (final entry in activeCounts.entries)
                 IntentionRelationCountsChanged(

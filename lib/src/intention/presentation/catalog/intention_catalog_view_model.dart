@@ -378,6 +378,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         selection: selection,
         query: query,
         counts: page.counts,
+        exactTitleCount: page.exactTitleCount,
         revision: page.revision,
       );
     }
@@ -391,6 +392,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       items: page.items,
       totalCount: page.totalCount,
       counts: page.counts,
+      exactTitleCount: page.exactTitleCount,
       nextCursor: page.nextCursor,
       revision: page.revision,
       pairOccupants: pairOccupants,
@@ -541,6 +543,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       items: combined,
       totalCount: confirmed.totalCount,
       counts: confirmed.counts,
+      exactTitleCount: confirmed.exactTitleCount,
       nextCursor: page.nextCursor,
       revision: confirmed.revision,
       pairOccupants: pairOccupants,
@@ -623,6 +626,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     items: confirmed.items,
     totalCount: confirmed.totalCount,
     counts: confirmed.counts,
+    exactTitleCount: confirmed.exactTitleCount,
     nextCursor: confirmed.nextCursor,
     revision: confirmed.revision,
     pairOccupants: confirmed.pairOccupants,
@@ -830,6 +834,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       items: confirmed.items,
       totalCount: confirmed.totalCount,
       counts: confirmed.counts,
+      exactTitleCount: confirmed.exactTitleCount,
       nextCursor: confirmed.nextCursor,
       revision: confirmed.revision,
       pairOccupants: reconcilePairOccupants(
@@ -867,6 +872,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       items: items,
       totalCount: confirmed.totalCount,
       counts: confirmed.counts,
+      exactTitleCount: confirmed.exactTitleCount,
       nextCursor: confirmed.nextCursor,
       revision: confirmed.revision,
       pairOccupants: confirmed.pairOccupants,
@@ -900,6 +906,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       items: items,
       totalCount: confirmed.totalCount,
       counts: confirmed.counts,
+      exactTitleCount: confirmed.exactTitleCount,
       nextCursor: confirmed.nextCursor,
       revision: confirmed.revision,
       pairOccupants: confirmed.pairOccupants,
@@ -929,6 +936,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
           items: items,
           totalCount: confirmed.totalCount,
           counts: confirmed.counts,
+          exactTitleCount: confirmed.exactTitleCount,
           nextCursor: confirmed.nextCursor,
           revision: revision,
           pairOccupants: pairOccupants,
@@ -938,6 +946,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         selection: confirmed.selection,
         query: confirmed.query,
         counts: confirmed.counts,
+        exactTitleCount: confirmed.exactTitleCount,
         revision: revision,
       ),
     };
@@ -961,6 +970,18 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     );
     if (counts == null) {
       return null;
+    }
+
+    final filter = confirmed.query.titleFilter;
+    var exactTitleCount = confirmed.exactTitleCount;
+    if (exactTitleCount != null && filter != null) {
+      bool matchesExact(IntentionCatalogEntrySnapshot? snapshot) =>
+          snapshot != null &&
+          snapshot.summary.archiveState == IntentionArchiveState.active &&
+          filter.matchesExactTitle(snapshot.summary.title);
+      exactTitleCount +=
+          (matchesExact(mutation.after) ? 1 : 0) -
+          (matchesExact(mutation.before) ? 1 : 0);
     }
 
     final items = switch (confirmed) {
@@ -997,6 +1018,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         selection: confirmed.selection,
         query: confirmed.query,
         counts: counts,
+        exactTitleCount: exactTitleCount,
         revision: mutation.revision,
       );
     }
@@ -1006,6 +1028,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       items: items,
       totalCount: totalCount,
       counts: counts,
+      exactTitleCount: exactTitleCount,
       nextCursor: confirmed.nextCursor,
       revision: mutation.revision,
       pairOccupants: pairOccupants,

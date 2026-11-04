@@ -7,10 +7,6 @@ import '../doable_icon.dart';
 import '../doable_metrics.dart';
 import '../doable_type.dart';
 import 'button.dart';
-import 'path_glyph.dart';
-
-/// Отметка перед строкой назначения: какое поле связи выбирается.
-enum TopBarPurposeMark { sourceField, relatedField }
 
 /// Строка назначения под заголовком панели: зачем открыт экран. Вместе с
 /// заголовком она — одна кнопка, которая показывает это назначение целиком.
@@ -20,15 +16,10 @@ final class TopBarPurpose {
     required this.label,
     required this.expanded,
     required this.onOpen,
-    this.mark,
   });
 
   /// Одна строка; не поместившийся текст кончается многоточием.
   final String subtitle;
-
-  /// Пунктирный глиф поля перед строкой. Диктор его не слышит: роль уже
-  /// названа словами в строке и в [label].
-  final TopBarPurposeMark? mark;
 
   /// Доступное название общей кнопки заголовка и строки.
   final String label;
@@ -44,9 +35,14 @@ final class TopBarAction {
     required this.icon,
     required this.label,
     required this.onPressed,
+    this.miniIcon,
   });
 
   final DoableIconData icon;
+
+  /// Мини-значок в углу [icon], как у плюса `NavBarCreateButton`: называет,
+  /// что создаёт кнопка.
+  final DoableIconData? miniIcon;
 
   /// Доступное название кнопки.
   final String label;
@@ -68,10 +64,14 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
   static const double _purposeInset = 56;
   static const double _chevronSize = 12;
   static const double _chevronGap = 5;
-  static const double _markSize = 12;
-  static const double _markGap = 5;
   static const double _titleIconSize = 16;
   static const double _titleIconGap = 6;
+  static const double _miniIconSize = 14;
+
+  /// Отступы мини-значка от края области 44: он выходит за плюс настолько же,
+  /// как у `NavBarCreateButton` в его области 48.
+  static const double _miniIconEnd = 2;
+  static const double _miniIconBottom = 6;
 
   /// Панель экрана, который отменяется целиком, с крестиком слева.
   const TopBar({
@@ -176,7 +176,8 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
          ),
        );
 
-  /// Панель со строкой назначения под заголовком.
+  /// Панель со строкой назначения под заголовком и необязательной
+  /// кнопкой-иконкой [action] справа.
   ///
   /// [context] — место, где панель передаётся в `Scaffold.appBar`. Обе строки
   /// показываются в его системном масштабе текста, и высота панели растёт
@@ -188,6 +189,7 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
     required String closeLabel,
     required VoidCallback onClose,
     required TopBarPurpose purpose,
+    this.action,
     Key? closeKey,
     super.key,
   }) : title = title,
@@ -206,7 +208,6 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
          textScaler: MediaQuery.textScalerOf(context),
        ),
        _button = null,
-       action = null,
        preferredSize = Size.fromHeight(
          _purposeHeight(
            title: title,
@@ -245,7 +246,7 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
   /// Без обработчика кнопка справа выключена и остаётся на своём месте.
   final ({String label, VoidCallback? onPressed})? _button;
 
-  /// Кнопка-иконка справа; есть только у [TopBar.back].
+  /// Кнопка-иконка справа; есть только у [TopBar.back] и [TopBar.withPurpose].
   final TopBarAction? action;
 
   @override
@@ -365,6 +366,7 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
                 child: _iconButton(
                   colors,
                   icon: action.icon,
+                  miniIcon: action.miniIcon,
                   label: action.label,
                   onTap: action.onPressed,
                 ),
@@ -393,31 +395,44 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
     required DoableIconData icon,
     required String label,
     required VoidCallback? onTap,
+    DoableIconData? miniIcon,
     Key? key,
-  }) => Center(
-    child: MergeSemantics(
-      child: Semantics(
-        button: true,
-        enabled: onTap != null,
-        label: label,
-        child: InkResponse(
-          key: key,
-          onTap: onTap,
-          radius: DoableMetrics.tapMin / 2,
-          child: SizedBox.square(
-            dimension: DoableMetrics.tapMin,
-            child: Center(
-              child: DoableIcon(
-                icon,
-                size: DoableMetrics.iconSize,
-                color: onTap == null ? colors.grip : colors.ink,
+  }) {
+    final color = onTap == null ? colors.grip : colors.ink;
+    return Center(
+      child: MergeSemantics(
+        child: Semantics(
+          button: true,
+          enabled: onTap != null,
+          label: label,
+          child: InkResponse(
+            key: key,
+            onTap: onTap,
+            radius: DoableMetrics.tapMin / 2,
+            child: SizedBox.square(
+              dimension: DoableMetrics.tapMin,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  DoableIcon(icon, size: DoableMetrics.iconSize, color: color),
+                  if (miniIcon != null)
+                    PositionedDirectional(
+                      end: _miniIconEnd,
+                      bottom: _miniIconBottom,
+                      child: DoableIcon(
+                        miniIcon,
+                        size: _miniIconSize,
+                        color: color,
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 
   /// Строки показываются в том же масштабе, по которому рассчитана высота.
   Widget _purposeButton(
@@ -447,18 +462,6 @@ final class TopBar extends StatelessWidget implements PreferredSizeWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (purpose.mark case final mark?) ...[
-                    PathGlyph(
-                      shape: switch (mark) {
-                        TopBarPurposeMark.sourceField => PathGlyphShape.diamond,
-                        TopBarPurposeMark.relatedField => PathGlyphShape.ring,
-                      },
-                      outline: PathGlyphOutline.dashed,
-                      size: _markSize,
-                      color: colors.muted,
-                    ),
-                    const SizedBox(width: _markGap),
-                  ],
                   Flexible(
                     child: Text(
                       purpose.subtitle,

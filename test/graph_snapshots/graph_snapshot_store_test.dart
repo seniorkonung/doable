@@ -19,6 +19,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -104,15 +105,28 @@ void main() {
     Intention source,
     Intention related, {
     LongTermRelationType type = LongTermRelationType.need,
-  }) async => (await confirm<LongTermRelationCreated>(
-    CreateLongTermRelation(
-      sourceIntentionId: source.id,
-      relatedIntentionId: related.id,
-      type: type,
-      priority: RelationPriority.p2,
-      description: null,
-    ),
-  )).relation;
+  }) async {
+    final relation = (await confirm<LongTermRelationsAdded>(
+      AddLongTermRelations(
+        pageIntentionId: source.id,
+        candidateIds: [related.id],
+        group: type == LongTermRelationType.need
+            ? IntentionRelationGroup.needs
+            : IntentionRelationGroup.canUse,
+      ),
+    )).relations.single;
+    return (await confirm<LongTermRelationUpdated>(
+      UpdateLongTermRelation(
+        relationId: relation.id,
+        patch: LongTermRelationPatch(
+          priority: const LongTermRelationFieldSet(RelationPriority.p2),
+          description: LongTermRelationDescriptionPatch.fromInput(
+            'Описание связи',
+          ),
+        ),
+      ),
+    )).relation;
+  }
 
   File snapshotFile(GraphSnapshotEntry snapshot) =>
       File.fromUri(snapshots.uri.resolve(snapshot.fileName));

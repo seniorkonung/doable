@@ -43,7 +43,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
     try {
       final success = await _writeGraph<LongTermRelationCommandSuccess>(
         (clock) => switch (command) {
-          CreateLongTermRelation() => _createLongTermRelation(command, clock),
+          AddLongTermRelations() => _addLongTermRelations(command, clock),
           UpdateLongTermRelation() => _updateLongTermRelation(command, clock),
           ArchiveLongTermRelation() => _setLongTermRelationScope(
             relationId: command.relationId,
@@ -82,77 +82,91 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
     }
   }
 
-  Future<_CommittedLongTermRelationCreation> _createLongTermRelation(
-    CreateLongTermRelation command,
+  /// Создаёт связи пачки в порядке набора. Вызывается внутри транзакции
+  /// команды: отказ на любом месте набора откатывает всю пачку.
+  ///
+  /// Группа задаёт участников, поэтому намерение страницы и каждый кандидат
+  /// проверяются в своей роли. Все связи получают одно показание времени, а
+  /// последовательность создания растёт в порядке набора.
+  Future<_CommittedLongTermRelationsAddition> _addLongTermRelations(
+    AddLongTermRelations command,
     _GraphWriteClock clock,
   ) async {
+    final pageIsSource =
+        command.group.direction == relation_domain.RelationDirection.outgoing;
+    final (pageRole, candidateRole) = pageIsSource
+        ? (RelationParticipantRole.source, RelationParticipantRole.related)
+        : (RelationParticipantRole.related, RelationParticipantRole.source);
     await _requireRelationParticipant(
-      command.sourceIntentionId,
-      RelationParticipantRole.source,
-      mustBeActive: true,
-    );
-    await _requireRelationParticipant(
-      command.relatedIntentionId,
-      RelationParticipantRole.related,
+      command.pageIntentionId,
+      pageRole,
       mustBeActive: true,
     );
 
-    final occupiedRelationId = await _findRelationForPair(
-      command.sourceIntentionId,
-      command.relatedIntentionId,
-    );
-    if (occupiedRelationId != null) {
-      throw _LongTermRelationPairOccupied(occupiedRelationId);
+    final pairs = <({IntentionId source, IntentionId related})>[];
+    for (final candidateId in command.candidateIds) {
+      await _requireRelationParticipant(
+        candidateId,
+        candidateRole,
+        mustBeActive: true,
+      );
+      final pair = pageIsSource
+          ? (source: command.pageIntentionId, related: candidateId)
+          : (source: candidateId, related: command.pageIntentionId);
+      final occupiedRelationId = await _findRelationForPair(
+        pair.source,
+        pair.related,
+      );
+      if (occupiedRelationId != null) {
+        throw _LongTermRelationPairOccupied(occupiedRelationId);
+      }
+      pairs.add(pair);
     }
 
-    final id = _relationIdGenerator.generate();
     final createdAt = relation_domain.RelationTimestamp(clock.read());
     final storedCreatedAt = createdAt.value.microsecondsSinceEpoch;
-    final creationSequence = await _database
-        .into(_database.longTermRelations)
-        .insert(
-          local.LongTermRelationsCompanion.insert(
-            id: id.toCanonicalString(),
-            sourceIntentionId: command.sourceIntentionId.toCanonicalString(),
-            relatedIntentionId: command.relatedIntentionId.toCanonicalString(),
-            type: switch (command.type) {
-              relation_domain.LongTermRelationType.need => 'need',
-              relation_domain.LongTermRelationType.can => 'can',
-            },
-            priority: switch (command.priority) {
-              relation_domain.RelationPriority.p1 => 1,
-              relation_domain.RelationPriority.p2 => 2,
-              relation_domain.RelationPriority.p3 => 3,
-              relation_domain.RelationPriority.p4 => 4,
-            },
-            description: Value(command.description?.value),
-            isArchived: const Value(false),
-            createdAt: storedCreatedAt,
-            updatedAt: storedCreatedAt,
+    final relations = <relation_domain.LongTermRelation>[];
+    for (final pair in pairs) {
+      final id = _relationIdGenerator.generate();
+      final creationSequence = await _database
+          .into(_database.longTermRelations)
+          .insert(
+            local.LongTermRelationsCompanion.insert(
+              id: id.toCanonicalString(),
+              sourceIntentionId: pair.source.toCanonicalString(),
+              relatedIntentionId: pair.related.toCanonicalString(),
+              type: _storedRelationType(command.group.type),
+              priority: _storedRelationPriority(
+                relation_domain.RelationPriority.p4,
+              ),
+              isArchived: const Value(false),
+              createdAt: storedCreatedAt,
+              updatedAt: storedCreatedAt,
+            ),
+          );
+      relations.add(
+        relation_domain.LongTermRelation(
+          id: id,
+          sourceIntentionId: pair.source,
+          relatedIntentionId: pair.related,
+          type: command.group.type,
+          priority: relation_domain.RelationPriority.p4,
+          scope: relation_domain.RelationScope.active,
+          creationSequence: relation_domain.RelationCreationSequence(
+            creationSequence,
           ),
-        );
-    final created = relation_domain.LongTermRelation(
-      id: id,
-      sourceIntentionId: command.sourceIntentionId,
-      relatedIntentionId: command.relatedIntentionId,
-      type: command.type,
-      priority: command.priority,
-      scope: relation_domain.RelationScope.active,
-      creationSequence: relation_domain.RelationCreationSequence(
-        creationSequence,
-      ),
-      createdAt: createdAt,
-      updatedAt: createdAt,
-    );
+          createdAt: createdAt,
+          updatedAt: createdAt,
+        ),
+      );
+    }
     final affectedCounts = await _readVerifiedRelationCountsFor([
-      command.sourceIntentionId,
-      command.relatedIntentionId,
+      command.pageIntentionId,
+      ...command.candidateIds,
     ]);
-    return _CommittedLongTermRelationCreation(
-      relation: created,
-      description: command.description,
+    return _CommittedLongTermRelationsAddition(
+      relations: relations,
       affectedCounts: affectedCounts,
-      permissions: const LongTermRelationPermissions.unrestricted(),
     );
   }
 
@@ -454,29 +468,24 @@ sealed class _CommittedLongTermRelationCommand
   const _CommittedLongTermRelationCommand();
 }
 
-final class _CommittedLongTermRelationCreation
+final class _CommittedLongTermRelationsAddition
     extends _CommittedLongTermRelationCommand {
-  _CommittedLongTermRelationCreation({
-    required this.relation,
-    required this.description,
+  _CommittedLongTermRelationsAddition({
+    required Iterable<relation_domain.LongTermRelation> relations,
     required Map<IntentionId, RelationCounts> affectedCounts,
-    required this.permissions,
-  }) : affectedCounts = Map.unmodifiable(affectedCounts);
+  }) : relations = List.unmodifiable(relations),
+       affectedCounts = Map.unmodifiable(affectedCounts);
 
-  final relation_domain.LongTermRelation relation;
-  final LongTermRelationDescription? description;
+  final List<relation_domain.LongTermRelation> relations;
   final Map<IntentionId, RelationCounts> affectedCounts;
-  final LongTermRelationPermissions permissions;
 
   @override
   bool get didMutate => true;
 
   @override
-  LongTermRelationCreated toSuccess(GraphRevision revision) =>
-      LongTermRelationCreated(
-        relation: relation,
-        description: description,
-        permissions: permissions,
+  LongTermRelationsAdded toSuccess(GraphRevision revision) =>
+      LongTermRelationsAdded(
+        relations: relations,
         changes: [
           for (final entry in affectedCounts.entries)
             IntentionRelationCountsChanged(
@@ -484,11 +493,12 @@ final class _CommittedLongTermRelationCreation
               intentionId: entry.key,
               counts: entry.value,
             ),
-          LongTermRelationCreatedChange(
-            revision: revision,
-            relation: relation,
-            permissions: permissions,
-          ),
+          for (final relation in relations)
+            LongTermRelationCreatedChange(
+              revision: revision,
+              relation: relation,
+              permissions: const LongTermRelationPermissions.unrestricted(),
+            ),
         ],
       );
 }
@@ -617,7 +627,7 @@ LongTermRelationCommandFailure _classifyLongTermRelationCommandFailure(
 LongTermRelationCommandDiagnosticsType _longTermRelationCommandDiagnosticsType(
   LongTermRelationCommand command,
 ) => switch (command) {
-  CreateLongTermRelation() => LongTermRelationCommandDiagnosticsType.create,
+  AddLongTermRelations() => LongTermRelationCommandDiagnosticsType.create,
   UpdateLongTermRelation() => LongTermRelationCommandDiagnosticsType.update,
   ArchiveLongTermRelation() => LongTermRelationCommandDiagnosticsType.archive,
   RestoreLongTermRelation() => LongTermRelationCommandDiagnosticsType.restore,

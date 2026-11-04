@@ -30,6 +30,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import 'daily_choice_picker_launch_test_support.dart'
+    show TestDailyChoicePickerLaunch;
 import '../../support/daily_choice_details_controls.dart';
 
 import '../../support/app_root_pages.dart';
@@ -1292,6 +1294,8 @@ void main() {
       await tester.pumpAndSettle();
       await _waitFor(tester, find.text('Choose a path to an action'));
       expect(_savedIds(harness), isEmpty);
+      expect(find.textContaining('Другая ветвь'), findsWidgets);
+      expect(find.textContaining('Другое действие'), findsWidgets);
       expect(
         find.byKey(const ValueKey('choice-path-select-action')),
         findsOneWidget,

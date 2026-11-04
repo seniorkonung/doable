@@ -11,6 +11,7 @@ void _registerUnnamedPageTests() {
           builder: (_) => ChoicePathPage.forCreationRefresh(
             startingIntentionId: _intentionId(_read),
             direction: ChoicePathDraftDirection.topDown,
+            pathInstance: ChoicePathPageInstance(),
           ),
         ),
       ),

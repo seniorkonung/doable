@@ -6,13 +6,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../design_system/components/empty_state.dart';
 import '../../../design_system/components/top_bar.dart';
+import '../../../design_system/doable_icon.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../../graph/application/graph_revision.dart';
+import '../../../long_term_relation/application/intention_relation_group.dart';
 import '../../../long_term_relation/application/relation_pair_probe.dart';
+import '../../../long_term_relation/presentation/relation_group_name.dart';
 import '../../application/intention_catalog.dart';
 import '../../domain/intention_id.dart';
 import '../catalog/intention_catalog_purpose.dart';
-import '../catalog/intention_catalog_state.dart';
 import '../catalog/intention_catalog_view_model.dart';
 import '../catalog/intention_tag_conditions_view_model.dart';
 import '../search/intention_list_header.dart';
@@ -31,19 +33,18 @@ import 'intention_picker_row.dart';
 /// заголовка списка и выдачи.
 ///
 /// Экран не знает маршрутов, права запуска и типа результата: о закрытии,
-/// выборе и открытии подробностей страница узнаёт из обработчиков. Строка, пару
-/// которой занимает связь, не выбирается: вид её отметки и действие нажатия на
-/// текст задаёт [occupiedPairMark].
+/// выборе, создании и открытии подробностей страница узнаёт из обработчиков.
 final class IntentionPickerView extends ConsumerStatefulWidget {
   const IntentionPickerView({
     required this.purpose,
     required this.closeLabel,
     required this.emptyScopeMessage,
     required this.onClose,
-    required this.onPick,
+    required this.rowBehavior,
     required this.onOpenDetails,
-    this.occupiedPairMark,
     this.purposeDescription,
+    this.notice,
+    this.footer,
     super.key,
   });
 
@@ -62,19 +63,45 @@ final class IntentionPickerView extends ConsumerStatefulWidget {
 
   final VoidCallback onClose;
 
-  /// Получает сводку строки с ревизией выдачи, из которой строка построена.
-  final void Function(GraphSnapshot<IntentionSummary> pick) onPick;
-
+  final IntentionPickerRowBehavior rowBehavior;
   final void Function(IntentionId id) onOpenDetails;
 
-  /// Отметка строки, пару которой занимает [PairOccupant]: что значит занятость
-  /// для вызвавшего потока, знает страница. Без неё строки не отмечаются: так у
-  /// поисков, которые пробы пары не строят.
-  final OccupiedPairMark Function(PairOccupant occupant)? occupiedPairMark;
+  /// Отказ экрана под выдачей.
+  final Widget? notice;
+
+  /// Закреплённая нижняя часть: сообщения приложения [Scaffold] ставит над ней.
+  final Widget? footer;
 
   @override
   ConsumerState<IntentionPickerView> createState() =>
       _IntentionPickerViewState();
+}
+
+/// Поведение строк выбирается вызывающей страницей целиком.
+sealed class IntentionPickerRowBehavior {
+  const IntentionPickerRowBehavior();
+}
+
+final class IntentionPickerSingle extends IntentionPickerRowBehavior {
+  const IntentionPickerSingle({required this.onPick});
+  final void Function(GraphSnapshot<IntentionSummary>) onPick;
+}
+
+final class IntentionPickerCheckable extends IntentionPickerRowBehavior {
+  const IntentionPickerCheckable({
+    required this.group,
+    required this.selectedIds,
+    required this.onToggle,
+    required this.onCreate,
+  });
+  final IntentionRelationGroup group;
+  final Set<IntentionId> selectedIds;
+  final void Function(GraphSnapshot<IntentionSummary>) onToggle;
+
+  /// Просит создать намерение: плюс шапки передаёт пустое [title], а строка
+  /// «Создать» — подстроку. [clearTitle] разом очищает поле и фильтр названия
+  /// и сохраняет условия по тегам.
+  final void Function(String title, VoidCallback clearTitle) onCreate;
 }
 
 final class _IntentionPickerViewState
@@ -82,20 +109,20 @@ final class _IntentionPickerViewState
   final _titleController = TextEditingController();
   bool _purposeExpanded = false;
 
+  /// Полем владеет экран, а применённым фильтром — модель выдачи.
+  void _clearTitle() {
+    _titleController.clear();
+    ref
+        .read(intentionCatalogViewModelProvider(widget.purpose).notifier)
+        .clearTitleFilter();
+  }
+
   Future<void> _openPurpose(
     IntentionPickerPurposeDescription description,
   ) async {
     setState(() => _purposeExpanded = true);
     await showIntentionPickerPurposeSheet(context, description);
     if (mounted) setState(() => _purposeExpanded = false);
-  }
-
-  OccupiedPairMark? _occupiedPair(
-    IntentionCatalogLoaded results,
-    IntentionSummary summary,
-  ) {
-    final occupant = results.pairOccupants[summary.id];
-    return occupant == null ? null : widget.occupiedPairMark?.call(occupant);
   }
 
   @override
@@ -109,12 +136,15 @@ final class _IntentionPickerViewState
     final l10n = AppLocalizations.of(context);
     final kind = IntentionSearchKind.of(widget.purpose);
     final keyPrefix = kind.keyPrefix;
-    final catalogProvider = intentionCatalogViewModelProvider(widget.purpose);
     final conditionsProvider = intentionTagConditionsViewModelProvider(
       widget.purpose,
     );
     final title = kind.title(l10n);
     final purposeDescription = widget.purposeDescription;
+    final onCreate = switch (widget.rowBehavior) {
+      IntentionPickerSingle() => null,
+      IntentionPickerCheckable(:final onCreate) => onCreate,
+    };
     return Scaffold(
       appBar: purposeDescription == null
           ? TopBar(
@@ -131,7 +161,6 @@ final class _IntentionPickerViewState
               onClose: widget.onClose,
               purpose: TopBarPurpose(
                 subtitle: purposeDescription.subtitle,
-                mark: purposeDescription.subtitleMark,
                 label: l10n.intentionPickerPurposeLabel(
                   title,
                   purposeDescription.subtitle,
@@ -139,6 +168,14 @@ final class _IntentionPickerViewState
                 expanded: _purposeExpanded,
                 onOpen: () => unawaited(_openPurpose(purposeDescription)),
               ),
+              action: onCreate == null
+                  ? null
+                  : TopBarAction(
+                      icon: DoableIconData.plus,
+                      miniIcon: DoableIconData.intentionMini,
+                      label: l10n.intentionPickerCreateIntention,
+                      onPressed: () => onCreate('', _clearTitle),
+                    ),
             ),
       body: SafeArea(
         top: false,
@@ -169,32 +206,85 @@ final class _IntentionPickerViewState
             Expanded(
               child: IntentionSearchList(
                 purpose: widget.purpose,
-                rowBuilder: (context, results, summary) => IntentionPickerRow(
-                  key: ValueKey('$keyPrefix-${summary.id.toCanonicalString()}'),
-                  purpose: widget.purpose,
-                  summary: summary,
-                  requiredTagIds: results.query.tagFilter.requiredTagIds,
-                  onPick: () => widget.onPick(
-                    GraphSnapshot(value: summary, revision: results.revision),
-                  ),
-                  onOpenPage: () => widget.onOpenDetails(summary.id),
-                  occupiedPair: _occupiedPair(results, summary),
-                ),
+                rowBuilder: (context, results, summary) {
+                  final key = ValueKey(
+                    '$keyPrefix-${summary.id.toCanonicalString()}',
+                  );
+                  final snapshot = GraphSnapshot(
+                    value: summary,
+                    revision: results.revision,
+                  );
+                  final occupant = results.pairOccupants[summary.id];
+                  void openPage() => widget.onOpenDetails(summary.id);
+                  return switch (widget.rowBehavior) {
+                    IntentionPickerSingle(:final onPick) => IntentionPickerRow(
+                      key: key,
+                      purpose: widget.purpose,
+                      summary: summary,
+                      requiredTagIds: results.query.tagFilter.requiredTagIds,
+                      onPick: () => onPick(snapshot),
+                      onOpenPage: openPage,
+                    ),
+                    IntentionPickerCheckable(
+                      :final group,
+                      :final selectedIds,
+                      :final onToggle,
+                    ) =>
+                      occupant == null
+                          ? IntentionPickerRow.checkable(
+                              key: key,
+                              purpose: widget.purpose,
+                              summary: summary,
+                              requiredTagIds:
+                                  results.query.tagFilter.requiredTagIds,
+                              chosen: selectedIds.contains(summary.id),
+                              onPick: () => onToggle(snapshot),
+                              onOpenPage: openPage,
+                            )
+                          : IntentionPickerRow.occupied(
+                              key: key,
+                              purpose: widget.purpose,
+                              summary: summary,
+                              reason: relationPairReasonName(
+                                l10n,
+                                RelationPairReason.from(
+                                  group: group,
+                                  occupant: occupant,
+                                ),
+                              ),
+                              onOpenPage: openPage,
+                            ),
+                  };
+                },
                 emptyScope: (_) => EmptyState(
                   title: l10n.intentionPickerEmptyScopeTitle,
                   text: widget.emptyScopeMessage,
                 ),
                 onResetFilters: () {
-                  _titleController.clear();
-                  ref.read(catalogProvider.notifier).clearTitleFilter();
+                  _clearTitle();
                   ref.read(conditionsProvider.notifier).clear();
                 },
                 bottomPadding: DoableMetrics.space10,
+                onCreate: onCreate == null
+                    ? null
+                    : (title) => onCreate(title, _clearTitle),
               ),
             ),
+            if (widget.notice case final notice?)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  DoableMetrics.space5,
+                  DoableMetrics.space2,
+                  DoableMetrics.space5,
+                  DoableMetrics.space2,
+                ),
+                child: notice,
+              ),
           ],
         ),
       ),
+      // https://api.flutter.dev/flutter/material/Scaffold/bottomNavigationBar.html
+      bottomNavigationBar: widget.footer,
     );
   }
 }

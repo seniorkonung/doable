@@ -1,27 +1,70 @@
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('команда создания долговременной связи', () {
-    test('не допускает прямую самосвязь', () {
+  group('команда добавления пачки долговременных связей', () {
+    test('сохраняет порядок набора', () {
+      final command = AddLongTermRelations(
+        pageIntentionId: _sourceId,
+        group: IntentionRelationGroup.needs,
+        candidateIds: [_thirdId, _relatedId],
+      );
+
+      expect(command.candidateIds, [_thirdId, _relatedId]);
+    });
+
+    test('отклоняет пустой набор', () {
       expect(
-        () => CreateLongTermRelation(
-          sourceIntentionId: _sourceId,
-          relatedIntentionId: _sourceId,
-          type: LongTermRelationType.can,
-          priority: RelationPriority.p4,
-          description: null,
+        () => AddLongTermRelations(
+          pageIntentionId: _sourceId,
+          group: IntentionRelationGroup.needs,
+          candidateIds: const [],
         ),
         throwsA(
-          isA<CreateLongTermRelationValidationException>().having(
+          isA<AddLongTermRelationsValidationException>().having(
             (error) => error.failure,
             'failure',
-            CreateLongTermRelationValidationFailure.sameIntention,
+            AddLongTermRelationsValidationFailure.noCandidates,
+          ),
+        ),
+      );
+    });
+
+    test('отклоняет повторы в наборе', () {
+      expect(
+        () => AddLongTermRelations(
+          pageIntentionId: _sourceId,
+          group: IntentionRelationGroup.neededFor,
+          candidateIds: [_relatedId, _thirdId, _relatedId],
+        ),
+        throwsA(
+          isA<AddLongTermRelationsValidationException>().having(
+            (error) => error.failure,
+            'failure',
+            AddLongTermRelationsValidationFailure.duplicateCandidates,
+          ),
+        ),
+      );
+    });
+
+    test('отклоняет намерение страницы среди кандидатов', () {
+      expect(
+        () => AddLongTermRelations(
+          pageIntentionId: _sourceId,
+          group: IntentionRelationGroup.canUse,
+          candidateIds: [_relatedId, _sourceId],
+        ),
+        throwsA(
+          isA<AddLongTermRelationsValidationException>().having(
+            (error) => error.failure,
+            'failure',
+            AddLongTermRelationsValidationFailure.pageIntentionAmongCandidates,
           ),
         ),
       );
@@ -103,6 +146,7 @@ final class _TestGraphRevision implements GraphRevision {
 
 final _sourceId = _intentionId('0f8fad5b-d9cb-469f-a165-70867728950e');
 final _relatedId = _intentionId('7c9e6679-7425-40de-944b-e07fc1f90ae7');
+final _thirdId = _intentionId('3f2504e0-4f89-41d3-9a0c-0305e82c3301');
 final _relationId = _longTermRelationId('018f0b5d-6b2e-7c80-8000-000000000001');
 
 IntentionId _intentionId(String value) => switch (IntentionId.decode(value)) {

@@ -15,6 +15,7 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -150,18 +151,16 @@ void main() {
       ),
       ['создание намерения'],
     )).intention;
-    final relation = (await expectOnePackage<LongTermRelationCreated>(
+    final relation = (await expectOnePackage<LongTermRelationsAdded>(
       repository.execute(
-        CreateLongTermRelation(
-          sourceIntentionId: source.id,
-          relatedIntentionId: selected.id,
-          type: LongTermRelationType.need,
-          priority: RelationPriority.p2,
-          description: null,
+        AddLongTermRelations(
+          pageIntentionId: source.id,
+          group: IntentionRelationGroup.needs,
+          candidateIds: [selected.id],
         ),
       ),
       ['создание связи'],
-    )).relation;
+    )).relations.single;
     final choice = (await expectOnePackage<DailyChoiceCreated>(
       repository.execute(
         CreateDailyChoice(

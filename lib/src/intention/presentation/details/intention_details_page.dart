@@ -31,10 +31,8 @@ import '../../../graph/application/graph_command_coordinator.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
 import '../edit/intention_edit_page.dart';
-import '../../../long_term_relation/application/long_term_relation_projection.dart';
 import '../../../long_term_relation/application/relation_counts.dart';
 import '../../../long_term_relation/presentation/details/relation_details_sheet.dart';
-import '../../../long_term_relation/presentation/editor/relation_editor_state.dart';
 import '../../../long_term_relation/presentation/intention_relations/intention_relations_sliver.dart';
 import '../../../long_term_relation/presentation/intention_relations/intention_relations_state.dart';
 import '../../../long_term_relation/presentation/intention_relations/intention_relations_view_model.dart';
@@ -661,11 +659,6 @@ final class _LoadedDetails extends StatelessWidget {
     final localizations = AppLocalizations.of(context);
     final intention = state.intention;
     final isActive = intention.archiveState == IntentionArchiveState.active;
-    final owner = RelationParticipantSummary(
-      id: intention.id,
-      title: intention.title,
-      archiveState: intention.archiveState,
-    );
     return CustomScrollView(
       controller: scrollController,
       slivers: [
@@ -813,11 +806,10 @@ final class _LoadedDetails extends StatelessWidget {
                 ),
                 onAdd: (group) => unawaited(
                   context.router.push(
-                    RelationEditorRoute(
-                      editorContext: RelationCreationContext(
-                        participant: owner,
-                        group: group,
-                      ),
+                    RelationBatchPickerRoute(
+                      pageIntentionId: intention.id,
+                      pageTitle: intention.title,
+                      group: group,
                     ),
                   ),
                 ),

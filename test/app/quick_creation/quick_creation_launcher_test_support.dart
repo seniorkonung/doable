@@ -1,5 +1,7 @@
 part of 'quick_creation_launcher_test.dart';
 
+const _foreignFilter = 'Намерение 3';
+
 enum _Origin {
   home('Главной', 0, HomePage),
   daily('каталогом дневных выборов', 1, DailyChoiceCatalogPage),
@@ -14,7 +16,6 @@ enum _Origin {
 String _label(QuickCreationMode mode, ChoicePathDraftDirection? direction) =>
     switch (mode) {
       QuickCreationMode.intention => 'Намерение',
-      QuickCreationMode.relation => 'Связь',
       QuickCreationMode.dailyChoice =>
         'Дневной выбор: ${_directionLabel(direction!)}',
     };
@@ -30,7 +31,6 @@ String _firstRoute(
   ChoicePathDraftDirection? direction,
 ) => switch (mode) {
   QuickCreationMode.intention => IntentionEditorRoute.name,
-  QuickCreationMode.relation => RelationEditorRoute.name,
   QuickCreationMode.dailyChoice => switch (direction!) {
     ChoicePathDraftDirection.topDown => DailyChoiceSourcePickerRoute.name,
     ChoicePathDraftDirection.bottomUp => DailyChoiceActionPickerRoute.name,
@@ -105,16 +105,11 @@ Future<BuildContext> _source(
   if (origin == _Origin.deep) {
     unawaited(
       router.push(
-        RelationEditorRoute(
-          editorContext: const RelationBlankCreationContext(),
-        ),
+        DailyChoiceActionPickerRoute(launch: TestDailyChoicePickerLaunch()),
       ),
     );
     await tester.pumpAndSettle();
-    await tester.enterText(
-      _key('relation-editor-description'),
-      'Чужой черновик',
-    );
+    await tester.enterText(_key('daily-choice-action-filter'), _foreignFilter);
     unawaited(
       router.push(IntentionDetailsRoute(intentionId: durabilityIntention(2))),
     );
@@ -163,10 +158,12 @@ Future<RootStackRouter> _openApp(
   return appRouter;
 }
 
-/// Настоящий поиск закрывается сразу, а его ID доставляется после сброса.
+/// Поиск, открытый после [holdNextPicker], закрывается сразу, а его ID
+/// доставляется после сброса.
 final class _DelayedPickerRouter extends RootStackRouter {
   final _gate = Completer<void>();
-  bool _hold = true;
+  bool _hold = false;
+  void holdNextPicker() => _hold = true;
   void release() => _gate.complete();
   @override
   List<AutoRoute> get routes => AppRouter().routes;
