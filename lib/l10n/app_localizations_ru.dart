@@ -3014,6 +3014,18 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get dailyChoiceTimeSheetLabel => 'Время дневного выбора';
+
+  @override
+  String get dailyChoiceTimeHalfSwitchLabel => 'Половина суток';
+
+  @override
+  String get dailyChoiceTimeAmLabel => 'До полудня';
+
+  @override
+  String get dailyChoiceTimePmLabel => 'После полудня';
+
+  @override
   String get dailyChoiceDateTomorrow => 'Завтра';
 
   @override

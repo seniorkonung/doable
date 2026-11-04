@@ -26,6 +26,7 @@ import '../../domain/daily_choice_id.dart';
 import '../../domain/daily_choice_priority.dart';
 import '../../domain/daily_choice_schedule.dart';
 import '../daily_choice_command_failure_message.dart';
+import '../details/daily_choice_field_labels.dart';
 import '../details/daily_choice_sheet.dart';
 import 'daily_choice_calendar.dart';
 import 'daily_choice_calendar_day_marks_view_model.dart';
@@ -508,13 +509,7 @@ final class _DailyChoiceCatalogBodyState
               ? l10n.dailyChoiceDetailsCompleted
               : l10n.dailyChoiceDetailsNotCompleted;
           void open() => unawaited(showDailyChoiceSheet(context, item.id));
-          final schedule = switch (item.schedule) {
-            DailyChoiceAllDay() => l10n.dailyChoiceAllDay,
-            DailyChoiceTime(:final hour, :final minute) => TimeOfDay(
-              hour: hour,
-              minute: minute,
-            ).format(context),
-          };
+          final schedule = dailyChoiceTimeValue(context, item.schedule);
           final priority = l10n.dailyChoicePriorityOption(
             item.priority.name.toUpperCase(),
           );

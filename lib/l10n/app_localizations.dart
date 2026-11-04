@@ -4600,6 +4600,30 @@ abstract class AppLocalizations {
   /// **'Date: {date}'**
   String dailyChoiceFieldDateLabel(String date);
 
+  /// Доступное название листа времени дневного выбора
+  ///
+  /// In en, this message translates to:
+  /// **'Daily choice time'**
+  String get dailyChoiceTimeSheetLabel;
+
+  /// Доступное название переключателя половины суток на 12-часовом циферблате
+  ///
+  /// In en, this message translates to:
+  /// **'Half of the day'**
+  String get dailyChoiceTimeHalfSwitchLabel;
+
+  /// Доступное название половины суток до полудня
+  ///
+  /// In en, this message translates to:
+  /// **'Before noon'**
+  String get dailyChoiceTimeAmLabel;
+
+  /// Доступное название половины суток после полудня
+  ///
+  /// In en, this message translates to:
+  /// **'After noon'**
+  String get dailyChoiceTimePmLabel;
+
   /// Дата выбора, которая наступит завтра
   ///
   /// In en, this message translates to:

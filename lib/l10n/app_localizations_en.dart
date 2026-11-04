@@ -2985,6 +2985,18 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get dailyChoiceTimeSheetLabel => 'Daily choice time';
+
+  @override
+  String get dailyChoiceTimeHalfSwitchLabel => 'Half of the day';
+
+  @override
+  String get dailyChoiceTimeAmLabel => 'Before noon';
+
+  @override
+  String get dailyChoiceTimePmLabel => 'After noon';
+
+  @override
   String get dailyChoiceDateTomorrow => 'Tomorrow';
 
   @override
