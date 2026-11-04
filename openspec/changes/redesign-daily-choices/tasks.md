@@ -1067,3 +1067,18 @@
   - **Зависимости:** 4.7, 4.9.
   - **Предполагаемые файлы:** меняются `lib/src/daily_choice/presentation/details/daily_choice_field_labels.dart`, `lib/src/daily_choice/presentation/details/daily_choice_time_sheet.dart`, `test/daily_choice/presentation/details/daily_choice_sheet_test.dart`, `test/daily_choice/presentation/details/daily_choice_time_sheet_test.dart`.
   - **Размер:** S.
+
+- [ ] 4.19 Переключатель `Tabs` создаётся отдельным конструктором без параметров полосы
+  - **Критерии приёмки:**
+    - У `Tabs` в `lib/src/design_system/components/tabs.dart` два конструктора. Полоса вкладок принимает `items`, `value`, `onChange`, `label`, `stuck` и `plane`. `Tabs.toggle` принимает `items`, `value`, `onChange`, `label` и `minWidth`, а `stuck` и `plane` у него нет.
+    - Переключатель с `stuck` или `plane` не компилируется. `assert` на сочетание переключателя с параметрами полосы удалён.
+    - `minWidth` есть только у `Tabs.toggle`: ни одна полоса его не задаёт. Пилюли полосы по-прежнему не уже `DoableMetrics.tapMin`.
+    - Смысл для диктора — выбранная вкладка у полосы, включённая кнопка у переключателя — следует из выбранного конструктора. Публичного параметра `semantics` и перечисления смысла, которое передаёт потребитель, нет.
+    - `TimeDial` в `lib/src/design_system/components/time_dial.dart` строит переключатель половины суток через `Tabs.toggle`.
+    - Вид, раскладка, семантика и поведение вкладок в `intention_details_tabs.dart` и `daily_choice_sheet.dart` и переключателя «AM» и «PM» в `TimeDial` не меняются.
+    - Тесты `test/design_system/tabs_test.dart` и `test/design_system/time_dial_test.dart` создают переключатель через `Tabs.toggle` и больше не обращаются к удалённому параметру `semantics`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/tabs_test.dart test/design_system/time_dial_test.dart test/intention/presentation/details test/daily_choice/presentation/details`.
+  - **Зависимости:** 4.6.
+  - **Предполагаемые файлы:** меняются `lib/src/design_system/components/tabs.dart`, `lib/src/design_system/components/time_dial.dart`, `test/design_system/tabs_test.dart`, `test/design_system/time_dial_test.dart`.
+  - **Размер:** S.
