@@ -55,6 +55,10 @@ import 'daily_choice_field_labels.dart';
 /// Флажок шапки выключен на время записи, а новое значение приходит из
 /// подписки. Отказ стоит над содержимым обеих вкладок и остаётся за панелью,
 /// пока она открыта, даже перекрытая страницей.
+///
+/// Подтверждённое удаление из меню закрывает панель, и до конца закрытия она
+/// показывает прежнее содержимое с выключенными флажком и параметрами. Панель,
+/// перекрытая в этот момент, остаётся открытой и показывает, что выбора нет.
 Future<void> showDailyChoiceSheet(
   BuildContext context,
   DailyChoiceId choiceId,
@@ -87,6 +91,10 @@ final class _DailyChoiceSheetState extends ConsumerState<DailyChoiceSheet> {
   late final DailyChoiceLocalDayObserver _localDay;
 
   var _tab = _ChoiceTab.overview;
+
+  /// Собственное удаление подтвердилось, когда панель была перекрыта, и она
+  /// осталась открытой без выбора.
+  var _deletedWhileCovered = false;
 
   @override
   void initState() {
@@ -151,8 +159,11 @@ final class _DailyChoiceSheetState extends ConsumerState<DailyChoiceSheet> {
           return;
         }
         final deleted = await _model.delete();
-        if (deleted && mounted && (ModalRoute.isCurrentOf(context) ?? false)) {
+        if (!deleted || !mounted) return;
+        if (ModalRoute.isCurrentOf(context) ?? false) {
           Navigator.of(context).pop();
+        } else {
+          setState(() => _deletedWhileCovered = true);
         }
       case null:
         break;
@@ -175,13 +186,15 @@ final class _DailyChoiceSheetState extends ConsumerState<DailyChoiceSheet> {
               ListState.loading(text: localizations.dailyChoiceDetailsLoading),
             ),
           ],
-          DailyChoiceDetailsNotFound() => [
-            _StateSliver(
-              ListState.error(
-                message: localizations.dailyChoiceDetailsNotFound,
-              ),
-            ),
+          DailyChoiceDetailsNotFound() => [_notFound(localizations)],
+          DailyChoiceDetailsDeleted() when _deletedWhileCovered => [
+            _notFound(localizations),
           ],
+          DailyChoiceDetailsDeleted(:final details) => _choice(
+            localizations,
+            details,
+            writable: false,
+          ),
           DailyChoiceDetailsUnavailable() => [
             _StateSliver(
               ListState.error(
@@ -201,43 +214,57 @@ final class _DailyChoiceSheetState extends ConsumerState<DailyChoiceSheet> {
             ),
           ],
           DailyChoiceDetailsCorruption() => [_corruption(localizations)],
-          DailyChoiceDetailsLoaded(:final details) when details.path.isEmpty =>
-            [_corruption(localizations)],
-          DailyChoiceDetailsLoaded(:final details) => [
-            HalfPinnedSliver(
-              child: _ChoiceHeader(
-                details: details,
-                tab: _tab,
-                onTabChange: (tab) => setState(() => _tab = tab),
-                onOptions:
-                    _model.operation is DailyChoiceDetailsOperationWriting
-                    ? null
-                    : () => unawaited(_showOptions()),
-                onToggle: _model.operation is DailyChoiceDetailsOperationWriting
-                    ? null
-                    : () => _model.change(
-                        DailyChoiceFieldsPatch(
-                          isCompleted: DailyChoiceFieldSet(
-                            !details.choice.isCompleted,
-                          ),
-                        ),
-                      ),
-              ),
-            ),
-            if (_model.operation
-                case final DailyChoiceDetailsOperationFailed operation)
-              _OperationFailureNotice(operation),
-            ...switch (_tab) {
-              _ChoiceTab.overview => [
-                _Overview(details: details, today: _localDay.today),
-              ],
-              _ChoiceTab.path => [_Path(details: details)],
-            },
-          ],
+          DailyChoiceDetailsLoaded(:final details) => _choice(
+            localizations,
+            details,
+            writable: _model.operation is! DailyChoiceDetailsOperationWriting,
+          ),
         },
       ),
     );
   }
+
+  /// Шапка, вкладки и текущая вкладка; без [writable] флажок и параметры
+  /// выключены.
+  List<Widget> _choice(
+    AppLocalizations localizations,
+    DailyChoiceDetails details, {
+    required bool writable,
+  }) {
+    if (details.path.isEmpty) return [_corruption(localizations)];
+    return [
+      HalfPinnedSliver(
+        child: _ChoiceHeader(
+          details: details,
+          tab: _tab,
+          onTabChange: (tab) => setState(() => _tab = tab),
+          onOptions: writable ? () => unawaited(_showOptions()) : null,
+          onToggle: writable
+              ? () => _model.change(
+                  DailyChoiceFieldsPatch(
+                    isCompleted: DailyChoiceFieldSet(
+                      !details.choice.isCompleted,
+                    ),
+                  ),
+                )
+              : null,
+        ),
+      ),
+      if (_model.operation
+          case final DailyChoiceDetailsOperationFailed operation)
+        _OperationFailureNotice(operation),
+      ...switch (_tab) {
+        _ChoiceTab.overview => [
+          _Overview(details: details, today: _localDay.today),
+        ],
+        _ChoiceTab.path => [_Path(details: details)],
+      },
+    ];
+  }
+
+  Widget _notFound(AppLocalizations localizations) => _StateSliver(
+    ListState.error(message: localizations.dailyChoiceDetailsNotFound),
+  );
 
   Widget _corruption(AppLocalizations localizations) => _StateSliver(
     ListState.error(message: localizations.dailyChoiceDetailsCorruption),

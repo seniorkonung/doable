@@ -106,34 +106,93 @@ void main() {
     },
   );
 
-  testWidgets('подтверждённое удаление закрывает панель и сообщает об успехе', (
-    tester,
-  ) async {
+  for (final (order, missingFirst) in [
+    ('снимок без выбора приходит до подтверждения', true),
+    ('снимок без выбора приходит после подтверждения', false),
+  ]) {
+    testWidgets('подтверждённое удаление закрывает панель с прежним '
+        'содержимым и сообщает об успехе один раз: $order', (tester) async {
+      final harness = await _openSheet(tester);
+      final repository = harness.repository;
+      repository.emit(_details());
+      await tester.pumpAndSettle();
+      await _startDeletion(tester);
+      _expectHeadLocked(tester);
+
+      if (missingFirst) {
+        repository.emitMissing();
+        await tester.pump();
+        expect(find.text('Пояснение'), findsOneWidget);
+        expect(find.text(_notFound), findsNothing);
+        _expectHeadLocked(tester);
+        repository.succeedDelete();
+      } else {
+        repository.succeedDelete();
+        await tester.pump();
+        repository.emitMissing();
+      }
+
+      await _expectClosingKeepsContent(tester);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Дневной выбор удалён.'), findsOneWidget);
+    });
+  }
+
+  testWidgets(
+    'панель, перекрытая страницей при подтверждении удаления, сама не '
+    'закрывается и при возврате показывает, что выбора нет',
+    (tester) async {
+      final (repository, router) = await _openOnRouter(tester);
+      repository.emit(_details());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Путь'));
+      await tester.pumpAndSettle();
+      await _startDeletion(tester);
+      await tester.tap(find.byKey(const ValueKey('daily-choice-intention-1')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(router.current.name, IntentionDetailsRoute.name);
+
+      repository.succeedDelete();
+      await tester.pump();
+      repository.emitMissing();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(router.current.name, IntentionDetailsRoute.name);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(Sheet), findsOneWidget);
+      expect(find.text(_notFound), findsOneWidget);
+      expect(find.byType(ChoiceHead), findsNothing);
+      expect(
+        find.textContaining('Дневной выбор удалён.').hitTestable(),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('отказ удаления выбора, который тем временем исчез, оставляет '
+      'панель открытой с тем, что выбора нет', (tester) async {
     final harness = await _openSheet(tester);
     harness.repository.emit(_details());
     await tester.pumpAndSettle();
-    await tester.tap(_options);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Удалить дневной выбор'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Удалить'));
+    await _startDeletion(tester);
+    harness.repository.emitMissing();
     await tester.pump();
-    harness.repository.succeedDelete();
+    expect(find.text(_notFound), findsNothing);
+
+    harness.repository.failCommand(const DailyChoiceNotFoundFailure());
     await tester.pumpAndSettle();
-    expect(find.byType(Sheet), findsNothing);
-    expect(find.textContaining('Дневной выбор удалён.'), findsOneWidget);
+    expect(find.byType(Sheet), findsOneWidget);
+    expect(find.text(_notFound), findsOneWidget);
+    expect(find.byType(ChoiceHead), findsNothing);
   });
 
   testWidgets('отказ удаления остаётся в панели', (tester) async {
     final harness = await _openSheet(tester);
     harness.repository.emit(_details());
     await tester.pumpAndSettle();
-    await tester.tap(_options);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Удалить дневной выбор'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Удалить'));
-    await tester.pump();
+    await _startDeletion(tester);
     harness.repository.failCommand(const DailyChoiceUnavailableFailure());
     await tester.pumpAndSettle();
     expect(find.text(_commandFailure), findsOneWidget);
@@ -765,6 +824,42 @@ void main() {
 
 const _commandFailure =
     'Не удалось выполнить действие с дневным выбором. Повторите попытку.';
+
+const _notFound = 'Дневной выбор больше не существует.';
+
+/// Подтверждает удаление из меню; запись остаётся незавершённой.
+Future<void> _startDeletion(WidgetTester tester) async {
+  await tester.tap(_options);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Удалить дневной выбор'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Удалить'));
+  await tester.pump();
+}
+
+/// Флажок и кнопка параметров выключены.
+void _expectHeadLocked(WidgetTester tester) {
+  final head = tester.widget<ChoiceHead>(find.byType(ChoiceHead));
+  expect(head.onToggle, isNull);
+  expect(head.options, isA<ChoiceHeadOptionsUnavailable>());
+}
+
+/// Проходит закрытие панели по кадрам: пока она в дереве, в ней прежние
+/// шапка, вкладки и «Обзор» с выключенной шапкой и нет того, что выбора нет.
+Future<void> _expectClosingKeepsContent(WidgetTester tester) async {
+  var frames = 0;
+  while (find.byType(Sheet).evaluate().isNotEmpty) {
+    expect(frames, lessThan(60), reason: 'Панель не закрылась.');
+    expect(find.text('Действие'), findsOneWidget);
+    expect(_tabs, findsOneWidget);
+    expect(find.text('Пояснение'), findsOneWidget);
+    expect(find.text(_notFound), findsNothing);
+    _expectHeadLocked(tester);
+    frames++;
+    await tester.pump(const Duration(milliseconds: 16));
+  }
+  expect(frames, greaterThan(2));
+}
 
 /// Не помещается в тело панели и в полном размере.
 final _longText = List.filled(300, 'слово').join(' ');

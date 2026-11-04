@@ -349,6 +349,7 @@ final class PackageConsumerProbes {
         case DailyChoiceDetailsLoading():
           if (probe.loaded) probe.forbiddenStates.add(state);
         case DailyChoiceDetailsNotFound() ||
+            DailyChoiceDetailsDeleted() ||
             DailyChoiceDetailsUnavailable() ||
             DailyChoiceDetailsCorruption() ||
             DailyChoiceDetailsUnexpected():

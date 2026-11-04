@@ -22,6 +22,14 @@ final class DailyChoiceDetailsNotFound extends DailyChoiceDetailsState {
   const DailyChoiceDetailsNotFound();
 }
 
+/// Собственная команда панели подтвердила удаление выбора. Модель больше не
+/// наблюдает его и хранит последнее загруженное содержимое для закрытия.
+final class DailyChoiceDetailsDeleted extends DailyChoiceDetailsState {
+  const DailyChoiceDetailsDeleted(this.details);
+
+  final DailyChoiceDetails details;
+}
+
 final class DailyChoiceDetailsUnavailable extends DailyChoiceDetailsState {
   const DailyChoiceDetailsUnavailable();
 }

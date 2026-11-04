@@ -26,7 +26,7 @@ final class DailyChoiceDetailsViewModel extends ChangeNotifier {
   GraphRevision? _acceptedRevision;
   int _generation = 0;
   DailyChoiceDetailsState _state = const DailyChoiceDetailsLoading();
-  DailyChoiceOperationToken? _activeToken;
+  _Command? _command;
   DailyChoiceDetailsOperation _operation =
       const DailyChoiceDetailsOperationIdle();
 
@@ -46,15 +46,20 @@ final class DailyChoiceDetailsViewModel extends ChangeNotifier {
         _coordinator.acceptDailyChoiceUpdate(
           UpdateDailyChoiceFields(choiceId: _id, patch: patch),
         ),
+        _Change.new,
       ),
     );
   }
 
   /// Возвращает успех только собственной принятой команды удаления.
+  ///
+  /// Снимок без выбора до исхода команды не показан, а после подтверждения
+  /// состояние становится [DailyChoiceDetailsDeleted].
   Future<bool> delete() async {
     if (!_canStartOperation) return false;
     final completion = await _run(
       _coordinator.acceptDailyChoiceDelete(DeleteDailyChoice(_id)),
+      _Deletion.new,
     );
     return switch (completion?.result) {
       GraphResultSuccess(value: DailyChoiceDeleted(:final choice)) =>
@@ -64,18 +69,21 @@ final class DailyChoiceDetailsViewModel extends ChangeNotifier {
   }
 
   bool get _canStartOperation =>
-      _activeToken == null && _state is DailyChoiceDetailsLoaded;
+      _command == null && _state is DailyChoiceDetailsLoaded;
 
   Future<DailyChoiceCommandCompletion?> _run(
     DailyChoiceCommandStart start,
+    _Command Function(DailyChoiceOperationToken token) command,
   ) async {
     switch (start) {
       case DailyChoiceCommandAccepted(:final token, :final future):
-        _activeToken = token;
+        _command = command(token);
         _setOperation(const DailyChoiceDetailsOperationWriting());
         final completion = await future;
-        if (identical(_activeToken, token)) {
-          _activeToken = null;
+        final finished = _command;
+        if (finished != null && identical(finished.token, token)) {
+          _command = null;
+          _applyOutcome(finished, completion);
           _setOperation(_operationAfter(completion));
         }
         return completion;
@@ -95,6 +103,29 @@ final class DailyChoiceDetailsViewModel extends ChangeNotifier {
         );
     }
     return null;
+  }
+
+  /// Показывает исход удаления: подтверждённое удаление сохраняет прежнее
+  /// содержимое, а иначе проявляется отложенный снимок без выбора.
+  void _applyOutcome(
+    _Command command,
+    DailyChoiceCommandCompletion completion,
+  ) {
+    switch ((command, completion.result)) {
+      case (
+            _Deletion() || _DeletionChoiceMissing(),
+            GraphResultSuccess(value: DailyChoiceDeleted(:final choice)),
+          )
+          when choice.id == _id:
+        _stopObserving();
+        if (_state case DailyChoiceDetailsLoaded(:final details)) {
+          _setState(DailyChoiceDetailsDeleted(details));
+        }
+      case (_DeletionChoiceMissing(), _):
+        _setState(const DailyChoiceDetailsNotFound());
+      case (_Change() || _Deletion(), _):
+        break;
+    }
   }
 
   DailyChoiceDetailsOperation _operationAfter(
@@ -149,12 +180,16 @@ final class DailyChoiceDetailsViewModel extends ChangeNotifier {
                     return;
                   }
                   _acceptedRevision = revision;
-                  final details = value.value;
-                  _setState(
-                    details == null
-                        ? const DailyChoiceDetailsNotFound()
-                        : DailyChoiceDetailsLoaded(details, revision),
-                  );
+                  switch ((value.value, _command)) {
+                    case (final details?, _):
+                      _setState(DailyChoiceDetailsLoaded(details, revision));
+                    case (null, _Deletion(:final token)):
+                      _command = _DeletionChoiceMissing(token);
+                    case (null, _DeletionChoiceMissing()):
+                      break;
+                    case (null, _Change() || null):
+                      _setState(const DailyChoiceDetailsNotFound());
+                  }
                 case GraphResultFailure(:final failure):
                   _setState(switch (failure) {
                     DailyChoiceReadCorruptionFailure() =>
@@ -177,6 +212,12 @@ final class DailyChoiceDetailsViewModel extends ChangeNotifier {
     }
   }
 
+  void _stopObserving() {
+    ++_generation;
+    unawaited(_subscription?.cancel());
+    _subscription = null;
+  }
+
   void _setState(DailyChoiceDetailsState next) {
     _state = next;
     notifyListeners();
@@ -184,12 +225,33 @@ final class DailyChoiceDetailsViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
-    ++_generation;
-    unawaited(_subscription?.cancel());
-    final active = _activeToken;
-    _activeToken = null;
-    if (active != null) _coordinator.releaseInitiatorPresentation(active);
+    _stopObserving();
+    final active = _command;
+    _command = null;
+    if (active != null) _coordinator.releaseInitiatorPresentation(active.token);
     _releaseFailure();
     super.dispose();
   }
+}
+
+/// Принятая команда модели до её исхода.
+sealed class _Command {
+  const _Command(this.token);
+
+  final DailyChoiceOperationToken token;
+}
+
+final class _Change extends _Command {
+  const _Change(super.token);
+}
+
+/// Удаление выбора, до исхода которого снимок без выбора не приходил.
+final class _Deletion extends _Command {
+  const _Deletion(super.token);
+}
+
+/// Удаление выбора, во время которого пришёл снимок без выбора. Он показан,
+/// только если удаление не подтвердится.
+final class _DeletionChoiceMissing extends _Command {
+  const _DeletionChoiceMissing(super.token);
 }
