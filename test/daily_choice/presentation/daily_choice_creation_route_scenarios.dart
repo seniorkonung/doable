@@ -38,9 +38,7 @@ void _registerCreationRouteScenarios() {
         await _tap(tester, find.text('Основание').first);
         unawaited(
           router.push(
-            DailyChoiceActionPickerRoute(
-              pickerContext: const PathReplacementDailyChoicePickerContext(),
-            ),
+            DailyChoiceActionPickerRoute(launch: TestDailyChoicePickerLaunch()),
           ),
         );
         final filter = find.byKey(const ValueKey('daily-choice-action-filter'));

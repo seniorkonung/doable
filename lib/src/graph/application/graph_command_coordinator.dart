@@ -325,9 +325,9 @@ final class LongTermRelationUnannouncedSuccessCompletion
   }) : super._(confirmedResult: result);
 }
 
-enum DailyChoiceCommandKind { create, update, replace, delete }
+enum DailyChoiceCommandKind { create, update, delete }
 
-final class DailyChoiceCommandCompletion extends GraphPresentableCompletion {
+sealed class DailyChoiceCommandCompletion extends GraphCommandCompletion {
   const DailyChoiceCommandCompletion._({
     required this.token,
     required this.kind,
@@ -353,6 +353,34 @@ final class DailyChoiceCommandCompletion extends GraphPresentableCompletion {
 
   @override
   bool get isFailure => confirmedResult is GraphResultFailure;
+}
+
+final class DailyChoicePresentableCompletion
+    extends DailyChoiceCommandCompletion
+    implements GraphPresentableCompletion {
+  const DailyChoicePresentableCompletion._({
+    required super.token,
+    required super.kind,
+    required super.confirmedResult,
+  }) : super._();
+}
+
+/// Успех изменения дневного выбора публикуется только для согласования данных.
+///
+/// Изменение следует политике «успех без сообщения» по ADR-0046: результат
+/// виден в открытой панели или карточке каталога, а отказ сохраняет протокол
+/// ADR-0012.
+final class DailyChoiceUnannouncedSuccessCompletion
+    extends DailyChoiceCommandCompletion {
+  const DailyChoiceUnannouncedSuccessCompletion._({
+    required super.token,
+    required super.kind,
+    required GraphCommandSucceeded<
+      DailyChoiceCommandSuccess,
+      DailyChoiceCommandFailure
+    >
+    result,
+  }) : super._(confirmedResult: result);
 }
 
 enum TagCommandKind { create, update, delete, move, assign, removeAssignment }
@@ -1050,14 +1078,6 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     DailyChoiceCommandKind.update,
   );
 
-  DailyChoiceCommandStart acceptDailyChoiceReplace(
-    ReplaceDailyChoicePath command,
-  ) => _acceptDailyChoice(
-    ExistingDailyChoiceKey(command.choiceId),
-    command,
-    DailyChoiceCommandKind.replace,
-  );
-
   DailyChoiceCommandStart acceptDailyChoiceDelete(DeleteDailyChoice command) =>
       _acceptDailyChoice(
         ExistingDailyChoiceKey(command.choiceId),
@@ -1141,14 +1161,30 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     DailyChoiceCommandKind kind,
   ) {
     final token = DailyChoiceOperationToken._();
+    final policy = _dailyChoicePresentationPolicyOf(kind);
     final acceptance = _acceptOperation(
       keys: {key},
       entry: _PresentationEntry(token),
-      execute: () async => DailyChoiceCommandCompletion._(
-        token: token,
-        kind: kind,
-        confirmedResult: await _executeDailyChoice(command),
-      ),
+      execute: () async {
+        final result = await _executeDailyChoice(command);
+        if (policy != _PresentationPolicy.standard &&
+            result
+                is GraphCommandSucceeded<
+                  DailyChoiceCommandSuccess,
+                  DailyChoiceCommandFailure
+                >) {
+          return DailyChoiceUnannouncedSuccessCompletion._(
+            token: token,
+            kind: kind,
+            result: result,
+          );
+        }
+        return DailyChoicePresentableCompletion._(
+          token: token,
+          kind: kind,
+          confirmedResult: result,
+        );
+      },
     );
     return switch (acceptance) {
       _GraphCommandAccepted(:final future) => DailyChoiceCommandAccepted(
@@ -1897,6 +1933,14 @@ _PresentationPolicy _intentionPresentationPolicyOf(IntentionCommandKind kind) =>
       IntentionCommandKind.archive ||
       IntentionCommandKind.restore => _PresentationPolicy.failureOnly,
     };
+
+_PresentationPolicy _dailyChoicePresentationPolicyOf(
+  DailyChoiceCommandKind kind,
+) => switch (kind) {
+  DailyChoiceCommandKind.create ||
+  DailyChoiceCommandKind.delete => _PresentationPolicy.standard,
+  DailyChoiceCommandKind.update => _PresentationPolicy.silentSuccess,
+};
 
 IntentionCommandKind _kindOf(IntentionCommand command) => switch (command) {
   CreateIntention() => IntentionCommandKind.create,

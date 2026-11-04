@@ -230,46 +230,38 @@ void main() {
     },
   );
 
-  test(
-    'замена пути убирает прежние опорные намерения на новой ревизии',
-    () async {
-      expect(
-        await repository.execute(durabilityCreate()),
-        isA<GraphCommandSucceeded>(),
-      );
-      expect(
-        await repository.execute(ArchiveIntention(durabilityIntention(2))),
-        isA<GraphCommandSucceeded>(),
-      );
-      final before = await read(period: StatisticsMonth(2026, 9));
-      expect(before.groups.single.seeds, [
-        for (final n in [1, 2, 3]) durabilityIntention(n),
-      ]);
-      final result = await repository.execute(
-        ReplaceDailyChoicePath(
-          choiceId: durabilityChoice(201),
-          sourceIntentionId: durabilityIntention(1),
-          selectedIntentionId: durabilityIntention(4),
-          path: durabilityPath([103]),
-        ),
-      );
-      expect(result, isA<GraphCommandSucceeded>());
-      final after = await read(period: StatisticsMonth(2026, 9));
-      expect(after.groups.single.seeds, [durabilityIntention(4)]);
-      expect(after.groups.single.counts.planned, 1);
-      expect(after.groups.single.counts.contribution, 1);
-      expect(
-        after.revision.compareTo(before.revision),
-        GraphRevisionOrder.newer,
-      );
-      expect(
-        after.revision.compareTo(
-          (result as GraphCommandSucceeded).value.revision,
-        ),
-        GraphRevisionOrder.same,
-      );
-    },
-  );
+  test('удаление выбора и создание нового с другим путём убирает прежние '
+      'опорные намерения на новой ревизии', () async {
+    expect(
+      await repository.execute(durabilityCreate()),
+      isA<GraphCommandSucceeded>(),
+    );
+    expect(
+      await repository.execute(ArchiveIntention(durabilityIntention(2))),
+      isA<GraphCommandSucceeded>(),
+    );
+    final before = await read(period: StatisticsMonth(2026, 9));
+    expect(before.groups.single.seeds, [
+      for (final n in [1, 2, 3]) durabilityIntention(n),
+    ]);
+    expect(
+      await repository.execute(DeleteDailyChoice(durabilityChoice(201))),
+      isA<GraphCommandSucceeded>(),
+    );
+    final result = await repository.execute(durabilityCreate(path: [103]));
+    expect(result, isA<GraphCommandSucceeded>());
+    final after = await read(period: StatisticsMonth(2026, 9));
+    expect(after.groups.single.seeds, [durabilityIntention(4)]);
+    expect(after.groups.single.counts.planned, 1);
+    expect(after.groups.single.counts.contribution, 1);
+    expect(after.revision.compareTo(before.revision), GraphRevisionOrder.newer);
+    expect(
+      after.revision.compareTo(
+        (result as GraphCommandSucceeded).value.revision,
+      ),
+      GraphRevisionOrder.same,
+    );
+  });
 
   test('команда между запросами не смешивает сводку и веса групп', () async {
     await addChoice(201, '2026-10-12');

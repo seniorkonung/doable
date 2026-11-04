@@ -118,14 +118,7 @@ enum LongTermRelationCommandDiagnosticsType {
   delete,
 }
 
-enum DailyChoicePathCommandDiagnosticsType { create, replacePath }
-
-enum DailyChoiceCommandDiagnosticsType {
-  create,
-  updateFields,
-  replacePath,
-  delete,
-}
+enum DailyChoiceCommandDiagnosticsType { create, updateFields, delete }
 
 enum DailyChoiceCommandDiagnosticsStage { validation, write, resultRead }
 
@@ -254,13 +247,11 @@ final class ChoicePathContinuationReadDiagnosticsEvent
   final bool isContinuation;
 }
 
+/// Проверка подтверждённого пути при создании дневного выбора.
 final class DailyChoicePathValidationDiagnosticsEvent extends DiagnosticsEvent {
   const DailyChoicePathValidationDiagnosticsEvent({
-    required this.commandType,
     required DiagnosticsStatus status,
   }) : super(status);
-
-  final DailyChoicePathCommandDiagnosticsType commandType;
 }
 
 final class DailyChoiceCommandDiagnosticsEvent extends DiagnosticsEvent {

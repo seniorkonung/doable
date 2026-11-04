@@ -35,43 +35,12 @@ void main() {
     permissions.clear();
     expect(change.before, isNull);
     expect(change.after!.id, choice.id);
-    expect(change.previousParticipants, isEmpty);
-    expect(change.currentParticipants, {_source, _selected});
     expect(change.releasedRelationIds, isEmpty);
     expect(change.occupiedRelationIds, {_relation});
     expect(change.intentionCounts[_source]!.dailySource, 1);
     expect(change.intentionCounts[_selected]!.dailySelected, 1);
     expect(change.relationPermissions[_relation]!.canDelete, isFalse);
   });
-
-  test(
-    'замена передаёт обе пары участников и новые разрешения без правки связи',
-    () {
-      final change = DailyChoiceChange(
-        revision: revision,
-        before: _choice(_source, _selected),
-        after: _choice(_replacement, _selected),
-        releasedRelationIds: [_relation],
-        occupiedRelationIds: [_newRelation],
-        intentionCounts: {
-          _source: _counts(),
-          _selected: _counts(selected: 1),
-          _replacement: _counts(source: 1),
-        },
-        relationPermissions: {
-          _relation: const LongTermRelationPermissions.unrestricted(),
-          _newRelation:
-              const LongTermRelationPermissions.referencedByDailyPath(),
-        },
-      );
-
-      expect(change.previousParticipants, {_source, _selected});
-      expect(change.currentParticipants, {_replacement, _selected});
-      expect(change.relationPermissions[_relation]!.canDelete, isTrue);
-      expect(change.relationPermissions[_newRelation]!.canDelete, isFalse);
-      expect(change.intentionCounts[_source]!.dailyTotal, 0);
-    },
-  );
 
   test('освобождение пути сохраняет фактическую блокировку другой ссылкой', () {
     final change = DailyChoiceChange(
@@ -87,7 +56,6 @@ void main() {
     );
 
     expect(change.relationPermissions[_relation]!.canDelete, isFalse);
-    expect(change.currentParticipants, isEmpty);
   });
 
   test('изменение только даты не выдаёт освобождение пути', () {
@@ -262,7 +230,5 @@ DailyChoiceId _dailyChoice(String value) =>
 
 final _source = _intention('018f0b5d-6b2e-7c80-8000-000000000001');
 final _selected = _intention('018f0b5d-6b2e-7c80-8000-000000000002');
-final _replacement = _intention('018f0b5d-6b2e-7c80-8000-000000000003');
 final _relation = _longTermRelation('018f0b5d-6b2e-7c80-8000-000000000004');
-final _newRelation = _longTermRelation('018f0b5d-6b2e-7c80-8000-000000000005');
 final _choiceId = _dailyChoice('018f0b5d-6b2e-7c80-8000-000000000006');

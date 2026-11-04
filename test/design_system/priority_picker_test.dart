@@ -2,6 +2,7 @@ import 'dart:ui' show FontFeature, ImageByteFormat;
 
 import 'package:doable/src/design_system/components/priority_picker.dart';
 import 'package:doable/src/design_system/doable_colors.dart';
+import 'package:doable/src/design_system/doable_priority.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/design_system/doable_type.dart';
 import 'package:flutter/material.dart';

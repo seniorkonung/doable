@@ -378,7 +378,7 @@ void main() {
     }
   });
 
-  test('сохранение и замена длинным путём ограничивают объём чтения', () async {
+  test('сохранение длинным путём ограничивает объём чтения', () async {
     final longPath = ConfirmedChoicePath([
       ConfirmedChoicePathStep(
         relationId: _relation(900),
@@ -420,30 +420,6 @@ void main() {
     );
     // Создание и чтение читают не больше одного пути вместе с его
     // участниками.
-    _expectEachReadAtMost(fixture.trace, _pathWithParticipants);
-
-    fixture.trace.clear();
-    expect(
-      await fixture.repository.execute(
-        ReplaceDailyChoicePath(
-          choiceId: durabilityChoice(10399),
-          sourceIntentionId: _intention(1),
-          selectedIntentionId: _intention(151),
-          path: longPath,
-        ),
-      ),
-      isA<GraphCommandSucceeded>(),
-    );
-    final replaced = await fixture.repository.getDailyChoice(
-      durabilityChoice(10399),
-    );
-    expect(replaced, isA<DailyChoiceReadSuccess>());
-    expect(
-      (replaced as DailyChoiceReadSuccess).value.value!.path.map(
-        (step) => step.relation.id,
-      ),
-      longPath.steps.map((step) => step.relationId),
-    );
     _expectEachReadAtMost(fixture.trace, _pathWithParticipants);
   });
 

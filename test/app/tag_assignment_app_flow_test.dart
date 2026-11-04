@@ -5,7 +5,7 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/components/tag_row.dart';
@@ -15,6 +15,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
+import '../support/daily_choice_catalog_controls.dart';
+import '../support/daily_choice_details_controls.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/intention_catalog_controls.dart';
 import '../support/tag_storage_fixture.dart';
@@ -201,11 +203,13 @@ void main() {
 
     router.pop();
     await tester.pumpAndSettle();
-    final choiceId = (DailyChoiceId.decode(
-      tagFixtureId(201),
-    ) as DailyChoiceIdDecodingSuccess).id;
-    unawaited(router.push(DailyChoiceDetailsRoute(choiceId: choiceId)));
-    await _until(tester, find.byKey(const ValueKey('daily-choice-edit-open')));
+    await openDailyChoices(tester, tap: _tap);
+    await selectDailyChoiceCatalogDate(
+      tester,
+      CalendarDate.fromParts(2026, 9, 25),
+    );
+    await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
+    await _until(tester, dailyChoiceDetailsReady);
     expect(choose, findsNothing);
     expect(tester.takeException(), isNull);
   });

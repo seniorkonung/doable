@@ -55,11 +55,11 @@ void main() {
     expect(_loaded(h).completed.items.single.id, _choiceId(2));
     expect(_loaded(h).totalCount, 3);
     expect(h.state.selection.incompleteExpanded, isTrue);
-    expect(h.state.selection.completedExpanded, isFalse);
+    expect(h.state.selection.completedExpanded, isTrue);
     h.model.toggleSection(false);
     h.model.toggleSection(true);
     expect(h.state.selection.incompleteExpanded, isFalse);
-    expect(h.state.selection.completedExpanded, isTrue);
+    expect(h.state.selection.completedExpanded, isFalse);
     expect(h.repository.queries, hasLength(2));
     expect(h.repository.queries.map((q) => q.isCompleted), [false, true]);
   });
@@ -301,7 +301,7 @@ void main() {
         h.model.selectDate(next);
         expect(h.state, isA<DailyChoiceCatalogInitialLoad>());
         expect(h.state.selection.incompleteExpanded, isFalse);
-        expect(h.state.selection.completedExpanded, isTrue);
+        expect(h.state.selection.completedExpanded, isFalse);
         h.repository.first(3, [], total: 0);
         await pumpEventQueue();
         h.repository.first(4, [
@@ -349,7 +349,7 @@ void main() {
       expect(_loaded(h).items.single.source.title, 'Новое основание');
       h.container.invalidate(h.provider);
       expect(h.state.selection.incompleteExpanded, isFalse);
-      expect(h.state.selection.completedExpanded, isTrue);
+      expect(h.state.selection.completedExpanded, isFalse);
     },
   );
 }

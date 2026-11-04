@@ -8,6 +8,7 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_state.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_view_model.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -268,6 +269,7 @@ final class PackageConsumerProbes {
           if (probe.loaded) probe.forbiddenStates.add(state);
         case RelationDetailsNotFound() ||
             RelationDetailsDeleted() ||
+            RelationDetailsOwnDeletionConfirmed() ||
             RelationDetailsUnavailable() ||
             RelationDetailsCorruption() ||
             RelationDetailsUnexpected():
@@ -325,7 +327,11 @@ final class PackageConsumerProbes {
 
   void dailyChoiceDetails(DailyChoiceId id) {
     final probe = _add('модель подробностей дневного выбора', observes: true);
-    final model = DailyChoiceDetailsViewModel(_repository, id);
+    final model = DailyChoiceDetailsViewModel(
+      _repository,
+      _container.read(graphCommandCoordinatorProvider.notifier),
+      id,
+    );
     _notifiers.add(model);
     model.addListener(() {
       final state = model.state;
@@ -344,6 +350,7 @@ final class PackageConsumerProbes {
         case DailyChoiceDetailsLoading():
           if (probe.loaded) probe.forbiddenStates.add(state);
         case DailyChoiceDetailsNotFound() ||
+            DailyChoiceDetailsDeleted() ||
             DailyChoiceDetailsUnavailable() ||
             DailyChoiceDetailsCorruption() ||
             DailyChoiceDetailsUnexpected():
@@ -357,12 +364,16 @@ final class PackageConsumerProbes {
   /// Каталог дневных выборов загружен для явно выбранного дня выбора
   /// фикстуры и охвата выполненных.
   bool get dailyCatalogSelected =>
-      dailyCatalogSelection == (durabilityChoiceDate, true) &&
+      dailyCatalogSelection == (durabilityChoiceDate, false, true) &&
       _container.read(dailyCatalogProvider) is DailyChoiceCatalogLoaded;
 
-  (Object?, bool?) get dailyCatalogSelection {
+  (Object?, bool, bool) get dailyCatalogSelection {
     final selection = _container.read(dailyCatalogProvider).selection;
-    return (selection.date, selection.completedExpanded);
+    return (
+      selection.date,
+      selection.incompleteExpanded,
+      selection.completedExpanded,
+    );
   }
 
   /// Выбранная группа вкладки «Связи» и раскрытие её архива.

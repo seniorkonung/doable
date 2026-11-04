@@ -40,14 +40,6 @@ final class ChoicePathPage extends ConsumerStatefulWidget {
   }) : sourceIntentionId = startingIntentionId,
        purpose = ChoicePathPurpose.refreshCreation;
 
-  const ChoicePathPage.forReplacement({
-    required IntentionId startingIntentionId,
-    required this.direction,
-    super.key,
-  }) : pathInstance = null,
-       sourceIntentionId = startingIntentionId,
-       purpose = ChoicePathPurpose.replace;
-
   final IntentionId sourceIntentionId;
   final ChoicePathDraftDirection direction;
   final ChoicePathPurpose purpose;
@@ -57,7 +49,7 @@ final class ChoicePathPage extends ConsumerStatefulWidget {
   ConsumerState<ChoicePathPage> createState() => ChoicePathPageState();
 }
 
-enum ChoicePathPurpose { create, refreshCreation, replace }
+enum ChoicePathPurpose { create, refreshCreation }
 
 final class ChoicePathSelection {
   ChoicePathSelection({
@@ -179,9 +171,7 @@ final class ChoicePathPageState extends ConsumerState<ChoicePathPage> {
     final scaffold = Scaffold(
       appBar: AppBar(
         title: Text(
-          widget.purpose == ChoicePathPurpose.replace
-              ? l10n.dailyChoiceReplaceSelectPath
-              : widget.direction == ChoicePathDraftDirection.bottomUp
+          widget.direction == ChoicePathDraftDirection.bottomUp
               ? l10n.choicePathBottomTitle
               : l10n.choicePathTitle,
         ),
@@ -268,11 +258,7 @@ final class ChoicePathPageState extends ConsumerState<ChoicePathPage> {
                     ),
                   ),
                 ),
-                child: Text(
-                  widget.purpose == ChoicePathPurpose.replace
-                      ? l10n.dailyChoiceReplaceOpenConfirmation
-                      : l10n.choicePathOpenConfirmation,
-                ),
+                child: Text(l10n.choicePathOpenConfirmation),
               ),
             ],
             if (canContinue &&

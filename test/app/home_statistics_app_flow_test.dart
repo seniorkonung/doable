@@ -612,25 +612,11 @@ void main() {
       expect(app.reads, coveredReads + 1);
 
       await app.coverHome(tester);
-      final replacingReads = app.reads;
-      await app.choice(
-        tester,
-        UpdateDailyChoiceFields(
-          choiceId: durabilityChoice(201),
-          patch: DailyChoiceFieldsPatch(date: DailyChoiceFieldSet(_today)),
-        ),
-      );
-      await app.choice(
-        tester,
-        ReplaceDailyChoicePath(
-          choiceId: durabilityChoice(201),
-          sourceIntentionId: durabilityIntention(1),
-          selectedIntentionId: durabilityIntention(4),
-          path: durabilityPath([103]),
-        ),
-      );
+      final recreatingReads = app.reads;
+      await app.choice(tester, DeleteDailyChoice(durabilityChoice(201)));
+      await app.choice(tester, durabilityCreate(path: [103], date: _today));
       await app.intention(tester, ArchiveIntention(durabilityIntention(4)));
-      expect(app.reads, replacingReads);
+      expect(app.reads, recreatingReads);
       await openHome(tester);
       await _until(
         tester,
@@ -638,7 +624,7 @@ void main() {
       );
       expect(find.text(app.texts.statisticsEmpty), findsOneWidget);
       expect(find.text('Намерение 2'), findsNothing);
-      expect(app.reads, replacingReads + 1);
+      expect(app.reads, recreatingReads + 1);
       await _tap(tester, find.text(app.texts.statisticsSelectedActions));
       await _until(tester, find.text('Намерение 4'));
       expect(find.text(app.texts.detailsArchived), findsOneWidget);
@@ -764,9 +750,6 @@ final class _App {
           command,
         ),
         UpdateDailyChoiceFields() => coordinator.acceptDailyChoiceUpdate(
-          command,
-        ),
-        ReplaceDailyChoicePath() => coordinator.acceptDailyChoiceReplace(
           command,
         ),
         DeleteDailyChoice() => coordinator.acceptDailyChoiceDelete(command),

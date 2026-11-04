@@ -1834,32 +1834,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceCreated => 'Daily choice created.';
 
   @override
-  String get dailyChoiceUpdated => 'Daily choice updated.';
-
-  @override
-  String get dailyChoicePathReplaced => 'Daily choice path replaced.';
-
-  @override
   String get dailyChoiceDeleted => 'Daily choice deleted.';
 
   @override
-  String get dailyChoiceDeleteAction => 'Delete daily choice permanently';
+  String get dailyChoiceSheetOptionEditDescription => 'Edit the description';
 
   @override
-  String get dailyChoiceDeleteConfirmationTitle =>
-      'Delete daily choice permanently?';
+  String get dailyChoiceSheetOptionDelete => 'Delete daily choice';
 
   @override
-  String dailyChoiceDeleteConfirmationMessage(
-    String phrase,
-    String date,
-    String choiceId,
-  ) {
-    return 'Choice: $phrase\nDate: $date\nChoice ID: $choiceId\n\nThis cannot be undone. Intentions, long-term relations, and other daily choices will remain.';
+  String get dailyChoiceDeleteDialogTitle => 'Delete daily choice?';
+
+  @override
+  String get dailyChoiceDeleteDialogBefore => 'The choice ';
+
+  @override
+  String dailyChoiceDeleteDialogAfter(String date) {
+    return ' for $date will be deleted. This cannot be undone.';
   }
 
   @override
-  String get dailyChoiceDeleteConfirmAction => 'Delete permanently';
+  String get dailyChoiceDeleteDialogAction => 'Delete';
 
   @override
   String get dailyChoiceSourceInvalid =>
@@ -2022,7 +2017,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get relationDeleteReferencedByDailyPath =>
-      'This relation is used by a saved daily path. Delete or replace the daily choices that use it first.';
+      'This relation is used by a saved daily path. Delete the daily choices that use it first.';
 
   @override
   String get relationDeleteUnavailable =>
@@ -2171,9 +2166,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationSheetDeleteDialogConfirm => 'Delete';
 
   @override
-  String get actionPickerCancel => 'Cancel action selection';
-
-  @override
   String get actionPickerLoading => 'Loading actions…';
 
   @override
@@ -2192,9 +2184,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Actions couldn’t be loaded because of an unexpected error.';
 
   @override
-  String get sourcePickerCancel => 'Cancel intention selection';
-
-  @override
   String get sourcePickerEmpty => 'No active intentions are available.';
 
   @override
@@ -2206,28 +2195,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'New daily choice: selected action';
 
   @override
-  String get dailyChoicePickerPurposeReplacementSource =>
-      'Path replacement: source intention';
-
-  @override
-  String get dailyChoicePickerPurposeReplacementAction =>
-      'Path replacement: selected action';
-
-  @override
   String get dailyChoicePickerFlowCreationFromSource =>
       'New daily choice, from an intention';
 
   @override
   String get dailyChoicePickerFlowCreationFromAction =>
       'New daily choice, from an action';
-
-  @override
-  String get dailyChoicePickerFlowReplacementFromSource =>
-      'Path replacement, from an intention';
-
-  @override
-  String get dailyChoicePickerFlowReplacementFromAction =>
-      'Path replacement, from an action';
 
   @override
   String get dailyChoicePickerStepCurrent => 'You are here';
@@ -2254,13 +2227,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get dailyChoicePickerStepDetails =>
       'Date, time, priority, and description';
-
-  @override
-  String get dailyChoicePickerStepReplacement => 'Replacement confirmation';
-
-  @override
-  String get dailyChoicePickerStepReplacementNote =>
-      'The date, scheduled time, priority, description, and completion stay the same';
 
   @override
   String get intentionPickerArchived => 'archived';
@@ -2746,18 +2712,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceCreationTitle => 'Confirm daily choice';
 
   @override
-  String get dailyChoiceScheduleLabel => 'Scheduled time';
-
-  @override
   String get dailyChoiceAllDay => 'All day';
-
-  @override
-  String get dailyChoiceSetTime => 'Set time';
-
-  @override
-  String dailyChoiceTimeLabel(String time) {
-    return 'Time: $time';
-  }
 
   @override
   String get dailyChoicePriorityLabel => 'Priority';
@@ -2829,25 +2784,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceCatalogCompleted => 'Completed';
 
   @override
-  String dailyChoiceCatalogTotalCount(int count) {
-    return 'Total daily choices: $count';
-  }
+  String get dailyChoiceCatalogEmptyTitle => 'No choices for this date';
 
   @override
-  String get dailyChoiceCatalogEmpty => 'No daily choices for this day.';
+  String get dailyChoiceCatalogEmptyText =>
+      'Create a choice from an action and set this date. It will appear here.';
 
   @override
-  String get dailyChoiceCatalogRefreshing => 'Refreshing daily choices…';
+  String get dailyChoiceCatalogRefreshing => 'Refreshing…';
+
+  @override
+  String get dailyChoiceCatalogScrollToTop => 'Back to top';
 
   @override
   String get dailyChoiceCatalogLoadingMore => 'Loading more daily choices…';
 
   @override
-  String get dailyChoiceCatalogLoadMore => 'Show more daily choices';
-
-  @override
-  String get dailyChoiceCatalogUnavailable =>
-      'Could not load daily choices. Try again.';
+  String get dailyChoiceCatalogUnavailable => 'Could not load daily choices.';
 
   @override
   String get dailyChoiceCatalogCorruption =>
@@ -2862,12 +2815,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not load daily choices because of an unexpected error.';
 
   @override
-  String dailyChoiceCatalogPathIntentionCount(int count) {
+  String dailyChoiceCatalogPathStepCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count intentions in path',
-      one: '$count intention in path',
+      other: '$count steps in path',
+      one: '$count step in path',
     );
     return '$_temp0';
   }
@@ -2875,43 +2828,32 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String dailyChoiceCatalogCompletionLabel(
     int number,
-    String phrase,
-    String date,
+    String action,
+    String priority,
   ) {
-    return 'Completion of choice #$number. $phrase. $date';
+    return 'Completion of choice #$number. $action. $priority';
   }
-
-  @override
-  String get dailyChoiceCompletionSaving => 'Saving completion…';
-
-  @override
-  String get dailyChoiceCompletionSynchronizing =>
-      'Completion saved. Refreshing the catalog…';
 
   @override
   String get dailyChoiceCompletionRefresh => 'Refresh choice';
 
   @override
-  String dailyChoiceCatalogRowLabel(
-    int number,
-    String phrase,
-    String date,
-    String completion,
-  ) {
-    return 'Choice #$number. $phrase. $date. $completion';
+  String dailyChoiceCatalogRowLabel(int number, String action) {
+    return 'Choice #$number. $action';
+  }
+
+  @override
+  String dailyChoiceCatalogRowSource(String source) {
+    return 'Source intention: $source';
+  }
+
+  @override
+  String dailyChoiceCatalogRowTime(String time) {
+    return 'At $time';
   }
 
   @override
   String get dailyChoiceDetailsTitle => 'Daily choice';
-
-  @override
-  String get dailyChoiceEditTitle => 'Edit daily choice';
-
-  @override
-  String get dailyChoiceEditSave => 'Save changes';
-
-  @override
-  String get dailyChoiceEditRefresh => 'Return to details and refresh';
 
   @override
   String get dailyChoiceDetailsLoading => 'Loading daily choice…';
@@ -2949,12 +2891,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceDetailsNotCompleted => 'Not completed';
 
   @override
-  String get dailyChoiceDetailsDescription => 'Description';
-
-  @override
-  String get dailyChoiceDetailsPath => 'Stored path';
-
-  @override
   String get dailyChoiceDetailsSource => 'Source intention';
 
   @override
@@ -2970,15 +2906,114 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceDetailsActive => 'Active';
 
   @override
-  String get dailyChoiceDetailsReady => 'Ready for action';
-
-  @override
-  String get dailyChoiceDetailsNotReady => 'Not ready for action';
-
-  @override
   String dailyChoiceDetailsStep(int number) {
     return 'Transition $number';
   }
+
+  @override
+  String get dailyChoiceSheetExpand => 'Expand daily choice sheet';
+
+  @override
+  String get dailyChoiceSheetCollapse => 'Collapse daily choice sheet';
+
+  @override
+  String dailyChoiceSheetCompletionLabel(String action, String priority) {
+    return 'Completion of the choice. $action. $priority';
+  }
+
+  @override
+  String get dailyChoiceSheetOptionsLabel => 'Daily choice options';
+
+  @override
+  String get dailyChoiceSheetTabsLabel => 'Daily choice sections';
+
+  @override
+  String get dailyChoiceSheetPathTab => 'Path';
+
+  @override
+  String dailyChoiceSheetPathTabLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Path, $count steps',
+      one: 'Path, $count step',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String dailyChoiceSheetPathTabArchivedLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Path, $count steps, something in it is archived',
+      one: 'Path, $count step, something in it is archived',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get dailyChoiceSheetPathArchivedNote =>
+      'The path contains archived intentions or relations.';
+
+  @override
+  String get dailyChoiceSheetDescriptionTitle => 'Description';
+
+  @override
+  String get dailyChoiceSheetDescriptionBack => 'Back to the daily choice';
+
+  @override
+  String get dailyChoiceSheetDescriptionSave => 'Save';
+
+  @override
+  String get dailyChoiceSheetDescriptionDiscardTitle => 'Discard changes?';
+
+  @override
+  String get dailyChoiceSheetDescriptionDiscardMessage =>
+      'Your changes to the description won’t be saved.';
+
+  @override
+  String get dailyChoiceSheetDescriptionDiscardAction => 'Discard';
+
+  @override
+  String get dailyChoiceSheetDescriptionContinueAction => 'Keep editing';
+
+  @override
+  String get dailyChoiceFieldDate => 'Date';
+
+  @override
+  String get dailyChoiceFieldTime => 'Time';
+
+  @override
+  String dailyChoiceFieldDateLabel(String date) {
+    return 'Date: $date. Change date';
+  }
+
+  @override
+  String dailyChoiceFieldTimeLabel(String time) {
+    return 'Time: $time. Change time';
+  }
+
+  @override
+  String get dailyChoiceDateSheetLabel => 'Daily choice date';
+
+  @override
+  String get dailyChoiceTimeSheetLabel => 'Daily choice time';
+
+  @override
+  String get dailyChoiceTimeHalfSwitchLabel => 'Half of the day';
+
+  @override
+  String get dailyChoiceTimeAmLabel => 'Before noon';
+
+  @override
+  String get dailyChoiceTimePmLabel => 'After noon';
+
+  @override
+  String get dailyChoiceDateTomorrow => 'Tomorrow';
+
+  @override
+  String get dailyChoiceDateYesterday => 'Yesterday';
 
   @override
   String get dailyChoiceCreationPath => 'Path to confirm';
@@ -2987,12 +3022,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String dailyChoiceCreationAction(String action) {
     return 'Selected action: $action';
   }
-
-  @override
-  String get dailyChoiceCreationDate => 'Daily choice date';
-
-  @override
-  String get dailyChoiceCreationDateHint => 'Enter YYYY-MM-DD (0001–9999)';
 
   @override
   String get dailyChoiceCreationDescription => 'Description (optional)';
@@ -3016,62 +3045,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get dailyChoiceCreationRefreshPath =>
       'Return to the path and refresh it';
-
-  @override
-  String get dailyChoiceReplaceTitle => 'Confirm path replacement';
-
-  @override
-  String get dailyChoiceReplacePreparing =>
-      'Preparing the new path confirmation…';
-
-  @override
-  String get dailyChoiceReplaceCurrent => 'Daily choice to replace';
-
-  @override
-  String get dailyChoiceReplaceNewPath => 'New path from source to action';
-
-  @override
-  String get dailyChoiceReplaceNoDescription => 'No description';
-
-  @override
-  String get dailyChoiceReplaceFieldsPreserved =>
-      'The date, description, and completion will stay unchanged when the path is replaced.';
-
-  @override
-  String get dailyChoiceReplaceCompletionPreserved =>
-      'Completion stays on even if a different action is selected.';
-
-  @override
-  String get dailyChoiceReplaceConfirm => 'Replace path only';
-
-  @override
-  String get dailyChoiceReplaceSubmitting => 'Replacing path…';
-
-  @override
-  String get dailyChoiceReplaceChooseAgain => 'Return to path selection';
-
-  @override
-  String get dailyChoiceReplaceOpen => 'Replace path';
-
-  @override
-  String get dailyChoiceReplaceChooseDirection =>
-      'Choose the new path direction';
-
-  @override
-  String get dailyChoiceReplaceChooseDirectionDescription =>
-      'Choose a new source or action to replace the saved path.';
-
-  @override
-  String get dailyChoiceReplaceFromSource => 'Start from a new source';
-
-  @override
-  String get dailyChoiceReplaceFromAction => 'Start from a new action';
-
-  @override
-  String get dailyChoiceReplaceSelectPath => 'Choose a replacement path';
-
-  @override
-  String get dailyChoiceReplaceOpenConfirmation => 'Confirm path replacement';
 
   @override
   String get choicePathOpenConfirmation => 'Continue to choice confirmation';

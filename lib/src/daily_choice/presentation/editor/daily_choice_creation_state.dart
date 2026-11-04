@@ -3,7 +3,6 @@ import '../../application/confirmed_choice_path.dart';
 import '../../application/daily_choice_result.dart';
 import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice_description.dart';
-import '../../domain/daily_choice_id.dart';
 import '../../domain/daily_choice_priority.dart';
 import '../../domain/daily_choice_schedule.dart';
 
@@ -20,9 +19,7 @@ final class DailyChoiceCreationSubmitting extends DailyChoiceCreationOperation {
 }
 
 final class DailyChoiceCreationSucceeded extends DailyChoiceCreationOperation {
-  const DailyChoiceCreationSucceeded(this.choiceId);
-
-  final DailyChoiceId choiceId;
+  const DailyChoiceCreationSucceeded();
 }
 
 sealed class DailyChoiceCreationFailure {
@@ -50,9 +47,7 @@ final class DailyChoiceCreationFailed extends DailyChoiceCreationOperation {
 }
 
 final class DailyChoiceCreationCreated {
-  const DailyChoiceCreationCreated(this.choiceId);
-
-  final DailyChoiceId choiceId;
+  const DailyChoiceCreationCreated();
 }
 
 /// Черновик одной формы. Путь уже подтверждён в обходе и повторно проверяется

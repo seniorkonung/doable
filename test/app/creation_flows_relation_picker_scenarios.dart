@@ -231,7 +231,10 @@ void _registerRelationPickerDailyChoiceTests() {
             );
             await _tap(tester, _key('choice-path-select-action'));
             await _tap(tester, _key('choice-path-open-confirmation'));
-            await tester.enterText(_key('daily-choice-date'), '2026-10-09');
+            await setDailyChoiceCreationDate(
+              tester,
+              CalendarDate.fromParts(2026, 10, 9),
+            );
             await tester.enterText(
               _key('daily-choice-description'),
               'Сохранённое описание',
@@ -245,14 +248,8 @@ void _registerRelationPickerDailyChoiceTests() {
             await _submit(tester, app, _Flow.topDown);
             await _until(
               tester,
-              () => app.router.current.name == DailyChoiceDetailsRoute.name,
+              () => app.router.stackData.length == history.length,
             );
-            expect(
-              app.router.stackData.take(history.length),
-              orderedEquals(history.map(same)),
-            );
-            expect(app.router.stackData, hasLength(history.length + 1));
-            await tester.binding.handlePopRoute();
             await tester.pumpAndSettle();
             expect(app.router.stackData, orderedEquals(history.map(same)));
           }

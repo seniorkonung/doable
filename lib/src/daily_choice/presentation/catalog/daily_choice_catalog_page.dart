@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../design_system/components/scroll_top_button.dart';
 import 'daily_choice_catalog_body.dart';
 import 'daily_choice_catalog_instance.dart';
 import 'daily_choice_local_date_provider.dart';
@@ -36,10 +37,13 @@ final class _DailyChoiceCatalogPageState
     value: Theme.of(context).brightness == Brightness.dark
         ? SystemUiOverlayStyle.light
         : SystemUiOverlayStyle.dark,
-    child: Scaffold(
-      body: DailyChoiceCatalogBody(
-        key: ObjectKey(_instance),
-        instance: _instance,
+    child: DailyChoiceCatalogBody(
+      key: ObjectKey(_instance),
+      instance: _instance,
+      scaffoldBuilder: (body, scrollTopButton) => Scaffold(
+        body: body,
+        floatingActionButton: scrollTopButton,
+        floatingActionButtonLocation: const ScrollTopButtonLocation(),
       ),
     ),
   );

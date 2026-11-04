@@ -11,7 +11,7 @@ final class DailyChoiceCatalogSelection {
   const DailyChoiceCatalogSelection({
     required this.date,
     this.incompleteExpanded = true,
-    this.completedExpanded = false,
+    this.completedExpanded = true,
   });
 
   final CalendarDate date;
@@ -257,7 +257,16 @@ final class DailyChoiceCatalogLoaded extends DailyChoiceCatalogState {
   final DailyChoiceCatalogReadFailure? refreshFailure;
   final bool needsRebase;
 
+  /// Повтор несёт только доказанно временный отказ обновления.
+  bool get canRetryRefresh =>
+      refreshFailure is DailyChoiceCatalogUnavailableFailure;
+
   int get totalCount => incomplete.totalCount + completed.totalCount;
+
+  /// Время есть у выбора дня в любой секции, в том числе в неполученной порции.
+  bool get hasTimedChoices =>
+      incomplete.hasTimedChoices || completed.hasTimedChoices;
+
   Iterable<DailyChoiceCatalogItem> get items => [
     ...incomplete.items,
     ...completed.items,

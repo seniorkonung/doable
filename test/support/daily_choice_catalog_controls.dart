@@ -19,8 +19,11 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calend
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
+import 'package:doable/src/design_system/components/choice_check.dart';
+import 'package:doable/src/design_system/components/choice_row.dart';
 import 'package:doable/src/design_system/components/day_heading.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
+import 'package:doable/src/design_system/components/notice.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
@@ -304,25 +307,103 @@ Future<void> _runCommand(
 bool _isBefore(CalendarDate a, CalendarDate b) =>
     a.toCanonicalString().compareTo(b.toCanonicalString()) < 0;
 
+/// Флажок выполнения на карточке каталога, когда карточка одна.
+///
+/// Карточку из нескольких шаг находит по её ключу выполнения.
+final dailyChoiceCompletionControl = find.byType(ChoiceCheck);
+
+/// Что показывает флажок выполнения [control]: выполнен ли выбор и можно ли
+/// сейчас изменить выполнение.
+///
+/// Шаг читает карточку вокруг флажка, поэтому сценарии не знают, каким
+/// виджетом каталог рисует флажок.
+({bool completed, bool enabled}) dailyChoiceCompletionState(
+  WidgetTester tester,
+  Finder control,
+) {
+  final row = tester.widget<ChoiceRow>(
+    find.ancestor(of: control, matching: find.byType(ChoiceRow)),
+  );
+  return (completed: row.done, enabled: row.onToggle != null);
+}
+
+/// Действие уведомления об отказе записи выполнения с подписью [label].
+///
+/// Уведомление стоит у карточки и несёт одно действие: повтор или
+/// актуализацию выбора.
+Finder dailyChoiceCompletionNoticeAction(String label) =>
+    find.descendant(of: find.byType(Notice), matching: find.text(label));
+
+/// Вертикальная прокрутка выдачи открытого каталога дневных выборов.
+Finder _catalogScroll() => find.descendant(
+  of: find.byType(DailyChoiceCatalogBody).last,
+  matching: find.byWidgetPredicate(
+    (widget) =>
+        widget is Scrollable && widget.axisDirection == AxisDirection.down,
+  ),
+);
+
+/// Подвал секции с ещё не полученными порциями: подгрузка или её отказ.
+///
+/// Лениво построенный подвал находится, только когда конец загруженной части
+/// секции подошёл к видимой области.
+Finder dailyChoiceCatalogPageFooter({
+  required bool completed,
+  bool skipOffstage = true,
+}) => find.descendant(
+  of: find.byType(DailyChoiceCatalogBody).last,
+  matching: find.byKey(
+    ValueKey('daily-choice-page-footer-$completed'),
+    skipOffstage: skipOffstage,
+  ),
+  skipOffstage: skipOffstage,
+);
+
+/// Наибольшее число жестов прокрутки до конца загруженной части секции.
+const _maxScrolls = 60;
+
+/// Прокручивает выдачу жестами, пока конец загруженной части секции не
+/// подойдёт к видимой области: тогда каталог сам запрашивает следующую порцию.
+///
+/// Шаг останавливается на подвале, который увидел первым, и ответа на запрос
+/// не ждёт: его завершает сам сценарий.
+Future<void> scrollToDailyChoiceCatalogPageEnd(
+  WidgetTester tester,
+  bool isCompleted,
+) async {
+  final footer = dailyChoiceCatalogPageFooter(
+    completed: isCompleted,
+    skipOffstage: false,
+  );
+  for (var scroll = 0; footer.evaluate().isEmpty; scroll++) {
+    if (scroll == _maxScrolls) {
+      fail('Каталог не показал конец загруженной части секции.');
+    }
+    await tester.drag(_catalogScroll(), const Offset(0, -300));
+    await tester.pump();
+  }
+  await tester.pump();
+}
+
 /// Показывает только выбранную секцию, сохраняя дату и загруженные порции.
 Future<void> showDailyChoiceCatalogSection(
   WidgetTester tester,
   bool isCompleted,
 ) async {
   final body = find.byType(DailyChoiceCatalogBody).last;
-  final scroll = find.descendant(
-    of: body,
-    matching: find.byWidgetPredicate(
-      (widget) =>
-          widget is Scrollable && widget.axisDirection == AxisDirection.down,
-    ),
-  );
+  final scroll = _catalogScroll();
   Finder header(bool completed) => find.descendant(
     of: body,
     matching: find.byKey(ValueKey('daily-choice-section-$completed')),
   );
   final semantics = tester.ensureSemantics();
-  for (final completed in [false, true]) {
+  // Невыполненные сворачиваются первыми: иначе прокрутка к заголовку
+  // выполненных дошла бы до конца их порции и получила бы следующую.
+  for (final (completed, expand) in [
+    (false, false),
+    (true, isCompleted),
+    (false, !isCompleted),
+  ]) {
     await tester.scrollUntilVisible(
       header(completed),
       completed ? 500 : -500,
@@ -333,7 +414,7 @@ Future<void> showDailyChoiceCatalogSection(
         .getSemantics(header(completed))
         .flagsCollection
         .isExpanded;
-    if ((expanded == Tristate.isTrue) != (completed == isCompleted)) {
+    if ((expanded == Tristate.isTrue) != expand) {
       await tester.tap(header(completed));
       await tester.pump();
     }
@@ -344,4 +425,35 @@ Future<void> showDailyChoiceCatalogSection(
     scrollable: scroll,
   );
   semantics.dispose();
+}
+
+/// Заголовок секции со счётчиком [count].
+Finder dailyChoiceSectionWithCount({
+  required bool completed,
+  required int count,
+  bool skipOffstage = true,
+}) => find.descendant(
+  of: find.byKey(
+    ValueKey('daily-choice-section-$completed'),
+    skipOffstage: skipOffstage,
+  ),
+  matching: find.text('$count', skipOffstage: skipOffstage),
+);
+
+/// Число в счётчике заголовка секции; заголовок должен быть построен.
+String dailyChoiceSectionCount(WidgetTester tester, {required bool completed}) {
+  final header = find.byKey(ValueKey('daily-choice-section-$completed'));
+  return tester
+      .widget<Text>(
+        find.descendant(
+          of: header,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Text &&
+                widget.data != null &&
+                int.tryParse(widget.data!) != null,
+          ),
+        ),
+      )
+      .data!;
 }

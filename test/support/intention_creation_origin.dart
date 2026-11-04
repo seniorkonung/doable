@@ -4,11 +4,12 @@ import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../daily_choice/presentation/daily_choice_picker_launch_test_support.dart'
+    show TestDailyChoicePickerLaunch;
 import 'app_root_pages.dart';
 
 /// Исходные страницы самостоятельного создания, включая чужой поиск действия.
@@ -48,9 +49,7 @@ enum IntentionCreationOrigin {
     if (this == deep) {
       unawaited(
         router.push<void>(
-          DailyChoiceActionPickerRoute(
-            pickerContext: const PathReplacementDailyChoicePickerContext(),
-          ),
+          DailyChoiceActionPickerRoute(launch: TestDailyChoicePickerLaunch()),
         ),
       );
       final filter = find.byKey(const ValueKey('daily-choice-action-filter'));

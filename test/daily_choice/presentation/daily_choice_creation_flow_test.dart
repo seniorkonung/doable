@@ -11,8 +11,6 @@ import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
-import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
-import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
@@ -20,6 +18,7 @@ import 'package:doable/src/design_system/components/tabs.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/design_system/doable_priority.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_tabs.dart';
@@ -30,6 +29,12 @@ import 'package:drift/drift.dart' show Variable;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
+
+import 'daily_choice_picker_launch_test_support.dart'
+    show TestDailyChoicePickerLaunch;
+import '../../support/daily_choice_creation_controls.dart';
+import '../../support/daily_choice_detail_fields_controls.dart';
+import '../../support/daily_choice_details_controls.dart';
 
 import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_catalog_controls.dart';
@@ -95,27 +100,35 @@ Future<void> _openConfirmation(WidgetTester tester) async {
     tester,
     find.byKey(const ValueKey('choice-path-open-confirmation')),
   );
-  await _waitFor(tester, find.byKey(const ValueKey('daily-choice-date')));
+  await awaitDailyChoiceConfirmation(tester, waitFor: _waitFor);
 }
 
 Future<void> _save(WidgetTester tester, {bool doubleTap = false}) async {
-  await tester.enterText(
-    find.byKey(const ValueKey('daily-choice-date')),
-    '2026-09-24',
-  );
+  await setDailyChoiceCreationDate(tester, CalendarDate.fromParts(2026, 9, 24));
   final submit = find.byKey(const ValueKey('daily-choice-submit'));
   await tester.ensureVisible(submit);
   await tester.tap(submit);
   if (doubleTap) await tester.tap(submit);
   await tester.pump();
   await _waitFor(tester, find.textContaining('Дневной выбор создан'));
-  await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
+  await _waitForCreationClosed(tester);
   await tester.pumpAndSettle();
-  await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
+}
+
+/// Подтверждение снимается только после успеха, поэтому его исчезновение
+/// означает закрытие потока, даже пока видно прежнее сообщение.
+Future<void> _waitForCreationClosed(WidgetTester tester) async {
+  final confirmation = find.byType(DailyChoiceCreationPage);
+  for (var attempt = 0; attempt < 500; attempt += 1) {
+    if (confirmation.evaluate().isEmpty) return;
+    await tester.pump(const Duration(milliseconds: 10));
+  }
+  fail('Поток создания не закрылся');
 }
 
 Future<void> _restartPath(
   WidgetTester tester,
+  LocalDatabaseHarness harness,
   List<int> relations, {
   ChoicePathDraftDirection direction = ChoicePathDraftDirection.topDown,
 }) async {
@@ -125,19 +138,12 @@ Future<void> _restartPath(
           .container
           .read(appRouterProvider);
   final history = [for (final route in router.stackData) route.name];
-  expect(history.last, DailyChoiceDetailsRoute.name);
-  final created = tester
-      .widget<DailyChoiceDetailsPage>(find.byType(DailyChoiceDetailsPage))
-      .choiceId;
-  await tester.binding.handlePopRoute();
-  await tester.pumpAndSettle();
+  final created = _savedIds(harness).last;
   switch (direction) {
     case ChoicePathDraftDirection.topDown:
-      // Созданный выбор открыт прямо над намерением: пошагового выбора и
-      // подтверждения в истории нет, а «назад» возвращает на вкладку
+      // Пошагового выбора и подтверждения в истории нет: открыта вкладка
       // «Выборы» с прежней ролью и созданным выбором в списке.
-      expect(history[history.length - 2], IntentionDetailsRoute.name);
-      expect(router.current.name, IntentionDetailsRoute.name);
+      expect(history.last, IntentionDetailsRoute.name);
       expect(
         tester
             .widget<Tabs<IntentionDetailsTab>>(
@@ -162,6 +168,8 @@ Future<void> _restartPath(
       );
       await _tap(tester, intentionChoicesAdd);
     case ChoicePathDraftDirection.bottomUp:
+      // Поток начат с каталога, и над ним ничего не осталось.
+      expect(history, [AppShellRoute.name]);
       await openDailyChoiceQuickCreation(
         tester,
         ChoicePathDraftDirection.bottomUp,
@@ -352,7 +360,6 @@ void main() {
       );
       expect(find.text('Перейти к подтверждению выбора'), findsNothing);
       await _openConfirmation(tester);
-      await _waitFor(tester, find.byType(DailyChoiceCreationPage));
       expect(
         find.descendant(
           of: find.byType(DailyChoiceCreationPage),
@@ -388,39 +395,18 @@ void main() {
       );
       final today = DateTime.now();
       expect(
-        tester
-            .widget<TextField>(find.byKey(const ValueKey('daily-choice-date')))
-            .controller!
-            .text,
-        CalendarDate.fromParts(
-          today.year,
-          today.month,
-          today.day,
-        ).toCanonicalString(),
+        shownDailyChoiceCreation(tester).date,
+        CalendarDate.fromParts(today.year, today.month, today.day),
       );
       expect(_savedIds(harness), hasLength(1));
 
-      await _tap(tester, find.text('Указать время'));
-      await tester.pumpAndSettle();
-      final timeFields = find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.byType(TextField),
-      );
-      await tester.enterText(timeFields.at(0), '18');
-      await tester.enterText(timeFields.at(1), '00');
-      await _tap(
+      await setDailyChoiceHour(tester, 18, tap: _tap);
+      await setDailyChoiceCreationPriority(
         tester,
-        find.text(
-          MaterialLocalizations.of(tester.element(find.byType(AlertDialog)))
-              .okButtonLabel,
-        ),
+        DailyChoicePriority.p2,
+        tap: _tap,
       );
-      await tester.pumpAndSettle();
-      await _tap(tester, find.text('Приоритет P2'));
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-date')),
-        createdDate.toCanonicalString(),
-      );
+      await setDailyChoiceCreationDate(tester, createdDate);
       final submit = find.byKey(const ValueKey('daily-choice-submit'));
       await tester.ensureVisible(submit);
       await tester.tap(submit);
@@ -446,68 +432,35 @@ void main() {
         _relation(102),
       ]);
 
-      await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
+      await _waitForCreationClosed(tester);
       await tester.pumpAndSettle();
-      expect(find.text('Время: 18:00'), findsOneWidget);
-      expect(find.text('Приоритет P2'), findsOneWidget);
-      await _tap(tester, find.byKey(const ValueKey('daily-choice-edit-open')));
-      await _waitFor(
-        tester,
-        find.byKey(const ValueKey('daily-choice-edit-submit')),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('Время: 18:00'), findsOneWidget);
-      expect(find.text('Приоритет P2'), findsOneWidget);
-      await _tap(tester, find.text('Весь день'));
+      // Созданный выбор открывается с исходной вкладки «Выборы».
       await _tap(
         tester,
-        find.byKey(const ValueKey('daily-choice-edit-submit')),
+        find.byKey(
+          ValueKey('intention-choices-row-${ids.last.toCanonicalString()}'),
+        ),
       );
-      await _waitFor(
-        tester,
-        find.byKey(const ValueKey('daily-choice-edit-open')),
-      );
+      await _waitFor(tester, dailyChoiceDetailsReady);
       await tester.pumpAndSettle();
-      expect(find.text('Весь день'), findsOneWidget);
-      expect(find.text('Приоритет P2'), findsOneWidget);
+      expect(dailyChoiceDetailsField('18:00'), findsOneWidget);
+      expect(shownDailyChoiceHead(tester).priority, DoablePriority.p2);
+      await setDailyChoiceAllDay(tester, tap: _tap);
+      await _waitFor(tester, dailyChoiceDetailsField('Весь день'));
+      await tester.pumpAndSettle();
+      expect(dailyChoiceDetailsField('Весь день'), findsOneWidget);
+      expect(shownDailyChoiceHead(tester).priority, DoablePriority.p2);
 
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('daily-choice-replace-open')),
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('daily-choice-replace-top-down')),
-      );
-      await _tap(tester, find.text('Основание'));
-      await _continue(tester, 103);
-      await _continue(tester, 104);
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('choice-path-select-action')),
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('choice-path-open-confirmation')),
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('daily-choice-replace-confirm')),
-      );
-      await _waitFor(tester, find.text('Выбранное действие: Другое действие'));
-      await tester.pumpAndSettle();
-      expect(find.text('Весь день'), findsOneWidget);
-      expect(find.text('Приоритет P2'), findsOneWidget);
-      final replaced = await _read(repository, ids.last);
-      expect(replaced.choice.id, created.choice.id);
-      expect(replaced.choice.date, createdDate);
-      expect(replaced.choice.schedule, const DailyChoiceAllDay());
-      expect(replaced.choice.priority, DailyChoicePriority.p2);
-      expect(replaced.choice.description, created.choice.description);
-      expect(replaced.choice.isCompleted, created.choice.isCompleted);
-      expect(replaced.path.map((step) => step.relation.id), [
-        _relation(103),
-        _relation(104),
+      final edited = await _read(repository, ids.last);
+      expect(edited.choice.id, created.choice.id);
+      expect(edited.choice.date, createdDate);
+      expect(edited.choice.schedule, const DailyChoiceAllDay());
+      expect(edited.choice.priority, DailyChoicePriority.p2);
+      expect(edited.choice.description, created.choice.description);
+      expect(edited.choice.isCompleted, created.choice.isCompleted);
+      expect(edited.path.map((step) => step.relation.id), [
+        _relation(101),
+        _relation(102),
       ]);
       expect(_savedIds(harness), ids);
 
@@ -525,28 +478,12 @@ void main() {
         }
         await showDailyChoiceCatalogSection(tester, day == catalogToday);
         await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
-        await _waitFor(
-          tester,
-          find.byKey(const ValueKey('daily-choice-edit-open')),
-        );
-        expect(
-          tester
-              .widget<DailyChoiceDetailsPage>(
-                find.byType(DailyChoiceDetailsPage),
-              )
-              .choiceId,
-          expectedId,
-        );
-        expect(
-          find.byKey(const ValueKey('daily-choice-relation-1')),
-          findsOneWidget,
-        );
-        expect(
-          find.byKey(const ValueKey('daily-choice-relation-2')),
-          findsOneWidget,
-        );
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
+        await _waitFor(tester, dailyChoiceDetailsReady);
+        expect(shownDailyChoice(tester), expectedId);
+        await showDailyChoicePath(tester, tap: _tap);
+        expect(dailyChoiceDetailsRelation(1), findsOneWidget);
+        expect(dailyChoiceDetailsRelation(2), findsOneWidget);
+        await closeDailyChoiceDetails(tester);
       }
     },
   );
@@ -607,7 +544,7 @@ void main() {
         tester,
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
-      await _waitFor(tester, find.byType(DailyChoiceCreationPage));
+      await awaitDailyChoiceConfirmation(tester, waitFor: _waitFor);
       final firstStep = find.descendant(
         of: find.byType(DailyChoiceCreationPage),
         matching: find.text('Чтобы Основание, нужно Действие в середине'),
@@ -633,9 +570,9 @@ void main() {
         isFalse,
       );
       expect(_savedIds(harness), isEmpty);
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-date')),
-        '2024-09-24',
+      await setDailyChoiceCreationDate(
+        tester,
+        CalendarDate.fromParts(2024, 9, 24),
       );
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
@@ -648,10 +585,10 @@ void main() {
         tester,
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
-      await _waitFor(tester, find.byKey(const ValueKey('daily-choice-date')));
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-date')),
-        '2024-09-24',
+      await awaitDailyChoiceConfirmation(tester, waitFor: _waitFor);
+      await setDailyChoiceCreationDate(
+        tester,
+        CalendarDate.fromParts(2024, 9, 24),
       );
       await tester.enterText(
         find.byKey(const ValueKey('daily-choice-description')),
@@ -674,8 +611,9 @@ void main() {
         _relation(102),
       ]);
 
+      await _waitForCreationClosed(tester);
       await tester.pumpAndSettle();
-      await _restartPath(tester, [
+      await _restartPath(tester, harness, [
         102,
         101,
       ], direction: ChoicePathDraftDirection.bottomUp);
@@ -687,14 +625,14 @@ void main() {
         tester,
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
-      await _waitFor(tester, find.byKey(const ValueKey('daily-choice-date')));
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-date')),
-        '2030-09-24',
+      await awaitDailyChoiceConfirmation(tester, waitFor: _waitFor);
+      await setDailyChoiceCreationDate(
+        tester,
+        CalendarDate.fromParts(2030, 9, 24),
       );
       await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
       await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-      await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
+      await _waitForCreationClosed(tester);
       final ids = _savedIds(harness);
       expect(ids, hasLength(2));
       expect(ids.toSet(), hasLength(2));
@@ -707,7 +645,7 @@ void main() {
       ]);
 
       await tester.pumpAndSettle();
-      await _restartPath(tester, [
+      await _restartPath(tester, harness, [
         102,
       ], direction: ChoicePathDraftDirection.bottomUp);
       await _tap(
@@ -718,7 +656,7 @@ void main() {
         tester,
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
-      await _waitFor(tester, find.byKey(const ValueKey('daily-choice-date')));
+      await awaitDailyChoiceConfirmation(tester, waitFor: _waitFor);
       expect(
         find.descendant(
           of: find.byType(DailyChoiceCreationPage),
@@ -735,9 +673,9 @@ void main() {
         ),
         findsNothing,
       );
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-date')),
-        '2030-09-24',
+      await setDailyChoiceCreationDate(
+        tester,
+        CalendarDate.fromParts(2030, 9, 24),
       );
       await tester.enterText(
         find.byKey(const ValueKey('daily-choice-description')),
@@ -745,7 +683,7 @@ void main() {
       );
       await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
       await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-      await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
+      await _waitForCreationClosed(tester);
       await tester.pumpAndSettle();
       final oneStepId = _savedIds(harness).last;
       final oneStep = await _read(repository, oneStepId);
@@ -756,7 +694,7 @@ void main() {
       expect(oneStep.choice.isCompleted, isTrue);
       expect(oneStep.path.map((step) => step.relation.id), [_relation(102)]);
 
-      await _restartPath(tester, [
+      await _restartPath(tester, harness, [
         102,
       ], direction: ChoicePathDraftDirection.bottomUp);
       await _tap(
@@ -767,10 +705,10 @@ void main() {
         tester,
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
-      await _waitFor(tester, find.byKey(const ValueKey('daily-choice-date')));
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-date')),
-        '2030-09-24',
+      await awaitDailyChoiceConfirmation(tester, waitFor: _waitFor);
+      await setDailyChoiceCreationDate(
+        tester,
+        CalendarDate.fromParts(2030, 9, 24),
       );
       await tester.enterText(
         find.byKey(const ValueKey('daily-choice-description')),
@@ -778,7 +716,7 @@ void main() {
       );
       await _tap(tester, find.byKey(const ValueKey('daily-choice-completed')));
       await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-      await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
+      await _waitForCreationClosed(tester);
       final allIds = _savedIds(harness);
       expect(allIds, hasLength(4));
       expect(allIds.toSet(), hasLength(4));
@@ -798,31 +736,22 @@ void main() {
       expect((await _read(repository, oneStepId)).path, hasLength(1));
 
       await tester.pumpAndSettle();
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
       await showDailyChoiceCatalogSection(tester, true);
       await _waitFor(tester, find.byKey(const ValueKey('daily-choice-row-3')));
       expect(find.text(duplicateDescription), findsNWidgets(2));
       await _tap(tester, find.byKey(const ValueKey('daily-choice-row-3')));
-      await _waitFor(tester, find.byType(DailyChoiceDetailsPage));
-      expect(
-        tester
-            .widget<DailyChoiceDetailsPage>(find.byType(DailyChoiceDetailsPage))
-            .choiceId,
-        allIds.last,
-      );
+      await _waitFor(tester, dailyChoiceDetails);
+      expect(shownDailyChoice(tester), allIds.last);
       await tester.pumpAndSettle();
       expect(
         find.descendant(
-          of: find.byType(DailyChoiceDetailsPage),
+          of: dailyChoiceDetails,
           matching: find.text(duplicateDescription),
         ),
         findsOneWidget,
       );
-      expect(
-        find.byKey(const ValueKey('daily-choice-relation-1')),
-        findsOneWidget,
-      );
+      await showDailyChoicePath(tester, tap: _tap);
+      expect(dailyChoiceDetailsRelation(1), findsOneWidget);
       expect(_savedIds(harness), hasLength(4));
     },
   );
@@ -878,10 +807,10 @@ void main() {
         tester,
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
-      await _waitFor(tester, find.byType(DailyChoiceCreationPage));
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-date')),
-        '2026-09-25',
+      await awaitDailyChoiceConfirmation(tester, waitFor: _waitFor);
+      await setDailyChoiceCreationDate(
+        tester,
+        CalendarDate.fromParts(2026, 9, 25),
       );
       await tester.enterText(
         find.byKey(const ValueKey('daily-choice-description')),
@@ -938,15 +867,12 @@ void main() {
         tester,
         find.byKey(const ValueKey('choice-path-open-confirmation')).last,
       );
-      await _waitFor(tester, find.byKey(const ValueKey('daily-choice-date')));
+      await awaitDailyChoiceConfirmation(tester, waitFor: _waitFor);
       await tester.pumpAndSettle();
       expect(_savedIds(harness), isEmpty);
       expect(
-        tester
-            .widget<TextField>(find.byKey(const ValueKey('daily-choice-date')))
-            .controller!
-            .text,
-        '2026-09-25',
+        shownDailyChoiceCreation(tester).date,
+        CalendarDate.fromParts(2026, 9, 25),
       );
       expect(
         tester
@@ -1094,7 +1020,7 @@ void main() {
         _relation(104),
       ]);
 
-      await _restartPath(tester, [101]);
+      await _restartPath(tester, harness, [101]);
       await _openConfirmation(tester);
       await _save(tester);
       final secondId = _savedIds(harness).last;
@@ -1102,7 +1028,7 @@ void main() {
       expect(second.choice.selectedIntentionId, _intention(2));
       expect(second.path.map((step) => step.relation.id), [_relation(101)]);
 
-      await _restartPath(tester, [101]);
+      await _restartPath(tester, harness, [101]);
       await _openConfirmation(tester);
       await _save(tester);
       final ids = _savedIds(harness);
@@ -1152,10 +1078,9 @@ void main() {
       await _continue(tester, 101);
       await _continue(tester, 102);
       await _openConfirmation(tester);
-      await _waitFor(tester, find.byType(DailyChoiceCreationPage));
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-date')),
-        '2026-09-25',
+      await setDailyChoiceCreationDate(
+        tester,
+        CalendarDate.fromParts(2026, 9, 25),
       );
       await tester.enterText(
         find.byKey(const ValueKey('daily-choice-description')),
@@ -1192,15 +1117,12 @@ void main() {
         tester,
         find.byKey(const ValueKey('choice-path-open-confirmation')).last,
       );
-      await _waitFor(tester, find.byKey(const ValueKey('daily-choice-date')));
+      await awaitDailyChoiceConfirmation(tester, waitFor: _waitFor);
       expect(find.textContaining('Другое действие'), findsWidgets);
       expect(find.textContaining('Действие в середине'), findsNothing);
       expect(
-        tester
-            .widget<TextField>(find.byKey(const ValueKey('daily-choice-date')))
-            .controller!
-            .text,
-        '2026-09-25',
+        shownDailyChoiceCreation(tester).date,
+        CalendarDate.fromParts(2026, 9, 25),
       );
       expect(
         tester
@@ -1276,16 +1198,10 @@ void main() {
       await _waitFor(tester, find.bySemanticsLabel(RegExp('Step 1:')));
       expect(find.bySemanticsLabel(RegExp('Step 1:')), findsOneWidget);
       await _openConfirmation(tester);
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-date')),
-        '2026-02-30',
-      );
-      await _tap(tester, find.byKey(const ValueKey('daily-choice-submit')));
-      expect(find.textContaining('Check the daily choice date.'), findsWidgets);
       expect(_savedIds(harness), isEmpty);
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-date')),
-        '2026-09-24',
+      await setDailyChoiceCreationDate(
+        tester,
+        CalendarDate.fromParts(2026, 9, 24),
       );
       final archived = await repository.execute(
         ArchiveLongTermRelation(_relation(101)),
@@ -1316,7 +1232,7 @@ void main() {
         tester,
         find.byKey(const ValueKey('choice-path-open-confirmation')).last,
       );
-      await _waitFor(tester, find.byKey(const ValueKey('daily-choice-date')));
+      await awaitDailyChoiceConfirmation(tester, waitFor: _waitFor);
       expect(_savedIds(harness), isEmpty);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
@@ -1336,7 +1252,7 @@ void main() {
         tester,
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
-      await _waitFor(tester, find.byKey(const ValueKey('daily-choice-date')));
+      await awaitDailyChoiceConfirmation(tester, waitFor: _waitFor);
       expect(
         tester
             .widget<TextField>(

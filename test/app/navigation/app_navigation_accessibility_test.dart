@@ -12,7 +12,6 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/design_system/doable_icon.dart';
@@ -70,11 +69,6 @@ void main() {
           intentionId: (IntentionId.decode(
             tagFixtureId(1),
           ) as IntentionIdDecodingSuccess).id,
-        ),
-        DailyChoiceDetailsRoute(
-          choiceId: (DailyChoiceId.decode(
-            tagFixtureId(201),
-          ) as DailyChoiceIdDecodingSuccess).id,
         ),
       ]) {
         unawaited(router.push<void>(route));

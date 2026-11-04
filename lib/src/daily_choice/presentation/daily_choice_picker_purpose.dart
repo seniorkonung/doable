@@ -1,45 +1,27 @@
 import '../../../l10n/app_localizations.dart';
 import '../../design_system/components/flow_steps.dart';
 import '../../intention/presentation/picker/intention_picker_purpose_sheet.dart';
-import 'daily_choice_picker_context.dart';
 
 /// Участник, с которого поток дневного выбора начинает путь. Его задаёт вид
 /// поиска: поиск исходного намерения начинает от намерения, поиск действия —
 /// от действия.
 enum DailyChoicePickerStart { source, action }
 
-/// Назначение поиска дневного выбора: поток из [pickerContext] и направление
-/// [start] определяют подзаголовок, строку листа и три шага потока.
+/// Назначение поиска дневного выбора: направление [start] определяет
+/// подзаголовок, строку листа и три шага потока создания.
 IntentionPickerPurposeDescription dailyChoicePickerPurpose(
   AppLocalizations l10n, {
-  required DailyChoicePickerContext pickerContext,
   required DailyChoicePickerStart start,
 }) {
-  final (subtitle, sheetLine) = switch ((pickerContext, start)) {
-    (InitialDailyChoicePickerContext(), DailyChoicePickerStart.source) => (
+  final (subtitle, sheetLine) = switch (start) {
+    DailyChoicePickerStart.source => (
       l10n.dailyChoicePickerPurposeCreationSource,
       l10n.dailyChoicePickerFlowCreationFromSource,
     ),
-    (InitialDailyChoicePickerContext(), DailyChoicePickerStart.action) => (
+    DailyChoicePickerStart.action => (
       l10n.dailyChoicePickerPurposeCreationAction,
       l10n.dailyChoicePickerFlowCreationFromAction,
     ),
-    (
-      PathReplacementDailyChoicePickerContext(),
-      DailyChoicePickerStart.source,
-    ) =>
-      (
-        l10n.dailyChoicePickerPurposeReplacementSource,
-        l10n.dailyChoicePickerFlowReplacementFromSource,
-      ),
-    (
-      PathReplacementDailyChoicePickerContext(),
-      DailyChoicePickerStart.action,
-    ) =>
-      (
-        l10n.dailyChoicePickerPurposeReplacementAction,
-        l10n.dailyChoicePickerFlowReplacementFromAction,
-      ),
   };
   // Путь выбора не бывает пустым ни в одном направлении, поэтому ни один шаг
   // не назван необязательным.
@@ -60,15 +42,7 @@ IntentionPickerPurposeDescription dailyChoicePickerPurpose(
         ),
       ],
     },
-    switch (pickerContext) {
-      InitialDailyChoicePickerContext() => FlowStep(
-        title: l10n.dailyChoicePickerStepDetails,
-      ),
-      PathReplacementDailyChoicePickerContext() => FlowStep(
-        title: l10n.dailyChoicePickerStepReplacement,
-        note: l10n.dailyChoicePickerStepReplacementNote,
-      ),
-    },
+    FlowStep(title: l10n.dailyChoicePickerStepDetails),
   ];
   return IntentionPickerPurposeDescription(
     subtitle: subtitle,

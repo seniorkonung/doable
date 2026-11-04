@@ -6,8 +6,6 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/presentation/daily_choice_creation_completion.dart';
 import 'package:doable/src/daily_choice/presentation/daily_choice_creation_flow_session.dart';
-import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
-import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
@@ -20,6 +18,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'daily_choice_picker_launch_test_support.dart'
+    show TestDailyChoicePickerLaunch;
 import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
@@ -31,7 +31,8 @@ void main() {
   });
   for (final direction in ChoicePathDraftDirection.values) {
     testWidgets(
-      'завершение $direction сохраняет одну запись, исходную историю и выход',
+      'завершение $direction сохраняет одну запись и возвращает на исходную '
+      'страницу над чужим черновиком',
       (tester) async {
         final app = await _launch(tester, direction);
         final history = app.history;
@@ -48,23 +49,11 @@ void main() {
               .map((route) => route.matchId),
           history,
         );
-        expect(find.textContaining('Дневной выбор создан'), findsWidgets);
-        expect(app.router.stackData, hasLength(history.length + 1));
-        expect(app.router.stackData.last.name, DailyChoiceDetailsRoute.name);
-        expect(
-          tester
-              .widget<DailyChoiceDetailsPage>(
-                find.byType(DailyChoiceDetailsPage),
-              )
-              .choiceId,
-          durabilityChoice(201),
-        );
-        expect(find.byType(ChoicePathPage), findsNothing);
-        expect(find.byType(DailyChoiceCreationPage), findsNothing);
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
+        expect(find.textContaining('Дневной выбор создан'), findsOneWidget);
         expect(app.router.stackData.map((route) => route.matchId), history);
         expect(find.byType(IntentionDetailsPage), findsOneWidget);
+        expect(find.byType(ChoicePathPage), findsNothing);
+        expect(find.byType(DailyChoiceCreationPage), findsNothing);
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(
@@ -92,28 +81,18 @@ void main() {
   }
   for (final direction in ChoicePathDraftDirection.values) {
     testWidgets(
-      'прежнее завершение $direction не меняет открытый результат и новую сессию',
+      'повторное завершение $direction не меняет исходную историю и новую сессию',
       (tester) async {
         final app = await _launch(tester, direction);
         final confirmationId = app.router.stackData.last.matchId;
         await _tap(tester, 'daily-choice-submit');
         expect(app.completions, hasLength(1));
-        final savedHistory = app.router.stackData
-            .map((route) => route.matchId)
-            .toList();
-        expect(app.router.stackData.last.name, DailyChoiceDetailsRoute.name);
+        expect(app.router.stackData.map((route) => route.matchId), app.history);
         completeDailyChoiceCreation(
           router: app.router,
           session: app.session,
           confirmationMatchId: confirmationId,
-          choiceId: durabilityChoice(201),
         );
-        await tester.pumpAndSettle();
-        expect(
-          app.router.stackData.map((route) => route.matchId),
-          savedHistory,
-        );
-        await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(app.router.stackData.map((route) => route.matchId), app.history);
         unawaited(
@@ -134,7 +113,6 @@ void main() {
           router: app.router,
           session: app.session,
           confirmationMatchId: confirmationId,
-          choiceId: durabilityChoice(201),
         );
         await tester.pumpAndSettle();
         expect(app.router.stackData.map((route) => route.matchId), newHistory);
@@ -215,9 +193,7 @@ Future<_App> _launch(
   await tester.pumpAndSettle();
   unawaited(
     router.push(
-      DailyChoiceActionPickerRoute(
-        pickerContext: const PathReplacementDailyChoicePickerContext(),
-      ),
+      DailyChoiceActionPickerRoute(launch: TestDailyChoicePickerLaunch()),
     ),
   );
   await tester.pumpAndSettle();

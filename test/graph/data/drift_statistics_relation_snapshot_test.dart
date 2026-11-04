@@ -128,12 +128,6 @@ void main() {
           isCompleted: DailyChoiceFieldSet(false),
         ),
       ),
-      ReplaceDailyChoicePath(
-        choiceId: durabilityChoice(201),
-        sourceIntentionId: durabilityIntention(1),
-        selectedIntentionId: durabilityIntention(4),
-        path: durabilityPath([103]),
-      ),
       DeleteDailyChoice(durabilityChoice(201)),
     ]) {
       expect(await repository.execute(command), isA<GraphCommandSucceeded>());

@@ -54,10 +54,9 @@ final class SelectDailyChoiceAction extends IntentionPickerPurpose {
       Object.hash(SelectDailyChoiceAction, identityHashCode(session));
 }
 
-/// Выбор нового исходного намерения при замене пути дневного выбора.
+/// Выбор исходного намерения (основания) для создания дневного выбора.
 ///
 /// Любое активное намерение допустимо как основание, независимо от готовности.
-/// Прежние участники не исключаются: новый путь заменяет обоих участников.
 final class SelectDailyChoiceSource extends IntentionPickerPurpose {
   const SelectDailyChoiceSource({required this.session});
 

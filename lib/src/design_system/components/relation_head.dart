@@ -5,11 +5,11 @@ import 'package:flutter/material.dart' hide Badge;
 import '../doable_colors.dart';
 import '../doable_icon.dart';
 import '../doable_metrics.dart';
+import '../doable_priority.dart';
 import '../doable_type.dart';
 import 'badge.dart';
-import 'end_overhang.dart';
+import 'edge_overhang.dart';
 import 'path_glyph.dart';
-import 'priority_picker.dart';
 import 'relation_stroke.dart';
 
 /// Вид связи: «нужно» — сплошная линия, «можно» — пунктирная.
@@ -132,7 +132,7 @@ final class RelationHead extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<DoableColors>()!;
     final archived = status is RelationHeadArchived;
-    final priorityColor = archived ? colors.grip : _colorOf(colors, priority);
+    final priorityColor = archived ? colors.grip : priority.color(colors);
     final tone = archived
         ? colors.grip
         : Color.lerp(priorityColor, colors.grip, .5)!;
@@ -200,9 +200,7 @@ final class RelationHead extends StatelessWidget {
           ),
       ],
     );
-    return menu == null
-        ? head
-        : EndOverhang(extent: _menuOverhang, child: head);
+    return menu == null ? head : EdgeOverhang(end: _menuOverhang, child: head);
   }
 }
 
@@ -215,14 +213,6 @@ const _aboveGlyph = 15.0;
 /// Строка под связью начинается на одной линии с названиями: рейка и
 /// space-3.
 const _noteInset = _railWidth + DoableMetrics.space3;
-
-Color _colorOf(DoableColors colors, DoablePriority priority) =>
-    switch (priority) {
-      DoablePriority.p1 => colors.p1,
-      DoablePriority.p2 => colors.p2,
-      DoablePriority.p3 => colors.p3,
-      DoablePriority.p4 => colors.p4,
-    };
 
 /// Рейка строки намерения: глиф с линией над ним или под ним.
 final class _Rail extends StatelessWidget {
@@ -521,8 +511,9 @@ final class _KindSwitch extends StatelessWidget {
     container: true,
     explicitChildNodes: true,
     label: kindSwitch.label,
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
+    // Пилюли не сужаются: при нехватке ширины, например при крупном системном
+    // шрифте, вторая переносится на новую строку.
+    child: Wrap(
       spacing: DoableMetrics.space1,
       children: [
         for (final option in RelationHeadKind.values)

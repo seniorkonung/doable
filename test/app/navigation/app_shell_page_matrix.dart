@@ -12,21 +12,18 @@ typedef _PageCase = ({
 enum _MatrixEntry {
   intention,
   editIntention,
-  dailyChoice,
   creation,
   condition,
+  source,
   action,
   actionCandidate,
   assignTags,
   draftTags,
-  replaceChoice,
-  replaceTopDown,
   addChoice,
   continuePath,
   selectAction,
   selectSource,
   confirmPath,
-  editChoice,
   createRelation,
   outgoingRelations,
   incomingRelations;
@@ -34,10 +31,9 @@ enum _MatrixEntry {
   Finder get finder => switch (this) {
     _MatrixEntry.intention => intentionCatalogRow('Читать'),
     _MatrixEntry.editIntention => intentionHeadTitle,
-    _MatrixEntry.dailyChoice => find.byKey(
-      const ValueKey('daily-choice-row-1'),
-    ),
-    _MatrixEntry.creation || _MatrixEntry.action => quickCreationAction(),
+    _MatrixEntry.creation ||
+    _MatrixEntry.source ||
+    _MatrixEntry.action => quickCreationAction(),
     _MatrixEntry.condition => intentionCatalogTagFilterControl,
     _MatrixEntry.actionCandidate => _summary(
       DailyChoiceActionPickerPage,
@@ -49,12 +45,6 @@ enum _MatrixEntry {
     _MatrixEntry.draftTags => find.byKey(
       const ValueKey('intention-editor-choose-tags'),
     ),
-    _MatrixEntry.replaceChoice => find.byKey(
-      const ValueKey('daily-choice-replace-open'),
-    ),
-    _MatrixEntry.replaceTopDown => find.byKey(
-      const ValueKey('daily-choice-replace-top-down'),
-    ),
     _MatrixEntry.addChoice => intentionChoicesAdd,
     _MatrixEntry.continuePath => _continuePath,
     _MatrixEntry.selectAction => find.byKey(
@@ -65,9 +55,6 @@ enum _MatrixEntry {
     ),
     _MatrixEntry.confirmPath => find.byKey(
       const ValueKey('choice-path-open-confirmation'),
-    ),
-    _MatrixEntry.editChoice => find.byKey(
-      const ValueKey('daily-choice-edit-open'),
     ),
     _MatrixEntry.createRelation => find.byKey(
       const ValueKey('intention-relations-add'),
@@ -169,9 +156,7 @@ void _registerPageMatrixTests() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('дневной выбор и каталог на дату над поиском показывают панель', (
-    tester,
-  ) async {
+  testWidgets('каталог на дату над поиском показывает панель', (tester) async {
     final router = await _start(tester);
     await _select(tester, AppDestination.intentionGraph);
     await _open(tester, intentionCatalogRow('Читать'), IntentionDetailsPage);
@@ -183,18 +168,8 @@ void _registerPageMatrixTests() {
         .element(find.byType(IntentionDetailsPage, skipOffstage: false))
         .markNeedsBuild();
     await tester.pump();
-    final choiceId = (DailyChoiceId.decode(
-      tagFixtureId(_choice),
-    ) as DailyChoiceIdDecodingSuccess).id;
-    unawaited(router.push(DailyChoiceDetailsRoute(choiceId: choiceId)));
-    await _until(tester, find.byType(DailyChoiceDetailsPage));
-    await tester.pumpAndSettle();
-    expect(find.byType(AppNavigationBar), findsOneWidget);
     unawaited(router.push(DailyChoiceDateCatalogRoute(date: _choiceDate)));
     await _until(tester, find.byType(DailyChoiceDateCatalogPage));
-    await tester.pumpAndSettle();
-    expect(find.byType(AppNavigationBar), findsOneWidget);
-    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byType(AppNavigationBar), findsOneWidget);
     await tester.binding.handlePopRoute();
@@ -458,7 +433,6 @@ void _registerPageMatrixTests() {
   });
 
   const read = _MatrixEntry.intention;
-  const daily = _MatrixEntry.dailyChoice;
   const cases = <_PageCase>[
     (
       name: 'намерение',
@@ -473,12 +447,6 @@ void _registerPageMatrixTests() {
       entries: [read, _MatrixEntry.editIntention],
     ),
     (
-      name: 'дневной выбор',
-      page: DailyChoiceDetailsPage,
-      panel: true,
-      entries: [daily],
-    ),
-    (
       name: 'поиск действия',
       page: DailyChoiceActionPickerPage,
       panel: false,
@@ -488,7 +456,7 @@ void _registerPageMatrixTests() {
       name: 'поиск основания',
       page: DailyChoiceSourcePickerPage,
       panel: false,
-      entries: [daily, _MatrixEntry.replaceChoice, _MatrixEntry.replaceTopDown],
+      entries: [_MatrixEntry.source],
     ),
     (
       name: 'создание намерения',
@@ -527,12 +495,6 @@ void _registerPageMatrixTests() {
       ],
     ),
     (
-      name: 'изменение дневного выбора',
-      page: DailyChoiceEditPage,
-      panel: false,
-      entries: [daily, _MatrixEntry.editChoice],
-    ),
-    (
       name: 'поиск участника исходящей группы',
       page: RelationBatchPickerPage,
       panel: false,
@@ -563,7 +525,7 @@ void _registerPageMatrixTests() {
           _MatrixEntry.intention ||
           _MatrixEntry.creation ||
           _MatrixEntry.condition => AppDestination.intentionGraph,
-          _MatrixEntry.dailyChoice ||
+          _MatrixEntry.source ||
           _MatrixEntry.action => AppDestination.dailyChoices,
           _ => null,
         };
@@ -577,6 +539,13 @@ void _registerPageMatrixTests() {
               tester,
               QuickCreationMode.intention,
               openedPage: find.byType(IntentionEditorPage),
+              wait: _until,
+            );
+          case _MatrixEntry.source:
+            await openDailyChoiceQuickCreation(
+              tester,
+              ChoicePathDraftDirection.topDown,
+              openedPage: find.byType(DailyChoiceSourcePickerPage),
               wait: _until,
             );
           case _MatrixEntry.action:

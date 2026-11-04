@@ -5,6 +5,7 @@ import 'package:doable/src/design_system/components/relation_row.dart';
 import 'package:doable/src/design_system/components/relation_stroke.dart';
 import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
+import 'package:doable/src/design_system/doable_priority.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/design_system/doable_type.dart';
 import 'package:flutter/material.dart' hide Badge;
@@ -34,13 +35,13 @@ void main() {
           Column(
             spacing: 8,
             children: [
-              _row(name: 'P1', priority: RelationRowPriority.p1),
-              _row(name: 'P2', priority: RelationRowPriority.p2),
-              _row(name: 'P3', priority: RelationRowPriority.p3),
-              _row(name: 'P4', priority: RelationRowPriority.p4),
+              _row(name: 'P1', priority: DoablePriority.p1),
+              _row(name: 'P2', priority: DoablePriority.p2),
+              _row(name: 'P3', priority: DoablePriority.p3),
+              _row(name: 'P4', priority: DoablePriority.p4),
               _row(
                 name: 'Архивная',
-                priority: RelationRowPriority.p1,
+                priority: DoablePriority.p1,
                 archived: true,
               ),
             ],
@@ -84,23 +85,23 @@ void main() {
               _row(
                 name: 'P1',
                 label: 'Нужно · P1',
-                priority: RelationRowPriority.p1,
+                priority: DoablePriority.p1,
               ),
               _row(
                 name: 'P3',
                 label: 'Можно · P3',
                 kind: RelationRowKind.can,
-                priority: RelationRowPriority.p3,
+                priority: DoablePriority.p3,
               ),
               _row(
                 name: 'P4',
                 label: 'Нужно · P4',
-                priority: RelationRowPriority.p4,
+                priority: DoablePriority.p4,
               ),
               _row(
                 name: 'Архивная',
                 label: 'Нужно · P2',
-                priority: RelationRowPriority.p2,
+                priority: DoablePriority.p2,
                 archived: true,
               ),
             ],
@@ -393,7 +394,7 @@ void main() {
             name: 'Handlungsbereitschaftsvoraussetzung',
             label: 'Можно использовать · P2',
             kind: RelationRowKind.can,
-            priority: RelationRowPriority.p2,
+            priority: DoablePriority.p2,
             note:
                 'Заметка связи длиннее, чем помещается в две строки узкой '
                 'строки при двукратном тексте',
@@ -483,7 +484,7 @@ RelationRow _row({
   required String name,
   String label = 'Нужно · P1',
   RelationRowKind kind = RelationRowKind.need,
-  RelationRowPriority priority = RelationRowPriority.p1,
+  DoablePriority priority = DoablePriority.p1,
   String? note,
   bool action = false,
   bool archived = false,

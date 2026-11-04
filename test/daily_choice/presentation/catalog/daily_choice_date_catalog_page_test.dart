@@ -13,8 +13,8 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/design_system/components/day_heading.dart';
+import 'package:doable/src/design_system/components/notice.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
-import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/design_system/components/calendar_handle.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -25,6 +25,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/daily_choice_details_controls.dart';
 import '../../../support/daily_choice_local_date.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import 'daily_choice_calendar_test_support.dart';
@@ -32,6 +33,69 @@ import '../../../support/daily_choice_catalog_controls.dart';
 import 'daily_choice_catalog_page_test_support.dart';
 
 void main() {
+  for (final onDate in [false, true]) {
+    testWidgets(
+      '${onDate ? "каталог на дату" : "корневой каталог"}: успех флажка не '
+      'объявляется сообщением, а счётчик свёрнутой секции выполненных растёт',
+      (tester) async {
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        final repository = CatalogPageRepository();
+        final selected = date(2026, 10, 7);
+        final router = await _start(
+          tester,
+          repository,
+          ControlledDailyChoiceLocalDate(selected),
+        );
+        if (onDate) {
+          await _pushDate(tester, router, selected);
+        } else {
+          await openDailyChoices(tester);
+        }
+        final open = catalogPageItem(1, date: selected);
+        final doneFirst = catalogPageItem(2, date: selected, isCompleted: true);
+        final doneSecond = catalogPageItem(
+          3,
+          date: selected,
+          isCompleted: true,
+        );
+        repository.completeFirst(0, [open, doneFirst, doneSecond], total: 3);
+        repository.completeDayStatuses(0, {});
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('daily-choice-section-true')),
+        );
+        await tester.pumpAndSettle();
+        expect(dailyChoiceSectionCount(tester, completed: false), '1');
+        expect(dailyChoiceSectionCount(tester, completed: true), '2');
+
+        await tester.tap(dailyChoiceCompletionControl);
+        await tester.pump();
+        repository.confirmCompletion(0, open, isCompleted: true, revision: 1);
+        await tester.pump();
+        await tester.pump();
+        repository.completeFirst(
+          1,
+          [
+            catalogPageItem(1, date: selected, isCompleted: true),
+            doneFirst,
+            doneSecond,
+          ],
+          total: 3,
+          revision: 1,
+        );
+        await tester.pumpAndSettle();
+
+        expect(dailyChoiceSectionCount(tester, completed: false), '0');
+        expect(dailyChoiceSectionCount(tester, completed: true), '3');
+        expect(find.byType(SnackBar), findsNothing);
+        expect(repository.completionCommands, hasLength(1));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final closePage in [false, true]) {
     testWidgets(
       'флажок: ${closePage ? 'закрытие каталога на дату' : 'уход из корневого каталога'} сохраняет поздний отказ без смены маршрута',
@@ -55,7 +119,7 @@ void main() {
         repository.completeFirst(0, [item], total: 1);
         repository.completeDayStatuses(0, {});
         await tester.pumpAndSettle();
-        await tester.tap(find.byType(Checkbox));
+        await tester.tap(dailyChoiceCompletionControl);
         await tester.pump();
         if (closePage) {
           await _back(tester);
@@ -75,10 +139,15 @@ void main() {
           await openDailyChoices(tester);
         }
         await tester.pumpAndSettle();
-        final checkbox = tester.widget<Checkbox>(find.byType(Checkbox));
-        expect(checkbox.value, isFalse);
-        expect(checkbox.onChanged, isNotNull);
+        final checkbox = dailyChoiceCompletionState(
+          tester,
+          dailyChoiceCompletionControl,
+        );
+        expect(checkbox.completed, isFalse);
+        expect(checkbox.enabled, isTrue);
         expect(find.byType(OperationFailurePresentation), findsNothing);
+        // Повтор принадлежит только сессии, получившей отказ.
+        expect(find.byType(Notice), findsNothing);
         expect(find.byType(SnackBar), findsNothing);
         expect(repository.completionCommands, hasLength(1));
         expect(tester.takeException(), isNull);
@@ -117,7 +186,7 @@ void main() {
         ], total: 1);
         repository.completeDayStatuses(0, {});
         await tester.pumpAndSettle();
-        await tester.tap(find.byType(Checkbox));
+        await tester.tap(dailyChoiceCompletionControl);
         await tester.pump();
         if (!presented) {
           tester.binding.handleAppLifecycleStateChanged(
@@ -157,8 +226,11 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byType(OperationFailurePresentation), findsNothing);
         expect(
-          tester.widget<Checkbox>(find.byType(Checkbox)).onChanged,
-          isNotNull,
+          dailyChoiceCompletionState(
+            tester,
+            dailyChoiceCompletionControl,
+          ).enabled,
+          isTrue,
         );
         expect(find.byType(SnackBar), findsNothing);
         expect(repository.completionCommands, hasLength(1));
@@ -191,7 +263,7 @@ void main() {
         repository.completeFirst(0, [item], total: 1);
         repository.completeDayStatuses(0, {});
         await tester.pumpAndSettle();
-        await tester.tap(find.byType(Checkbox));
+        await tester.tap(dailyChoiceCompletionControl);
         await tester.pump();
         if (changeDate) {
           await tester.tap(calendarDay(next));
@@ -203,7 +275,7 @@ void main() {
           );
         }
         await tester.pumpAndSettle();
-        expect(find.byType(Checkbox), findsNothing);
+        expect(dailyChoiceCompletionControl, findsNothing);
         repository.failCompletion(0, const DailyChoiceUnavailableFailure());
         await tester.pumpAndSettle();
         expect(find.byType(SnackBar), findsOneWidget);
@@ -224,9 +296,12 @@ void main() {
           );
         }
         await tester.pumpAndSettle();
-        final checkbox = tester.widget<Checkbox>(find.byType(Checkbox));
-        expect(checkbox.value, isFalse);
-        expect(checkbox.onChanged, isNotNull);
+        final checkbox = dailyChoiceCompletionState(
+          tester,
+          dailyChoiceCompletionControl,
+        );
+        expect(checkbox.completed, isFalse);
+        expect(checkbox.enabled, isTrue);
         expect(find.byType(OperationFailurePresentation), findsNothing);
         expect(find.byType(SnackBar), findsNothing);
         expect(repository.completionCommands, hasLength(1));
@@ -252,7 +327,7 @@ void main() {
       repository.completeFirst(0, [item], total: 1);
       repository.completeDayStatuses(0, {});
       await tester.pumpAndSettle();
-      final checkbox = find.byType(Checkbox);
+      final checkbox = dailyChoiceCompletionControl;
       await tester.tap(checkbox);
       await tester.pump();
       await openHome(tester);
@@ -269,13 +344,16 @@ void main() {
       await openDailyChoices(tester);
       await tester.pumpAndSettle();
       expect(find.byType(OperationFailurePresentation), findsNothing);
-      expect(tester.widget<Checkbox>(checkbox).onChanged, isNull);
-      await tester.tap(find.widgetWithText(TextButton, 'Обновить выбор'));
+      expect(dailyChoiceCompletionState(tester, checkbox).enabled, isFalse);
+      // Вернувшаяся карточка сохраняет в уведомлении только актуализацию.
+      expect(find.byType(Notice), findsOneWidget);
+      expect(dailyChoiceCompletionNoticeAction('Повторить'), findsNothing);
+      await tester.tap(dailyChoiceCompletionNoticeAction('Обновить выбор'));
       await tester.pump();
       repository.completeFirst(1, [item], total: 1);
       await tester.pumpAndSettle();
-      expect(tester.widget<Checkbox>(checkbox).value, isFalse);
-      expect(tester.widget<Checkbox>(checkbox).onChanged, isNotNull);
+      expect(dailyChoiceCompletionState(tester, checkbox).completed, isFalse);
+      expect(dailyChoiceCompletionState(tester, checkbox).enabled, isTrue);
       expect(find.byType(OperationFailurePresentation), findsNothing);
       expect(find.byType(SnackBar), findsNothing);
       expect(repository.completionCommands, hasLength(1));
@@ -311,9 +389,6 @@ void main() {
         await tester.tap(
           find.byKey(const ValueKey('daily-choice-section-false')),
         );
-        await tester.tap(
-          find.byKey(const ValueKey('daily-choice-section-true')),
-        );
         await tester.pumpAndSettle();
         final body = tester.widget<DailyChoiceCatalogBody>(
           find.byType(DailyChoiceCatalogBody),
@@ -329,11 +404,7 @@ void main() {
             )
             .first;
         final position = tester.state<ScrollableState>(scrollable).position;
-        final footer = find.byKey(
-          const ValueKey('daily-choice-load-more-true'),
-        );
-        await tester.scrollUntilVisible(footer, 1000, scrollable: scrollable);
-        await tester.tap(footer);
+        await scrollToDailyChoiceCatalogPageEnd(tester, true);
         repository.completeMore(1, [
           for (var number = 51; number <= 60; number++)
             catalogPageItem(number, date: selected, isCompleted: true),
@@ -439,7 +510,7 @@ void main() {
       await tester.tap(row);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      expect(find.byType(DailyChoiceDetailsPage), findsOneWidget);
+      expect(dailyChoiceDetails, findsOneWidget);
       await _back(tester);
       expect(find.text('2030'), findsOneWidget);
       expect(find.text('Январь'), findsOneWidget);
@@ -468,13 +539,15 @@ void main() {
       expect(repository.queries.last.date, selected);
       expect(repository.queries.last.isCompleted, isFalse);
       expect(repository.queries.last.cursor, isNull);
-      repository.completeFirst(3, [], total: 0);
+      repository.completeFirst(3, [
+        catalogPageItem(1, date: selected),
+      ], total: 1);
       repository.completeDayStatuses(3, {});
       await tester.pumpAndSettle();
       expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
       expect(dayCell(tester, selected).isSelected, isTrue);
       expect(find.bySemanticsLabel('Развернуть календарь'), findsOneWidget);
-      expect(find.text('Не выполненные'), findsOneWidget);
+      expect(find.text('Невыполненные'), findsOneWidget);
       await _back(tester);
       expect(find.text('2029'), findsOneWidget);
       await _calendarCommand(tester, 'Вернуться к дням месяца');
@@ -517,7 +590,9 @@ void main() {
       expect(repository.queries, hasLength(1));
       expect(repository.queries.single.date, selected);
       expect(repository.queries.single.isCompleted, isFalse);
-      repository.completeFirst(0, [], total: 0);
+      repository.completeFirst(0, [
+        catalogPageItem(1, date: selected),
+      ], total: 1);
       repository.completeDayStatuses(0, {});
       await tester.pumpAndSettle();
 
@@ -612,26 +687,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(dayCell(tester, marked).status, DailyChoiceDayStatus.allCompleted);
 
-    final footer = find.byKey(const ValueKey('daily-choice-load-more-true'));
-    await tester.scrollUntilVisible(footer, 500, scrollable: _verticalScroll);
-    await tester.tap(footer);
-    await tester.pump();
+    await scrollToDailyChoiceCatalogPageEnd(tester, true);
     repository.completeMore(1, [
       catalogPageItem(51, date: selected, isCompleted: true),
     ]);
     await tester.pumpAndSettle();
-    final row = find.byKey(const ValueKey('daily-choice-row-50'));
+    final row = find.byKey(
+      const ValueKey('daily-choice-row-50'),
+      skipOffstage: false,
+    );
     await tester.ensureVisible(row);
     await tester.pumpAndSettle();
     final position = tester.getTopLeft(row).dy;
     await tester.tap(row);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.byType(DailyChoiceDetailsPage), findsOneWidget);
-    expect(
-      router.current.argsAs<DailyChoiceDetailsRouteArgs>().choiceId,
-      catalogPageItem(50, date: selected).id,
-    );
+    expect(shownDailyChoice(tester), catalogPageItem(50, date: selected).id);
     await _back(tester);
     expect(tester.getTopLeft(row).dy, closeTo(position, 1));
 
@@ -647,9 +718,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
     expect(dayCell(tester, selected).isSelected, isTrue);
-    expect(find.text('Не выполненные'), findsOneWidget);
+    expect(find.text('Невыполненные'), findsOneWidget);
     expect(find.text('Отметки дней не загружены.'), findsOneWidget);
-    expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
+    expect(dailyChoiceSectionCount(tester, completed: false), '1');
 
     await _back(tester);
     expect(tester.getTopLeft(row).dy, closeTo(position, 1));
@@ -658,12 +729,14 @@ void main() {
     expect(find.bySemanticsLabel('Свернуть календарь'), findsOneWidget);
     expect(dayCell(tester, marked).status, DailyChoiceDayStatus.allCompleted);
     expect(find.text('Отметки дней не загружены.'), findsNothing);
-    await tester.scrollUntilVisible(
-      find.text('Всего дневных выборов: 51'),
-      200,
-      scrollable: _verticalScroll,
+    await tester.ensureVisible(
+      find.byKey(
+        const ValueKey('daily-choice-section-true'),
+        skipOffstage: false,
+      ),
     );
-    expect(find.text('Всего дневных выборов: 51'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(dailyChoiceSectionCount(tester, completed: true), '51');
     expect(repository.queries, hasLength(3));
     expect(tester.takeException(), isNull);
   });
@@ -691,7 +764,6 @@ void main() {
 
     await _pushDate(tester, router, selected);
     await tester.pump(const Duration(seconds: 1));
-    await showDailyChoiceCatalogSection(tester, true);
     await _back(tester);
     repository.completeFirst(1, [
       catalogPageItem(2, date: selected, isCompleted: true),
@@ -700,14 +772,9 @@ void main() {
     await tester.pumpAndSettle();
     expectDailyChoicesRootPage(router);
     expect(dayCell(tester, today).isSelected, isTrue);
-    expect(find.text('Не выполненные'), findsOneWidget);
+    expect(find.text('Невыполненные'), findsOneWidget);
     expect(find.bySemanticsLabel('Свернуть календарь'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('Всего дневных выборов: 1'),
-      100,
-      scrollable: _verticalScroll,
-    );
-    expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
+    expect(dailyChoiceSectionCount(tester, completed: false), '1');
     expect(find.text('Отметки дней не загружены.'), findsNothing);
 
     await _pushDate(tester, router, selected);
@@ -719,8 +786,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(visibleWeeks(tester), weeksFrom(date(2026, 10, 5), 1));
     expect(dayCell(tester, selected).isSelected, isTrue);
-    expect(find.text('Не выполненные'), findsOneWidget);
-    expect(find.text('На этот день нет дневных выборов.'), findsOneWidget);
+    expect(find.text('Невыполненные'), findsNothing);
+    expect(find.text('Выборов на эту дату нет'), findsOneWidget);
     expect(
       tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
       AppDestination.dailyChoices,

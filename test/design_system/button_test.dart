@@ -1,5 +1,6 @@
 import 'package:doable/src/design_system/components/button.dart';
 import 'package:doable/src/design_system/doable_colors.dart';
+import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/design_system/doable_type.dart';
@@ -353,6 +354,112 @@ void main() {
         semantics.dispose();
       });
     }
+  }
+
+  for (final brightness in Brightness.values) {
+    final theme = brightness == Brightness.light ? 'светлой' : 'тёмной';
+    final colors = switch (brightness) {
+      Brightness.light => DoableColors.light,
+      Brightness.dark => DoableColors.dark,
+    };
+
+    testWidgets('в $theme теме тихая кнопка размера sm со значком — плашка '
+        'fill высотой control-height-sm, значок muted 18, подпись ink '
+        'табличными цифрами, отступы 10 слева и space-3 справа', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      await tester.pumpWidget(
+        _app(
+          brightness: brightness,
+          block: false,
+          button: Button.quietSmallIcon(
+            label: '18:00',
+            icon: DoableIconData.calendar,
+            semanticLabel: 'Время: 18:00. Изменить время',
+            onPressed: () {},
+          ),
+        ),
+      );
+
+      final plane = tester.getRect(_plane);
+      final icon = tester.getRect(find.byType(DoableIcon));
+      final text = tester.getRect(find.text('18:00'));
+      expect(plane.height, DoableMetrics.controlHeightSm);
+      expect(_planeMaterial(tester).color, colors.fill);
+      expect(_planeMaterial(tester).shape, const StadiumBorder());
+      expect(icon.size, const Size.square(18));
+      expect(icon.left, plane.left + 10);
+      expect(text.left, icon.right + 6);
+      expect(plane.right, text.right + DoableMetrics.space3);
+      expect(
+        tester.widget<DoableIcon>(find.byType(DoableIcon)).color,
+        colors.muted,
+      );
+      expect(
+        tester.getSize(find.byType(Button)).height,
+        greaterThanOrEqualTo(DoableMetrics.tapMin),
+        reason: 'область нажатия выше плашки',
+      );
+
+      final style = _labelStyle(tester, '18:00');
+      expect(style.color, colors.ink);
+      expect(style.fontSize, DoableType.section.fontSize);
+      expect(style.fontWeight, DoableType.section.fontWeight);
+      expect(style.fontFeatures, contains(const FontFeature.tabularFigures()));
+      expect(
+        tester.getSemantics(find.byType(Button)),
+        matchesSemantics(
+          label: 'Время: 18:00. Изменить время',
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          isFocusable: true,
+          hasTapAction: true,
+          hasFocusAction: true,
+        ),
+      );
+      semantics.dispose();
+    });
+
+    testWidgets('в $theme теме выключенная тихая кнопка размера sm со значком '
+        'остаётся на месте с подписью и значком grip и объявляется '
+        'недоступной', (tester) async {
+      final semantics = tester.ensureSemantics();
+      Widget app(VoidCallback? onPressed) => _app(
+        brightness: brightness,
+        block: false,
+        button: Button.quietSmallIcon(
+          label: '18:00',
+          icon: DoableIconData.calendar,
+          semanticLabel: 'Время: 18:00',
+          onPressed: onPressed,
+        ),
+      );
+      await tester.pumpWidget(app(() {}));
+      final enabledPlane = tester.getRect(_plane);
+
+      await tester.pumpWidget(app(null));
+      // Material меняет цвета кнопки с анимацией.
+      await tester.pumpAndSettle();
+
+      expect(tester.getRect(_plane), enabledPlane);
+      expect(_planeMaterial(tester).color, colors.fill);
+      expect(_labelStyle(tester, '18:00').color, colors.grip);
+      expect(
+        tester.widget<DoableIcon>(find.byType(DoableIcon)).color,
+        colors.grip,
+      );
+      expect(
+        tester.getSemantics(find.byType(Button)),
+        matchesSemantics(
+          label: 'Время: 18:00',
+          isButton: true,
+          hasEnabledState: true,
+        ),
+      );
+      semantics.dispose();
+    });
   }
 
   testWidgets('нажатие по области выше плашки передаётся потребителю', (

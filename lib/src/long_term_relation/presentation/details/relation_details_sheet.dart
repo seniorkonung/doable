@@ -17,6 +17,7 @@ import '../../../design_system/components/text_field.dart';
 import '../../../design_system/components/top_bar.dart';
 import '../../../design_system/doable_colors.dart';
 import '../../../design_system/doable_metrics.dart';
+import '../../../design_system/doable_priority.dart';
 import '../../../design_system/doable_type.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
@@ -49,6 +50,10 @@ import 'relation_details_view_model.dart';
 ///
 /// Новый отказ любой операции панель показывает сама: прокручивает тело к концу
 /// содержимого, где стоят уведомления, и не меняет размер.
+///
+/// Подтверждённое удаление из параметров закрывает панель, и до конца закрытия
+/// она показывает прежнее содержимое с выключенными элементами. Панель,
+/// перекрытая в этот момент, остаётся открытой и показывает, что связи нет.
 Future<void> showRelationDetailsSheet(
   BuildContext context,
   LongTermRelationId relationId,
@@ -86,6 +91,10 @@ final class _RelationDetailsSheetState
   final _endKey = GlobalKey();
 
   _DescriptionEdit? _edit;
+
+  /// Прежнее содержимое после подтверждённого удаления показывает только
+  /// панель, начавшая его, хотя модель связи общая для всех её панелей.
+  final _deletionInitiator = RelationDeletionInitiator();
 
   RelationDetailsViewModelProvider get _provider =>
       relationDetailsViewModelProvider(widget.relationId);
@@ -218,14 +227,18 @@ final class _RelationDetailsSheetState
   }
 
   Future<void> _delete() async {
-    final deleted = await ref.read(_provider.notifier).delete();
+    final viewModel = ref.read(_provider.notifier);
+    final deleted = await viewModel.delete(_deletionInitiator);
     // Закрытие принадлежит принявшей команду панели, а не общему Deleted. После
     // ожидания сброшенный или перекрытый маршрут теряет это право.
     // https://api.flutter.dev/flutter/widgets/Route/isCurrent.html
     // pop синхронен: после проверки нет новой асинхронной границы.
     // https://api.flutter.dev/flutter/widgets/NavigatorState/pop.html
-    if (deleted && mounted && (ModalRoute.of(context)?.isCurrent ?? false)) {
+    if (!deleted || !mounted) return;
+    if (ModalRoute.of(context)?.isCurrent ?? false) {
       Navigator.of(context).pop();
+    } else {
+      viewModel.releaseDeletedContent(_deletionInitiator);
     }
   }
 
@@ -260,6 +273,24 @@ final class _RelationDetailsSheetState
     final edit = state is RelationDetailsLoaded ? _edit : null;
     final isRunning = state.isOperationRunning;
     final isChanged = edit != null && _isChanged(edit);
+    Widget loadedRelation(RelationDetailsLoaded loaded) => _LoadedRelation(
+      state: loaded,
+      description: switch (edit) {
+        final edit? => _DescriptionEditing(
+          controller: _descriptionController,
+          focusNode: _descriptionFocus,
+          invalid: edit.invalid,
+          onChanged: (_) => _changeDescription(edit),
+        ),
+        null => _DescriptionSaved(onOpen: _openDescription),
+      },
+      endKey: _endKey,
+      onRetry: viewModel.retry,
+      onChangeType: viewModel.changeType,
+      onChangePriority: viewModel.changePriority,
+      onOpenOptions: () => unawaited(_openOptions()),
+      onRetryLifecycleChange: _retryLifecycleChange,
+    );
     return PopScope<void>(
       // Во время сохранения команда продолжится и без панели, а её отказ
       // предъявит оболочка.
@@ -276,6 +307,9 @@ final class _RelationDetailsSheetState
             localizations,
             details,
           ),
+          RelationDetailsOwnDeletionConfirmed(:final shown, :final initiator)
+              when identical(initiator, _deletionInitiator) =>
+            _sheetLabel(localizations, shown.details),
           _ => localizations.relationDetailsTitle,
         },
         bar: edit == null
@@ -300,26 +334,17 @@ final class _RelationDetailsSheetState
             RelationDetailsLoading() => ListState.loading(
               text: localizations.relationDetailsLoading,
             ),
-            final RelationDetailsLoaded loaded => _LoadedRelation(
-              state: loaded,
-              description: switch (edit) {
-                final edit? => _DescriptionEditing(
-                  controller: _descriptionController,
-                  focusNode: _descriptionFocus,
-                  invalid: edit.invalid,
-                  onChanged: (_) => _changeDescription(edit),
-                ),
-                null => _DescriptionSaved(onOpen: _openDescription),
-              },
-              endKey: _endKey,
-              onRetry: viewModel.retry,
-              onChangeType: viewModel.changeType,
-              onChangePriority: viewModel.changePriority,
-              onOpenOptions: () => unawaited(_openOptions()),
-              onRetryLifecycleChange: _retryLifecycleChange,
+            final RelationDetailsLoaded loaded => loadedRelation(loaded),
+            // Закрывающаяся после собственного удаления панель показывает
+            // прежнюю связь: её элементы выключены, пока шла запись.
+            RelationDetailsOwnDeletionConfirmed(:final shown, :final initiator)
+                when identical(initiator, _deletionInitiator) =>
+              loadedRelation(shown),
+            RelationDetailsNotFound() ||
+            RelationDetailsDeleted() ||
+            RelationDetailsOwnDeletionConfirmed() => ListState.error(
+              message: localizations.relationDetailsNotFound,
             ),
-            RelationDetailsNotFound() || RelationDetailsDeleted() =>
-              ListState.error(message: localizations.relationDetailsNotFound),
             RelationDetailsUnavailable() => ListState.error(
               message: localizations.relationDetailsUnavailable,
               retry: retry,

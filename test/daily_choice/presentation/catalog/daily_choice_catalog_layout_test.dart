@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 
+import '../../../support/daily_choice_catalog_controls.dart';
 import 'daily_choice_calendar_test_support.dart';
 import 'daily_choice_catalog_page_test_support.dart';
 
@@ -359,6 +360,31 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('обновление выдачи во время удержания ручки сохраняет '
+      'восстановление неизменившейся выдачи', (tester) async {
+    final repository = await _openExpandedCatalogAtEnd(tester, false);
+    final position = tester.state<ScrollableState>(_pageScroll).position;
+    final offset = position.pixels;
+    final gesture = await _startShortCollapse(tester);
+    final items = [
+      for (var number = 1; number <= 20; number++)
+        catalogPageItem(number, date: _today),
+    ];
+    await confirmOutsideChoiceChange(
+      tester,
+      repository,
+      items.first,
+      revision: 1,
+    );
+    await gesture.cancel();
+    await _settle(tester);
+
+    expect(position.pixels, closeTo(offset, _epsilon));
+    repository.completeFirst(1, items, total: 20, revision: 1);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
   for (final (:locale, :full) in _configurations) {
     final language = locale.languageCode;
 
@@ -386,29 +412,22 @@ void main() {
           28,
         );
         await _expectWholeTexts(tester);
-        final checkbox = find.byType(Checkbox, skipOffstage: false);
+        final checkbox = find.byKey(
+          ValueKey('daily-choice-completion-${item.id.toCanonicalString()}'),
+          skipOffstage: false,
+        );
         await _dragUntilReachable(tester, checkbox);
         final rect = tester.getRect(checkbox);
         expect(rect.width, greaterThanOrEqualTo(kMinInteractiveDimension));
         expect(rect.height, greaterThanOrEqualTo(kMinInteractiveDimension));
-        expect(
-          find.text(_l10n(tester).dailyChoicePriorityOption('P2')),
-          findsOneWidget,
-        );
-        expect(
-          find.text(_l10n(tester).dailyChoiceCatalogPathIntentionCount(4)),
-          findsOneWidget,
-        );
         expect(find.text('Пояснение'), findsOneWidget);
         await tester.tap(checkbox);
         await tester.pump();
         expect(repository.completionCommands.single.choiceId, item.id);
         await _expectWholeTexts(tester);
-        final phrase = find.text(
-          _l10n(tester).dailyChoiceDetailsPhrase('Основание', 'Действие'),
-        );
-        await _dragUntilReachable(tester, phrase);
-        _expectTappable(tester, phrase);
+        final action = find.text('Действие');
+        await _dragUntilReachable(tester, action);
+        _expectTappable(tester, action);
         expect(tester.takeException(), isNull);
       });
 
@@ -472,7 +491,7 @@ void main() {
           // Выдача сдвигается ровно на прирост высоты календаря.
           final grown = month.calendar.height - week.calendar.height;
           expect(grown, greaterThan(0));
-          expect(month.countOffset - week.countOffset, moreOrLessEquals(grown));
+          expect(month.listOffset - week.listOffset, moreOrLessEquals(grown));
           // Месяц раскрывается внутри страницы: прокрутка остаётся одной.
           expect(_pageScroll, findsOneWidget);
           _expectColumns(tester, shown.weeks);
@@ -514,7 +533,7 @@ void main() {
             moreOrLessEquals(grown),
           );
           expect(
-            selected.countOffset - collapsed.countOffset,
+            selected.listOffset - collapsed.listOffset,
             moreOrLessEquals(grown),
           );
           expect(tester.takeException(), isNull);
@@ -570,13 +589,7 @@ void main() {
             find.byKey(ValueKey(key), skipOffstage: false),
           );
         }
-        final loadMore = find.byKey(
-          const ValueKey('daily-choice-load-more-false'),
-          skipOffstage: false,
-        );
-        await _dragUntilReachable(tester, loadMore);
-        await tester.tap(loadMore);
-        await tester.pump();
+        await scrollToDailyChoiceCatalogPageEnd(tester, false);
         repository.completeMore(1, [catalogPageItem(21, date: _today)]);
         await tester.pumpAndSettle();
 
@@ -660,11 +673,7 @@ void main() {
         final repository = CatalogPageRepository();
         await _open(tester, repository, locale, today: _today);
         final l10n = _l10n(tester);
-        final retry = find.widgetWithText(
-          TextButton,
-          l10n.commonRetry,
-          skipOffstage: false,
-        );
+        final retry = find.text(l10n.commonRetry, skipOffstage: false);
 
         await _dragUntilReachable(
           tester,
@@ -689,11 +698,11 @@ void main() {
         await tester.pumpAndSettle();
         await _dragUntilReachable(
           tester,
-          find.text(l10n.dailyChoiceCatalogTotalCount(0), skipOffstage: false),
+          find.text(l10n.dailyChoiceCatalogEmptyTitle, skipOffstage: false),
         );
         await _dragUntilReachable(
           tester,
-          find.text(l10n.dailyChoiceCatalogEmpty, skipOffstage: false),
+          find.text(l10n.dailyChoiceCatalogEmptyText, skipOffstage: false),
         );
         await _expectWholeTexts(tester);
         await _dragUntilReachable(tester, calendarDay(date(2026, 10, 1)));
@@ -705,7 +714,10 @@ void main() {
         (tester) async {
           final repository = CatalogPageRepository();
           await _open(tester, repository, locale, today: _today);
-          repository.completeFirst(0, [], total: 0);
+          repository.completeFirst(0, [
+            catalogPageItem(1, date: _today),
+            catalogPageItem(2, date: _today, isCompleted: true),
+          ], total: 2);
           await tester.pumpAndSettle();
           for (final completed in [false, true]) {
             final header = find.byKey(
@@ -840,8 +852,8 @@ void _expectReachable(WidgetTester tester, Finder finder) {
 }
 
 /// Последний элемент выдачи [finder] на прокрученной до конца странице
-/// заканчивается у верхнего края панели, и касание его видимой
-/// части достигает его. Длинная строка выше видимой части
+/// заканчивается над свободным местом в 72 у верхнего края панели, и касание
+/// его видимой части достигает его. Длинная строка выше видимой части
 /// страницы, поэтому целиком она видна только по частям при прокрутке.
 void _expectAtEnd(WidgetTester tester, Finder finder) {
   final area = _visibleArea(tester);
@@ -849,8 +861,12 @@ void _expectAtEnd(WidgetTester tester, Finder finder) {
   final lastHeader = tester.getRect(
     find.byKey(const ValueKey('daily-choice-section-true')),
   );
-  expect(rect.bottom, moreOrLessEquals(lastHeader.top, epsilon: _epsilon));
-  expect(lastHeader.bottom, moreOrLessEquals(area.bottom, epsilon: _epsilon));
+  // Второй заголовок стоит на 2 ниже строк первой секции.
+  expect(rect.bottom, moreOrLessEquals(lastHeader.top - 2, epsilon: _epsilon));
+  expect(
+    lastHeader.bottom,
+    moreOrLessEquals(area.bottom - 72, epsilon: _epsilon),
+  );
   expect(rect.bottom, greaterThan(area.top));
   _expectHit(tester, finder, rect.intersect(area).center);
 }
@@ -949,13 +965,13 @@ void _expectHit(WidgetTester tester, Finder finder, Offset position) {
 
 /// Положение календаря и выдачи под ним в общей прокрутке.
 ///
-/// [countOffset] — расстояние от верха календаря до количества выдачи; оно не
-/// зависит от прокрутки страницы.
+/// [listOffset] — расстояние от верха календаря до заголовка первой секции; оно
+/// не зависит от прокрутки страницы.
 typedef _Layout = ({
   Rect calendar,
   int rows,
   double rowHeight,
-  double countOffset,
+  double listOffset,
 });
 
 _Layout _measure(WidgetTester tester) {
@@ -968,10 +984,10 @@ _Layout _measure(WidgetTester tester) {
     tester,
     calendarDay(weeks.first.firstWhere((day) => day != null)!),
   );
-  final count = _rect(
+  final list = _rect(
     tester,
-    find.text(
-      _l10n(tester).dailyChoiceCatalogTotalCount(1),
+    find.byKey(
+      const ValueKey('daily-choice-section-false'),
       skipOffstage: false,
     ),
   );
@@ -979,7 +995,7 @@ _Layout _measure(WidgetTester tester) {
     calendar: calendar,
     rows: weeks.length,
     rowHeight: firstDay.height,
-    countOffset: count.top - calendar.top,
+    listOffset: list.top - calendar.top,
   );
 }
 

@@ -7,8 +7,8 @@ import '../doable_type.dart';
 /// Шапка периода с готовым заголовком и командами соседних периодов.
 ///
 /// Отсутствие обработчика делает соответствующую стрелку недоступной.
-/// Без [titleAction] заголовок остаётся текстом. Названия команд и состояние
-/// выбора задаёт потребитель.
+/// Без [titleAction] заголовок остаётся текстом без шеврона выбора. Названия
+/// команд и состояние выбора задаёт потребитель.
 final class CalendarHeader extends StatelessWidget {
   const CalendarHeader({
     super.key,
@@ -45,7 +45,7 @@ final class CalendarHeader extends StatelessWidget {
           borderRadius: radius,
         ),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 6, 10, 6),
+          padding: EdgeInsets.fromLTRB(14, 6, action == null ? 14 : 10, 6),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -59,14 +59,17 @@ final class CalendarHeader extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: DoableMetrics.space1),
-              CustomPaint(
-                size: const Size.square(16),
-                painter: _ChevronPainter(
-                  action?.isExpanded == true ? _Chevron.up : _Chevron.down,
-                  colors.muted,
+              // Шеврон показывает, что заголовок открывает выбор.
+              if (action != null) ...[
+                const SizedBox(width: DoableMetrics.space1),
+                CustomPaint(
+                  size: const Size.square(16),
+                  painter: _ChevronPainter(
+                    action.isExpanded ? _Chevron.up : _Chevron.down,
+                    colors.muted,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),

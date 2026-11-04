@@ -48,20 +48,17 @@ final class DailyChoiceChange implements GraphChange {
     if ((before == null && released.isNotEmpty) ||
         (after == null && occupied.isNotEmpty) ||
         (before == null && occupied.isEmpty) ||
-        (after == null && released.isEmpty) ||
-        released.intersection(occupied).isNotEmpty) {
+        (after == null && released.isEmpty)) {
       throw const DailyChoiceChangeValidationException(
         DailyChoiceChangeValidationFailure.invalidPathDelta,
       );
     }
-    final previousParticipants = _participants(before);
-    final currentParticipants = _participants(after);
     final counts = Map<IntentionId, RelationCounts>.unmodifiable(
       intentionCounts,
     );
     if (!counts.keys.toSet().containsAll({
-      ...previousParticipants,
-      ...currentParticipants,
+      ..._participants(before),
+      ..._participants(after),
     })) {
       throw const DailyChoiceChangeValidationException(
         DailyChoiceChangeValidationFailure.missingCounts,
@@ -85,8 +82,6 @@ final class DailyChoiceChange implements GraphChange {
       revision: revision,
       before: before,
       after: after,
-      previousParticipants: previousParticipants,
-      currentParticipants: currentParticipants,
       releasedRelationIds: released,
       occupiedRelationIds: occupied,
       intentionCounts: counts,
@@ -98,8 +93,6 @@ final class DailyChoiceChange implements GraphChange {
     required this.revision,
     required this.before,
     required this.after,
-    required this.previousParticipants,
-    required this.currentParticipants,
     required this.releasedRelationIds,
     required this.occupiedRelationIds,
     required this.intentionCounts,
@@ -110,8 +103,6 @@ final class DailyChoiceChange implements GraphChange {
   final GraphRevision revision;
   final DailyChoice? before;
   final DailyChoice? after;
-  final Set<IntentionId> previousParticipants;
-  final Set<IntentionId> currentParticipants;
   final Set<LongTermRelationId> releasedRelationIds;
   final Set<LongTermRelationId> occupiedRelationIds;
   final Map<IntentionId, RelationCounts> intentionCounts;

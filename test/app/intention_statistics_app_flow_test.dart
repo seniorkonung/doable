@@ -16,8 +16,6 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
-import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
-import 'package:doable/src/daily_choice/presentation/editor/daily_choice_edit_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/data/contribution_reachability.dart';
@@ -48,6 +46,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/daily_choice_detail_fields_controls.dart';
+import '../support/daily_choice_details_controls.dart';
 import '../support/daily_choice_durability_fixture.dart';
 import '../support/app_root_pages.dart';
 import '../support/daily_choice_local_date.dart';
@@ -527,9 +527,6 @@ final class _App {
           command,
         ),
         UpdateDailyChoiceFields() => coordinator.acceptDailyChoiceUpdate(
-          command,
-        ),
-        ReplaceDailyChoicePath() => coordinator.acceptDailyChoiceReplace(
           command,
         ),
         DeleteDailyChoice() => coordinator.acceptDailyChoiceDelete(command),

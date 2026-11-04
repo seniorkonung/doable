@@ -1,13 +1,15 @@
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
-import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
-import 'package:doable/src/daily_choice/presentation/editor/daily_choice_edit_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/choice_row.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
+import 'package:doable/src/design_system/doable_priority.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/daily_choice_detail_fields_controls.dart';
+import '../../../support/daily_choice_details_controls.dart';
 import '../../../support/daily_choice_durability_fixture.dart';
 import '../../../support/daily_choice_catalog_controls.dart';
 import 'daily_choice_catalog_page_test_support.dart';
@@ -47,13 +49,12 @@ void main() {
         );
         await _until(
           tester,
-          () => find.text('Приоритет P2').evaluate().isNotEmpty,
+          () => _rowWith(DoablePriority.p2).evaluate().isNotEmpty,
         );
         final text = find.text(description);
         expect(tester.widget<Text>(text).maxLines, 2);
         expect(tester.widget<Text>(text).overflow, TextOverflow.ellipsis);
-        expect(find.text('18:00'), findsNWidgets(2));
-        expect(find.text('3 намерения в пути'), findsOneWidget);
+        expect(find.text('18:00'), findsOneWidget);
         await expandDailyChoiceCatalogCalendar(tester);
         final viewport = shownDailyChoiceCatalogViewport(tester);
         final route = router.current.name;
@@ -62,7 +63,7 @@ void main() {
             'daily-choice-completion-${durabilityChoice(201).toCanonicalString()}',
           ),
         );
-        expect(tester.widget<Checkbox>(checkbox).value, isFalse);
+        expect(dailyChoiceCompletionState(tester, checkbox).completed, isFalse);
         final done = dailyChoiceCatalogDayMark(
           durabilityChoiceDate,
           mark: DayMark.done,
@@ -77,20 +78,15 @@ void main() {
         await tester.tap(checkbox);
         await _until(
           tester,
-          () => done.evaluate().isNotEmpty && checkbox.evaluate().isEmpty,
+          () =>
+              done.evaluate().isNotEmpty &&
+              checkbox.evaluate().isNotEmpty &&
+              dailyChoiceCompletionState(tester, checkbox).completed,
         );
         expect(router.current.name, route);
-        expect(find.byType(DailyChoiceDetailsPage), findsNothing);
+        expect(dailyChoiceDetails, findsNothing);
         expect(shownDailyChoiceCatalogDate(tester), durabilityChoiceDate);
         expect(shownDailyChoiceCatalogViewport(tester), viewport);
-        final completedSection = find.byKey(
-          const ValueKey('daily-choice-section-true'),
-        );
-        await tester.ensureVisible(completedSection);
-        await tester.pumpAndSettle();
-        await tester.tap(completedSection);
-        await tester.pumpAndSettle();
-        expect(tester.widget<Checkbox>(checkbox).value, isTrue);
         await tester.ensureVisible(
           find.byKey(const ValueKey('daily-choice-row-1')),
         );
@@ -98,64 +94,32 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('daily-choice-row-1')));
         await _until(
           tester,
-          () => find
-              .byKey(const ValueKey('daily-choice-edit-open'))
-              .evaluate()
-              .isNotEmpty,
+          () => dailyChoiceDetailsReady.evaluate().isNotEmpty,
         );
         await tester.pumpAndSettle();
-        final details = find.byType(DailyChoiceDetailsPage);
+        final details = dailyChoiceDetails;
         expect(
           find.descendant(of: details, matching: find.text(description)),
           findsOneWidget,
         );
-        expect(find.text('Время: 18:00'), findsOneWidget);
-        expect(
-          find.descendant(of: details, matching: find.text('Выполнено')),
-          findsOneWidget,
-        );
-        await tester.scrollUntilVisible(
-          find.byKey(const ValueKey('daily-choice-relation-2')),
-          400,
-        );
-        expect(
-          find.byKey(const ValueKey('daily-choice-relation-1')),
-          findsOneWidget,
-        );
-        expect(
-          find.byKey(const ValueKey('daily-choice-relation-2')),
-          findsOneWidget,
-        );
-        final edit = find.byKey(const ValueKey('daily-choice-edit-open'));
-        await tester.scrollUntilVisible(edit, 300);
-        await tester.tap(edit);
+        expect(dailyChoiceDetailsField('18:00'), findsOneWidget);
+        expect(shownDailyChoiceHead(tester).done, isTrue);
+        await setDailyChoicePriority(tester, DailyChoicePriority.p1, tap: _tap);
         await _until(
           tester,
-          () => find.byType(DailyChoiceEditPage).evaluate().isNotEmpty,
+          () => shownDailyChoiceHead(tester).priority == DoablePriority.p1,
         );
-        await tester.pumpAndSettle();
-        final priority = find.widgetWithText(ChoiceChip, 'Приоритет P1');
-        await tester.ensureVisible(priority);
-        await tester.tap(priority);
-        await tester.pumpAndSettle();
-        final submit = find.byKey(const ValueKey('daily-choice-edit-submit'));
-        await tester.ensureVisible(submit);
-        await tester.tap(submit);
+        await showDailyChoicePath(tester);
+        expect(dailyChoiceDetailsRelation(1), findsOneWidget);
+        expect(dailyChoiceDetailsRelation(2), findsOneWidget);
+        await closeDailyChoiceDetails(tester);
         await _until(
           tester,
-          () => find.byType(DailyChoiceEditPage).evaluate().isEmpty,
+          () => _rowWith(DoablePriority.p1).evaluate().isNotEmpty,
         );
-        await tester.pumpAndSettle();
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
-        await _until(
-          tester,
-          () => find.text('Приоритет P1').evaluate().isNotEmpty,
-        );
-        expect(find.text('18:00'), findsNWidgets(2));
-        expect(find.text('3 намерения в пути'), findsOneWidget);
+        expect(find.text('18:00'), findsOneWidget);
         expect(find.text(description), findsOneWidget);
-        expect(tester.widget<Checkbox>(checkbox).value, isTrue);
+        expect(dailyChoiceCompletionState(tester, checkbox).completed, isTrue);
         expect(done, findsOneWidget);
         expect(shownDailyChoiceCatalogDate(tester), durabilityChoiceDate);
         expect(shownDailyChoiceCatalogViewport(tester), viewport);
@@ -167,11 +131,10 @@ void main() {
           () =>
               todo.evaluate().isNotEmpty &&
               checkbox.evaluate().isNotEmpty &&
-              !tester.widget<Checkbox>(checkbox).value!,
+              !dailyChoiceCompletionState(tester, checkbox).completed,
         );
         expect(done, findsNothing);
-        expect(find.text('Приоритет P1'), findsOneWidget);
-        expect(find.text('3 намерения в пути'), findsOneWidget);
+        expect(_rowWith(DoablePriority.p1), findsOneWidget);
         expect(find.text(description), findsOneWidget);
         expect(router.current.name, route);
         expect(shownDailyChoiceCatalogViewport(tester), viewport);
@@ -180,6 +143,19 @@ void main() {
       },
     );
   }
+}
+
+/// Карточка с приоритетом [priority].
+Finder _rowWith(DoablePriority priority) => find.byWidgetPredicate(
+  (widget) => widget is ChoiceRow && widget.priority == priority,
+);
+
+/// Прокрутка к элементу сдвигает его только к следующему кадру.
+Future<void> _tap(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.tap(finder);
+  await tester.pump();
 }
 
 Future<void> _until(WidgetTester tester, bool Function() condition) async {

@@ -2,11 +2,11 @@ import 'dart:ui' show ImageByteFormat;
 
 import 'package:doable/src/design_system/components/badge.dart';
 import 'package:doable/src/design_system/components/path_glyph.dart';
-import 'package:doable/src/design_system/components/priority_picker.dart';
 import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/design_system/components/relation_stroke.dart';
 import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
+import 'package:doable/src/design_system/doable_priority.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/design_system/doable_type.dart';
 import 'package:flutter/material.dart' hide Badge;
@@ -204,6 +204,110 @@ void main() {
       );
     });
   }
+
+  testWidgets('при обычном масштабе на экране 360 пилюли стоят в одну строку '
+      'с промежутком space-1', (tester) async {
+    _setScreen(tester);
+    await tester.pumpWidget(
+      _app(
+        Brightness.light,
+        _head(width: _screenWidth, status: _switchStatus(), menu: _menu()),
+      ),
+    );
+
+    final need = tester.getRect(_plane('Нужно'));
+    final can = tester.getRect(_plane('Можно'));
+    expect(can.top, need.top);
+    expect(can.left - need.right, 4);
+    expect(
+      tester.getRect(_open(_target)).top -
+          tester.getRect(_open(_source)).bottom,
+      44,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('при системном масштабе 2 на экране 360 вторая пилюля '
+      'переносится на новую строку, обе видны целиком и нажимаются, а кнопка '
+      'параметров остаётся доступной', (tester) async {
+    _setScreen(tester);
+    final changes = <RelationHeadKind>[];
+    var menuOpened = 0;
+    Future<void> pumpHead(RelationHeadKind kind) => tester.pumpWidget(
+      _app(
+        Brightness.light,
+        _head(
+          kind: kind,
+          width: _screenWidth,
+          status: _switchStatus(onChange: changes.add),
+          menu: _menu(onOpen: () => menuOpened++),
+        ),
+        textScale: 2,
+      ),
+    );
+    await pumpHead(RelationHeadKind.need);
+
+    final screen = Offset.zero & const Size(_screenWidth, 800);
+    final head = tester.getRect(find.byType(RelationHead));
+    final need = tester.getRect(_plane('Нужно'));
+    final can = tester.getRect(_plane('Можно'));
+    final needArea = tester.getRect(_open('Нужно'));
+    final canArea = tester.getRect(_open('Можно'));
+    final menuArea = tester.getRect(_menuArea());
+
+    // Вторая пилюля начинает новую строку под первой.
+    expect(can.left, need.left);
+    expect(can.top, greaterThanOrEqualTo(need.bottom));
+
+    // Подписи и значки лежат внутри своих пилюль, а пилюли — на экране.
+    for (final (name, plane) in [('Нужно', need), ('Можно', can)]) {
+      expect(plane.right, lessThanOrEqualTo(screen.right), reason: name);
+      final text = tester.getRect(find.text(name));
+      final mark = tester.getRect(_mark(name));
+      expect(_inside(text, plane), isTrue, reason: name);
+      expect(_inside(mark, plane), isTrue, reason: name);
+      expect(
+        tester.renderObject<RenderParagraph>(find.text(name)).didExceedMaxLines,
+        isFalse,
+        reason: name,
+      );
+    }
+
+    // Области нажатия не меньше tap-min, не пересекаются и не выходят за экран.
+    for (final area in [needArea, canArea, menuArea]) {
+      expect(area.width, greaterThanOrEqualTo(44));
+      expect(area.height, greaterThanOrEqualTo(44));
+      expect(_inside(area, screen), isTrue);
+    }
+    expect(needArea.overlaps(canArea), isFalse);
+    expect(needArea.overlaps(menuArea), isFalse);
+    expect(canArea.overlaps(menuArea), isFalse);
+
+    // Строка вида выросла на высоту второй строки пилюль, а кнопка параметров
+    // осталась у правого края шапки.
+    final sourceArea = tester.getRect(_open(_source));
+    final targetArea = tester.getRect(_open(_target));
+    expect(
+      targetArea.top - sourceArea.bottom,
+      needArea.height + canArea.height,
+    );
+    expect(menuArea.right - head.right, 14);
+    expect(tester.takeException(), isNull);
+
+    await tester.tapAt(canArea.center);
+    await tester.pump();
+    expect(changes, [RelationHeadKind.can]);
+
+    await tester.tapAt(menuArea.center);
+    await tester.pump();
+    expect(menuOpened, 1);
+    expect(changes, [RelationHeadKind.can]);
+
+    await pumpHead(RelationHeadKind.can);
+    await tester.tapAt(tester.getRect(_open('Нужно')).center);
+    await tester.pump();
+    expect(changes, [RelationHeadKind.can, RelationHeadKind.need]);
+  });
 
   testWidgets('нажатие на другую пилюлю сообщает вид, а на выбранную ничего '
       'не делает', (tester) async {
@@ -601,8 +705,9 @@ Widget _head({
   RelationHeadParticipant? target,
   RelationHeadStatus status = const RelationHeadActive(),
   RelationHeadMenu? menu,
+  double width = 400,
 }) => SizedBox(
-  width: 400,
+  width: width,
   child: Padding(
     padding: const EdgeInsets.symmetric(horizontal: 20),
     child: RelationHead(
@@ -617,6 +722,34 @@ Widget _head({
     ),
   ),
 );
+
+const _screenWidth = 360.0;
+
+/// Экран шириной 360 с одним физическим пикселем на логический.
+void _setScreen(WidgetTester tester) {
+  tester.view
+    ..devicePixelRatio = 1
+    ..physicalSize = const Size(_screenWidth, 800);
+  addTearDown(tester.view.reset);
+}
+
+RelationHeadStatus _switchStatus({ValueChanged<RelationHeadKind>? onChange}) =>
+    RelationHeadActive(
+      kindSwitch: RelationHeadKindSwitch(
+        label: 'Вид связи',
+        onChange: onChange ?? (_) {},
+      ),
+    );
+
+RelationHeadMenu _menu({VoidCallback? onOpen}) =>
+    RelationHeadMenu(label: 'Параметры связи', onOpen: onOpen ?? () {});
+
+/// [inner] целиком лежит в [outer], границы включены.
+bool _inside(Rect inner, Rect outer) =>
+    inner.left >= outer.left &&
+    inner.top >= outer.top &&
+    inner.right <= outer.right &&
+    inner.bottom <= outer.bottom;
 
 /// Вертикальные отрезки линии связи сверху вниз с их границами.
 List<(RelationStroke, Rect)> _lines(WidgetTester tester) {
@@ -705,22 +838,29 @@ Future<Color> _pixel(
   }))!;
 }
 
-Widget _app(Brightness brightness, Widget child, {GlobalKey? boundary}) =>
-    MaterialApp(
-      theme: doableTheme(brightness),
-      home: Scaffold(
-        body: RepaintBoundary(
-          key: boundary,
-          child: ColoredBox(
-            color: _ground,
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: child,
-              ),
+Widget _app(
+  Brightness brightness,
+  Widget child, {
+  GlobalKey? boundary,
+  double textScale = 1,
+}) => MaterialApp(
+  theme: doableTheme(brightness),
+  home: MediaQuery(
+    data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
+    child: Scaffold(
+      body: RepaintBoundary(
+        key: boundary,
+        child: ColoredBox(
+          color: _ground,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: child,
             ),
           ),
         ),
       ),
-    );
+    ),
+  ),
+);

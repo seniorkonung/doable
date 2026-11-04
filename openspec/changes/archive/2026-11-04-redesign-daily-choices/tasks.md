@@ -1,0 +1,1135 @@
+## Phase 1: Экран дня показывает выборы по дизайну
+
+- [x] 1.1 Обе секции каталога раскрыты при первом открытии
+  - **Критерии приёмки:**
+    - Корневой каталог и каталог на дату начинают с раскрытыми «Невыполненными» и «Выполненными», в том числе в новом поколении графа.
+    - Сворачивание, смена даты и возврат из другого раздела сохраняют выбор пользователя по прежним правилам.
+    - Тесты, которые раскрывали выполненные нажатием или `toggleSection(true)`, выражают то же намерение при новом начальном состоянии. Проверка сохранения состояния по-прежнему меняет его относительно начального.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/app test/graph/presentation`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняется `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart`;
+    - меняются `test/daily_choice/presentation/catalog/daily_choice_catalog_view_model_test.dart`, `daily_choice_date_catalog_page_test.dart`, `daily_choice_catalog_details_integration_test.dart`;
+    - меняются `test/app/navigation/app_shell_state_test.dart`, `test/app/creation_flows_test_support.dart`, `test/app/intention_statistics_catalog_scenarios.dart`;
+    - меняются остальные тесты `test/daily_choice/presentation/catalog`, `test/app` и `test/graph/presentation`, которые зависят от свёрнутых выполненных.
+  - **Размер:** M по логике: меняется одно значение, а файлов больше нормы, потому что их ожидания нельзя поправить отдельно от него.
+
+- [x] 1.2 Подпись «Весь день» зависит от всего дня, а не от секции
+  - **Критерии приёмки:**
+    - `DailyChoiceCatalogLoaded` даёт признак времени всего дня как дизъюнкцию признаков обеих секций, а подпись группы читает его вместо признака своей секции.
+    - Если все невыполненные выборы на весь день, а среди выполненных есть выбор на 18:00, невыполненные стоят под подписью «Весь день». Время в ещё не полученной порции даёт тот же результат.
+    - Если во всём дне нет выборов со временем, подписи «Весь день» нет ни в одной секции.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_cards_test.dart`.
+  - **Зависимости:** 1.1.
+  - **Предполагаемые файлы:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart`, `daily_choice_catalog_body.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_cards_test.dart`.
+  - **Размер:** S.
+
+- [x] 1.3 Модуль основ даёт одно перечисление приоритета для всех компонентов
+  - **Критерии приёмки:**
+    - `DoablePriority` модуля основ заменяет `RelationRowPriority` и сам выбирает цвет P1–P4, поэтому компоненты не повторяют это сопоставление.
+    - Домен переводится в перечисление на границе экрана. `RelationRow` выглядит как прежде.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/relation_row_test.dart test/long_term_relation/presentation/intention_relations`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - добавляется `lib/src/design_system/doable_priority.dart`;
+    - меняются `lib/src/design_system/components/relation_row.dart`, `lib/src/long_term_relation/presentation/intention_relations/intention_relations_sliver.dart`;
+    - меняются `test/design_system/relation_row_test.dart`, `test/long_term_relation/presentation/intention_relations/intention_relations_sliver_test.dart`.
+  - **Размер:** S.
+
+- [x] 1.4 Кольцо и цепочка выбора показывают приоритет и выполнение
+  - **Критерии приёмки:**
+    - `ChoiceCheck` без области нажатия и имени показывает кольцо цвета приоритета и выполненное состояние по своему README.
+    - `ReasonChain` без узла экранного диктора получает число шагов, приоритет и признак `off` и показывает ромб, по кольцу на промежуточное намерение и круг.
+    - До семи шагов цепочка рисуется целиком, а от восьми имеет постоянную длину с многоточием, поэтому длинный путь не меняет ширину.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/choice_check_test.dart test/design_system/reason_chain_test.dart`.
+  - **Зависимости:** 1.3.
+  - **Предполагаемые файлы:**
+    - добавляются `lib/src/design_system/components/choice_check.dart`, `reason_chain.dart`;
+    - меняется `lib/src/design_system/doable_metrics.dart`;
+    - добавляются `test/design_system/choice_check_test.dart`, `reason_chain_test.dart`.
+  - **Размер:** M.
+
+- [x] 1.5 Компонент `ChoiceRow` показывает один дневной выбор
+  - **Критерии приёмки:**
+    - Исходное намерение занимает одну строку с многоточием, выбранное действие переносится, описание занимает не больше двух строк. У выполненного выбора цепочка серая, а действие зачёркнуто.
+    - Строка состоит из двух кнопок: флажка по README и текста, который открывает выбор. Нажатие на флажок не открывает выбор, а без `onToggle` флажок выключен и раскладка не меняется.
+    - Тексты, доступные названия и ключи обеих кнопок задаёт потребитель. Предметных типов и параметров множественного выделения у компонента нет.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/choice_row_test.dart`.
+  - **Зависимости:** 1.4.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/choice_row.dart`, `test/design_system/choice_row_test.dart`.
+  - **Размер:** S.
+
+- [x] 1.6 Каталог показывает выборы карточками `ChoiceRow`
+  - **Критерии приёмки:**
+    - Карточка показывает флажок, исходное намерение, цепочку с числом шагов `pathIntentionCount - 1`, выбранное действие и описание. Даты, времени, слова приоритета, числа намерений и формулировки «Чтобы…» в ней нет.
+    - Нажатие на карточку открывает прежний подробный просмотр, а флажок меняет выполнение и его не открывает. Доступное имя строки называет время и число шагов, а имя флажка — приоритет.
+    - Подпись группы остаётся элементом ленивого списка и оформлена по README `TimeGroup`, а под последней строкой выдачи есть свободное место из этого README.
+    - Ключи `daily-choice-row-*` и `daily-choice-completion-*` сохранены. Тесты читают состояние флажка одним шагом в `test/support/daily_choice_catalog_controls.dart`, а не виджетом `Checkbox`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/app test/graph/presentation`.
+  - **Зависимости:** 1.2, 1.5.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`;
+    - меняется `test/support/daily_choice_catalog_controls.dart`;
+    - меняются `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`, `daily_choice_date_catalog_page_test.dart`, `daily_choice_catalog_card_flow_test.dart`, `daily_choice_catalog_cards_test.dart`, `daily_choice_catalog_layout_test.dart`, `daily_choice_catalog_accessibility_test.dart`;
+    - меняются `test/app/daily_choice_app_flow_test.dart`, `daily_choice_completion_lifecycle_scenarios.dart`, `intention_statistics_catalog_scenarios.dart`, `navigation/app_shell_state_test.dart`, `navigation/app_shell_layout_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы только из-за перевода тестов на общий шаг.
+
+- [x] 1.7 Заголовки секций показывают счётчик и шеврон
+  - **Критерии приёмки:**
+    - `SectionHeader` — одна кнопка с названием, счётчиком и шевроном, который показывает раскрытие.
+    - Счётчик равен числу выборов секции за день, включая неполученные порции. Секция без выборов показывает 0 и не показывает карточек.
+    - Ключ `daily-choice-section-*` и состояния заголовка и раскрытия для экранного диктора сохранены. Верхняя секция называется «Невыполненные», как в спецификации.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/section_header_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_cards_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_accessibility_test.dart`.
+  - **Зависимости:** 1.1.
+  - **Предполагаемые файлы:**
+    - добавляются `lib/src/design_system/components/section_header.dart`, `test/design_system/section_header_test.dart`;
+    - меняются `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/l10n/app_ru.arb`, `test/daily_choice/presentation/catalog/daily_choice_catalog_cards_test.dart`.
+  - **Размер:** M.
+
+- [x] 1.8 Первая загрузка, отказ и пустой день показаны состояниями дизайн-системы
+  - **Критерии приёмки:**
+    - При первой загрузке и её отказе под заголовком дня стоит `ListState`, а заголовков секций нет. Доказанно временный отказ предлагает повтор для выбранной даты, и другой день остаётся доступным.
+    - Пустой день показывает `EmptyState` с текстами дизайна в `SliverFillRemaining` вместо секций.
+    - Строка общего количества, её локализация и `_SliverStatus` удалены. Ветви `toggleSection` для состояний без данных удалены, потому что заголовков там больше нет.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog test/app/navigation test/app/intention_statistics_app_flow_test.dart`.
+  - **Зависимости:** 1.7.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `daily_choice_catalog_view_model.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`;
+    - меняются `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`, `daily_choice_catalog_cards_test.dart`, `daily_choice_catalog_layout_test.dart`, `daily_choice_catalog_accessibility_test.dart`;
+    - меняются `test/app/intention_statistics_catalog_scenarios.dart`, `navigation/app_shell_layout_test.dart`, `navigation/app_shell_state_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы, потому что тесты ждут загрузку по удаляемой строке количества.
+
+- [x] 1.9 Обновление выдачи не сдвигает строки
+  - **Критерии приёмки:**
+    - `ListState` получает вариант `refreshing` по своему README и объявляет его как статус.
+    - Строка обновления стоит на линии заголовка дня и не занимает места в выдаче. Позиции заголовков и карточек не меняются при её появлении и исчезновении, в том числе при обновлении после записи выполнения.
+    - Устаревшая выдача показывает `Notice`, а повтор предлагает только при доказанно временном отказе.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/list_state_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`.
+  - **Зависимости:** 1.8.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/list_state.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `test/design_system/list_state_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`.
+  - **Размер:** M.
+
+- [x] 1.10 Следующая порция секции подгружается сама
+  - **Критерии приёмки:**
+    - Подвал секции с продолжением — последний элемент её ленивого `SliverList`: он показывает `ListState.more` и после кадра вызывает `loadMore` той же секции. `SliverToBoxAdapter` для него не подходит, потому что строит содержимое сразу и загрузил бы все порции при открытии.
+    - Порция запрашивается, только когда конец загруженной части приближается к видимой области, и встаёт перед секцией выполненных. Секция, конец которой далеко, порцию не запрашивает.
+    - При неактуальной выдаче или занятой порции запроса нет. Подвал на виду запрашивает порцию, когда выдача снова актуальна.
+    - Отказ показывает `ListState.error` на месте подвала, а повтор предлагает только при доказанно временном отказе.
+    - Кнопка «Показать ещё», ключ `daily-choice-load-more-*`, её строка и `_Status` удалены. Тесты подгружают порцию общим шагом прокрутки в `test/support/daily_choice_catalog_controls.dart`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog test/app/navigation test/app/intention_statistics_app_flow_test.dart`.
+  - **Зависимости:** 1.6, 1.9.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`;
+    - меняется `test/support/daily_choice_catalog_controls.dart`;
+    - меняются `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`, `daily_choice_date_catalog_page_test.dart`, `daily_choice_catalog_accessibility_test.dart`, `daily_choice_catalog_cards_test.dart`, `daily_choice_catalog_layout_test.dart`;
+    - меняются `test/app/intention_statistics_catalog_scenarios.dart`, `navigation/app_shell_layout_test.dart`, `navigation/app_shell_state_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы только из-за перевода тестов на общий шаг.
+
+- [x] 1.11 Запись выполнения не показывает текст под карточкой
+  - **Критерии приёмки:**
+    - Пока запись и согласование идут, флажок недоступен, под карточкой ничего нет, а её позиция не меняется.
+    - Отказ показан в `Notice` у карточки с `OperationFailurePresentation` и одним действием: повтором при доказанно временном отказе, иначе «Обновить выбор». Вернувшаяся карточка без открытой сессии сохраняет только действие актуализации.
+    - Успех объявляется как раньше. `_Banner` и строки хода записи удалены.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog test/app/daily_choice_app_lifecycle_test.dart`.
+  - **Зависимости:** 1.9.
+  - **Предполагаемые файлы:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`, `daily_choice_date_catalog_page_test.dart`.
+  - **Размер:** M.
+
+- [x] 1.12 Компонент `ScrollTopButton` возвращает список к началу
+  - **Критерии приёмки:**
+    - Компонент оформлен по своему README, а доступное имя и обработчик задаёт потребитель.
+    - Значок стрелки к линии взят из `Main.dc.html` и добавлен по правилам `lib/src/design_system/icons/README.md` вместе с обновлённым эталоном таблицы иконок.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/scroll_top_button_test.dart test/design_system/doable_icon_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - добавляются `lib/src/design_system/components/scroll_top_button.dart`, `lib/src/design_system/icons/assets/to_top.svg`, `test/design_system/scroll_top_button_test.dart`;
+    - меняются `lib/src/design_system/doable_icon.dart`, `lib/src/design_system/icons/README.md`, `test/design_system/goldens/doable_icons.png`.
+  - **Размер:** S по логике: один компонент и один значок.
+
+- [x] 1.13 Длинная выдача возвращается к началу кнопкой на обоих каталогах
+  - **Критерии приёмки:**
+    - Кнопка появляется, когда выдача прокручена дальше высоты своей видимой области, и исчезает в её пределах, в том числе при смене дня.
+    - Нажатие плавно возвращает к заголовку дня, а при уменьшении движения — сразу. Выбранная дата и состояния секций не меняются.
+    - Кнопка стоит в слоте `floatingActionButton` страницы со своей `FloatingActionButtonLocation` на месте из README на обоих каталогах. Показанное сообщение стоит над ней и её не перекрывает.
+    - `DailyChoiceCatalogBody` принимает каркас функцией от тела и кнопки, а `OrdinaryPageScaffold` — параметр `floatingActionButton`. Вложенного `Scaffold` нет.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart test/daily_choice/presentation/catalog/daily_choice_date_catalog_page_test.dart test/app/navigation/ordinary_page_scaffold_test.dart`.
+  - **Зависимости:** 1.12.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `daily_choice_catalog_page.dart`, `daily_choice_date_catalog_page.dart`, `lib/src/app/navigation/ordinary_page_scaffold.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`;
+    - меняются `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`, `daily_choice_date_catalog_page_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы только из-за двух страниц и двух файлов локализации.
+
+- [x] 1.14 Проверить готовность фазы: экран дня по дизайну на обоих каталогах
+  - **Критерии приёмки:**
+    - Сценарии секций, групп, карточки, пустого дня и подгрузки подтверждены на обоих каталогах.
+    - Прежние гарантии календаря и позиции прокрутки сохранились: их тесты проходят без ослабления ожиданий.
+    - Прежний способ показа выдачи удалён: в `lib/` и `test/` нет `_Banner`, `_SliverStatus`, `daily-choice-load-more`, `dailyChoiceCatalogLoadMore`, `dailyChoiceCatalogTotalCount`, `dailyChoiceCompletionSaving`, `dailyChoiceCompletionSynchronizing` и `RelationRowPriority`.
+  - **Проверка:**
+    - `mise run codegen-check`.
+    - `mise run check`.
+    - `mise exec --no-deps -- openspec validate redesign-daily-choices --strict`.
+    - `mise exec --no-deps -- flutter build apk --debug`: сборка для ручных проверок на устройстве, которые остаются за владельцем продукта.
+  - **Зависимости:** 1.1–1.13.
+  - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
+
+- [x] 1.15 Устаревшая выдача показывает отказ на месте подвала секции вместо вечного кольца
+  - **Критерии приёмки:**
+    - Пока есть `refreshFailure`, подвал секции с продолжением показывает не `ListState.more`, а `ListState.error` с текстом `_failureMessage`, как `Notice` в начале выдачи. `Notice` остаётся.
+    - Действие `model.retryRefresh` в подвале есть только при `DailyChoiceCatalogUnavailableFailure`, иначе действия нет.
+    - При актуальной выдаче и на время обновления подвал показывает кольцо. Вызов `_requestPage` из построения подвала сохранён, поэтому подвал на виду запрашивает порцию, когда выдача снова актуальна. Модель, чтение и схема не меняются.
+    - Тест закрепляет, что в устаревшей выдаче в подвале нет кольца и его объявления, показан отказ, а повтор есть только при доказанно временном отказе.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog`.
+  - **Зависимости:** 1.10.
+  - **Предполагаемые файлы:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`.
+  - **Размер:** S.
+
+- [x] 1.16 Строка обновления занимает постоянное место в строке дня и не ложится на её текст
+  - **Критерии приёмки:**
+    - `DayHeading` получает необязательный слот в конце строки дня и остаётся представлением без предметных типов по ADR-0030. Наложение `Stack` и `PositionedDirectional` в `daily_choice_catalog_body.dart` удалено.
+    - Каталог всегда передаёт в слот `ListState.refreshing`, поэтому ширина занята постоянно, а высота заголовка и позиции строк выдачи не зависят от обновления. Слот получает конечную ширину: внутри `ListState.refreshing` стоит `Flexible`, и при неограниченной ширине раскладка падает.
+    - Вне обновления содержимое слота невидимо, не объявляется диктором, не попадает в семантику и не запрашивает кадры. `Visibility` с `maintainSize` требует `maintainAnimation`, поэтому кольцо останавливается отдельно: иначе экран дня перерисовывался бы постоянно, а `pumpAndSettle` в тестах не завершался бы.
+    - При обновлении живая область и объявление статуса сохраняются.
+    - При масштабе шрифта 1 вид заголовка по README `DayHeading` не меняется.
+    - Принятое следствие: при крупном шрифте день недели и отметка «Сегодня» раньше переносятся на вторую строку, и это видно постоянно.
+    - Тест при ширине 360 и масштабе 2 подтверждает, что строка обновления не пересекает текст заголовка, а высота заголовка и позиции строк выдачи одинаковы при её появлении и исчезновении.
+    - Проверки отсутствия строки в группе «обновление выдачи» выражают то же намерение при постоянном слоте: вне обновления строка скрыта и её нет в семантике.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/day_heading_test.dart test/daily_choice/presentation test/app test/graph/presentation`.
+  - **Зависимости:** 1.9.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/day_heading.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`.
+  - **Размер:** S.
+
+- [x] 1.17 Проверка перезапуска подтверждает на экране строку выбора именно этого дня
+  - **Критерии приёмки:**
+    - В `test/app/daily_choice_app_lifecycle_test.dart` проверки порядкового ключа `daily-choice-row-1` в сценарии перезапуска (строки 765–768 и 788–791) заменены проверкой ключа `daily-choice-completion-<id>` с каноническим идентификатором сохранённого выбора этого дня, например через `durabilityUuid`: для нового сегодня (`_nextTodayChoice`), прошлого (`_pastChoice`) и будущего дня (`_futureChoice`).
+    - Тест падает, если после перезапуска экран показывает строку другого дня: ключ связан с выбором, а не с порядковым номером строки.
+    - Дата в карточку не возвращается: спецификация запрещает показывать её там.
+    - Остальные ожидания теста не ослаблены. Производственный код, спецификация и design не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/daily_choice_app_lifecycle_test.dart`.
+  - **Зависимости:** 1.6.
+  - **Предполагаемые файлы:** `test/app/daily_choice_app_lifecycle_test.dart`.
+  - **Размер:** XS.
+
+- [x] 1.18 В тестах компонентов нет тестов без отдельной регрессии
+  - **Критерии приёмки:**
+    - Из `test/design_system/scroll_top_button_test.dart` удалён тест «название потребителя заменяет прежнее»: попадание обязательного `label` в семантику уже утверждает тест «кнопка не показывает текста, а название и команда нажатия принадлежат одному узлу диктора».
+    - Параметр `label` вспомогательной `_app` удалён, потому что его передавал только этот тест. `ScrollTopButton` получает константу `_label`, и она сохраняется для остальных тестов.
+    - Из `test/design_system/choice_check_test.dart` удалён тест «выбор без выполнения не рисует галочку»: тест кольца p1–p4 уже требует в центре кольца цвет тона без значка.
+    - Остальные тесты этих файлов не меняются. Импорты, которые после удаления перестали использоваться, убраны.
+    - Производственный код, спецификация и design не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/scroll_top_button_test.dart test/design_system/choice_check_test.dart`.
+    - `mise run check`: это последняя задача фазы.
+  - **Зависимости:** 1.4, 1.12, 1.15–1.17: полная проверка завершает фазу.
+  - **Предполагаемые файлы:** `test/design_system/scroll_top_button_test.dart`, `test/design_system/choice_check_test.dart`.
+  - **Размер:** XS.
+
+- [x] 1.19 При крупном шрифте строка обновления сужается до кольца, и день недели не разрывается внутри слова
+  - **Критерии приёмки:**
+    - При масштабе текста больше 1,5 `ListState.refreshing` показывает только кольцо 14 без видимого слова, поэтому постоянное место строки обновления в слоте `DayHeading` сужается до кольца. При масштабе 1,5 и ниже вид прежний: кольцо и текст caption.
+    - Порог 1,5 взят из замера: при 1,5 день недели в окне 360 не разрывается на русском и английском, а при 1,75 уже разрывается.
+    - Масштаб — отношение размера caption после `MediaQuery.textScalerOf(context)` к исходному размеру: `TextScaler` может быть нелинейным, а слот занимает именно текст caption.
+    - Живая область и объявление «Обновляем…» диктором сохраняются при любом масштабе: без видимого слова `text` остаётся названием живой области, как у `ListState.more`.
+    - Гарантии задачи 1.16 сохраняются: слот постоянный, вне обновления его содержимое скрыто и кольцо остановлено, высота заголовка и позиции строк выдачи не зависят от обновления.
+    - `DayHeading` остаётся представлением без предметных типов по ADR-0030: вид по масштабу выбирает сам `ListState`.
+    - Тест каталога при ширине 360 и масштабе 2 подтверждает, что символы дня недели занимают одну строку абзаца для «Понедельник», «Воскресенье» и английского «Wednesday». Высота заголовка для этого не подходит: отметка «Сегодня» может стоять на второй строке по принятому следствию задачи 1.16.
+    - Тест задачи 1.16 при масштабе 200% выражает то же намерение без видимого слова: объявление проверяется не через `find.text`, а остальные его ожидания не ослаблены.
+    - Тест `ListState` подтверждает, что при масштабе 1,75 нет видимого текста, а название в живой области есть, и что при масштабе 1,5 текст виден.
+    - Спецификация и design не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/list_state_test.dart test/design_system/day_heading_test.dart test/daily_choice/presentation/catalog`.
+  - **Зависимости:** 1.9, 1.16.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/list_state.dart`, при необходимости комментария `lib/src/design_system/components/day_heading.dart`, `test/design_system/list_state_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_page_test.dart`.
+  - **Размер:** S.
+
+- [x] 1.20 Решение о повторе отказа обновления принимается в одном месте
+  - **Критерии приёмки:**
+    - `DailyChoiceCatalogLoaded` получает свойство `canRetryRefresh`, истинное при `refreshFailure is DailyChoiceCatalogUnavailableFailure`, по образцу `canRetry` у отказов первой загрузки и порции.
+    - `Notice` в начале выдачи и подвал секции в `daily_choice_catalog_body.dart` и `retryRefresh` в `daily_choice_catalog_view_model.dart` читают `canRetryRefresh`. Прямых проверок типа отказа обновления для решения о повторе в них не остаётся.
+    - Проверка `freshness == stale` в `retryRefresh` сохраняется.
+    - Это рефакторинг без смены поведения: тексты отказов, модель выдачи, чтение и схема не меняются.
+    - Новые тесты не добавляются: существующие тесты каталога уже закрепляют, когда повтор предлагается, и проходят без изменения ожиданий.
+    - Спецификация и design не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/catalog`.
+    - `mise run check`: это последняя задача фазы.
+  - **Зависимости:** 1.9, 1.15, 1.19: полная проверка завершает фазу.
+  - **Предполагаемые файлы:** `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart`.
+  - **Размер:** XS.
+
+## Phase 2: Дневной выбор создаётся один раз и не меняет путь
+
+- [x] 2.1 Успешное создание дневного выбора закрывает поток и возвращает на исходную страницу
+  - **Критерии приёмки:**
+    - `completeDailyChoiceCreation` снимает подтверждение и корень потока и не открывает подробный просмотр. Цикл снятия общий с `leaveDailyChoiceCreation` и отличается только проверкой состояния сессии. Перед каждым снятием по-прежнему проверяются полная история и отсутствие верхнего безымянного маршрута.
+    - `DailyChoiceCreationFlowSaved`, `DailyChoiceCreationSucceeded` и `DailyChoiceCreationCreated` не несут идентификатор выбора, а `claimOpening` заменён одной попыткой завершения без него. Повторный вызов завершения не меняет ни исходную историю, ни новую сессию.
+    - После успеха над глубокой историей открыта исходная страница, пути и подтверждения в истории нет, а страницы до начала создания не изменились, в том числе страница-задача с черновиком ниже. Сообщение «Дневной выбор создан» предъявлено один раз.
+    - Если человек покинул подтверждение до результата, поздний успех не меняет текущую страницу. Тесты выхода и возврата проходят без ослабления ожиданий.
+    - Тесты, которые ждали подробный просмотр после создания, ждут исходную страницу. Комментарий `DailyChoiceCreationLauncher` о замене маршрута пути снят.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/app/creation_flows_integration_test.dart test/app/daily_choice_app_flow_test.dart test/app/daily_choice_app_lifecycle_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/daily_choice_creation_completion.dart`, `daily_choice_creation_flow_session.dart`, `daily_choice_creation_launcher.dart`, `editor/daily_choice_creation_page.dart`, `editor/daily_choice_creation_state.dart`, `editor/daily_choice_creation_view_model.dart`;
+    - меняются `test/daily_choice/presentation/daily_choice_creation_completion_test.dart`, `daily_choice_creation_flow_session_test.dart`, `daily_choice_creation_flow_test.dart`, `daily_choice_creation_launcher_test.dart`, `editor/daily_choice_creation_page_test.dart`, `editor/daily_choice_creation_view_model_test.dart`;
+    - меняются `test/app/creation_flows_test_support.dart`, `creation_flows_integration_test.dart`, `daily_choice_app_flow_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы, потому что тесты ждут удаляемый переход.
+
+- [x] 2.2 Результат создания виден на исходной странице со всех входов
+  - **Критерии приёмки:**
+    - Один параметризованный тест на настоящем хранилище проходит четыре входа: «От намерения» и «От действия» кнопки быстрого создания и «Добавить» на вкладке «Выборы» в обоих направлениях. После создания открыта исходная страница, а сообщение называет «Дневной выбор создан».
+    - Возврат на вкладку «Выборы» показывает эту вкладку с новым выбором.
+    - Каталог на 2026-10-07 после быстрого создания выбора на 2026-10-09 показывает прежнюю дату и её выдачу.
+    - Производственный код меняется, только если тест нашёл расхождение со спецификацией.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/daily_choice_app_flow_test.dart`.
+  - **Зависимости:** 2.1.
+  - **Предполагаемые файлы:** `test/app/daily_choice_app_flow_test.dart`.
+  - **Размер:** S.
+
+- [x] 2.3 Подробный просмотр теряет вход в замену пути, а её поток удалён
+  - **Критерии приёмки:**
+    - Кнопки `daily-choice-replace-open` нет. Изменение и удаление на странице подробного просмотра работают как прежде.
+    - Удалены `daily_choice_path_replacement_flow.dart`, `daily_choice_path_replace_page.dart`, `daily_choice_path_replace_state.dart`, `daily_choice_path_replace_view_model.dart` и их тесты.
+    - Удалены `ChoicePathPage.forReplacement`, `ChoicePathPurpose.replace` и их ветви заголовка и кнопки. Пересчёт пути перед созданием работает как прежде.
+    - Все строки `dailyChoiceReplace*` удалены из обоих файлов локализации.
+    - Значение ключа `relationDeleteReferencedByDailyPath` называет только удаление использующих связь дневных выборов. В `lib/l10n/app_ru.arb`: «Связь используется в сохранённом дневном пути. Сначала удалите использующие её дневные выборы.», в `lib/l10n/app_en.arb`: «This relation is used by a saved daily path. Delete the daily choices that use it first.». Имя ключа и условие показа не меняются. Отдельный тест на текст не добавляется: вернуть эту формулировку нечему.
+    - Сценарий безымянного подтверждения замены удалён, а панель над безымянной страницей по-прежнему проверяет сценарий пересчёта пути. Вспомогательные функции без вызывающих удалены.
+    - Строка матрицы «поиск основания» в `app_shell_page_matrix.dart` сохраняется, по-прежнему проверяет `DailyChoiceSourcePickerPage` без панели и открывает страницу входом создания «От намерения»: `openDailyChoiceQuickCreation` с `ChoicePathDraftDirection.topDown` по образцу записи `_MatrixEntry.action`. Записи `replaceChoice` и `replaceTopDown` и их поисковые ветви удалены. Удалить строку вместо перевода на вход создания нельзя.
+    - Из хвоста теста в `daily_choice_creation_flow_test.dart` удалены шаги замены, начиная с нажатия `daily-choice-replace-open` и кончая ожиданиями замены. Файл к этому моменту уже изменён задачей 2.1, поэтому границы определяются по шагам, а не по номерам строк. Проверки сохранённого выбора из этого хвоста остаются для самого выбора: дата, расписание, приоритет, описание и выполнение, а путь ожидается из связей 101 и 102 вместо 103 и 104. Переменная `replaced` переименована по смыслу.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/app/navigation`.
+    - `mise run codegen-check`.
+    - `grep -nE 'замените|or replace' lib/l10n/app_ru.arb lib/l10n/app_en.arb` ничего не находит.
+  - **Зависимости:** 2.1: она меняет тот же тест создания.
+  - **Предполагаемые файлы:**
+    - удаляются четыре файла потока в `lib/src/daily_choice/presentation/editor/` и `test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart`, `editor/daily_choice_path_replace_page_test.dart`, `editor/daily_choice_path_replace_view_model_test.dart`;
+    - меняются `lib/src/daily_choice/presentation/details/daily_choice_details_page.dart`, `path/choice_path_page.dart`, `daily_choice_creation_flow_session.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`;
+    - меняются `test/app/navigation/app_shell_unnamed_page_scenarios.dart`, `app_shell_page_matrix.dart`, `app_shell_pages_above_test.dart`;
+    - меняется `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`.
+  - **Размер:** M по логике: удаление без нового поведения.
+
+- [x] 2.4 Поиски дневного выбора знают только потоки создания
+  - **Критерии приёмки:**
+    - Закрытый `DailyChoicePickerContext` и оба его варианта удалены. Страницы и маршруты обоих поисков принимают `DailyChoicePickerLaunch launch`, а файл назван по этому типу: `daily_choice_picker_launch.dart`.
+    - `dailyChoicePickerPurpose` принимает только `DailyChoicePickerStart`. Подзаголовок, строка листа и шаги зависят только от начала, а третий шаг всегда «Дата, время, приоритет и описание».
+    - Закрытие обоих поисков подписано «Отменить создание». Строки `dailyChoicePicker*Replacement*`, `actionPickerCancel` и `sourcePickerCancel` удалены из обоих файлов локализации.
+    - Общий контракт поиска в тестах проверяет создание в обоих направлениях, а `app_router_test.dart` открывает поиск с активным запуском. Файл контракта назван по типу запуска.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation test/app/routing`.
+    - `mise run codegen-check`.
+  - **Зависимости:** 2.3.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/daily_choice_picker_context.dart`, `daily_choice_picker_purpose.dart`, `daily_choice_creation_launcher.dart`, `source_picker/daily_choice_source_picker_page.dart`, `action_picker/daily_choice_action_picker_page.dart`, `lib/src/app/routing/app_router.gr.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`;
+    - меняются `test/daily_choice/presentation/daily_choice_picker_context_test_support.dart`, `source_picker/daily_choice_source_picker_page_test.dart`, `action_picker/daily_choice_action_picker_page_test.dart`, `daily_choice_creation_launcher_test.dart`, `test/app/routing/app_router_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы из-за двух страниц поиска и их тестов.
+
+- [x] 2.5 Тесты слоя данных не зависят от команды замены пути
+  - **Критерии приёмки:**
+    - Шаг замены убран там, где проверял саму замену: в `drift_daily_choice_read_cost_test.dart`, `drift_graph_fact_log_completeness_test.dart`, `drift_graph_fact_log_write_test.dart`, `drift_statistics_relation_snapshot_test.dart`, в конце теста «меняет зависимости наблюдаемого пути вместе со снимком» и вместе с тестом «замена обоих участников переключает наблюдение на новый путь». Данные, нужные только этому шагу, убраны.
+    - Состояние, которое замена только готовила, получено удалением и созданием в тестах «согласует счётчики прежнего и нового действия при замене пути», «замена и удаление дубликата снимают только последние ссылки» и «замена пути убирает прежние опорные намерения на новой ревизии». Названия говорят о новых шагах, а ожидания не ослаблены, кроме совпадения ревизий, которого у двух команд быть не может.
+    - Цикл в `file_backed_daily_choice_durability_test.dart` теряет шаг замены и проверяет, что изменение полей и повторное открытие сохраняют путь созданного выбора.
+    - Новые названия получают и три теста, которые после удаления шага обещают больше, чем проверяют. Названия говорят о проверяемом: «команды дневных выборов: создание, изменение полей, замена пути и удаление вместе с шагами» в `drift_graph_fact_log_completeness_test.dart`, «повторное открытие сохраняет создание, замену пути и независимые правки» в `file_backed_daily_choice_durability_test.dart` и «меняет зависимости наблюдаемого пути вместе со снимком» в `drift_daily_choice_watch_test.dart`.
+    - `test/graph/data/graph_fact_capture_test.dart` не меняется: тест на строке 377 записывает смену пути прямым SQL и проверяет чтение прежних данных, от команды замены он не зависит.
+    - Производственный код не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data`.
+    - `grep -nE 'замена пути и|замену пути и независимые|меняет зависимости наблюдаемого' test/graph/data/drift_graph_fact_log_completeness_test.dart test/graph/data/file_backed_daily_choice_durability_test.dart test/graph/data/drift_daily_choice_watch_test.dart` ничего не находит.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** в `test/graph/data/` меняются `drift_daily_choice_read_cost_test.dart`, `drift_daily_choice_watch_test.dart`, `drift_daily_path_protection_test.dart`, `drift_graph_fact_log_completeness_test.dart`, `drift_graph_fact_log_write_test.dart`, `drift_statistics_relation_snapshot_test.dart`, `drift_statistics_seed_groups_test.dart`, `file_backed_daily_choice_durability_test.dart`.
+  - **Размер:** M по логике: в каждом файле правка в одном месте.
+
+- [x] 2.6 Тесты согласования и приложения не зависят от команды замены пути
+  - **Критерии приёмки:**
+    - Тест «повтор и замена согласуют открытые представления одной ревизией» теряет шаг замены, а шаг удаления проверяется от состояния после повтора. Название говорит о повторе и удалении.
+    - В `home_statistics_app_flow_test.dart` выбор с путём к намерению 4 получен удалением прежнего выбора и созданием нового. Ожидания показа и числа чтений не меняются.
+    - В `daily_choice_catalog_details_integration_test.dart` шаг замены заменён вторым изменением полей, связь 103 убрана, а ожидания числа намерений пути отражают неизменный путь. Проверки пересборки обеих секций не ослаблены.
+    - Производственный код не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/presentation/graph_reconciliation_checkpoint_test.dart test/app/home_statistics_app_flow_test.dart test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, `test/app/home_statistics_app_flow_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart`.
+  - **Размер:** S.
+
+- [x] 2.7 Команда замены пути удалена из всех слоёв
+  - **Критерии приёмки:**
+    - Удалены `ReplaceDailyChoicePath`, `DailyChoicePathReplaced`, `acceptDailyChoiceReplace`, `DailyChoiceCommandKind.replace`, `_replaceDailyChoicePath`, ветви презентера и строка `dailyChoicePathReplaced`. Создание, изменение полей, удаление и их сообщения работают как прежде, а подтверждённый путь по-прежнему проверяется при создании.
+    - Ветвь пересечения `released` и `occupied` в `DailyChoiceChange` удалена: обе дельты были непусты только у замены.
+    - Поля `previousParticipants` и `currentParticipants` удалены из `DailyChoiceChange`: в `lib/` их читает только сама фабрика, потребителя нет. Проверка `missingCounts` остаётся и использует локальные значения участников `before` и `after`.
+    - Удалены `drift_daily_choice_replace_test.dart`, тест замены в `daily_choice_change_test.dart`, сценарий и вспомогательные ветви замены в `graph_operation_presenter_test.dart`, проверка и `_replace` в `graph_command_coordinator_daily_choice_test.dart`, ветви `switch` в `home_statistics_app_flow_test.dart` и `intention_statistics_app_flow_test.dart`. Из `daily_choice_change_test.dart` убраны и ожидания полей `previousParticipants` и `currentParticipants`.
+    - Комментарии во всём `lib/src` не упоминают замену пути и участников дневного выбора, а комментарий `SelectDailyChoiceSource` описывает выбор основания для создания. Замена участников долговременной связи, замена графа и «замена значения» остаются: это живое поведение.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/application test/graph test/app/home_statistics_app_flow_test.dart test/app/intention_statistics_app_flow_test.dart`.
+    - `mise run codegen-check`.
+    - `grep -rnE 'замен[а-я]* пути|заменяет обоих' lib/src` ничего не находит.
+  - **Зависимости:** 2.3, 2.5, 2.6.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/application/daily_choice_command.dart`, `daily_choice_result.dart`, `lib/src/daily_choice/presentation/daily_choice_creation_flow_session.dart`, `source_picker/daily_choice_source_picker_page.dart`, `lib/src/graph/application/graph_command_coordinator.dart`, `graph_change.dart`, `lib/src/graph/data/drift_personal_graph_repository_daily_choice_commands.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/src/intention/presentation/catalog/intention_catalog_purpose.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`;
+    - удаляется `test/graph/data/drift_daily_choice_replace_test.dart`;
+    - меняются `test/daily_choice/application/daily_choice_change_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/graph/application/graph_command_coordinator_daily_choice_test.dart`, `test/app/home_statistics_app_flow_test.dart`, `intention_statistics_app_flow_test.dart`.
+  - **Размер:** M по логике: удаление без нового поведения.
+
+- [x] 2.8 Диагностика дневного выбора знает только оставшиеся команды
+  - **Критерии приёмки:**
+    - `DailyChoiceCommandDiagnosticsType.replacePath` и `DailyChoicePathCommandDiagnosticsType` удалены. `DailyChoicePathValidationDiagnosticsEvent` относится только к созданию и не имеет `commandType`, а `developer_diagnostics_sink.dart` пишет его без этого поля.
+    - Тесты диагностики создания проходят без изменения ожиданий к кодам отказа.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_daily_choice_create_test.dart test/graph/data/drift_daily_choice_diagnostics_test.dart test/shared/diagnostics`.
+  - **Зависимости:** 2.7.
+  - **Предполагаемые файлы:** `lib/src/shared/diagnostics/diagnostics_sink.dart`, `developer_diagnostics_sink.dart`, `lib/src/graph/data/drift_personal_graph_repository_daily_choice_commands.dart`.
+  - **Размер:** S.
+
+- [x] 2.9 Глоссарий говорит, что другой путь создаётся новым выбором
+  - **Критерии приёмки:**
+    - Определения «Готовность к действию», «Связь „я сегодня“» и «Путь выбора» в `CONTEXT.md` не упоминают замену участников и пути, а сохранённый путь не назван текущим.
+    - «Связь „я сегодня“» говорит, что участники и путь не меняются после создания, а другой путь означает новый выбор: человек удаляет выбор и создаёт новый. Это поведение приложения, а не инвариант хранилища.
+    - Остальные понятия, включая «Замену графа», не меняются.
+  - **Проверка:**
+    - `grep -nE "замене её участников|Замена исходного намерения|текущий сохранённый путь" CONTEXT.md` ничего не находит.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `CONTEXT.md`.
+  - **Размер:** XS.
+
+- [x] 2.10 Проверить готовность фазы: создание возвращает на исходную страницу, а замены пути нет
+  - **Критерии приёмки:**
+    - Создание со всех входов возвращает на исходную страницу, в том числе над глубокой историей и при уходе до результата.
+    - В коде и спецификациях не осталось вызывающих удалённого потока: в `lib/` и `test/` нет `ReplaceDailyChoicePath`, `DailyChoicePathReplaced`, `acceptDailyChoiceReplace`, `DailyChoiceCommandKind.replace`, `forReplacement`, `DailyChoicePickerContext`, `DailyChoicePathCommandDiagnosticsType`, `replacePath`, `dailyChoiceReplace`, `daily-choice-replace` и `claimOpening`. В дельтах спецификаций замена пути остаётся только удалённым поведением.
+    - Данные, ранее изменённые заменой, читаются как прежде: хранилище, формат данных, журнал фактов и чтение дневных выборов не менялись от базовой точки фазы.
+  - **Проверка:**
+    - `git diff --quiet 5777debb24916bda3f92ed888089f9612a7e73d5 HEAD -- lib/src/data lib/src/graph_format lib/src/graph_snapshots lib/src/graph/data/drift_personal_graph_repository_daily_choice_reads.dart lib/src/graph/data/drift_personal_graph_repository_daily_choice_catalog.dart`.
+    - `mise run codegen-check`.
+    - `mise run check`.
+    - `mise exec --no-deps -- openspec validate redesign-daily-choices --strict`.
+    - `mise exec --no-deps -- flutter build apk --debug`: сборка для ручных проверок на устройстве, которые остаются за владельцем продукта.
+  - **Зависимости:** 2.1–2.9.
+  - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
+
+- [x] 2.11 Повторное завершение создания останавливает проверка истории, а не отдельная защита
+  - **Критерии приёмки:**
+    - Поле `_completionAttempted` и метод `claimCompletion` с его комментарием удалены из `DailyChoiceCreationFlowSession`. Эта задача заменяет критерий задачи 2.1 об одной попытке завершения.
+    - Условие `completeDailyChoiceCreation` больше не вызывает `claimCompletion`, а комментарий функции не говорит об одной попытке.
+    - Из теста «успех фиксируется до навигации и не сбрасывается поздним возвратом» удалены только две строки с `claimCompletion`.
+    - Проверки состояния `DailyChoiceCreationFlowSaved`, полной истории, принадлежности подтверждения сессии и верхнего безымянного маршрута не меняются, включая проверки перед каждым снятием в `_removeFlowRoutes`.
+    - Тесты «повторное завершение … не меняет исходную историю и новую сессию» проходят без изменений.
+    - Поведение продукта и спецификация не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/daily_choice_creation_completion_test.dart test/daily_choice/presentation/daily_choice_creation_flow_session_test.dart`.
+    - `mise exec --no-deps -- openspec validate redesign-daily-choices --strict`.
+    - `grep -rnE 'claimCompletion|_completionAttempted' lib test` ничего не находит.
+  - **Зависимости:** 2.1.
+  - **Предполагаемые файлы:** `lib/src/daily_choice/presentation/daily_choice_creation_flow_session.dart`, `lib/src/daily_choice/presentation/daily_choice_creation_completion.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_session_test.dart`.
+  - **Размер:** XS.
+
+- [x] 2.12 Тест согласования не хранит данные удалённого шага замены
+  - **Критерии приёмки:**
+    - Из теста «повтор и удаление согласуют открытые представления одной ревизией» удалены вставка связи 105 вместе с лишним вызовом `seedGraph`, подписка и ожидание на этой связи и все проверки `relation(105).permissions.canDelete`.
+    - Вкладки выборов остаются только у намерений 1 и 3: намерения 4 и 5 убраны из `pages`, подписок, `selectRole`, ожидания `IntentionChoicesEmpty` и диагностики, а проверки их пустых вкладок удалены до и после повтора.
+    - Отдельной контрольной проверки незатронутого участника взамен нет: посторонние изменения уже проверяют нулевые счётчики намерения 2 и цикл сравнения намерений 1–5, а разрешение удалять неиспользуемую связь проверяет `test/graph/data/drift_relation_watch_test.dart`.
+    - Подписки и загрузка подробностей намерений 1–5, проверки связей 101 и 102, счётчики намерения 2, цикл сравнения намерений 1–5 и все ожидания к затронутым представлениям и ревизиям сохранены и не ослаблены.
+    - Производственный код, спецификация и design не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/presentation/graph_reconciliation_checkpoint_test.dart`.
+    - `mise exec --no-deps -- openspec validate redesign-daily-choices --strict`.
+    - `grep -nE '\b105\b|choicesProvider\([45]\)|\[1, 3, 4, 5\]|\[3, 4\]|\[4, 5\]' test/graph/presentation/graph_reconciliation_checkpoint_test.dart` ничего не находит.
+  - **Зависимости:** 2.6.
+  - **Предполагаемые файлы:** `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`.
+  - **Размер:** XS.
+
+## Phase 3: Выбор открывается в нижней панели
+
+- [x] 3.1 В ветке этого изменения есть готовая фаза 2 `add-relations-in-batches`
+  - **Критерии приёмки:**
+    - Коммит `5b2253f4`, завершающий фазу 2 того изменения, входит в историю ветки. Вершина `change/add-relations-in-batches` не вливается: её фаза 3 не завершена. Если коммит уже в истории, задача только выполняет проверки. Если влить его на этом этапе нельзя, задача останавливается и называет причину: остальные задачи фазы без него не начинаются.
+    - Конфликты решены в пользу этого изменения там, где оно удалило поведение: четыре файла тестов замены пути остаются удалёнными, а `ReplaceDailyChoicePath`, `DailyChoicePathReplaced`, `DailyChoiceCommandKind.replace` и `RelationRowPriority` не возвращаются. Создание, изменение и удаление связи по фазе 2 того изменения работают как в его ветке.
+    - Перечисление приоритета одно: `PriorityPicker` и `RelationHead` берут `DoablePriority` и его цвет из `lib/src/design_system/doable_priority.dart`, а объявление в `priority_picker.dart` и повторные сопоставления цвета удалены.
+    - Индекс `docs/adr/README.md` содержит записи обеих веток, строки обеих веток сохранены в ARB, а созданные файлы получены `mise run codegen`, а не правкой вручную.
+  - **Проверка:**
+    - `git merge-base --is-ancestor 5b2253f4 HEAD`.
+    - `mise run codegen-check`.
+    - `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- flutter test test/app test/daily_choice test/design_system test/graph test/intention test/long_term_relation`: слияние меняет все эти модули.
+    - `mise exec --no-deps -- openspec validate redesign-daily-choices --strict`.
+    - `git grep -nE 'ReplaceDailyChoicePath|DailyChoicePathReplaced|RelationRowPriority|enum DoablePriority' -- lib test` находит только объявление в `doable_priority.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - конфликтуют `docs/adr/README.md`, `lib/l10n/app_ru.arb`, `lib/src/app/routing/app_router.gr.dart`, `lib/src/graph/application/graph_command_coordinator.dart` с созданным `.g.dart`;
+    - конфликтуют `test/app/creation_flows_integration_test.dart`, `test/app/creation_flows_test_support.dart`, `test/app/routing/app_router_test.dart`, `test/daily_choice/application/daily_choice_change_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart`, `test/graph/data/drift_daily_path_protection_test.dart`, `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`;
+    - остаются удалёнными `test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart`, `test/daily_choice/presentation/editor/daily_choice_path_replace_page_test.dart`, `test/daily_choice/presentation/editor/daily_choice_path_replace_view_model_test.dart`, `test/graph/data/drift_daily_choice_replace_test.dart`;
+    - меняются `lib/src/design_system/components/priority_picker.dart`, `relation_head.dart`.
+  - **Размер:** M по логике: файлов больше нормы, но нового поведения нет.
+
+- [x] 3.2 Страница над панелью, открытой над корневым каталогом, возвращает панель и уходит вместе с ней при сбросе истории
+  - **Критерии приёмки:**
+    - Сценарий идёт на настоящем `AppRouter` в `test/app/navigation/app_shell_sheet_stack_test.dart`: лист `showDoableSheet` над корневым каталогом дневных выборов открывает через `context.router.push` страницу намерения, и она встаёт над листом. Тот файл уже проверяет лист над страницей намерения, поэтому новый сценарий добавляет только случай, когда под листом остаётся корневая страница.
+    - «Назад» возвращает тот же лист с его состоянием, а следующее «назад» показывает каталог.
+    - Выбор пункта панели навигации на странице над листом убирает из истории и страницу, и лист: последующее «назад» не показывает ни одного из них.
+    - `lib/` не меняется. Если лист не удерживается или остаётся после сброса, работа над фазой останавливается: решение D11 пересматривает человек.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/navigation/app_shell_sheet_stack_test.dart`.
+  - **Зависимости:** 3.1.
+  - **Предполагаемые файлы:** `test/app/navigation/app_shell_sheet_stack_test.dart`.
+  - **Размер:** S.
+
+- [x] 3.3 `Sheet` получает раскрываемый вариант без заголовка и нижней кнопки
+  - **Критерии приёмки:**
+    - `Sheet.expandableUntitled` принимает `label`, `slivers`, `expandLabel` и `collapseLabel`. `_ExpandableParts` получает закрытый вариант шапки, поэтому бессмысленные сочетания вроде заголовка без пояснения непредставимы, а параметры `Sheet.expandable` не меняются.
+    - Компактная высота равна всему пределу, как `SheetCompactHeight.limit`. Параметра высоты у варианта нет: другого потребителя нет.
+    - Над списком стоит только ручка-кнопка, тело начинается в 6 под её линией по README `Sheet`, а нижней части нет. Область нажатия ручки стоит над первым срезом тела и принимает касания.
+    - `label` называет лист диктору, как у `Sheet.untitled`. `hostsMessages` не укорачивает лист.
+    - Перетаскивание и передача жеста телу остаются общим кодом раскрываемого листа, поэтому новые тесты проверяют только отличия варианта и раскрытие нажатием на ручку. Тесты `Sheet`, `Sheet.expandable` и `Sheet.untitled` проходят без правок.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/sheet_test.dart`.
+  - **Зависимости:** 3.1.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/sheet.dart`, `test/design_system/sheet_test.dart`.
+  - **Размер:** M.
+
+- [x] 3.4 Срез модуля основ держит шапку закреплённой только до половины видимой высоты
+  - **Критерии приёмки:**
+    - `HalfPinnedSliver` на каждой раскладке сравнивает высоту ребёнка с половиной `SliverConstraints.viewportMainAxisExtent`: не выше порога срез закреплён, выше прокручивается как обычный.
+    - Смена видимой высоты через порог не меняет дерево виджетов, поэтому состояние ребёнка сохраняется.
+    - Закреплённый срез сообщает свою высоту в `maxScrollObstructionExtent`, а прокручиваемый — ноль.
+    - Тело прокручивается под закреплённым срезом и не получает нажатия по нему. Непрозрачный фон задаёт потребитель.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/half_pinned_sliver_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** добавляются `lib/src/design_system/components/half_pinned_sliver.dart`, `test/design_system/half_pinned_sliver_test.dart`.
+  - **Размер:** S.
+
+- [x] 3.5 Компонент `ChoiceHead` показывает шапку выбора
+  - **Критерии приёмки:**
+    - Раскладка следует README `ChoiceHead`: флажок `ChoiceCheck` в области шириной `tapMin` на всю высоту шапки, исходное намерение, слот цепочки, выбранное действие и три точки. Названия и отметки архива переносятся, текст не обрезается.
+    - У выполненного выбора оба названия зачёркнуты, а действие стоит цветом `muted`.
+    - Без `onToggle` флажок недоступен.
+    - Кнопку параметров задаёт закрытый тип с тремя состояниями: кнопки нет, кнопка доступна с обработчиком, кнопка временно недоступна. Временно недоступная кнопка остаётся на месте, поэтому раскладка не сдвигается. У `null` нет двух смыслов, а бессмысленные сочетания вроде названия при отсутствующей кнопке непредставимы. Точные имена типа выбирает исполнитель.
+    - Состояние «кнопки нет» нужно требованию «Изменение описания в нижней панели», им воспользуется фаза 4.
+    - Это отступление от параметра `onOptions` из README `ChoiceHead`: один необязательный обработчик не различает отсутствие кнопки и её временную недоступность. Папка `context/` не меняется.
+    - Тест `test/design_system/choice_head_test.dart` подтверждает отсутствие кнопки и временную недоступность.
+    - Тексты, отметки, цепочку, доступные названия и ключи обеих кнопок задаёт потребитель. Предметных типов у компонента нет.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/choice_head_test.dart`.
+  - **Зависимости:** 3.1: компонент стоит рядом с общим `DoablePriority`.
+  - **Предполагаемые файлы:** добавляются `lib/src/design_system/components/choice_head.dart`, `test/design_system/choice_head_test.dart`.
+  - **Размер:** S.
+
+- [x] 3.6 Компонент `DetailRow` показывает одно поле выбора
+  - **Критерии приёмки:**
+    - Строка следует README `DetailRow`: подпись слева, справа пилюля со значком и значением либо виджет потребителя со сдвигом за край для `PriorityPicker`.
+    - Строка не ниже `tapMin` и растёт вместе с текстом, поэтому крупный шрифт его не обрезает.
+    - Без `onPress` пилюля недоступна, а значение остаётся читаемым и доступным диктору.
+    - Тексты и `valueLabel` задаёт потребитель. Предметных типов у компонента нет.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/detail_row_test.dart test/design_system/button_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** добавляются `lib/src/design_system/components/detail_row.dart`, `test/design_system/detail_row_test.dart`; меняются `lib/src/design_system/components/button.dart`, `test/design_system/button_test.dart`, если у кнопки нет варианта sm со значком.
+  - **Размер:** S.
+
+- [x] 3.7 Компонент `ChoicePath` показывает сохранённый путь
+  - **Критерии приёмки:**
+    - Шаги и связи стоят по README `ChoicePath`: ромб исходного намерения, кольца промежуточных, круг выбранного действия, а между шагами — связь со своей линией, словом и плиткой цвета приоритета самой связи. `PathGlyphShape` получает форму круга.
+    - Длинное название переносится, глиф остаётся на первой строке, а линия под ним тянется. Путь не сокращается.
+    - Архивированные шаги и связи выглядят по README и несут отметку из слота, а под путём с архивом стоит строка потребителя.
+    - Шаг и связь — отдельные кнопки с областью не меньше `tapMin`. Обработчики, ключи, слова и доступные названия задаёт потребитель, предметных типов у компонента нет.
+    - Рейка строится на `PathGlyph` и `RelationStroke` без `PathRail`: его отступ рассчитан на поле формы, а задача 3.18 `add-relations-in-batches` его удаляет. Строка `ChoicePath` таблицы D6 в `design.md` исправлена.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/choice_path_test.dart test/design_system/path_glyph_test.dart`.
+    - `mise exec --no-deps -- openspec validate redesign-daily-choices --strict`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** добавляются `lib/src/design_system/components/choice_path.dart`, `test/design_system/choice_path_test.dart`; меняются `lib/src/design_system/components/path_glyph.dart`, `test/design_system/path_glyph_test.dart`, `openspec/changes/redesign-daily-choices/design.md`.
+  - **Размер:** M.
+
+- [x] 3.8 Модель панели записывает изменение полей и удаление одной операцией
+  - **Критерии приёмки:**
+    - `DailyChoiceDetailsViewModel` получает координатор и операции `change(DailyChoiceFieldsPatch)` и `delete()`. Обе делят один токен, а вторая команда во время первой не отправляется.
+    - Состояние операции — закрытый тип: простой, запись, отказ с правом предъявления. Новое значение приходит только из подписки, а при отказе остаётся последний подтверждённый снимок.
+    - Отказ следует ADR-0012: модель берёт право через `claimInitiatorFailure`, следующая принятая операция снимает прежний отказ, а `dispose` до результата освобождает право, и отказ предъявляет общая поверхность один раз.
+    - `DailyChoiceCommandAlreadyRunning` становится отказом конфликта, а `GraphCommandCoordinatorDraining` — непредвиденным отказом, как на странице сейчас.
+    - `delete()` возвращает `true` только после подтверждённого удаления этого выбора.
+    - Страница подробного просмотра передаёт координатор в модель и работает как прежде.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart test/graph/presentation/graph_reconciliation_checkpoint_test.dart test/graph/presentation/tag_package_catalog_consumers_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/details/daily_choice_details_view_model.dart`, `daily_choice_details_state.dart`, `daily_choice_details_page.dart`;
+    - меняются `test/daily_choice/presentation/details/daily_choice_details_view_model_test.dart`, `test/graph/presentation/package_consumers_test_support.dart`;
+    - меняются вызовы конструктора в `test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart` (до слияния из 3.1 строки 149 и 566) и `test/graph/presentation/graph_reconciliation_checkpoint_test.dart` (до слияния строка 357): оба передают в `DailyChoiceDetailsViewModel` координатор из уже имеющегося `ProviderContainer`.
+  - **Размер:** M по логике: файлов больше нормы только из-за вызовов конструктора в тестах.
+
+- [x] 3.9 `showDailyChoiceSheet` показывает выбор в панели с шапкой, вкладками и «Обзором»
+  - **Критерии приёмки:**
+    - Функция показывает `Sheet.expandableUntitled` через `showDoableSheet` с `hostsMessages: true`. Панель владеет моделью. Доступное название и подписи ручки — постоянные строки, не зависящие от данных выбора.
+    - Первый срез тела — `HalfPinnedSliver` с непрозрачным фоном, а в нём `ChoiceHead` и `Tabs`. Цепочка получает `details.path.length` шагов, как на карточке, а архивированные исходное намерение и действие несут отметку архива.
+    - Панель открывается на «Обзоре». Вкладка «Путь» называет число шагов и несёт значок архива, если в пути что-то архивировано.
+    - «Обзор» показывает описание целиком, с его переносами строк, и строки даты, времени и приоритета. Значения только показываются: у `DetailRow` нет `onPress`, у `PriorityPicker` нет `onChange`, а подсказки «Добавить описание» пока нет.
+    - Дата читается «Сегодня», «Завтра» или «Вчера», иначе числом и коротким месяцем, а год стоит, только если он не текущий. Время показано в системном формате или как «Весь день», а сохранённые минуты показаны как есть.
+    - Вместо шапки и вкладок при загрузке стоит `ListState.loading`, а при `DailyChoiceDetailsNotFound`, `DailyChoiceDetailsUnavailable`, `DailyChoiceDetailsCorruption` и `DailyChoiceDetailsUnexpected` — `ListState.error` со своим текстом. Меню нет, лист сам не закрывается, а повтор предлагается только при `DailyChoiceDetailsUnavailable`. Пустой путь показан как повреждение, как на странице.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details/daily_choice_sheet_test.dart`.
+    - `mise run codegen-check`.
+  - **Зависимости:** 3.3–3.6, 3.8.
+  - **Предполагаемые файлы:**
+    - добавляются `lib/src/daily_choice/presentation/details/daily_choice_sheet.dart`, `daily_choice_field_labels.dart`, `test/daily_choice/presentation/details/daily_choice_sheet_test.dart`;
+    - меняются `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации.
+  - **Размер:** M.
+
+- [x] 3.10 Вкладка «Путь» показывает сохранённый путь и ведёт к его участникам
+  - **Критерии приёмки:**
+    - Вкладка показывает `ChoicePath` с исходным намерением, каждой связью и промежуточным намерением в сохранённом порядке и с выбранным действием. Последняя связь сохраняет тип «нужно» или «можно», а текущей готовности действия на вкладке нет.
+    - Названия и архивные состояния берутся из текущего снимка, а под путём с архивом стоит строка об этом.
+    - Нажатие на намерение открывает его страницу поверх панели, а нажатие на связь — `showRelationDetailsSheet`. Ключи `daily-choice-intention-*` и `daily-choice-relation-*` сохранены, а доступные названия называют роль шага, вид связи и архив.
+    - Тест на настоящем `AppRouter` подтверждает сценарий «Возврат со страницы намерения показывает панель»: после возврата открыта вкладка «Путь».
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details/daily_choice_sheet_test.dart`.
+    - `mise run codegen-check`.
+  - **Зависимости:** 3.2, 3.7, 3.9.
+  - **Предполагаемые файлы:** `lib/src/daily_choice/presentation/details/daily_choice_sheet.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, `test/daily_choice/presentation/details/daily_choice_sheet_test.dart`.
+  - **Размер:** M.
+
+- [x] 3.11 Флажок в шапке меняет выполнение, а отказ остаётся в панели
+  - **Критерии приёмки:**
+    - Нажатие на флажок отправляет `change` с противоположным выполнением. Пока запись идёт, флажок недоступен, а кнопка параметров находится в состоянии «временно недоступна» из задачи 3.5, поэтому раскладка шапки не меняется. Меню появляется в задаче 3.12, и до неё кнопка остаётся в этом состоянии и вне записи.
+    - Новое состояние показано после подтверждения записи. Успех пока объявляется сообщением над панелью, как у флажка карточки: молчаливую политику вводит фаза 4.
+    - Отказ показан в `Notice` с `OperationFailurePresentation` над содержимым обеих вкладок, а панель показывает последнее подтверждённое состояние и снова допускает нажатие.
+    - Новый отказ виден без ручной прокрутки, в том числе когда тело прокручено.
+    - Панель, перекрытая страницей, сохраняет право на отказ и показывает его в `Notice` при возврате, как панель связи и по ADR-0012: человек на странице сверху не узнаёт об отказе до возврата. Общая поверхность предъявляет отказ один раз только после закрытия панели или сброса истории.
+    - Механизм уже есть, и модель о маршруте не знает: `PresentationFrameEvidence` не подтверждает предъявление на маршруте, который не является верхним, а `OperationFailurePresentation.dispose` отдаёт право.
+    - Тест подтверждает подключение панели к этому механизму: отказ при перекрытой панели не показан общей поверхностью и виден в панели после возврата, а при закрытии или сбросе истории предъявлен общей поверхностью один раз.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details/daily_choice_sheet_test.dart`.
+  - **Зависимости:** 3.9, 3.10: тест перекрывает панель страницей шага пути.
+  - **Предполагаемые файлы:** `lib/src/daily_choice/presentation/details/daily_choice_sheet.dart`, `test/daily_choice/presentation/details/daily_choice_sheet_test.dart`.
+  - **Размер:** S.
+
+- [x] 3.12 Меню панели открывает прежнюю форму и удаляет выбор с подтверждением
+  - **Критерии приёмки:**
+    - Кнопка параметров открывает `OptionsMenu` «Дневной выбор» с входом в прежнюю форму и последним пунктом «Удалить дневной выбор» в тоне `danger`. Действие начинается после закрытия меню и только если панель осталась верхним маршрутом.
+    - Первый пункт открывает `DailyChoiceEditRoute` поверх панели, а после сохранения панель показывает новые значения.
+    - Удаление подтверждается `ConfirmDialog` дизайн-системы, который называет выбор, его дату и необратимость. Отмена ничего не меняет.
+    - Подтверждённое удаление закрывает панель, а сообщение «Дневной выбор удалён» предъявляется один раз. Отказ остаётся в панели по задаче 3.11.
+    - Прежние строки диалога удалены из обоих файлов локализации.
+    - Сценарии находят новый диалог по видимому содержимому: заголовку и подписи действия из локализации, а не по ключу и не по `AlertDialog`. Ключ в `showConfirmDialog` не добавляется, контракт `ConfirmDialog` не меняется.
+    - Сценарий удаления на странице проходит до задачи 3.16.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details`.
+    - `mise exec --no-deps -- flutter test test/app/daily_choice_app_flow_test.dart test/app/navigation/app_shell_layout_test.dart`: `ordinary_page_layout_scenarios.dart` входит во второй файл как `part` и отдельно не запускается.
+    - `mise run codegen-check`.
+  - **Зависимости:** 3.11.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/details/daily_choice_sheet.dart`, `daily_choice_delete_confirmation.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются `test/daily_choice/presentation/details/daily_choice_sheet_test.dart`, `daily_choice_details_page_test.dart`, `test/app/daily_choice_app_flow_test.dart`, `test/app/navigation/ordinary_page_layout_scenarios.dart`: страница использует тот же диалог до задачи 3.16.
+  - **Размер:** M.
+
+- [x] 3.13 Весь текст панели достижим при крайних размерах
+  - **Критерии приёмки:**
+    - При названиях по 255 графем, крупном системном шрифте и на низком экране тест прокруткой доходит до всего текста шапки, вкладок, описания и полей в компактном и полном размере, и ни один текст не обрезан.
+    - Сценарий «Высокая шапка прокручивается вместе с телом» подтверждён: палец вверх по шапке раскрывает панель, затем шапка и вкладки прокручиваются вместе с телом, а ручка стоит на месте.
+    - Шапка не выше порога остаётся закреплённой при прокрутке тела, а раскрытие панели через порог не меняет выбранную вкладку.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details/daily_choice_sheet_layout_test.dart`.
+  - **Зависимости:** 3.10, 3.12.
+  - **Предполагаемые файлы:** добавляется `test/daily_choice/presentation/details/daily_choice_sheet_layout_test.dart`; `lib/src/daily_choice/presentation/details/daily_choice_sheet.dart` меняется, только если тест нашёл расхождение со спецификацией.
+  - **Размер:** S.
+
+- [x] 3.14 Сценарии приложения работают с подробным просмотром через общие шаги
+  - **Критерии приёмки:**
+    - `test/support/daily_choice_details_controls.dart` называет намерения человека: подробный просмотр открыт, какой выбор открыт, открыть форму изменения, начать удаление, открыть шаг или связь пути, закрыть подробный просмотр.
+    - Все сценарии, доходящие до просмотра нажатием на карточку или строку, идут через эти шаги и не ищут `daily-choice-edit-open` и `daily-choice-delete-open` сами.
+    - Сценарии проходят без изменения ожиданий.
+    - `ordinary_page_layout_scenarios.dart` и `tag_assignment_app_flow_test.dart` открывают страницу маршрутом и на общие шаги не переводятся: после 3.15 шаги работают с панелью, а эти обращения убирает задача 3.16.
+    - `daily_choice_details_page_test.dart` не переводится: он проверяет саму страницу и удаляется в задаче 3.16.
+    - Производственный код не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app test/daily_choice/presentation/catalog test/daily_choice/presentation/daily_choice_creation_flow_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - добавляется `test/support/daily_choice_details_controls.dart`;
+    - меняются `test/app/daily_choice_app_flow_test.dart`, `daily_choice_app_lifecycle_test.dart`, `intention_statistics_catalog_scenarios.dart`, `long_term_relation_app_flow_test.dart`;
+    - меняются `test/app/navigation/app_shell_layout_test.dart`, `app_shell_page_matrix.dart`, `app_shell_state_test.dart`;
+    - меняются `test/daily_choice/presentation/catalog/daily_choice_catalog_card_flow_test.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы только из-за перевода тестов на общие шаги.
+
+- [x] 3.15 Карточка каталога и строка вкладки «Выборы» открывают панель
+  - **Критерии приёмки:**
+    - `daily_choice_catalog_body.dart` и `intention_details_page.dart` вызывают `showDailyChoiceSheet`, поэтому оба каталога и вкладка «Выборы» открывают одну панель.
+    - Сценарии «Нажатие на карточку открывает панель» и «Страница намерения открывает ту же панель» подтверждены на настоящем приложении: панель навигации и страница под панелью недоступны, а закрытие возвращает страницу с прежним состоянием.
+    - Сценарий на настоящем приложении: панель → «Путь» → страница исходного намерения → «Выборы» → та же панель → удаление → назад. Вторая панель закрыта, а первая открыта и показывает, что выбор не найден, без шапки, вкладок и меню, и закрывает её пользователь.
+    - Всё, что доходит до просмотра нажатием на карточку или строку, работает с панелью: меняются шаги `test/support/daily_choice_details_controls.dart` и сценарии из перечня этой задачи. Прямые обращения к странице и маршруту остаются задаче 3.16.
+    - Матрица оболочки не считает подробный просмотр обычной страницей, а вход в форму изменения проходит из панели в два нажатия: кнопка параметров и пункт меню.
+    - Ожидания не ослаблены: проверка, читавшая текст страницы, подтверждает то же значение в том виде, в каком его показывает панель. Это относится к типу связи в `long_term_relation_app_flow_test.dart`, выбранному действию в `intention_statistics_catalog_scenarios.dart` и дате в `daily_choice_app_lifecycle_test.dart`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app test/daily_choice/presentation test/intention/presentation/details`.
+  - **Зависимости:** 3.10, 3.12, 3.14.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/src/intention/presentation/details/intention_details_page.dart`;
+    - меняются `test/support/daily_choice_details_controls.dart`, `test/intention/presentation/details/intention_details_choices_test.dart`;
+    - меняются `test/app/daily_choice_app_flow_test.dart`, `daily_choice_app_lifecycle_test.dart`, `intention_statistics_catalog_scenarios.dart`, `long_term_relation_app_flow_test.dart`;
+    - меняются `test/app/navigation/app_shell_layout_test.dart`, `app_shell_page_matrix.dart`, `app_shell_state_test.dart`;
+    - меняются `test/daily_choice/presentation/catalog/daily_choice_catalog_accessibility_test.dart`, `daily_choice_catalog_card_flow_test.dart`, `daily_choice_catalog_page_test.dart`, `daily_choice_date_catalog_page_test.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`.
+  - **Размер:** M по логике: 16 файлов, из них в `lib/` меняются только два вызова. Смена входа и перевод сценариев проходят проверку только вместе.
+
+- [x] 3.16 Страница подробного просмотра удалена вместе с маршрутом
+  - **Критерии приёмки:**
+    - Удалены `daily_choice_details_page.dart`, `DailyChoiceDetailsRoute` и `daily_choice_details_page_test.dart`. Каждый сценарий удалённого теста, кроме двух сценариев формы из следующего пункта, уже подтверждён панелью либо описывал показ страницы, которого больше нет.
+    - Сценарии формы «редактор открывается из подробностей и меняет только выбранные поля» и «отмена и неверный ввод не отправляют правку» удаляются и не переносятся в `daily_choice_edit_page_test.dart`. Их покрывают `test/daily_choice/presentation/editor/daily_choice_edit_state_test.dart` (только выбранные поля и пробельное описание), `test/daily_choice/domain/daily_choice_description_test.dart` (граница 4097 графем) и тест задачи 3.12 (вход в форму из панели и сохранение). Показ ошибки даты и кнопка «Отмена» этой формы остаются без теста, пока форма не удалена в фазе 4: её код в фазе 3 не меняется. Владелец продукта принял этот пробел осознанно.
+    - Проверки раскладки и доступности не считают подробный просмотр обычной страницей. Сценарии, открывавшие страницу маршрутом, доходят до просмотра общими шагами, а ожидания, не связанные с показом самой страницы, не ослаблены. `DailyChoiceEditRoute` сохранён до фазы 4.
+    - Строки, которые читала только страница, удалены из обоих файлов локализации, а созданные файлы получены `mise run codegen`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app test/daily_choice/presentation test/intention/presentation/details`.
+    - `mise run codegen-check`.
+    - `git grep -nE 'DailyChoiceDetailsPage|DailyChoiceDetailsRoute|daily_choice_details_page|daily-choice-edit-open|daily-choice-delete-open' -- lib test` ничего не находит.
+  - **Зависимости:** 3.15.
+  - **Предполагаемые файлы:**
+    - удаляются `lib/src/daily_choice/presentation/details/daily_choice_details_page.dart`, `test/daily_choice/presentation/details/daily_choice_details_page_test.dart`;
+    - меняются `lib/src/app/routing/app_router.dart`, `app_router.gr.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются `test/app/navigation/app_navigation_accessibility_test.dart`, `app_shell_pages_above_test.dart`, `ordinary_page_layout_scenarios.dart`, `test/app/creation_flows_test_support.dart`, `test/app/tag_assignment_app_flow_test.dart`;
+    - убирается импорт страницы из `test/app/intention_statistics_app_flow_test.dart` и `test/app/navigation/app_shell_layout_test.dart`: он нужен их частям `intention_statistics_catalog_scenarios.dart` до 3.15 и `ordinary_page_layout_scenarios.dart` до этой задачи.
+  - **Размер:** M по логике: удаление без нового поведения.
+
+- [x] 3.17 Проверить готовность фазы: выбор открывается в панели, а страницы подробного просмотра нет
+  - **Критерии приёмки:**
+    - Переход на страницу поверх панели и сброс истории работают либо приняты изменением решения в `design.md`.
+    - При названиях максимальной длины, крупном системном шрифте и на низком экране весь текст шапки, вкладки, описание и поля достижимы в компактном и полном размере без обрезки: шапка закреплена до порога, а выше него прокручивается вместе с телом.
+    - Выбор, удалённый из второй панели, оставляет первую открытой: при возврате на неё вместо шапки и вкладок показано, что выбор не найден, меню параметров нет, а закрывает её пользователь.
+    - У страницы подробного просмотра не осталось вызывающих, а её маршрута нет. Форма по-прежнему доступна из панели.
+  - **Проверка:**
+    - `mise run codegen-check`.
+    - `mise run check`.
+    - `mise exec --no-deps -- openspec validate redesign-daily-choices --strict`.
+    - `mise exec --no-deps -- flutter build apk --debug`: сборка для ручных проверок на устройстве, которые остаются за владельцем продукта.
+  - **Зависимости:** 3.1–3.16.
+  - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
+
+- [x] 3.18 Собственное удаление закрывает панель выбора с прежним содержимым
+  - **Критерии приёмки:**
+    - После собственного подтверждённого удаления закрывающаяся панель до конца анимации показывает прежнее содержимое: шапку, вкладки и текущую вкладку. «Дневной выбор больше не существует.» не показано и не объявлено ни в одном кадре закрытия.
+    - Флажок и кнопка параметров выключены от начала записи удаления до закрытия панели, поэтому меню нельзя открыть ни во время записи, ни при закрытии.
+    - Модель отличает собственное удаление от чужого при любом порядке прихода снимка без выбора и завершения команды. Снимок, пришедший во время записи удаления, не показывает «не найден» до исхода команды, а снимок после подтверждения не меняет содержимое закрывающейся панели.
+    - Выбор, удалённый извне, по-прежнему показывает «не найден», а лист сам не закрывается.
+    - Панель, перекрытая страницей в момент завершения собственного удаления, сама не закрывается и при возврате показывает «не найден», как в `design.md`, D4. Модель о маршруте не знает, как в задаче 3.11.
+    - При отказе удаления панель остаётся открытой с отказом. Если выбор тем временем исчез, она показывает «не найден».
+    - Сообщение «Дневной выбор удалён» предъявляется один раз.
+    - Состояния выражены закрытыми типами с исчерпывающей обработкой, а не флагом рядом с прежними состояниями.
+    - Спецификация не меняется.
+    - Тест панели выдаёт снимок удаления и в обоих порядках покадрово проходит закрытие без `pumpAndSettle`: панель ещё в дереве в проверенных кадрах, прежнее содержимое на месте, «не найден» нет. Тесты подтверждают случай перекрытой панели и отказ, при котором выбор исчез. Чужое удаление уже подтверждают `daily_choice_sheet_test.dart` и `test/app/daily_choice_app_flow_test.dart`, новых тестов на него не нужно.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart test/graph/presentation/graph_reconciliation_checkpoint_test.dart test/graph/presentation/tag_package_catalog_consumers_test.dart test/app/daily_choice_app_flow_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/details/daily_choice_details_view_model.dart`, `daily_choice_details_state.dart`, `daily_choice_sheet.dart`;
+    - меняется `test/daily_choice/presentation/details/daily_choice_sheet_test.dart`, при необходимости `daily_choice_details_view_model_test.dart`;
+    - меняется исчерпывающий разбор состояния в `test/graph/presentation/package_consumers_test_support.dart`, если появляется новый вариант.
+  - **Размер:** M.
+
+- [x] 3.19 Панель связи проверена на ложное «не найден» при собственном удалении и при подтверждении дефекта исправлена
+  - **Критерии приёмки:**
+    - Сначала тест воспроизводит дефект: после собственного подтверждённого удаления связи он покадрово проходит закрытие панели без `pumpAndSettle` и проверяет, что «Эта связь больше не существует.» нет ни в одном кадре, пока панель в дереве. Тест проверяет все порядки прихода снимка без связи, подтверждённого изменения из потока завершений и завершения команды. Подозрение на дефект исходит из кода: `relation_details_sheet.dart:322` показывает «не найден» и для `RelationDetailsNotFound`, и для `RelationDetailsDeleted`, а `RelationDetailsDeleted` общий для своего и чужого удаления.
+    - Если тест падает, дефект подтверждён и устраняется с поведением задачи 3.18: закрывающаяся панель показывает прежнее содержимое с выключенными элементами и не показывает и не объявляет «не найден». Чужое удаление показывает «не найден», панель, перекрытая в момент завершения, сама не закрывается и при возврате показывает «не найден», при отказе панель остаётся открытой с отказом, а если связь тем временем исчезла, показывает «не найден». Сообщение «Связь удалена» предъявляется один раз, а состояния выражены закрытыми типами. Тест остаётся в наборе.
+    - Если тест проходит во всех порядках, дефект не подтверждён: код и тесты не меняются, тест в набор не входит, а результат с причиной записан в этой задаче.
+    - Спецификация не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/details test/graph/presentation/graph_reconciliation_checkpoint_test.dart test/graph/presentation/tag_package_catalog_consumers_test.dart test/app/long_term_relation_app_flow_test.dart`.
+    - `mise run codegen-check`, если меняется код модели.
+  - **Зависимости:** 3.18: поведение повторяет дневной выбор.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/presentation/details/relation_details_sheet.dart`, `relation_details_view_model.dart`, `relation_details_state.dart`, если дефект подтверждён;
+    - меняются `test/long_term_relation/presentation/details/relation_details_sheet_test.dart`, `relation_details_view_model_test.dart`, а при смене состояний `test/graph/presentation/graph_reconciliation_checkpoint_test.dart`, `package_consumers_test_support.dart`;
+    - меняется `openspec/changes/redesign-daily-choices/tasks.md`, если дефект не подтверждён.
+  - **Размер:** M.
+
+- [x] 3.20 Переключатель вида связи целиком виден и нажимается при крупном системном шрифте
+  - **Критерии приёмки:**
+    - В `_KindSwitch` компонента `RelationHead` пилюли собраны в `Wrap` вместо `Row`, как в `PriorityPicker`: при нехватке ширины вторая пилюля переносится на новую строку. При системном масштабе до 2 на экране шириной 360 с полями 20 и меню, как в панели связи, «Нужно» и «Можно» видны целиком и нажимаются; области нажатия не меньше `DoableMetrics.tapMin` в обоих измерениях, не перекрываются и не обрезаны, переполнения нет. Высота строки вида внутри `IntrinsicHeight` растёт вместе с переносом, а кнопка меню остаётся видимой и доступной для нажатия.
+    - При обычном масштабе пилюли стоят в одну строку с прежним промежутком `DoableMetrics.space1`. Слова не сокращаются, шрифт не уменьшается и не масштабируется, значки вида сохранены. Семантика переключателя и поведение выбора не меняются; компонент остаётся представлением без предметных типов по ADR-0030. Спецификации и `design.md` не меняются.
+    - В `test/design_system/relation_head_test.dart` проверка использует настоящий Inter через существующий `FontLoader`, а не тестовый шрифт: русские подписи, ширина экрана 360, масштаб 2, поля 20 с каждой стороны и меню воспроизводят панель связи. Она подтверждает перенос, полную видимость подписей и значков, минимальные неперекрывающиеся области нажатия обеих пилюль, рост высоты строки, отсутствие переполнения и срабатывание обеих пилюль и меню. При масштабе 1 подтверждены одна строка и прежний промежуток; существующие проверки семантики и поведения выбора сохранены.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/relation_head_test.dart test/long_term_relation/presentation/details`.
+  - **Зависимости:** 3.1: общий компонент `RelationHead` уже в ветке; задача выполняется после 3.19 по порядку файла.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/relation_head.dart`, `test/design_system/relation_head_test.dart`.
+  - **Размер:** S.
+
+- [x] 3.21 Неиспользуемая строка `dailyChoiceDeleteAction` удалена из локализации
+  - **Критерии приёмки:**
+    - Ключ `dailyChoiceDeleteAction` удалён из `lib/l10n/app_ru.arb` и `lib/l10n/app_en.arb`, в английском файле вместе с описанием `@dailyChoiceDeleteAction`. Его единственным потребителем была страница подробного просмотра, удалённая в задаче 3.16.
+    - `app_localizations.dart`, `app_localizations_ru.dart` и `app_localizations_en.dart` получены только `mise run codegen`, без ручных правок.
+    - У каждой оставшейся строки удаления дневного выбора есть действующий потребитель. Действующие `dailyChoiceSheetOptionDelete` и `dailyChoiceDeleteDialogAction` не затронуты.
+    - Поведение и видимый текст не меняются, новые тесты не нужны. Отдельный поиск других неиспользуемых строк в эту задачу не входит.
+  - **Проверка:**
+    - `mise run codegen-check`.
+    - `git grep dailyChoiceDeleteAction -- lib test` ничего не находит.
+  - **Зависимости:** 3.16; задача выполняется после 3.20 по порядку файла.
+  - **Предполагаемые файлы:** `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`, созданные `lib/l10n/app_localizations.dart`, `app_localizations_ru.dart`, `app_localizations_en.dart`.
+  - **Размер:** XS.
+
+- [x] 3.22 Меню панели выбора не проверяет недостижимое состояние записи
+  - **Критерии приёмки:**
+    - Перед удалением проверки подтверждено, что после задачи 3.18 меню панели по-прежнему нельзя открыть ни во время записи, ни при закрытии панели после собственного удаления: кнопка параметров выключена на всё это время, а других вызывающих `_showOptions` нет.
+    - В `_showOptions` удалена проверка `if (_model.operation is DailyChoiceDetailsOperationWriting) return;`. Запрет действий на время записи остаётся у владельцев: кнопка параметров выключена на время записи, а модель защищает операцию через `_canStartOperation`.
+    - Проверки `mounted`, верхнего маршрута и загруженного выбора с непустым путём сохранены.
+    - Поведение пользователя не меняется, новые тесты не нужны: на удалённую ветку теста нет, существующие тесты меню и удаления проходят. Спецификации и `design.md` не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details`.
+  - **Зависимости:** 3.18: выключение кнопки параметров до закрытия панели; задача выполняется после 3.21 по порядку файла.
+  - **Предполагаемые файлы:** `lib/src/daily_choice/presentation/details/daily_choice_sheet.dart`.
+  - **Размер:** XS.
+
+- [x] 3.23 Прежнее содержимое после собственного удаления связи показывает только панель, начавшая удаление
+  - **Критерии приёмки:**
+    - Общая модель `RelationDetailsViewModel` с ключом `relationId` сохраняется; отдельная модель на каждую панель не вводится. Право показать прежнее содержимое при закрытии после собственного удаления получает только экземпляр панели, начавший удаление: например, панель передаёт в `delete()` свой непрозрачный идентификатор, и он хранится в `RelationDetailsOwnDeletionConfirmed`. Сейчас этим правом пользуется любая панель той же связи, потому что флажок `_deletedWhileCovered` ставит только инициатор (`relation_details_sheet.dart:240`, `:310`, `:340`).
+    - Любая другая открытая панель той же связи после подтверждённого удаления показывает «Эта связь больше не существует.» при любом порядке прихода снимка без связи, пакета потока завершений и исхода команды. Она сама не закрывается, а кнопка параметров недоступна.
+    - Поведение задачи 3.19 для панели-инициатора не меняется: она закрывается, и «не найден» нет ни в одном кадре закрытия; панель, перекрытая страницей в момент завершения, сама не закрывается и при возврате показывает «не найден»; при отказе панель остаётся открытой с отказом, а если связь тем временем исчезла, показывает «не найден»; сообщение «Связь удалена» предъявляется один раз.
+    - Состояния выражены закрытыми типами с исчерпывающим разбором, без флага рядом с прежними состояниями.
+    - Спецификации и `design.md` не меняются.
+    - Новый тест в `relation_details_sheet_test.dart` открывает две панели одной связи: вторая открыта поверх страницы участника, на которую ведёт первая. Тест удаляет связь из верхней панели и в обоих порядках прихода событий проверяет, что верхняя закрывается с прежним содержимым, а нижняя после возврата показывает «Эта связь больше не существует.». Существующие тесты задачи 3.19 остаются в наборе и проходят.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/details test/graph/presentation/graph_reconciliation_checkpoint_test.dart test/graph/presentation/tag_package_catalog_consumers_test.dart test/app/long_term_relation_app_flow_test.dart`.
+    - `mise run codegen-check`.
+  - **Зависимости:** 3.19: исправляется её поведение для второй панели той же связи; задача выполняется после 3.22 по порядку файла.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/presentation/details/relation_details_view_model.dart` и созданный `relation_details_view_model.g.dart`, `relation_details_state.dart`, `relation_details_sheet.dart`;
+    - меняется `test/long_term_relation/presentation/details/relation_details_sheet_test.dart`, а при смене вариантов состояния `test/graph/presentation/package_consumers_test_support.dart`.
+  - **Размер:** M.
+
+## Phase 4: Выбор меняется на месте одними полями
+
+- [x] 4.1 В ветке этого изменения есть `main` с архивированными `add-relations-in-batches` и `open-full-intention-pages-from-pickers`
+  - **Критерии приёмки:**
+    - Коммит `52f6cf70` из `main` — слияние PR #83 `change/open-full-intention-pages-from-pickers` вместе с его архивацией — входит в историю ветки. Он содержит и слияние `change/add-relations-in-batches` `19a1625d` с архивацией `3fab3364`. Вливается именно `52f6cf70`, а не более поздняя вершина `main`: перечень конфликтов ниже посчитан для него. Если коммит уже в истории, задача только выполняет проверки.
+    - Конфликты решены в пользу этого изменения там, где оно удалило поведение: `daily_choice_path_replace_page.dart` и `daily_choice_path_replacement_flow_test.dart` остаются удалёнными, а `ReplaceDailyChoicePath`, `DailyChoicePathReplaced` и `DailyChoiceCommandKind.replace` не возвращаются. Поведение фаз 3 и 4 `add-relations-in-batches` и `open-full-intention-pages-from-pickers` работает как в `main`: в том числе панель навигации видна на страницах над поиском участника связи.
+    - Изменения обеих сторон одного файла сохраняются, если не противоречат друг другу: например, `Badge.archivedInline` этой ветки остаётся вместе с удалением `Badge.word` в `main`. `OrdinaryPageScaffold` сливается без конфликта и сохраняет `floatingActionButton` этой ветки без `pickerFooter`, который убрал `main`.
+    - В `docs/adr/README.md` по порядку номеров стоят строка и пояснение ADR-0053 из `main` и строка и пояснение ADR-0054 этого изменения. Файл `docs/adr/0053-open-ordinary-pages-independently-of-picker-history.md` не меняется, а ADR этого изменения лежит в `docs/adr/0054-show-and-change-daily-choice-in-one-routeless-sheet.md`.
+    - Каталогов `openspec/changes/add-relations-in-batches/` и `openspec/changes/open-full-intention-pages-from-pickers/` нет: оба изменения лежат в архиве, а канонические спецификации содержат их итоговый текст. Строки обеих сторон сохранены в ARB, а созданные файлы получены `mise run codegen`, а не правкой вручную.
+  - **Проверка:**
+    - `git merge-base --is-ancestor 52f6cf70 HEAD`.
+    - `mise run codegen-check`.
+    - `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- flutter test test/app test/daily_choice test/data_transfer test/design_system test/graph test/graph_snapshots test/intention test/long_term_relation`: слияние меняет все эти модули.
+    - `git grep -nE 'ReplaceDailyChoicePath|DailyChoicePathReplaced|daily_choice_path_replace' -- lib test` ничего не находит.
+    - `git grep -n '0053-show-and-change' -- docs` ничего не находит.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - конфликтуют `lib/src/app/routing/app_router.gr.dart`, `lib/src/daily_choice/presentation/daily_choice_creation_flow_session.dart`, `lib/src/daily_choice/presentation/path/choice_path_page.dart`, `lib/src/design_system/components/badge.dart`, `lib/src/graph/application/graph_command_coordinator.g.dart`, `docs/adr/README.md`;
+    - конфликтуют `test/app/creation_flows_test_support.dart`, `test/app/navigation/app_shell_pages_above_test.dart`, `app_shell_unnamed_page_scenarios.dart`, `test/daily_choice/presentation/daily_choice_creation_completion_test.dart`, `daily_choice_creation_flow_test.dart`, `test/graph/data/drift_graph_fact_log_completeness_test.dart`, `drift_graph_fact_log_write_test.dart`;
+    - остаются удалёнными `lib/src/daily_choice/presentation/editor/daily_choice_path_replace_page.dart`, `test/daily_choice/presentation/daily_choice_path_replacement_flow_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы, но нового поведения нет.
+
+- [x] 4.2 Дельты изменения сверены с итоговым текстом требований `add-relations-in-batches` и `open-full-intention-pages-from-pickers`
+  - **Критерии приёмки:**
+    - Список пересечений из `design.md`, D12, пересчитан по каноническим спецификациям после задачи 4.1: сравнено каждое требование, которое это изменение помечает `MODIFIED` или `REMOVED` и которое меняло `add-relations-in-batches` или `open-full-intention-pages-from-pickers`.
+    - Каждое такое `MODIFIED` сохраняет всё, что внесли эти изменения, кроме частей, которые это изменение убирает намеренно: замены пути, открытия созданного дневного выбора и страницы подробного просмотра. «Панель на обычных страницах независимо от истории» отличается от канона только подробным просмотром дневного выбора, который открывается листом поверх страницы, и отсутствием изменения дневного выбора с выбором направления и заменой пути. Исключения для поиска участника связи и сценария «Страницы над поиском участника скрывают панель» в дельте нет. `REMOVED` убирают только требования, которые убирает это изменение. Копия «Атомарность и согласованность изменений дневного выбора» совпадает с итоговым текстом «Атомарность и согласованность операций дневного выбора», кроме частей о замене пути.
+    - Строгая проверка проходит без сообщений о ненайденных требованиях.
+    - Список D12 соответствует пересчитанному, а утверждения D12 и раздела рисков о том, что требований этих изменений нет в каноне ветки, заменены итогом сверки.
+    - Поведение, которое реализуют остальные задачи фазы, не меняется. Если сверка требует его изменить, задача останавливается и называет расхождение: решение принимает человек.
+  - **Проверка:**
+    - `mise exec --no-deps -- openspec validate redesign-daily-choices --strict`.
+    - Текст каждого требования из пересчитанного списка сравнён с `openspec/specs/<capability>/spec.md`.
+  - **Зависимости:** 4.1.
+  - **Предполагаемые файлы:** `openspec/changes/redesign-daily-choices/specs/app-navigation/spec.md`, `daily-choice-management/spec.md`, `long-term-relation-management/spec.md`, `quick-creation/spec.md`, `openspec/changes/redesign-daily-choices/design.md`.
+  - **Размер:** S.
+
+- [x] 4.3 Подтверждённое изменение дневного выбора не объявляется сообщением
+  - **Критерии приёмки:**
+    - `DailyChoiceCommandKind.update` получает политику «успех без сообщения» по ADR-0046, как изменение намерения и связи: подтверждённый успех не предъявляется ни инициатором, ни общей поверхностью, а отказ следует протоколу ADR-0012. Создание и удаление остаются на обычной политике.
+    - Политику задаёт вид операции, поэтому молчат флажок карточки каталога, флажок шапки панели и прежняя форма до её удаления. Сценарий «Успех флажка карточки не объявляется сообщением» подтверждён: счётчик свёрнутой секции выполненных растёт, а сообщения нет.
+    - Отказ изменения по-прежнему предъявляется один раз: панелью или карточкой, а после их ухода — общей поверхностью.
+    - Строка `dailyChoiceUpdated` удалена из обоих файлов локализации, а созданные файлы получены `mise run codegen`.
+    - Ожидания, которые ждали «Дневной выбор изменён.», проверяют отсутствие сообщения и подтверждённое значение; остальные ожидания не ослаблены.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/application/graph_command_coordinator_daily_choice_test.dart test/graph/presentation test/daily_choice/presentation test/app/daily_choice_app_flow_test.dart test/app/daily_choice_app_lifecycle_test.dart`.
+    - `mise run codegen-check`.
+  - **Зависимости:** 4.1: координатор и презентер менялись в обеих ветках.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются потребители завершения команды дневного выбора, если его тип разделится на объявляемый и молчаливый успех, как у намерения: `daily_choice_details_view_model.dart`, `daily_choice_catalog_view_model.dart`, `daily_choice_creation_flow_session.dart`, `daily_choice_creation_view_model.dart`, `daily_choice_edit_view_model.dart`;
+    - меняются `test/graph/application/graph_command_coordinator_daily_choice_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/daily_choice/presentation/details/daily_choice_sheet_test.dart`, тест карточки в `test/daily_choice/presentation/catalog/`, `test/app/daily_choice_app_lifecycle_test.dart`.
+  - **Размер:** M по логике: политика меняется в одном месте, остальные файлы — её потребители и ожидания.
+
+- [x] 4.4 Раскрываемый лист без заголовка принимает полосу изменения по дельте `bottom-sheets`
+  - **Критерии приёмки:**
+    - `Sheet.expandableUntitled` получает необязательную полосу `bar`, как `Sheet.untitled`. Это декларативный параметр: метода управления размером наружу нет.
+    - Появление полосы переводит лист в полный размер, а полоса стоит вместо ручки. Пока полоса на месте, лист не перетаскивается: жест на его поверхности, в том числе быстрый бросок вниз, не двигает лист, а жест на теле только прокручивает тело. Над открытой клавиатурой тело кончается над ней, и его конец достижим прокруткой.
+    - После снятия полосы лист остаётся в полном размере, а на её месте стоит ручка-кнопка, нажатие которой сворачивает лист. Дальше лист движется по общим правилам раскрываемого листа.
+    - Перетаскивание без полосы остаётся общим кодом, поэтому тесты `Sheet`, `Sheet.expandable`, `Sheet.untitled` и `Sheet.expandableUntitled` проходят без правок, а новые тесты проверяют только поведение с полосой.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/sheet_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/design_system/components/sheet.dart`, `test/design_system/sheet_test.dart`.
+  - **Размер:** M.
+
+- [x] 4.5 Компонент `DateGrid` показывает месяц для выбора одной даты
+  - **Критерии приёмки:**
+    - Сетка следует README `DateGrid` для одной даты: шапка с месяцем, годом и шевронами к соседним месяцам, подписи дней недели высотой 28 и шесть недель дней без боковых полей. Шапка — `CalendarHeader` без действия заголовка, дни — `MonthGridDay`, подписи — `MonthGridWeekday`.
+    - Сегодняшний и выбранный дни и дни соседних месяцев выглядят по README, а дни соседних месяцев нажимаются. Отметки дня стоят под числом, а на выбранном дне имеют цвет `on-accent`.
+    - Режимы многих дат и переноса выделения из README не реализуются: «Дублировать на даты» и множественное выделение в изменение не входят.
+    - Тексты, отметки, доступные названия и обработчики задаёт потребитель. Предметных типов у компонента нет.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/date_grid_test.dart test/design_system/calendar_header_test.dart test/design_system/month_grid_day_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** добавляются `lib/src/design_system/components/date_grid.dart`, `test/design_system/date_grid_test.dart`; меняются `calendar_header.dart` и `month_grid_day.dart` с их тестами, только если им не хватает вида из README.
+  - **Размер:** S.
+
+- [x] 4.6 Компонент `TimeDial` выбирает целый час или «Весь день»
+  - **Критерии приёмки:**
+    - Циферблат следует README `TimeDial`: при 24-часовом формате два кольца часов, при 12-часовом одно кольцо с 12 наверху и переключателем половины суток над ним, а в центре — «Весь день». Нажатие на час или «Весь день» сообщает выбор потребителю, а переключатель меняет только показанную половину суток. Начальную половину задаёт потребитель.
+    - Отмеченное значение задаёт закрытый тип: час, «Весь день» или ничего. «Ничего» нужно сохранённому времени с минутами: тогда не отмечены ни час, ни «Весь день». У `null` нет двух смыслов.
+    - Переключатель половины суток — `Tabs` с семантикой переключателя и минимальной шириной пилюль из README `Tabs`. Прежние вкладки не меняются.
+    - Каждый час и «Весь день» — кнопка с областью не меньше `tapMin`, доступным названием потребителя и отметкой выбранного. Тексты и подписи часов задаёт потребитель. Предметных типов у компонента нет.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/time_dial_test.dart test/design_system/tabs_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** добавляются `lib/src/design_system/components/time_dial.dart`, `test/design_system/time_dial_test.dart`; меняются `lib/src/design_system/components/tabs.dart`, `test/design_system/tabs_test.dart`.
+  - **Размер:** M.
+
+- [x] 4.7 Лист времени задаёт выбору целый час или «Весь день»
+  - **Критерии приёмки:**
+    - Функция показывает `Sheet.untitled` с `TimeDial` и возвращает `DailyChoiceSchedule`, а при закрытии без выбора — ничего. Доступное название листа называет время дневного выбора.
+    - Формат циферблата следует итоговому формату часов устройства и локали. Час даёт `DailyChoiceTime` с нулём минут, «Весь день» — `DailyChoiceAllDay`, и выбор закрывает лист. Запрет минут живёт только здесь, домен не сужается.
+    - Отмечен текущий час или «Весь день». Сохранённое время с минутами не отмечает ничего, а при 12-часовом формате лист открывается на его половине суток.
+    - Подпись времени собирает одна функция из `daily_choice_field_labels.dart`: её берут лист, поле «Время» панели и подписи групп каталога.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details test/daily_choice/presentation/catalog`.
+    - `mise run codegen-check`.
+  - **Зависимости:** 4.6.
+  - **Предполагаемые файлы:** добавляются `lib/src/daily_choice/presentation/details/daily_choice_time_sheet.dart`, `test/daily_choice/presentation/details/daily_choice_time_sheet_test.dart`; меняются `daily_choice_field_labels.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации.
+  - **Размер:** S.
+
+- [x] 4.8 Лист даты задаёт дату выбора по месяцу с отметками дней
+  - **Критерии приёмки:**
+    - Функция показывает `Sheet.untitled` с `DateGrid` на месяце текущей даты выбора и возвращает выбранную `CalendarDate`, а при закрытии без выбора — ничего. Выбор дня, в том числе дня соседнего месяца, закрывает лист, а шевроны переходят к соседним месяцам. Доступное название листа называет дату дневного выбора.
+    - Текущая дата выбора отмечена выбранной, а сегодняшний день — сегодняшним. Подпись месяца, дни недели и доступные названия дней берутся так же, как в календаре каталога.
+    - Отметки дней приходят из собственного экземпляра `DailyChoiceCalendarDayMarksViewModel`: лист держит свой `DailyChoiceCatalogInstance` всё время жизни по ADR-0028 и работает из каталога, со страницы намерения и из создания. Переход к другому месяцу передаёт модели новый просмотр.
+    - Отказ получения отметок ничего не показывает: дни остаются без отметок, а выбор дня и переходы работают. Тест листа подтверждает сценарий «Отказ получения отметок не мешает листу даты»: после перехода к ноябрю 2026 года лист возвращает 2026-11-12.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details/daily_choice_date_sheet_test.dart`, а при изменении файлов каталога ещё и `test/daily_choice/presentation/catalog`.
+    - `mise run codegen-check`.
+  - **Зависимости:** 4.5.
+  - **Предполагаемые файлы:** добавляются `lib/src/daily_choice/presentation/details/daily_choice_date_sheet.dart`, `test/daily_choice/presentation/details/daily_choice_date_sheet_test.dart`; меняются `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации; `lib/src/daily_choice/presentation/catalog/daily_choice_calendar.dart` и `daily_choice_calendar_day.dart` меняются, только если их подписи выносятся для общего использования.
+  - **Размер:** M.
+
+- [x] 4.9 Дата, время и приоритет меняются в панели сразу через общий блок полей
+  - **Критерии приёмки:**
+    - `DailyChoiceDetailFields` показывает строки `DetailRow` «Дата», «Время» и «Приоритет» в этом порядке и сообщает выбранные значения колбэками. Блок сам открывает листы задач 4.7 и 4.8, поэтому его потребители о них не знают. Доступное название пилюли называет поле, полное значение и действие. Недоступный блок не открывает листы и не меняет приоритет.
+    - «Обзор» панели показывает блок вместо строк только для чтения. Каждый выбор — отдельный `change` с одним полем, а выбор уже показанного значения ничего не записывает. Пока запись идёт, блок, флажок и кнопка параметров недоступны. Новое значение показывается после подтверждения, а при отказе панель показывает прежнее значение и `Notice` и снова допускает изменение.
+    - Подтверждены сценарии «Приоритет меняется без отдельного сохранения», «Перенос даты оставляет панель открытой» с каталогом под панелью, «Отказ записи остаётся в панели», «Час выбирается на циферблате» и «Сохранённые минуты показываются как есть», в том числе отсутствие сообщения об успехе.
+    - Общие шаги тестов выбирают дату, час, «Весь день» и приоритет в блоке, где бы он ни стоял, и называют намерение человека, а не виджеты. Ими пользуются тесты панели, а позже — подтверждения создания и сценарии приложения.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart`.
+  - **Зависимости:** 4.3, 4.7, 4.8.
+  - **Предполагаемые файлы:**
+    - добавляются `lib/src/daily_choice/presentation/details/daily_choice_detail_fields.dart`, `test/support/daily_choice_detail_fields_controls.dart`;
+    - меняются `lib/src/daily_choice/presentation/details/daily_choice_sheet.dart`, `test/daily_choice/presentation/details/daily_choice_sheet_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart`.
+  - **Размер:** M.
+
+- [x] 4.10 Сценарии создания задают дату и приоритет через общие шаги
+  - **Критерии приёмки:**
+    - Общие шаги называют намерения человека на подтверждении создания: подтверждение готово, задать дату, задать приоритет, прочитать показанные значения. Пока шаги работают с прежними полями страницы.
+    - Все сценарии, которые задают эти поля или ждут поля даты как признака готовности подтверждения, идут через шаги и не ищут `daily-choice-date` и подписи «Приоритет P…» сами. Исключение — проверки самой страницы в `daily_choice_creation_page_test.dart` и проверки недоступности полей во время записи: их меняет задача 4.11.
+    - Сценарии проходят без изменения ожиданий. Производственный код не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app test/daily_choice/presentation`.
+  - **Зависимости:** нет; задача выполняется после 4.9 по порядку файла, чтобы шаги стояли рядом с шагами блока.
+  - **Предполагаемые файлы:**
+    - добавляются шаги в `test/support/` рядом с `daily_choice_detail_fields_controls.dart`;
+    - меняются `test/app/creation_flows_test_support.dart`, `test/app/daily_choice_app_flow_test.dart`, `test/app/daily_choice_app_lifecycle_test.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`, `test/daily_choice/presentation/path/choice_path_page_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы только из-за перевода тестов на общие шаги.
+
+- [x] 4.11 Подтверждение создания показывает тот же блок полей, а текстового ввода даты нет
+  - **Критерии приёмки:**
+    - Страница подтверждения создания показывает `DailyChoiceDetailFields` вместо текстового поля даты и `DailyChoicePlanningFields`. Выбранные значения остаются в черновике модели до подтверждения создания, а пока команда выполняется, блок недоступен. Новый выбор начинается с даты входа, «Весь день» и P4.
+    - Текстовый ввод даты и его проверка удалены со страницы. Строки, которые после этого никто не читает, удалены.
+    - Сценарий «Подтверждение создания использует те же поля» подтверждён: дата и час, выбранные в листах, показаны в полях, а выбор не создан до подтверждения. Шаги задачи 4.10 работают с блоком через шаги задачи 4.9. Сценарии сохранения полей при конфликте пути и после временного отказа проверяют то же, что и раньше.
+    - Остальная страница — путь, описание, выполнение и кнопки — не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app test/daily_choice/presentation`.
+    - `mise run codegen-check`.
+    - `git grep -n "'daily-choice-date'" -- lib test` ничего не находит.
+  - **Зависимости:** 4.9, 4.10.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/editor/daily_choice_creation_page.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются шаги задачи 4.10, `test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`.
+  - **Размер:** M.
+
+- [x] 4.12 Описание дневного выбора меняется в панели под полосой
+  - **Критерии приёмки:**
+    - «Обзор» показывает описание целиком с его переносами строк, а без описания — подсказку «Добавить описание». Нажатие открывает изменение под полосой из задачи 4.4: в полосе стрелка назад, «Описание» и «Сохранить», а над полем в `HalfPinnedSliver` стоит шапка выбора без кнопки параметров. «Сохранить» недоступна, пока текст не изменён и пока идёт запись.
+    - Сохранение — отдельный `change` только с описанием. `DailyChoiceDescriptionPatch` строится из текста одной функцией, как `LongTermRelationDescriptionPatch.fromInput`: полностью пробельный текст очищает описание, остальной сохраняется целиком. Неверный ввод — больше 4096 графем или некорректный Unicode — показан у поля, а при отказе записи панель показывает `Notice`. В обоих случаях введённый текст остаётся в поле.
+    - После подтверждённого сохранения или выхода стрелкой панель показывает «Обзор» в полном размере с ручкой, а сообщения об успехе нет. Выход стрелкой и системное «назад» с несохранёнными правками спрашивают подтверждение через `showDiscardDialog`, а отказ от правок не меняет сохранённый выбор. Описание выполненного выбора меняется так же.
+    - Сценарии «Описание добавляется под полосой» и «Уход с несохранённым описанием спрашивает подтверждение» и три сценария требования «Изменение содержимого под полосой» подтверждены на панели дневного выбора.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details test/daily_choice/application`.
+    - `mise run codegen-check`.
+  - **Зависимости:** 4.3, 4.4.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/details/daily_choice_sheet.dart`, `lib/src/daily_choice/application/daily_choice_command.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации, а `daily_choice_details_view_model.dart` — если панели нужен исход сохранения;
+    - меняется `test/daily_choice/presentation/details/daily_choice_sheet_test.dart`, добавляется `test/daily_choice/application/daily_choice_command_test.dart`.
+  - **Размер:** M.
+
+- [x] 4.13 Поле описания и шапка достижимы над клавиатурой при крайних размерах
+  - **Критерии приёмки:**
+    - Сценарий «Поле описания достижимо под высокой шапкой над клавиатурой» подтверждён: при названиях по 255 графем, крупном системном шрифте и на низком экране поле с кареткой видно над клавиатурой, шапка прокручивается вместе с полем, и прокруткой достижим весь её текст без обрезки.
+    - Открытие и закрытие клавиатуры переводят шапку через порог закрепления в обе стороны, а текст и фокус поля сохраняются.
+    - Шапка не выше порога остаётся закреплённой над полем и не закрывает каретку.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details/daily_choice_sheet_layout_test.dart`.
+  - **Зависимости:** 4.12.
+  - **Предполагаемые файлы:** `test/daily_choice/presentation/details/daily_choice_sheet_layout_test.dart`; `lib/src/daily_choice/presentation/details/daily_choice_sheet.dart` и `lib/src/design_system/components/half_pinned_sliver.dart` меняются, только если тест нашёл расхождение со спецификацией.
+  - **Размер:** S.
+
+- [x] 4.14 Меню панели предлагает изменить описание вместо формы, а сценарии меняют выбор в панели
+  - **Критерии приёмки:**
+    - Меню «Дневной выбор» содержит только «Изменить описание», а без описания «Добавить описание», и «Удалить дневной выбор». Первый пункт открывает то же изменение описания, что и нажатие на описание, в том числе с вкладки «Путь». Сценарий «Параметры не предлагают заменить путь» подтверждён.
+    - Общий шаг `openDailyChoiceEdit` заменён шагами изменения в панели: дата, время и приоритет меняются шагами задачи 4.9, а описание — шагом изменения под полосой. Сценарии, которые меняли выбор формой, меняют его в панели, а правка нескольких полей одной отправкой формы становится отдельными изменениями.
+    - Ожидания не ослаблены: проверки устойчивости записи в `daily_choice_app_lifecycle_test.dart` проверяют те же гарантии для изменения из панели, в том числе закрытие панели до результата по сценарию «Уход с экрана сохраняет результат операции».
+    - Матрица оболочки не содержит страницу изменения дневного выбора: из панели её больше не открыть.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app test/daily_choice/presentation test/intention/presentation/details`.
+    - `mise run codegen-check`.
+  - **Зависимости:** 4.9, 4.12.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/details/daily_choice_sheet.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - меняются `test/support/daily_choice_details_controls.dart`, `test/daily_choice/presentation/details/daily_choice_sheet_test.dart`, `test/daily_choice/presentation/daily_choice_creation_flow_test.dart`, `test/daily_choice/presentation/catalog/daily_choice_catalog_card_flow_test.dart`;
+    - меняются `test/app/daily_choice_app_flow_test.dart`, `daily_choice_app_lifecycle_test.dart`, `intention_statistics_catalog_scenarios.dart`, `test/app/navigation/app_shell_page_matrix.dart`, `app_shell_state_test.dart`.
+  - **Размер:** M по логике: в `lib/` меняется только меню, остальное — перевод сценариев.
+
+- [x] 4.15 Форма изменения дневного выбора удалена вместе с маршрутом
+  - **Критерии приёмки:**
+    - Удалены `DailyChoiceEditPage`, её состояние и модель, `DailyChoiceEditRoute`, `DailyChoicePlanningFields` с `_TimeInputDialog` и их тесты. Каждый сценарий удалённых тестов уже подтверждён панелью, блоком полей или построением изменения описания из задачи 4.12 либо проверял поведение формы, которого больше нет.
+    - Строки, которые читали только удалённые файлы, удалены из обоих файлов локализации, а созданные файлы получены `mise run codegen`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app test/daily_choice/presentation`.
+    - `mise run codegen-check`.
+    - `git grep -nE 'DailyChoiceEdit(Page|Route|State|ViewModel)|DailyChoicePlanningFields|_TimeInputDialog|daily-choice-edit-' -- lib test` ничего не находит.
+  - **Зависимости:** 4.11, 4.14.
+  - **Предполагаемые файлы:**
+    - удаляются `lib/src/daily_choice/presentation/editor/daily_choice_edit_page.dart`, `daily_choice_edit_state.dart`, `daily_choice_edit_view_model.dart` с созданным `.g.dart`, `daily_choice_planning_fields.dart`;
+    - удаляются `test/daily_choice/presentation/editor/daily_choice_edit_page_test.dart`, `daily_choice_edit_state_test.dart`, `daily_choice_edit_view_model_test.dart`;
+    - меняются `lib/src/app/routing/app_router.dart`, `app_router.gr.dart`, `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb` с созданными файлами локализации;
+    - убирается импорт формы из `test/app/intention_statistics_app_flow_test.dart` и `test/app/navigation/app_shell_pages_above_test.dart`.
+  - **Размер:** M по логике: удаление без нового поведения.
+
+- [x] 4.16 Проверить готовность фазы: выбор меняется на месте одними полями, а формы изменения нет
+  - **Критерии приёмки:**
+    - Все сценарии спецификаций изменения подтверждены без устройства, а полные проверки проекта проходят.
+    - Над клавиатурой при названиях максимальной длины и крупном системном шрифте поле описания и весь текст шапки достижимы без обрезки, а переход через порог закрепления не сбрасывает текст и фокус поля.
+    - Дельты сверены с итоговым текстом `add-relations-in-batches`.
+    - Ручные проверки на устройстве остаются за владельцем продукта.
+  - **Проверка:**
+    - `mise run codegen-check`.
+    - `mise run check`.
+    - `mise exec --no-deps -- openspec validate redesign-daily-choices --strict`.
+    - `mise exec --no-deps -- flutter build apk --debug`: сборка для ручных проверок на устройстве, которые остаются за владельцем продукта.
+  - **Зависимости:** 4.1–4.15.
+  - **Предполагаемые файлы:** нет (только проверка).
+  - **Размер:** XS.
+
+- [x] 4.17 Панель снова допускает изменения и закрывает изменение описания только после снимка с записанным значением
+  - **Критерии приёмки:**
+    - После собственной подтверждённой записи `change` модель `DailyChoiceDetailsViewModel` не возвращается сразу в `DailyChoiceDetailsOperationIdle`, а ждёт снимок из `watchDailyChoice` с ревизией не старше подтверждённой. Ревизия берётся из `completion.confirmedResult`, как в `DailyChoiceCompletionAwaitingSnapshot` модели каталога. Если показанный снимок уже не старше этой ревизии, ожидания нет.
+    - Пока снимок не пришёл, блок полей, флажок выполнения и кнопка параметров панели недоступны, как во время записи, а изменение описания под полосой остаётся открытым. Оно закрывается, только когда показан этот снимок, а не сразу после успеха `change`.
+    - Любой другой исход подписки — выбор не найден, ошибка чтения, повреждение — тоже заканчивает ожидание, и панель не остаётся недоступной.
+    - Отказ записи, удаление и закрытие панели до результата ведут себя как сейчас. Сообщения об успехе нет.
+    - Тест панели фиксирует кадр между подтверждением записи и приходом снимка: показано прежнее значение, управление недоступно, изменение описания ещё открыто. После снимка показано новое значение, изменение описания закрыто, а управление снова доступно.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details test/daily_choice/presentation/catalog/daily_choice_catalog_details_integration_test.dart`.
+    - `mise run codegen-check`, если меняются создаваемые файлы.
+  - **Зависимости:** 4.9, 4.12.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/daily_choice/presentation/details/daily_choice_details_view_model.dart` с его состоянием операции в `daily_choice_details_state.dart`, `lib/src/daily_choice/presentation/details/daily_choice_sheet.dart`;
+    - меняется `test/daily_choice/presentation/details/daily_choice_sheet_test.dart`, а тест модели — если без него ожидание снимка не проверить.
+  - **Размер:** S.
+
+- [x] 4.18 Циферблат, поле «Время» и подписи часов следуют одному итоговому формату часов устройства и локали
+  - **Критерии приёмки:**
+    - Формат часов дневных выборов определяет одна функция в `lib/src/daily_choice/presentation/details/daily_choice_field_labels.dart`. Она берёт `MaterialLocalizations.of(context).timeOfDayFormat(alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context))` и даёт 12-часовой формат, только если этот формат 12-часовой. Другого места выбора формата часов у дневных выборов нет: будущая собственная настройка формата времени в приложении переопределит только эту функцию.
+    - Лист времени выбирает `TimeDialClock12` или `TimeDialClock24` по этой функции, а не только по `MediaQuery.alwaysUse24HourFormatOf`. Начальная половина суток, подписи половин суток и остальное поведение листа не меняются.
+    - Поле «Время», подписи групп каталога и доступные названия часов циферблата по-прежнему строит `dailyChoiceTimeValue` через `TimeOfDay.format`, поэтому формат циферблата совпадает со всеми показами времени.
+    - Русская локаль при выключенном 24-часовом времени показывает 24-часовой циферблат и «18:00», английская — 12-часовой циферблат и «6:00 PM».
+    - Тест `daily_choice_sheet_test.dart`, который в русской локали при выключенном 24-часовом времени выбирает час на 12-часовом циферблате, переписан под новое поведение. Тест `daily_choice_time_sheet_test.dart` подтверждает для ru и en при выключенном 24-часовом времени, что формат циферблата совпадает с подписями часов.
+    - Подписи резервных копий в `backup_descriptions.dart` уже следуют той же политике и не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details test/daily_choice/presentation/catalog`.
+  - **Зависимости:** 4.7, 4.9.
+  - **Предполагаемые файлы:** меняются `lib/src/daily_choice/presentation/details/daily_choice_field_labels.dart`, `lib/src/daily_choice/presentation/details/daily_choice_time_sheet.dart`, `test/daily_choice/presentation/details/daily_choice_sheet_test.dart`, `test/daily_choice/presentation/details/daily_choice_time_sheet_test.dart`.
+  - **Размер:** S.
+
+- [x] 4.19 Переключатель `Tabs` создаётся отдельным конструктором без параметров полосы
+  - **Критерии приёмки:**
+    - У `Tabs` в `lib/src/design_system/components/tabs.dart` два конструктора. Полоса вкладок принимает `items`, `value`, `onChange`, `label`, `stuck` и `plane`. `Tabs.toggle` принимает `items`, `value`, `onChange`, `label` и `minWidth`, а `stuck` и `plane` у него нет.
+    - Переключатель с `stuck` или `plane` не компилируется. `assert` на сочетание переключателя с параметрами полосы удалён.
+    - `minWidth` есть только у `Tabs.toggle`: ни одна полоса его не задаёт. Пилюли полосы по-прежнему не уже `DoableMetrics.tapMin`.
+    - Смысл для диктора — выбранная вкладка у полосы, включённая кнопка у переключателя — следует из выбранного конструктора. Публичного параметра `semantics` и перечисления смысла, которое передаёт потребитель, нет.
+    - `TimeDial` в `lib/src/design_system/components/time_dial.dart` строит переключатель половины суток через `Tabs.toggle`.
+    - Вид, раскладка, семантика и поведение вкладок в `intention_details_tabs.dart` и `daily_choice_sheet.dart` и переключателя «AM» и «PM» в `TimeDial` не меняются.
+    - Тесты `test/design_system/tabs_test.dart` и `test/design_system/time_dial_test.dart` создают переключатель через `Tabs.toggle` и больше не обращаются к удалённому параметру `semantics`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/tabs_test.dart test/design_system/time_dial_test.dart test/intention/presentation/details test/daily_choice/presentation/details`.
+  - **Зависимости:** 4.6.
+  - **Предполагаемые файлы:** меняются `lib/src/design_system/components/tabs.dart`, `lib/src/design_system/components/time_dial.dart`, `test/design_system/tabs_test.dart`, `test/design_system/time_dial_test.dart`.
+  - **Размер:** S.
+
+- [x] 4.20 У `TimeDial` и его частей нет параметров, которые не нужны текущему вызову
+  - **Критерии приёмки:**
+    - Построитель содержимого `_DialButton` в `lib/src/design_system/components/time_dial.dart` больше не принимает `showsFocus`: параметр становится построителем без аргументов или готовым дочерним виджетом. Кольцо фокуса по-прежнему рисует сама кнопка.
+    - Публичного параметра `allDayHint` у `TimeDial` и его внутренних частей нет. Доступное название кнопки «Весь день» берётся из `allDayLabel`. Доступные названия часов по-прежнему задаёт потребитель через `hourLabel`.
+    - Лист времени в `lib/src/daily_choice/presentation/details/daily_choice_time_sheet.dart` больше не передаёт `allDayHint`.
+    - Видимый текст, доступные названия, кольцо фокуса и поведение циферблата не меняются.
+    - Тесты `test/design_system/time_dial_test.dart` меняются только там, где передавали удалённый параметр или ждали его значение как доступное название кнопки «Весь день».
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/time_dial_test.dart test/daily_choice/presentation/details`.
+  - **Зависимости:** 4.6, 4.7, 4.18, 4.19 — обе последние тоже меняют `time_dial.dart` или лист времени, поэтому эта задача выполняется после них.
+  - **Предполагаемые файлы:** меняются `lib/src/design_system/components/time_dial.dart`, `lib/src/daily_choice/presentation/details/daily_choice_time_sheet.dart`, `test/design_system/time_dial_test.dart`.
+  - **Размер:** XS.
+
+- [x] 4.21 Тесты подтверждения создания не проверяют отказ по полю даты, которого система не порождает
+  - **Критерии приёмки:**
+    - Из `test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart` удалён тест «отказ по полю даты показан уведомлением отказа страницы», который подставляет `DailyChoiceValidationFailure(DailyChoiceValidationField.date)`. Ни команда, ни репозиторий такой отказ не порождают, а общий путь уведомления отказа страницы проверяют её остальные тесты отказов.
+    - Остальные тесты страницы не меняются.
+    - Производственный код, значение `DailyChoiceValidationField.date`, строка `dailyChoiceDateInvalid`, тесты модели создания и презентера не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/editor`.
+  - **Зависимости:** 4.11.
+  - **Предполагаемые файлы:** меняется `test/daily_choice/presentation/editor/daily_choice_creation_page_test.dart`.
+  - **Размер:** XS.
+
+- [x] 4.22 Запись, которая ничего не изменила, не оставляет панель ждать снимок
+  - **Критерии приёмки:**
+    - После собственной подтверждённой записи `change` модель `DailyChoiceDetailsViewModel` в `lib/src/daily_choice/presentation/details/daily_choice_details_view_model.dart` не входит в `DailyChoiceDetailsOperationAwaitingSnapshot`, если показанный загруженный снимок уже содержит записанные значения из подтверждённого `DailyChoiceFieldsUpdated.choice`: дату, описание, выполнение, время и приоритет, сравнённые по значению. Тогда операция сразу становится `DailyChoiceDetailsOperationIdle`, а `change` завершается успехом, даже если ревизия подтверждения новее ревизии показанного снимка и нового снимка подписка не выпустит.
+    - Если хотя бы одно из этих значений в показанном снимке отличается от записанного, ожидание снимка остаётся таким, как задано в 4.17.
+    - Контракт прикладного слоя, `DailyChoiceFieldsUpdated`, `ConfirmedGraphResult`, репозиторий и подписка `watchDailyChoice` не меняются. `daily_choice_sheet.dart` не меняется, и «Сохранить» для пробельного ввода в пустое описание остаётся доступной.
+    - Отказ записи, удаление, закрытие панели и прежние выходы из ожидания снимка ведут себя как сейчас. Сообщения об успехе нет.
+    - Тест модели: показан снимок с ревизией R(n), запись без изменения значений подтверждена более новой ревизией, нового снимка нет. `change` завершается успехом, операция — `DailyChoiceDetailsOperationIdle`, новые операции разрешены.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details`.
+  - **Зависимости:** 4.17.
+  - **Предполагаемые файлы:** меняются `lib/src/daily_choice/presentation/details/daily_choice_details_view_model.dart`, `test/daily_choice/presentation/details/daily_choice_details_view_model_test.dart`.
+  - **Размер:** XS.
+
+- [x] 4.23 Формат часов циферблата и подписей времени дневных выборов решается в одном месте
+  - **Критерии приёмки:**
+    - Формат часов (12 или 24) для циферблата и всех подписей времени дневных выборов решает только `dailyChoiceUsesTwelveHourClock` в `lib/src/daily_choice/presentation/details/daily_choice_field_labels.dart`, и её комментарий о единственном месте выбора формата верен.
+    - `dailyChoiceTimeValue` форматирует время с форматом из `dailyChoiceUsesTwelveHourClock`, например `MaterialLocalizations.of(context).formatTimeOfDay(time, alwaysUse24HourFormat: !dailyChoiceUsesTwelveHourClock(context))`, а не выбирает формат сам через `TimeOfDay.format(context)`. Комментарии обеих функций описывают это устройство.
+    - Задача заменяет критерий 4.18 о том, что `dailyChoiceTimeValue` строит время через `TimeOfDay.format`. Остальные критерии 4.18 действуют.
+    - Видимый вывод не меняется: русская локаль при выключенном 24-часовом времени показывает «18:00» и 24-часовой циферблат, английская — «6:00 PM» и 12-часовой циферблат, английская при включённом 24-часовом времени — 24-часовой циферблат.
+    - «Весь день», подписи половин суток, `backup_descriptions.dart`, `TimeDial` и лист времени не меняются.
+    - Существующие тесты совпадения формата циферблата и подписей в `test/daily_choice/presentation/details/daily_choice_time_sheet_test.dart` и `test/daily_choice/presentation/details/daily_choice_sheet_test.dart` проходят без ослабления. Новый тест добавляется, только если они не ловят расхождение формата циферблата и подписей времени.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/daily_choice/presentation/details test/daily_choice/presentation/catalog`.
+  - **Зависимости:** 4.18.
+  - **Предполагаемые файлы:** меняется `lib/src/daily_choice/presentation/details/daily_choice_field_labels.dart`.
+  - **Размер:** XS.

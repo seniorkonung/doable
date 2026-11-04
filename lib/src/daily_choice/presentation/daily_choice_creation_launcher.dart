@@ -7,7 +7,7 @@ import 'package:flutter/widgets.dart';
 import '../../app/routing/app_router.gr.dart';
 import '../../intention/domain/intention_id.dart';
 import '../application/choice_path_draft.dart';
-import 'daily_choice_picker_context.dart';
+import 'daily_choice_picker_launch.dart';
 
 /// Самостоятельный вход через поиск основания или действия.
 ///
@@ -34,13 +34,12 @@ final class DailyChoiceCreationLauncher {
     final launch = _Launch(sourceContext, source, router);
     _pending = launch;
     try {
-      final pickerContext = InitialDailyChoicePickerContext(launch: launch);
       final id = await router.push<IntentionId>(switch (direction) {
         ChoicePathDraftDirection.topDown => DailyChoiceSourcePickerRoute(
-          pickerContext: pickerContext,
+          launch: launch,
         ),
         ChoicePathDraftDirection.bottomUp => DailyChoiceActionPickerRoute(
-          pickerContext: pickerContext,
+          launch: launch,
         ),
       });
       if (id == null || !launch.canOpenPath) return;
@@ -117,7 +116,7 @@ final class _Launch implements DailyChoicePickerLaunch {
     router.addListener(check);
     try {
       // Future push означает возврат со страницы. Открытие подтверждает
-      // конкретный маршрут: replace пути может вообще не завершить Future.
+      // конкретный маршрут.
       // https://pub.dev/documentation/auto_route/11.1.0/auto_route/StackRouter/push.html
       unawaited(router.push<void>(path).then<void>((_) => finish()));
       check();

@@ -10,19 +10,16 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
-import 'package:auto_route/auto_route.dart' as _i19;
-import 'package:collection/collection.dart' as _i28;
-import 'package:doable/src/app/home/home_page.dart' as _i10;
+import 'package:auto_route/auto_route.dart' as _i17;
+import 'package:collection/collection.dart' as _i26;
+import 'package:doable/src/app/home/home_page.dart' as _i8;
 import 'package:doable/src/app/navigation/app_shell_page.dart' as _i1;
-import 'package:doable/src/app/settings/settings_page.dart' as _i18;
+import 'package:doable/src/app/settings/settings_page.dart' as _i16;
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart'
-    as _i21;
+    as _i19;
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart'
-    as _i26;
-import 'package:doable/src/daily_choice/application/daily_choice_details.dart'
-    as _i30;
-import 'package:doable/src/daily_choice/domain/calendar_date.dart' as _i27;
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart' as _i29;
+    as _i24;
+import 'package:doable/src/daily_choice/domain/calendar_date.dart' as _i25;
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart'
     as _i3;
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart'
@@ -30,49 +27,45 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart'
     as _i6;
 import 'package:doable/src/daily_choice/presentation/daily_choice_creation_flow_session.dart'
-    as _i25;
-import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart'
     as _i23;
-import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart'
-    as _i7;
+import 'package:doable/src/daily_choice/presentation/daily_choice_picker_launch.dart'
+    as _i21;
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart'
     as _i5;
-import 'package:doable/src/daily_choice/presentation/editor/daily_choice_edit_page.dart'
-    as _i8;
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart'
     as _i2;
 import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart'
-    as _i9;
-import 'package:doable/src/intention/domain/intention_id.dart' as _i20;
+    as _i7;
+import 'package:doable/src/intention/domain/intention_id.dart' as _i18;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
-    as _i11;
+    as _i9;
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart'
-    as _i12;
+    as _i10;
 import 'package:doable/src/intention/presentation/details/intention_page_target.dart'
-    as _i13;
+    as _i11;
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart'
-    as _i14;
+    as _i12;
 import 'package:doable/src/intention/presentation/editor/intention_creation_launch.dart'
-    as _i16;
+    as _i14;
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart'
-    as _i15;
+    as _i13;
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart'
-    as _i32;
+    as _i28;
 import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart'
-    as _i17;
-import 'package:flutter/foundation.dart' as _i31;
-import 'package:flutter/material.dart' as _i22;
-import 'package:flutter/widgets.dart' as _i24;
+    as _i15;
+import 'package:flutter/foundation.dart' as _i27;
+import 'package:flutter/material.dart' as _i20;
+import 'package:flutter/widgets.dart' as _i22;
 
 /// generated route for
 /// [_i1.AppShellPage]
-class AppShellRoute extends _i19.PageRouteInfo<void> {
-  const AppShellRoute({List<_i19.PageRouteInfo>? children})
+class AppShellRoute extends _i17.PageRouteInfo<void> {
+  const AppShellRoute({List<_i17.PageRouteInfo>? children})
     : super(AppShellRoute.name, initialChildren: children);
 
   static const String name = 'AppShellRoute';
 
-  static _i19.PageInfo page = _i19.PageInfo(
+  static _i17.PageInfo page = _i17.PageInfo(
     name,
     builder: (data) {
       return const _i1.AppShellPage();
@@ -82,12 +75,12 @@ class AppShellRoute extends _i19.PageRouteInfo<void> {
 
 /// generated route for
 /// [_i2.ChoicePathPage]
-class ChoicePathRoute extends _i19.PageRouteInfo<ChoicePathRouteArgs> {
+class ChoicePathRoute extends _i17.PageRouteInfo<ChoicePathRouteArgs> {
   ChoicePathRoute({
-    required _i20.IntentionId sourceIntentionId,
-    required _i21.ChoicePathDraftDirection direction,
-    _i22.Key? key,
-    List<_i19.PageRouteInfo>? children,
+    required _i18.IntentionId sourceIntentionId,
+    required _i19.ChoicePathDraftDirection direction,
+    _i20.Key? key,
+    List<_i17.PageRouteInfo>? children,
   }) : super(
          ChoicePathRoute.name,
          args: ChoicePathRouteArgs(
@@ -100,7 +93,7 @@ class ChoicePathRoute extends _i19.PageRouteInfo<ChoicePathRouteArgs> {
 
   static const String name = 'ChoicePathRoute';
 
-  static _i19.PageInfo page = _i19.PageInfo(
+  static _i17.PageInfo page = _i17.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<ChoicePathRouteArgs>();
@@ -120,11 +113,11 @@ class ChoicePathRouteArgs {
     this.key,
   });
 
-  final _i20.IntentionId sourceIntentionId;
+  final _i18.IntentionId sourceIntentionId;
 
-  final _i21.ChoicePathDraftDirection direction;
+  final _i19.ChoicePathDraftDirection direction;
 
-  final _i22.Key? key;
+  final _i20.Key? key;
 
   @override
   String toString() {
@@ -148,28 +141,25 @@ class ChoicePathRouteArgs {
 /// generated route for
 /// [_i3.DailyChoiceActionPickerPage]
 class DailyChoiceActionPickerRoute
-    extends _i19.PageRouteInfo<DailyChoiceActionPickerRouteArgs> {
+    extends _i17.PageRouteInfo<DailyChoiceActionPickerRouteArgs> {
   DailyChoiceActionPickerRoute({
-    required _i23.DailyChoicePickerContext pickerContext,
-    _i24.Key? key,
-    List<_i19.PageRouteInfo>? children,
+    required _i21.DailyChoicePickerLaunch launch,
+    _i22.Key? key,
+    List<_i17.PageRouteInfo>? children,
   }) : super(
          DailyChoiceActionPickerRoute.name,
-         args: DailyChoiceActionPickerRouteArgs(
-           pickerContext: pickerContext,
-           key: key,
-         ),
+         args: DailyChoiceActionPickerRouteArgs(launch: launch, key: key),
          initialChildren: children,
        );
 
   static const String name = 'DailyChoiceActionPickerRoute';
 
-  static _i19.PageInfo page = _i19.PageInfo(
+  static _i17.PageInfo page = _i17.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<DailyChoiceActionPickerRouteArgs>();
       return _i3.DailyChoiceActionPickerPage(
-        pickerContext: args.pickerContext,
+        launch: args.launch,
         key: args.key,
       );
     },
@@ -177,40 +167,37 @@ class DailyChoiceActionPickerRoute
 }
 
 class DailyChoiceActionPickerRouteArgs {
-  const DailyChoiceActionPickerRouteArgs({
-    required this.pickerContext,
-    this.key,
-  });
+  const DailyChoiceActionPickerRouteArgs({required this.launch, this.key});
 
-  final _i23.DailyChoicePickerContext pickerContext;
+  final _i21.DailyChoicePickerLaunch launch;
 
-  final _i24.Key? key;
+  final _i22.Key? key;
 
   @override
   String toString() {
-    return 'DailyChoiceActionPickerRouteArgs{pickerContext: $pickerContext, key: $key}';
+    return 'DailyChoiceActionPickerRouteArgs{launch: $launch, key: $key}';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! DailyChoiceActionPickerRouteArgs) return false;
-    return pickerContext == other.pickerContext && key == other.key;
+    return launch == other.launch && key == other.key;
   }
 
   @override
-  int get hashCode => pickerContext.hashCode ^ key.hashCode;
+  int get hashCode => launch.hashCode ^ key.hashCode;
 }
 
 /// generated route for
 /// [_i4.DailyChoiceCatalogPage]
-class DailyChoiceCatalogRoute extends _i19.PageRouteInfo<void> {
-  const DailyChoiceCatalogRoute({List<_i19.PageRouteInfo>? children})
+class DailyChoiceCatalogRoute extends _i17.PageRouteInfo<void> {
+  const DailyChoiceCatalogRoute({List<_i17.PageRouteInfo>? children})
     : super(DailyChoiceCatalogRoute.name, initialChildren: children);
 
   static const String name = 'DailyChoiceCatalogRoute';
 
-  static _i19.PageInfo page = _i19.PageInfo(
+  static _i17.PageInfo page = _i17.PageInfo(
     name,
     builder: (data) {
       return const _i4.DailyChoiceCatalogPage();
@@ -221,16 +208,16 @@ class DailyChoiceCatalogRoute extends _i19.PageRouteInfo<void> {
 /// generated route for
 /// [_i5.DailyChoiceCreationPage]
 class DailyChoiceCreationRoute
-    extends _i19.PageRouteInfo<DailyChoiceCreationRouteArgs> {
+    extends _i17.PageRouteInfo<DailyChoiceCreationRouteArgs> {
   DailyChoiceCreationRoute({
-    required _i25.DailyChoiceCreationFlowSession session,
-    required _i26.ConfirmedChoicePath path,
+    required _i23.DailyChoiceCreationFlowSession session,
+    required _i24.ConfirmedChoicePath path,
     required List<_i5.DailyChoiceCreationStep> steps,
-    required _i27.CalendarDate initialDate,
-    _i21.ChoicePathDraftDirection direction =
-        _i21.ChoicePathDraftDirection.topDown,
-    _i22.Key? key,
-    List<_i19.PageRouteInfo>? children,
+    required _i25.CalendarDate initialDate,
+    _i19.ChoicePathDraftDirection direction =
+        _i19.ChoicePathDraftDirection.topDown,
+    _i20.Key? key,
+    List<_i17.PageRouteInfo>? children,
   }) : super(
          DailyChoiceCreationRoute.name,
          args: DailyChoiceCreationRouteArgs(
@@ -246,7 +233,7 @@ class DailyChoiceCreationRoute
 
   static const String name = 'DailyChoiceCreationRoute';
 
-  static _i19.PageInfo page = _i19.PageInfo(
+  static _i17.PageInfo page = _i17.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<DailyChoiceCreationRouteArgs>();
@@ -268,21 +255,21 @@ class DailyChoiceCreationRouteArgs {
     required this.path,
     required this.steps,
     required this.initialDate,
-    this.direction = _i21.ChoicePathDraftDirection.topDown,
+    this.direction = _i19.ChoicePathDraftDirection.topDown,
     this.key,
   });
 
-  final _i25.DailyChoiceCreationFlowSession session;
+  final _i23.DailyChoiceCreationFlowSession session;
 
-  final _i26.ConfirmedChoicePath path;
+  final _i24.ConfirmedChoicePath path;
 
   final List<_i5.DailyChoiceCreationStep> steps;
 
-  final _i27.CalendarDate initialDate;
+  final _i25.CalendarDate initialDate;
 
-  final _i21.ChoicePathDraftDirection direction;
+  final _i19.ChoicePathDraftDirection direction;
 
-  final _i22.Key? key;
+  final _i20.Key? key;
 
   @override
   String toString() {
@@ -295,7 +282,7 @@ class DailyChoiceCreationRouteArgs {
     if (other is! DailyChoiceCreationRouteArgs) return false;
     return session == other.session &&
         path == other.path &&
-        const _i28.ListEquality<_i5.DailyChoiceCreationStep>().equals(
+        const _i26.ListEquality<_i5.DailyChoiceCreationStep>().equals(
           steps,
           other.steps,
         ) &&
@@ -308,7 +295,7 @@ class DailyChoiceCreationRouteArgs {
   int get hashCode =>
       session.hashCode ^
       path.hashCode ^
-      const _i28.ListEquality<_i5.DailyChoiceCreationStep>().hash(steps) ^
+      const _i26.ListEquality<_i5.DailyChoiceCreationStep>().hash(steps) ^
       initialDate.hashCode ^
       direction.hashCode ^
       key.hashCode;
@@ -317,11 +304,11 @@ class DailyChoiceCreationRouteArgs {
 /// generated route for
 /// [_i6.DailyChoiceDateCatalogPage]
 class DailyChoiceDateCatalogRoute
-    extends _i19.PageRouteInfo<DailyChoiceDateCatalogRouteArgs> {
+    extends _i17.PageRouteInfo<DailyChoiceDateCatalogRouteArgs> {
   DailyChoiceDateCatalogRoute({
-    required _i27.CalendarDate date,
-    _i22.Key? key,
-    List<_i19.PageRouteInfo>? children,
+    required _i25.CalendarDate date,
+    _i20.Key? key,
+    List<_i17.PageRouteInfo>? children,
   }) : super(
          DailyChoiceDateCatalogRoute.name,
          args: DailyChoiceDateCatalogRouteArgs(date: date, key: key),
@@ -330,7 +317,7 @@ class DailyChoiceDateCatalogRoute
 
   static const String name = 'DailyChoiceDateCatalogRoute';
 
-  static _i19.PageInfo page = _i19.PageInfo(
+  static _i17.PageInfo page = _i17.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<DailyChoiceDateCatalogRouteArgs>();
@@ -342,9 +329,9 @@ class DailyChoiceDateCatalogRoute
 class DailyChoiceDateCatalogRouteArgs {
   const DailyChoiceDateCatalogRouteArgs({required this.date, this.key});
 
-  final _i27.CalendarDate date;
+  final _i25.CalendarDate date;
 
-  final _i22.Key? key;
+  final _i20.Key? key;
 
   @override
   String toString() {
@@ -363,126 +350,27 @@ class DailyChoiceDateCatalogRouteArgs {
 }
 
 /// generated route for
-/// [_i7.DailyChoiceDetailsPage]
-class DailyChoiceDetailsRoute
-    extends _i19.PageRouteInfo<DailyChoiceDetailsRouteArgs> {
-  DailyChoiceDetailsRoute({
-    required _i29.DailyChoiceId choiceId,
-    _i22.Key? key,
-    List<_i19.PageRouteInfo>? children,
-  }) : super(
-         DailyChoiceDetailsRoute.name,
-         args: DailyChoiceDetailsRouteArgs(choiceId: choiceId, key: key),
-         initialChildren: children,
-       );
-
-  static const String name = 'DailyChoiceDetailsRoute';
-
-  static _i19.PageInfo page = _i19.PageInfo(
-    name,
-    builder: (data) {
-      final args = data.argsAs<DailyChoiceDetailsRouteArgs>();
-      return _i7.DailyChoiceDetailsPage(choiceId: args.choiceId, key: args.key);
-    },
-  );
-}
-
-class DailyChoiceDetailsRouteArgs {
-  const DailyChoiceDetailsRouteArgs({required this.choiceId, this.key});
-
-  final _i29.DailyChoiceId choiceId;
-
-  final _i22.Key? key;
-
-  @override
-  String toString() {
-    return 'DailyChoiceDetailsRouteArgs{choiceId: $choiceId, key: $key}';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    if (other is! DailyChoiceDetailsRouteArgs) return false;
-    return choiceId == other.choiceId && key == other.key;
-  }
-
-  @override
-  int get hashCode => choiceId.hashCode ^ key.hashCode;
-}
-
-/// generated route for
-/// [_i8.DailyChoiceEditPage]
-class DailyChoiceEditRoute
-    extends _i19.PageRouteInfo<DailyChoiceEditRouteArgs> {
-  DailyChoiceEditRoute({
-    required _i30.DailyChoiceDetails details,
-    _i22.Key? key,
-    List<_i19.PageRouteInfo>? children,
-  }) : super(
-         DailyChoiceEditRoute.name,
-         args: DailyChoiceEditRouteArgs(details: details, key: key),
-         initialChildren: children,
-       );
-
-  static const String name = 'DailyChoiceEditRoute';
-
-  static _i19.PageInfo page = _i19.PageInfo(
-    name,
-    builder: (data) {
-      final args = data.argsAs<DailyChoiceEditRouteArgs>();
-      return _i8.DailyChoiceEditPage(details: args.details, key: args.key);
-    },
-  );
-}
-
-class DailyChoiceEditRouteArgs {
-  const DailyChoiceEditRouteArgs({required this.details, this.key});
-
-  final _i30.DailyChoiceDetails details;
-
-  final _i22.Key? key;
-
-  @override
-  String toString() {
-    return 'DailyChoiceEditRouteArgs{details: $details, key: $key}';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    if (other is! DailyChoiceEditRouteArgs) return false;
-    return details == other.details && key == other.key;
-  }
-
-  @override
-  int get hashCode => details.hashCode ^ key.hashCode;
-}
-
-/// generated route for
-/// [_i9.DailyChoiceSourcePickerPage]
+/// [_i7.DailyChoiceSourcePickerPage]
 class DailyChoiceSourcePickerRoute
-    extends _i19.PageRouteInfo<DailyChoiceSourcePickerRouteArgs> {
+    extends _i17.PageRouteInfo<DailyChoiceSourcePickerRouteArgs> {
   DailyChoiceSourcePickerRoute({
-    required _i23.DailyChoicePickerContext pickerContext,
-    _i24.Key? key,
-    List<_i19.PageRouteInfo>? children,
+    required _i21.DailyChoicePickerLaunch launch,
+    _i22.Key? key,
+    List<_i17.PageRouteInfo>? children,
   }) : super(
          DailyChoiceSourcePickerRoute.name,
-         args: DailyChoiceSourcePickerRouteArgs(
-           pickerContext: pickerContext,
-           key: key,
-         ),
+         args: DailyChoiceSourcePickerRouteArgs(launch: launch, key: key),
          initialChildren: children,
        );
 
   static const String name = 'DailyChoiceSourcePickerRoute';
 
-  static _i19.PageInfo page = _i19.PageInfo(
+  static _i17.PageInfo page = _i17.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<DailyChoiceSourcePickerRouteArgs>();
-      return _i9.DailyChoiceSourcePickerPage(
-        pickerContext: args.pickerContext,
+      return _i7.DailyChoiceSourcePickerPage(
+        launch: args.launch,
         key: args.key,
       );
     },
@@ -490,72 +378,69 @@ class DailyChoiceSourcePickerRoute
 }
 
 class DailyChoiceSourcePickerRouteArgs {
-  const DailyChoiceSourcePickerRouteArgs({
-    required this.pickerContext,
-    this.key,
-  });
+  const DailyChoiceSourcePickerRouteArgs({required this.launch, this.key});
 
-  final _i23.DailyChoicePickerContext pickerContext;
+  final _i21.DailyChoicePickerLaunch launch;
 
-  final _i24.Key? key;
+  final _i22.Key? key;
 
   @override
   String toString() {
-    return 'DailyChoiceSourcePickerRouteArgs{pickerContext: $pickerContext, key: $key}';
+    return 'DailyChoiceSourcePickerRouteArgs{launch: $launch, key: $key}';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! DailyChoiceSourcePickerRouteArgs) return false;
-    return pickerContext == other.pickerContext && key == other.key;
+    return launch == other.launch && key == other.key;
   }
 
   @override
-  int get hashCode => pickerContext.hashCode ^ key.hashCode;
+  int get hashCode => launch.hashCode ^ key.hashCode;
 }
 
 /// generated route for
-/// [_i10.HomePage]
-class HomeRoute extends _i19.PageRouteInfo<void> {
-  const HomeRoute({List<_i19.PageRouteInfo>? children})
+/// [_i8.HomePage]
+class HomeRoute extends _i17.PageRouteInfo<void> {
+  const HomeRoute({List<_i17.PageRouteInfo>? children})
     : super(HomeRoute.name, initialChildren: children);
 
   static const String name = 'HomeRoute';
 
-  static _i19.PageInfo page = _i19.PageInfo(
+  static _i17.PageInfo page = _i17.PageInfo(
     name,
     builder: (data) {
-      return const _i10.HomePage();
+      return const _i8.HomePage();
     },
   );
 }
 
 /// generated route for
-/// [_i11.IntentionCatalogPage]
-class IntentionCatalogRoute extends _i19.PageRouteInfo<void> {
-  const IntentionCatalogRoute({List<_i19.PageRouteInfo>? children})
+/// [_i9.IntentionCatalogPage]
+class IntentionCatalogRoute extends _i17.PageRouteInfo<void> {
+  const IntentionCatalogRoute({List<_i17.PageRouteInfo>? children})
     : super(IntentionCatalogRoute.name, initialChildren: children);
 
   static const String name = 'IntentionCatalogRoute';
 
-  static _i19.PageInfo page = _i19.PageInfo(
+  static _i17.PageInfo page = _i17.PageInfo(
     name,
     builder: (data) {
-      return const _i11.IntentionCatalogPage();
+      return const _i9.IntentionCatalogPage();
     },
   );
 }
 
 /// generated route for
-/// [_i12.IntentionDetailsPage]
+/// [_i10.IntentionDetailsPage]
 class IntentionDetailsRoute
-    extends _i19.PageRouteInfo<IntentionDetailsRouteArgs> {
+    extends _i17.PageRouteInfo<IntentionDetailsRouteArgs> {
   IntentionDetailsRoute({
-    required _i20.IntentionId intentionId,
-    _i13.IntentionPageTarget target = const _i13.OverviewTarget(),
-    _i31.Key? key,
-    List<_i19.PageRouteInfo>? children,
+    required _i18.IntentionId intentionId,
+    _i11.IntentionPageTarget target = const _i11.OverviewTarget(),
+    _i27.Key? key,
+    List<_i17.PageRouteInfo>? children,
   }) : super(
          IntentionDetailsRoute.name,
          args: IntentionDetailsRouteArgs(
@@ -568,11 +453,11 @@ class IntentionDetailsRoute
 
   static const String name = 'IntentionDetailsRoute';
 
-  static _i19.PageInfo page = _i19.PageInfo(
+  static _i17.PageInfo page = _i17.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<IntentionDetailsRouteArgs>();
-      return _i12.IntentionDetailsPage(
+      return _i10.IntentionDetailsPage(
         intentionId: args.intentionId,
         target: args.target,
         key: args.key,
@@ -584,15 +469,15 @@ class IntentionDetailsRoute
 class IntentionDetailsRouteArgs {
   const IntentionDetailsRouteArgs({
     required this.intentionId,
-    this.target = const _i13.OverviewTarget(),
+    this.target = const _i11.OverviewTarget(),
     this.key,
   });
 
-  final _i20.IntentionId intentionId;
+  final _i18.IntentionId intentionId;
 
-  final _i13.IntentionPageTarget target;
+  final _i11.IntentionPageTarget target;
 
-  final _i31.Key? key;
+  final _i27.Key? key;
 
   @override
   String toString() {
@@ -613,13 +498,13 @@ class IntentionDetailsRouteArgs {
 }
 
 /// generated route for
-/// [_i14.IntentionEditPage]
-class IntentionEditRoute extends _i19.PageRouteInfo<IntentionEditRouteArgs> {
+/// [_i12.IntentionEditPage]
+class IntentionEditRoute extends _i17.PageRouteInfo<IntentionEditRouteArgs> {
   IntentionEditRoute({
-    required _i20.IntentionId intentionId,
-    _i14.IntentionEditFocus focus = _i14.IntentionEditFocus.title,
-    _i22.Key? key,
-    List<_i19.PageRouteInfo>? children,
+    required _i18.IntentionId intentionId,
+    _i12.IntentionEditFocus focus = _i12.IntentionEditFocus.title,
+    _i20.Key? key,
+    List<_i17.PageRouteInfo>? children,
   }) : super(
          IntentionEditRoute.name,
          args: IntentionEditRouteArgs(
@@ -632,11 +517,11 @@ class IntentionEditRoute extends _i19.PageRouteInfo<IntentionEditRouteArgs> {
 
   static const String name = 'IntentionEditRoute';
 
-  static _i19.PageInfo page = _i19.PageInfo(
+  static _i17.PageInfo page = _i17.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<IntentionEditRouteArgs>();
-      return _i14.IntentionEditPage(
+      return _i12.IntentionEditPage(
         intentionId: args.intentionId,
         focus: args.focus,
         key: args.key,
@@ -648,15 +533,15 @@ class IntentionEditRoute extends _i19.PageRouteInfo<IntentionEditRouteArgs> {
 class IntentionEditRouteArgs {
   const IntentionEditRouteArgs({
     required this.intentionId,
-    this.focus = _i14.IntentionEditFocus.title,
+    this.focus = _i12.IntentionEditFocus.title,
     this.key,
   });
 
-  final _i20.IntentionId intentionId;
+  final _i18.IntentionId intentionId;
 
-  final _i14.IntentionEditFocus focus;
+  final _i12.IntentionEditFocus focus;
 
-  final _i22.Key? key;
+  final _i20.Key? key;
 
   @override
   String toString() {
@@ -677,14 +562,14 @@ class IntentionEditRouteArgs {
 }
 
 /// generated route for
-/// [_i15.IntentionEditorPage]
+/// [_i13.IntentionEditorPage]
 class IntentionEditorRoute
-    extends _i19.PageRouteInfo<IntentionEditorRouteArgs> {
+    extends _i17.PageRouteInfo<IntentionEditorRouteArgs> {
   IntentionEditorRoute({
-    _i22.Key? key,
-    _i16.IntentionCreationLaunch launch =
-        const _i16.IntentionCreationStandalone(),
-    List<_i19.PageRouteInfo>? children,
+    _i20.Key? key,
+    _i14.IntentionCreationLaunch launch =
+        const _i14.IntentionCreationStandalone(),
+    List<_i17.PageRouteInfo>? children,
   }) : super(
          IntentionEditorRoute.name,
          args: IntentionEditorRouteArgs(key: key, launch: launch),
@@ -693,13 +578,13 @@ class IntentionEditorRoute
 
   static const String name = 'IntentionEditorRoute';
 
-  static _i19.PageInfo page = _i19.PageInfo(
+  static _i17.PageInfo page = _i17.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<IntentionEditorRouteArgs>(
         orElse: () => const IntentionEditorRouteArgs(),
       );
-      return _i15.IntentionEditorPage(key: args.key, launch: args.launch);
+      return _i13.IntentionEditorPage(key: args.key, launch: args.launch);
     },
   );
 }
@@ -707,12 +592,12 @@ class IntentionEditorRoute
 class IntentionEditorRouteArgs {
   const IntentionEditorRouteArgs({
     this.key,
-    this.launch = const _i16.IntentionCreationStandalone(),
+    this.launch = const _i14.IntentionCreationStandalone(),
   });
 
-  final _i22.Key? key;
+  final _i20.Key? key;
 
-  final _i16.IntentionCreationLaunch launch;
+  final _i14.IntentionCreationLaunch launch;
 
   @override
   String toString() {
@@ -731,15 +616,15 @@ class IntentionEditorRouteArgs {
 }
 
 /// generated route for
-/// [_i17.RelationBatchPickerPage]
+/// [_i15.RelationBatchPickerPage]
 class RelationBatchPickerRoute
-    extends _i19.PageRouteInfo<RelationBatchPickerRouteArgs> {
+    extends _i17.PageRouteInfo<RelationBatchPickerRouteArgs> {
   RelationBatchPickerRoute({
-    required _i20.IntentionId pageIntentionId,
+    required _i18.IntentionId pageIntentionId,
     required String pageTitle,
-    required _i32.IntentionRelationGroup group,
-    _i24.Key? key,
-    List<_i19.PageRouteInfo>? children,
+    required _i28.IntentionRelationGroup group,
+    _i22.Key? key,
+    List<_i17.PageRouteInfo>? children,
   }) : super(
          RelationBatchPickerRoute.name,
          args: RelationBatchPickerRouteArgs(
@@ -753,11 +638,11 @@ class RelationBatchPickerRoute
 
   static const String name = 'RelationBatchPickerRoute';
 
-  static _i19.PageInfo page = _i19.PageInfo(
+  static _i17.PageInfo page = _i17.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<RelationBatchPickerRouteArgs>();
-      return _i17.RelationBatchPickerPage(
+      return _i15.RelationBatchPickerPage(
         pageIntentionId: args.pageIntentionId,
         pageTitle: args.pageTitle,
         group: args.group,
@@ -775,13 +660,13 @@ class RelationBatchPickerRouteArgs {
     this.key,
   });
 
-  final _i20.IntentionId pageIntentionId;
+  final _i18.IntentionId pageIntentionId;
 
   final String pageTitle;
 
-  final _i32.IntentionRelationGroup group;
+  final _i28.IntentionRelationGroup group;
 
-  final _i24.Key? key;
+  final _i22.Key? key;
 
   @override
   String toString() {
@@ -807,17 +692,17 @@ class RelationBatchPickerRouteArgs {
 }
 
 /// generated route for
-/// [_i18.SettingsPage]
-class SettingsRoute extends _i19.PageRouteInfo<void> {
-  const SettingsRoute({List<_i19.PageRouteInfo>? children})
+/// [_i16.SettingsPage]
+class SettingsRoute extends _i17.PageRouteInfo<void> {
+  const SettingsRoute({List<_i17.PageRouteInfo>? children})
     : super(SettingsRoute.name, initialChildren: children);
 
   static const String name = 'SettingsRoute';
 
-  static _i19.PageInfo page = _i19.PageInfo(
+  static _i17.PageInfo page = _i17.PageInfo(
     name,
     builder: (data) {
-      return const _i18.SettingsPage();
+      return const _i16.SettingsPage();
     },
   );
 }

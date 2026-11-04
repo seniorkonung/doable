@@ -4,6 +4,7 @@ import 'package:doable/src/design_system/components/archived_fold.dart';
 import 'package:doable/src/design_system/components/count_tiles.dart';
 import 'package:doable/src/design_system/components/empty_state.dart';
 import 'package:doable/src/design_system/components/relation_row.dart';
+import 'package:doable/src/design_system/doable_priority.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -202,7 +203,7 @@ void main() {
       final note = TextPreview.fromText(description).text;
       final row = _relationRow(tester, 1);
       expect(row.kind, RelationRowKind.need);
-      expect(row.priority, RelationRowPriority.p1);
+      expect(row.priority, DoablePriority.p1);
       expect(row.label, l10n.detailsRelationsRowNeed('P1'));
       expect(row.name, 'Сделать силовую тренировку');
       expect(row.note, note);

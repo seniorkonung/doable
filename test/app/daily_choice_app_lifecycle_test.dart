@@ -48,6 +48,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/daily_choice_creation_controls.dart';
+import '../support/daily_choice_detail_fields_controls.dart';
+import '../support/daily_choice_details_controls.dart';
+
 import '../support/app_root_pages.dart';
 import '../support/daily_choice_catalog_controls.dart';
 import '../support/daily_choice_catalog_provider.dart';
@@ -244,17 +248,12 @@ void main() {
         tester,
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
-      await _until(
+      await awaitDailyChoiceConfirmation(
         tester,
-        () => find
-            .byKey(const ValueKey('daily-choice-submit'))
-            .evaluate()
-            .isNotEmpty,
+        waitFor: (tester, finder) =>
+            _until(tester, () => finder.evaluate().isNotEmpty),
       );
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-date')),
-        createdDate.toCanonicalString(),
-      );
+      await setDailyChoiceCreationDate(tester, createdDate);
       gate.arm(
         fail: false,
         operation: LocalDatabaseSqlOperation.insert,
@@ -322,10 +321,8 @@ void main() {
       // Новый выбор относится к другому дню: человек выбирает этот день.
       await selectDailyChoiceCatalogDate(tester, createdDate, tap: _tap);
       await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
-      expect(
-        find.textContaining(createdDate.toCanonicalString()),
-        findsWidgets,
-      );
+      await tester.pumpAndSettle();
+      expect(dailyChoiceDetailsField('Завтра'), findsOneWidget);
       expect(_storedIds(harness, 'daily_choices'), hasLength(2));
       await tester.pump(const Duration(seconds: 1));
       expect(message, findsNothing);
@@ -390,27 +387,7 @@ void main() {
       final repository = ready.container.read(personalGraphRepositoryProvider);
 
       gate.arm(fail: true);
-      await _tap(tester, find.byKey(const ValueKey('daily-choice-edit-open')));
-      await _until(
-        tester,
-        () => find
-            .byKey(const ValueKey('daily-choice-edit-date'))
-            .evaluate()
-            .isNotEmpty,
-      );
-      await tester.pumpAndSettle(const Duration(milliseconds: 1));
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-edit-date')),
-        '2027-01-02',
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-edit-description')),
-        'Запись до commit',
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('daily-choice-edit-submit')),
-      );
+      await changeDailyChoiceDescription(tester, 'Запись до commit', tap: _tap);
       await _until(tester, () => gate.hasEntered);
       expect(_storedDate(harness, 202), '2026-09-23');
       final failedRead = repository.getDailyChoice(durabilityChoice(202));
@@ -444,12 +421,12 @@ void main() {
             .evaluate()
             .isNotEmpty,
       );
-      expect(find.textContaining('Дневной выбор изменён'), findsNothing);
       expect(
         find.byKey(const ValueKey('graph-operation-message')),
         findsWidgets,
       );
       await tester.pumpAndSettle();
+      expect(dailyChoiceDetails, findsNothing);
       ScaffoldMessenger.of(
         tester.element(
           find.byKey(const ValueKey('graph-operation-message')).first,
@@ -461,23 +438,14 @@ void main() {
         findsNothing,
       );
 
+      // Закрытая до результата панель открывается заново.
+      await _tap(tester, find.byKey(const ValueKey('daily-choice-row-2')));
+      await _until(tester, () => dailyChoiceDetailsReady.evaluate().isNotEmpty);
       gate.arm(fail: false);
-      await _tap(tester, find.byKey(const ValueKey('daily-choice-edit-open')));
-      await _until(
+      await setDailyChoiceDate(
         tester,
-        () => find
-            .byKey(const ValueKey('daily-choice-edit-date'))
-            .evaluate()
-            .isNotEmpty,
-      );
-      await tester.pumpAndSettle(const Duration(milliseconds: 1));
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-edit-date')),
-        '2027-01-02',
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('daily-choice-edit-submit')),
+        CalendarDate.fromParts(2027, 1, 2),
+        tap: _tap,
       );
       await _until(tester, () => gate.hasEntered);
       var readCompleted = false;
@@ -512,25 +480,8 @@ void main() {
         findsNothing,
       );
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      await _until(
-        tester,
-        () => find
-            .byKey(const ValueKey('graph-operation-message'))
-            .evaluate()
-            .isNotEmpty,
-      );
-      expect(find.textContaining('Дневной выбор изменён'), findsWidgets);
-      expect(
-        find.byKey(const ValueKey('graph-operation-message')),
-        findsWidgets,
-      );
       await tester.pumpAndSettle();
-      ScaffoldMessenger.of(
-        tester.element(
-          find.byKey(const ValueKey('graph-operation-message')).first,
-        ),
-      ).hideCurrentSnackBar();
-      await tester.pumpAndSettle();
+      expect(dailyChoiceDetails, findsNothing);
       expect(
         find.byKey(const ValueKey('graph-operation-message')),
         findsNothing,
@@ -747,7 +698,7 @@ void main() {
           mode: DailyChoiceCalendarMode.week,
         ),
         'раскрытие невыполненных': true,
-        'раскрытие выполненных': false,
+        'раскрытие выполненных': true,
         'сегодня': _nextToday,
         'загруженные записи': [durabilityUuid(_nextTodayChoice)],
         'позиция прокрутки': 0.0,
@@ -761,7 +712,15 @@ void main() {
         findsOneWidget,
       );
       await showDailyChoiceCatalogSection(tester, true);
-      expect(_rowLabel(tester, 1), contains(_nextToday.toCanonicalString()));
+      expect(
+        find.byKey(
+          ValueKey(
+            'daily-choice-completion-${durabilityUuid(_nextTodayChoice)}',
+          ),
+          skipOffstage: false,
+        ),
+        findsOneWidget,
+      );
       expect(durabilityFileState(harness.databaseFile), stored);
 
       // Сохранённые прошлый и будущий выборы доступны выбором их дня.
@@ -781,7 +740,13 @@ void main() {
           tester,
           result.items.single.isCompleted,
         );
-        expect(_rowLabel(tester, 1), contains(date.toCanonicalString()));
+        expect(
+          find.byKey(
+            ValueKey('daily-choice-completion-${durabilityUuid(choice)}'),
+            skipOffstage: false,
+          ),
+          findsOneWidget,
+        );
       }
       expect(second.catalogQueries.map(_conditions), [
         (_nextToday, false, false),
@@ -904,15 +869,6 @@ ScrollPosition _catalogPosition(WidgetTester tester) => tester
           .first,
     )
     .position;
-
-/// Подпись строки [number] выдачи каталога дневных выборов для экранного
-/// диктора.
-String _rowLabel(WidgetTester tester, int number) => tester
-    .widget<Semantics>(
-      find.byKey(ValueKey('daily-choice-row-$number'), skipOffstage: false),
-    )
-    .properties
-    .label!;
 
 /// Реальный адаптер, который записывает условия чтений выдачи каталога
 /// дневных выборов и дошедшие до хранилища команды.

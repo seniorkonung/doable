@@ -14,16 +14,10 @@ import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/app/settings/settings_page.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
-import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
-import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
-import 'package:doable/src/daily_choice/presentation/editor/daily_choice_edit_page.dart';
-import 'package:doable/src/daily_choice/presentation/editor/daily_choice_path_replace_page.dart';
-import 'package:doable/src/daily_choice/presentation/editor/daily_choice_path_replacement_flow.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
@@ -51,6 +45,8 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../daily_choice/presentation/daily_choice_picker_launch_test_support.dart'
+    show TestDailyChoicePickerLaunch;
 import '../../intention/presentation/picker/intention_picker_test_support.dart';
 import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_local_date.dart';
@@ -156,9 +152,7 @@ void main() {
       await _select(tester, AppDestination.intentionGraph);
       unawaited(
         router.push(
-          DailyChoiceActionPickerRoute(
-            pickerContext: const PathReplacementDailyChoicePickerContext(),
-          ),
+          DailyChoiceActionPickerRoute(launch: TestDailyChoicePickerLaunch()),
         ),
       );
       final filter = find.byKey(const ValueKey('daily-choice-action-filter'));
@@ -276,9 +270,7 @@ void _expectAboveShell(
   expect(top, findsOneWidget, reason: '$page');
   expect(tester.getRect(top), Offset.zero & _screen(tester), reason: '$page');
 
-  final ordinary =
-      expectedPanel ??
-      (page == IntentionDetailsPage || page == DailyChoiceDetailsPage);
+  final ordinary = expectedPanel ?? page == IntentionDetailsPage;
   expect(
     find.byType(AppNavigationBar),
     ordinary ? findsOneWidget : findsNothing,
@@ -453,17 +445,6 @@ Future<void> _open(WidgetTester tester, Finder entry, Type page) async {
 Future<void> _close(WidgetTester tester, Type page) async {
   await tester.binding.handlePopRoute();
   await _gone(tester, page);
-}
-
-/// Закрывает системным действием «назад» все страницы поверх оболочки.
-Future<void> _closeAll(WidgetTester tester) async {
-  bool hasRootPage() =>
-      _rootPages.values.any((page) => find.byType(page).evaluate().isNotEmpty);
-  for (var page = 0; page < 12 && !hasRootPage(); page++) {
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-  }
-  expect(hasRootPage(), isTrue);
 }
 
 Future<void> _gone(WidgetTester tester, Type page) async {

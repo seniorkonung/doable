@@ -856,34 +856,40 @@ void main() {
     },
   );
 
-  for (final scenario in <({DailyChoiceCommandKind kind, String message})>[
-    (
-      kind: DailyChoiceCommandKind.create,
-      message: 'Create — “daily choice”: Daily choice created.',
-    ),
-    (
-      kind: DailyChoiceCommandKind.update,
-      message: 'Edit — “daily choice”: Daily choice updated.',
-    ),
-    (
-      kind: DailyChoiceCommandKind.replace,
-      message: 'Edit — “daily choice”: Daily choice path replaced.',
-    ),
-  ]) {
-    testWidgets(
-      'успех дневной команды ${scenario.kind.name} предъявляется один раз',
-      (tester) async {
-        final harness = await _pumpPresenterApp(tester);
-        final accepted = harness.startDailyChoice(scenario.kind);
-        harness.completeDailyChoiceSuccess(accepted, scenario.kind);
-        await tester.pumpAndSettle();
+  testWidgets('успех создания дневного выбора предъявляется один раз', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester);
+    final accepted = harness.startDailyChoice(DailyChoiceCommandKind.create);
+    harness.completeDailyChoiceSuccess(accepted, DailyChoiceCommandKind.create);
+    await tester.pumpAndSettle();
 
-        expect(find.text(scenario.message), findsOneWidget);
-        await _closeMessage(tester);
-        expect(find.byType(SnackBar), findsNothing);
-      },
+    expect(
+      find.text('Create — “daily choice”: Daily choice created.'),
+      findsOneWidget,
     );
-  }
+    await _closeMessage(tester);
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
+  testWidgets(
+    'успех изменения дневного выбора не объявляется сообщением и не занимает '
+    'очередь',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final intention = harness.startDelete(index: 1, title: 'Намерение');
+      final update = harness.startDailyChoice(DailyChoiceCommandKind.update);
+      harness.completeDeleted(intention);
+      harness.completeDailyChoiceSuccess(update, DailyChoiceCommandKind.update);
+      await update.future;
+      await tester.pumpAndSettle();
+
+      expect(find.text(_deleted('Намерение')), findsOneWidget);
+
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
 
   for (final scenario in <({Locale locale, String message})>[
     (
@@ -1998,7 +2004,6 @@ final class _PresenterHarness {
       switch (kind) {
         DailyChoiceCommandKind.create => _startDailyChoiceCreate(),
         DailyChoiceCommandKind.update => startDailyChoiceUpdate(),
-        DailyChoiceCommandKind.replace => _startDailyChoiceReplace(),
         DailyChoiceCommandKind.delete => startDailyChoiceDelete(),
       };
 
@@ -2022,21 +2027,6 @@ final class _PresenterHarness {
         date: CalendarDate.fromParts(2026, 9, 23),
         description: null,
         isCompleted: false,
-      ),
-    ) as DailyChoiceCommandAccepted;
-    _coordinator.releaseInitiatorPresentation(accepted.token);
-    _dailyChoiceIndexes[accepted] = commandIndex;
-    return accepted;
-  }
-
-  DailyChoiceCommandAccepted _startDailyChoiceReplace() {
-    final commandIndex = repository.dailyChoiceCommands.length;
-    final accepted = _coordinator.acceptDailyChoiceReplace(
-      ReplaceDailyChoicePath(
-        choiceId: _dailyChoiceId,
-        sourceIntentionId: testDetailsIntentionId(1),
-        selectedIntentionId: testDetailsIntentionId(2),
-        path: _confirmedChoicePath(),
       ),
     ) as DailyChoiceCommandAccepted;
     _coordinator.releaseInitiatorPresentation(accepted.token);
@@ -2129,12 +2119,6 @@ final class _PresenterHarness {
         changes: changes,
       ),
       DailyChoiceCommandKind.update => DailyChoiceFieldsUpdated(
-        before: choice,
-        choice: choice,
-        path: path,
-        changes: changes,
-      ),
-      DailyChoiceCommandKind.replace => DailyChoicePathReplaced(
         before: choice,
         choice: choice,
         path: path,

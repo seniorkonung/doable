@@ -102,19 +102,6 @@ final class DailyChoiceFieldsUpdated extends DailyChoiceCommandSuccess {
   final StoredChoicePath path;
 }
 
-final class DailyChoicePathReplaced extends DailyChoiceCommandSuccess {
-  DailyChoicePathReplaced({
-    required this.before,
-    required this.choice,
-    required this.path,
-    required super.changes,
-  });
-
-  final DailyChoice before;
-  final DailyChoice choice;
-  final StoredChoicePath path;
-}
-
 final class DailyChoiceDeleted extends DailyChoiceCommandSuccess {
   DailyChoiceDeleted({required this.choice, required super.changes});
 

@@ -49,14 +49,7 @@ void main() {
 
       expect(session.recordCompletion(completion), isTrue);
       final saved = session.state;
-      expect(
-        saved,
-        isA<DailyChoiceCreationFlowSaved>().having(
-          (state) => state.choiceId,
-          'идентификатор созданного выбора',
-          durabilityChoice(201),
-        ),
-      );
+      expect(saved, isA<DailyChoiceCreationFlowSaved>());
       expect(observed, [
         isA<DailyChoiceCreationFlowSubmitting>(),
         isA<DailyChoiceCreationFlowSaved>(),
@@ -175,11 +168,7 @@ void main() {
         isA<DailyChoiceCreationFlowLeft>().having(
           (state) => state.lastActiveState,
           'сохранённый результат после выхода',
-          isA<DailyChoiceCreationFlowSaved>().having(
-            (state) => state.choiceId,
-            'идентификатор',
-            durabilityChoice(202),
-          ),
+          isA<DailyChoiceCreationFlowSaved>(),
         ),
       );
       expect(session.recordCompletion(failure), isFalse);

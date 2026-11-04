@@ -79,24 +79,15 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
     unawaited(_assemble());
   }
 
+  /// Заголовки секций есть только над подтверждёнными данными.
   void toggleSection(bool isCompleted) {
-    _selection = _selection.toggle(isCompleted);
-    state = switch (state) {
-      DailyChoiceCatalogInitialLoad() => DailyChoiceCatalogInitialLoad(
-        _selection,
-        completionOperations: state.completionOperations,
-      ),
-      DailyChoiceCatalogInitialFailure(:final failure) =>
-        DailyChoiceCatalogInitialFailure(
-          _selection,
-          failure,
-          completionOperations: state.completionOperations,
-        ),
-      DailyChoiceCatalogLoaded loaded => loaded.withStatus(
+    if (state case final DailyChoiceCatalogLoaded loaded) {
+      _selection = _selection.toggle(isCompleted);
+      state = loaded.withStatus(
         selection: _selection,
         refreshFailure: loaded.refreshFailure,
-      ),
-    };
+      );
+    }
   }
 
   Future<void> retryFirstPage() {
@@ -114,7 +105,7 @@ final class DailyChoiceCatalogViewModel extends _$DailyChoiceCatalogViewModel {
     final loaded = state;
     if (loaded is DailyChoiceCatalogLoaded &&
         loaded.freshness == DailyChoiceCatalogFreshness.stale &&
-        loaded.refreshFailure is DailyChoiceCatalogUnavailableFailure) {
+        loaded.canRetryRefresh) {
       return _assemble(base: loaded);
     }
     return Future.value();

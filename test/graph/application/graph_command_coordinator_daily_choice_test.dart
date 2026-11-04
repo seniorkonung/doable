@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
+import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
@@ -14,7 +14,6 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -40,10 +39,6 @@ void main() {
       final claimFuture = registration.nextClaim();
 
       expect(coordinator.isDailyChoiceRunning(_choiceA), isTrue);
-      expect(
-        coordinator.acceptDailyChoiceReplace(_replace(_choiceA)),
-        isA<DailyChoiceCommandAlreadyRunning>(),
-      );
       expect(
         coordinator.acceptDailyChoiceDelete(DeleteDailyChoice(_choiceA)),
         isA<DailyChoiceCommandAlreadyRunning>(),
@@ -93,6 +88,79 @@ void main() {
           ),
     );
     expect(coordinator.isDailyChoiceRunning(_choiceA), isFalse);
+    await coordinator.shutdown();
+  });
+
+  test('успех изменения публикуется для согласования без права предъявления и '
+      'не задерживает следующий отказ', () async {
+    final repository = _ControlledRepository();
+    final coordinator = _coordinator(repository);
+    final completions = <GraphCommandCompletion>[];
+    final subscription = coordinator.completions.listen(completions.add);
+    final registration = coordinator.registerAppPresentation();
+    final claims = <GraphAppPresentationClaim?>[];
+    unawaited(registration.nextClaim().then(claims.add));
+
+    final accepted = coordinator.acceptDailyChoiceUpdate(
+      UpdateDailyChoiceFields(
+        choiceId: _choiceA,
+        patch: const DailyChoiceFieldsPatch(
+          isCompleted: DailyChoiceFieldSet(true),
+        ),
+      ),
+    ) as DailyChoiceCommandAccepted;
+    repository.completeUpdated(0);
+    final completion = await accepted.future;
+    await pumpEventQueue();
+
+    expect(completion.kind, DailyChoiceCommandKind.update);
+    expect(completion.isFailure, isFalse);
+    expect(completion, isNot(isA<GraphPresentableCompletion>()));
+    expect(completion.revision, const _Revision());
+    expect(completions, [same(completion)]);
+    expect(claims, isEmpty);
+    expect(coordinator.claimInitiatorFailure(accepted.token), isNull);
+
+    final failed = coordinator.acceptDailyChoiceDelete(
+      DeleteDailyChoice(_choiceB),
+    ) as DailyChoiceCommandAccepted;
+    coordinator.releaseInitiatorPresentation(failed.token);
+    repository.completeDailyFailure(1);
+    final failure = await failed.future;
+    await pumpEventQueue();
+
+    expect(claims.single?.completions, [same(failure)]);
+    coordinator.confirmAppPresentation(claims.single!, [failure.token]);
+    registration.release();
+    await subscription.cancel();
+    await coordinator.shutdown();
+  });
+
+  test('отказ изменения принадлежит сначала инициатору', () async {
+    final repository = _ControlledRepository();
+    final coordinator = _coordinator(repository);
+    final registration = coordinator.registerAppPresentation();
+    final claims = <GraphAppPresentationClaim?>[];
+    unawaited(registration.nextClaim().then(claims.add));
+
+    final accepted = coordinator.acceptDailyChoiceUpdate(
+      UpdateDailyChoiceFields(
+        choiceId: _choiceA,
+        patch: const DailyChoiceFieldsPatch(
+          isCompleted: DailyChoiceFieldSet(true),
+        ),
+      ),
+    ) as DailyChoiceCommandAccepted;
+    repository.completeDailyFailure(0);
+    final completion = await accepted.future;
+    await pumpEventQueue();
+
+    expect(completion, isA<GraphPresentableCompletion>());
+    expect(claims, isEmpty);
+    final claim = coordinator.claimInitiatorFailure(accepted.token);
+    expect(claim, isNotNull);
+    coordinator.releaseInitiatorClaim(claim!);
+    registration.release();
     await coordinator.shutdown();
   });
 
@@ -146,34 +214,20 @@ GraphCommandCoordinator _coordinator(PersonalGraphRepository repository) {
   return container.read(graphCommandCoordinatorProvider.notifier);
 }
 
-ReplaceDailyChoicePath _replace(DailyChoiceId id) => ReplaceDailyChoicePath(
-  choiceId: id,
-  sourceIntentionId: _source,
-  selectedIntentionId: _selected,
-  path: _path,
-);
-
-final _path = ConfirmedChoicePath([
-  ConfirmedChoicePathStep(
-    relationId: _relation,
-    sourceIntentionId: _source,
-    type: LongTermRelationType.need,
-    relatedIntentionId: _selected,
-  ),
-]);
-
 String _uuid(int number) =>
     '018f47c2-6b7d-7abc-8def-${number.toRadixString(16).padLeft(12, '0')}';
 final _source = (IntentionId.decode(_uuid(1)) as IntentionIdDecodingSuccess).id;
 final _selected =
     (IntentionId.decode(_uuid(2)) as IntentionIdDecodingSuccess).id;
-final _relation = (LongTermRelationId.decode(
-  _uuid(3),
-) as LongTermRelationIdDecodingSuccess).id;
 final _choiceA =
     (DailyChoiceId.decode(_uuid(4)) as DailyChoiceIdDecodingSuccess).id;
 final _choiceB =
     (DailyChoiceId.decode(_uuid(5)) as DailyChoiceIdDecodingSuccess).id;
+final _stepId =
+    (ChoicePathStepId.decode(_uuid(6)) as ChoicePathStepIdDecodingSuccess).id;
+final _relationId = (LongTermRelationId.decode(
+  _uuid(7),
+) as LongTermRelationIdDecodingSuccess).id;
 
 final class _ControlledRepository
     with TagReadContractTestFallback
@@ -203,6 +257,41 @@ final class _ControlledRepository
       DailyChoiceCommandFailure
     >(DailyChoiceUnavailableFailure()),
   );
+
+  void completeUpdated(int index) {
+    const revision = _Revision();
+    final choice = DailyChoice(
+      id: _choiceA,
+      sourceIntentionId: _source,
+      selectedIntentionId: _selected,
+      date: CalendarDate.fromParts(2026, 9, 23),
+      description: null,
+      isCompleted: true,
+    );
+    _results[index].complete(
+      GraphCommandSucceeded<
+        DailyChoiceCommandSuccess,
+        DailyChoiceCommandFailure
+      >(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: DailyChoiceFieldsUpdated(
+            before: choice,
+            choice: choice,
+            path: StoredChoicePath([
+              ChoicePathStep(
+                id: _stepId,
+                dailyChoiceId: _choiceA,
+                relationId: _relationId,
+                previousStepId: null,
+              ),
+            ]),
+            changes: [const _Change(revision)],
+          ),
+        ),
+      ),
+    );
+  }
 
   void fail(int index) =>
       _results[index].completeError(StateError('Текст записи.'));

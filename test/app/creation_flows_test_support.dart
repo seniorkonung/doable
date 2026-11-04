@@ -3,7 +3,7 @@ part of 'creation_flows_integration_test.dart';
 Future<void> _seedDailyChoicesForReturn(AppDatabase database) async {
   await seedDurabilityGraph(database);
   await seedGraph(database, () async {
-    for (var index = 0; index < 12; index++) {
+    for (var index = 0; index < 30; index++) {
       await database.customStatement(
         'INSERT INTO daily_choices (id, source_intention_id, '
         'selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
@@ -54,14 +54,14 @@ enum _Flow {
     'daily_choices',
     0,
     'daily-choice-submit',
-    DailyChoiceDetailsRoute.name,
+    null,
   ),
   bottomUp(
     'дневной выбор от действия',
     'daily_choices',
     0,
     'daily-choice-submit',
-    DailyChoiceDetailsRoute.name,
+    null,
   );
 
   const _Flow(
@@ -76,7 +76,7 @@ enum _Flow {
   final int initialRows;
   final String submit;
 
-  /// Маршрут созданной сущности.
+  /// Маршрут созданной сущности; дневной выбор возвращает на исходную страницу.
   final String? resultRoute;
 
   Future<void> open(
@@ -162,7 +162,10 @@ enum _Flow {
         );
         await _tap(tester, _key('choice-path-open-confirmation'));
         expect(find.byType(AppNavigationBar), findsNothing);
-        await tester.enterText(_key('daily-choice-date'), '2026-10-09');
+        await setDailyChoiceCreationDate(
+          tester,
+          CalendarDate.fromParts(2026, 10, 9),
+        );
         await tester.enterText(
           _key('daily-choice-description'),
           'Сохранённое описание',
@@ -313,8 +316,7 @@ Future<_App> _start(
   await tester.pumpAndSettle();
   container.read(openedDailyChoiceCatalogProvider(container).notifier)
     ..selectDate(CalendarDate.fromParts(2026, 10, 7))
-    ..toggleSection(false)
-    ..toggleSection(true);
+    ..toggleSection(false);
   await tester.pumpAndSettle();
   return _App(router, container, database, observer);
 }

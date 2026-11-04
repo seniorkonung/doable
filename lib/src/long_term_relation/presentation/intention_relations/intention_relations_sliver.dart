@@ -11,6 +11,7 @@ import '../../../design_system/components/count_tiles.dart';
 import '../../../design_system/components/empty_state.dart';
 import '../../../design_system/components/relation_row.dart';
 import '../../../design_system/doable_metrics.dart';
+import '../../../design_system/doable_priority.dart';
 import '../../../intention/application/intention_details.dart';
 import '../../../intention/domain/intention.dart';
 import '../../../intention/domain/intention_id.dart';
@@ -544,10 +545,10 @@ final class _GroupRow extends StatelessWidget {
         LongTermRelationType.can => RelationRowKind.can,
       },
       priority: switch (relation.priority) {
-        RelationPriority.p1 => RelationRowPriority.p1,
-        RelationPriority.p2 => RelationRowPriority.p2,
-        RelationPriority.p3 => RelationRowPriority.p3,
-        RelationPriority.p4 => RelationRowPriority.p4,
+        RelationPriority.p1 => DoablePriority.p1,
+        RelationPriority.p2 => DoablePriority.p2,
+        RelationPriority.p3 => DoablePriority.p3,
+        RelationPriority.p4 => DoablePriority.p4,
       },
       label: switch (relation.type) {
         LongTermRelationType.need => l10n.detailsRelationsRowNeed(priority),

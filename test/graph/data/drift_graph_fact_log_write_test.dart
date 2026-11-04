@@ -185,38 +185,6 @@ void main() {
       ),
       ['изменение дневного выбора'],
     );
-    final other = (await expectOnePackage<IntentionSaved>(
-      repository.execute(
-        CreateIntention.withInitialState(
-          title: 'Говорить',
-          description: null,
-          readiness: IntentionReadiness.ready,
-          tagIds: const {},
-        ),
-      ),
-      ['создание намерения'],
-    )).intention;
-    final otherRelation = (await expectOnePackage<LongTermRelationsAdded>(
-      repository.execute(
-        AddLongTermRelations(
-          pageIntentionId: source.id,
-          group: IntentionRelationGroup.needs,
-          candidateIds: [other.id],
-        ),
-      ),
-      ['создание связи'],
-    )).relations.single;
-    await expectOnePackage<DailyChoicePathReplaced>(
-      repository.execute(
-        ReplaceDailyChoicePath(
-          choiceId: choice.id,
-          sourceIntentionId: source.id,
-          selectedIntentionId: other.id,
-          path: _path(otherRelation.id, source.id, other.id),
-        ),
-      ),
-      ['изменение дневного выбора'],
-    );
     await expectOnePackage<DailyChoiceDeleted>(
       repository.execute(DeleteDailyChoice(choice.id)),
       ['удаление дневного выбора'],

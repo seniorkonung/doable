@@ -29,6 +29,12 @@ sealed class Badge extends StatelessWidget {
   /// `fill` за коробкой архива. Диктор читает слово.
   const factory Badge.archived({required String word, Key? key}) =
       BadgeArchived;
+
+  /// Та же метка в строке, которая не должна стать выше своего текста: без
+  /// полей сверху и снизу, поэтому она высотой со строку слова при любом
+  /// размере шрифта.
+  const factory Badge.archivedInline({required String word, Key? key}) =
+      BadgeArchived.inline;
 }
 
 /// Метка-значок: плитка 22×20 со значком [icon] тона [tone].
@@ -68,9 +74,16 @@ final class BadgeMark extends Badge {
 
 /// Метка архива: коробка архива и слово [word].
 final class BadgeArchived extends Badge {
-  const BadgeArchived({required this.word, super.key}) : super._();
+  const BadgeArchived({required this.word, super.key})
+    : _verticalPadding = 1,
+      super._();
+
+  const BadgeArchived.inline({required this.word, super.key})
+    : _verticalPadding = 0,
+      super._();
 
   final String word;
+  final double _verticalPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +95,7 @@ final class BadgeArchived extends Badge {
         borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(5, 1, 7, 1),
+        padding: EdgeInsets.fromLTRB(5, _verticalPadding, 7, _verticalPadding),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           spacing: DoableMetrics.space1,

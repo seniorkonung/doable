@@ -26,7 +26,22 @@ final class TabItem<T extends Object> {
   final DoableIconData? icon;
 }
 
-/// Прокручиваемая полоса вкладок. Выбором и закреплением управляет страница.
+/// Плоскость под полосой вкладок: фон полосы и цвет, в который затухают её края.
+enum TabsPlane { page, sheet }
+
+/// Смысл пилюль для экранного диктора, который следует из конструктора.
+///
+/// [tab] — разделы одного вида, выбранный раздел отмечен как выбранная вкладка.
+/// [toggle] — нажатые кнопки вроде «AM» и «PM»: выбранная кнопка отмечена
+/// как включённая.
+enum _TabsSemantics { tab, toggle }
+
+/// Полоса вкладок или переключатель. Выбором и закреплением управляет страница.
+///
+/// Вкладки идут прокручиваемой полосой с затухающими краями. Переключатель
+/// [Tabs.toggle] — короткий ряд пилюль без прокрутки, закрепления и
+/// затухающих краёв: он занимает ширину своих пилюль, а место в раскладке
+/// задаёт потребитель.
 final class Tabs<T extends Object> extends StatefulWidget {
   const Tabs({
     required this.items,
@@ -34,14 +49,34 @@ final class Tabs<T extends Object> extends StatefulWidget {
     required this.onChange,
     required this.label,
     this.stuck = false,
+    this.plane = TabsPlane.page,
     super.key,
-  });
+  }) : _semantics = _TabsSemantics.tab,
+       minWidth = DoableMetrics.tapMin;
+
+  /// Переключатель из равных по ширине пилюль: нажатая кнопка объявлена
+  /// включённой, а не выбранной вкладкой.
+  ///
+  /// [minWidth] — наименьшая ширина пилюли: пилюли «AM» и «PM» равны.
+  const Tabs.toggle({
+    required this.items,
+    required this.value,
+    required this.onChange,
+    required this.label,
+    required this.minWidth,
+    super.key,
+  }) : _semantics = _TabsSemantics.toggle,
+       stuck = false,
+       plane = TabsPlane.page;
 
   final List<TabItem<T>> items;
   final T value;
   final ValueChanged<T> onChange;
   final String label;
   final bool stuck;
+  final TabsPlane plane;
+  final double minWidth;
+  final _TabsSemantics _semantics;
 
   /// Высота закреплённой полосы для `SliverPersistentHeader`: 52 при обычном
   /// тексте, с ростом пилюль при увеличении системного масштаба.
@@ -87,7 +122,8 @@ final class _TabsState<T extends Object> extends State<Tabs<T>> {
   }
 
   void _scheduleReveal() {
-    if (_revealScheduled) return;
+    // У переключателя нет прокрутки, которую нужно двигать к выбранной пилюле.
+    if (_revealScheduled || widget._semantics == _TabsSemantics.toggle) return;
     _revealScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _revealScheduled = false;
@@ -102,19 +138,45 @@ final class _TabsState<T extends Object> extends State<Tabs<T>> {
     });
   }
 
+  Widget _buildToggle() => Semantics(
+    container: true,
+    explicitChildNodes: true,
+    label: widget.label,
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      spacing: DoableMetrics.space1,
+      children: [
+        for (final item in widget.items)
+          _TabPill(
+            item: item,
+            selected: item.id == widget.value,
+            height: Tabs._pillHeight(context),
+            semantics: widget._semantics,
+            minWidth: widget.minWidth,
+            onTap: () => widget.onChange(item.id),
+          ),
+      ],
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     assert(
       widget.items.map((item) => item.id).toSet().length == widget.items.length,
     );
     assert(widget.items.any((item) => item.id == widget.value));
+    if (widget._semantics == _TabsSemantics.toggle) return _buildToggle();
     _itemKeys.removeWhere(
       (id, _) => !widget.items.any((item) => item.id == id),
     );
     final colors = Theme.of(context).extension<DoableColors>()!;
     final pillHeight = Tabs._pillHeight(context);
+    final (plane, fade) = switch (widget.plane) {
+      TabsPlane.page => (colors.bg, colors.bgFade),
+      TabsPlane.sheet => (colors.raised, colors.raised.withValues(alpha: 0)),
+    };
     return Material(
-      color: colors.bg,
+      color: plane,
       child: DecoratedBox(
         position: DecorationPosition.foreground,
         decoration: BoxDecoration(
@@ -158,6 +220,8 @@ final class _TabsState<T extends Object> extends State<Tabs<T>> {
                               item: item,
                               selected: item.id == widget.value,
                               height: pillHeight,
+                              semantics: widget._semantics,
+                              minWidth: widget.minWidth,
                               onTap: () => widget.onChange(item.id),
                             ),
                         ],
@@ -172,9 +236,7 @@ final class _TabsState<T extends Object> extends State<Tabs<T>> {
                     child: IgnorePointer(
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [colors.bg, colors.bgFade],
-                          ),
+                          gradient: LinearGradient(colors: [plane, fade]),
                         ),
                       ),
                     ),
@@ -187,9 +249,7 @@ final class _TabsState<T extends Object> extends State<Tabs<T>> {
                     child: IgnorePointer(
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [colors.bgFade, colors.bg],
-                          ),
+                          gradient: LinearGradient(colors: [fade, plane]),
                         ),
                       ),
                     ),
@@ -209,6 +269,8 @@ final class _TabPill<T extends Object> extends StatefulWidget {
     required this.item,
     required this.selected,
     required this.height,
+    required this.semantics,
+    required this.minWidth,
     required this.onTap,
     super.key,
   });
@@ -216,6 +278,8 @@ final class _TabPill<T extends Object> extends StatefulWidget {
   final TabItem<T> item;
   final bool selected;
   final double height;
+  final _TabsSemantics semantics;
+  final double minWidth;
   final VoidCallback onTap;
 
   @override
@@ -250,10 +314,13 @@ final class _TabPillState<T extends Object> extends State<_TabPill<T>> {
         FocusManager.instance.highlightMode == FocusHighlightMode.traditional;
     // Роль вкладки и готовое название принадлежат одному узлу:
     // https://api.flutter.dev/flutter/dart-ui/SemanticsRole.html
+    final isTab = widget.semantics == _TabsSemantics.tab;
     return Semantics(
       container: true,
-      role: SemanticsRole.tab,
-      selected: widget.selected,
+      role: isTab ? SemanticsRole.tab : SemanticsRole.none,
+      button: isTab ? null : true,
+      selected: isTab ? widget.selected : null,
+      toggled: isTab ? null : widget.selected,
       label: widget.item.semanticLabel,
       onTap: widget.onTap,
       child: InkWell(
@@ -279,33 +346,41 @@ final class _TabPillState<T extends Object> extends State<_TabPill<T>> {
             ),
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                minWidth: DoableMetrics.tapMin,
+                minWidth: widget.minWidth,
                 minHeight: widget.height,
               ),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: ExcludeSemantics(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    spacing: 6,
-                    children: [
-                      Text(
-                        widget.item.label,
-                        style: DoableType.section.copyWith(
-                          color: widget.selected ? colors.ink : colors.muted,
-                        ),
-                      ),
-                      if (widget.item.count case final count?)
+                // Подпись стоит по центру пилюли, когда её ширина задана
+                // наименьшей шириной, а не подписью.
+                child: Center(
+                  widthFactor: 1,
+                  heightFactor: 1,
+                  child: ExcludeSemantics(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      spacing: 6,
+                      children: [
                         Text(
-                          '$count',
-                          style: DoableType.label.copyWith(
-                            color: colors.muted,
-                            fontFeatures: const [FontFeature.tabularFigures()],
+                          widget.item.label,
+                          style: DoableType.section.copyWith(
+                            color: widget.selected ? colors.ink : colors.muted,
                           ),
                         ),
-                      if (widget.item.icon case final icon?)
-                        DoableIcon(icon, size: 14, color: colors.muted),
-                    ],
+                        if (widget.item.count case final count?)
+                          Text(
+                            '$count',
+                            style: DoableType.label.copyWith(
+                              color: colors.muted,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                        if (widget.item.icon case final icon?)
+                          DoableIcon(icon, size: 14, color: colors.muted),
+                      ],
+                    ),
                   ),
                 ),
               ),

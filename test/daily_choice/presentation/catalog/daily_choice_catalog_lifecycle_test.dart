@@ -125,7 +125,7 @@ void main() {
 
     final catalog = _catalogState(tester);
     expect(catalog, isA<DailyChoiceCatalogLoaded>());
-    expect(catalog.selection.completedExpanded, false);
+    expect(catalog.selection.completedExpanded, true);
     final shownWeeks = visibleWeeks(tester);
     expect(shownWeeks, weeksFrom(date(2026, 9, 28), 6));
     expect(_todayMarker(tester, date(2026, 10, 6)), findsOneWidget);

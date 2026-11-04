@@ -160,11 +160,10 @@ final class DailyChoiceCreationViewModel
         return;
       }
       state = switch (completion.result) {
-        GraphResultSuccess(value: DailyChoiceCreated(:final choice)) =>
-          state.withOperation(
-            DailyChoiceCreationSucceeded(choice.id),
-            event: DailyChoiceCreationCreated(choice.id),
-          ),
+        GraphResultSuccess(value: DailyChoiceCreated()) => state.withOperation(
+          const DailyChoiceCreationSucceeded(),
+          event: const DailyChoiceCreationCreated(),
+        ),
         GraphResultSuccess() => state.withOperation(
           const DailyChoiceCreationFailed(
             DailyChoiceCreationCommandRejected(DailyChoiceUnexpectedFailure()),

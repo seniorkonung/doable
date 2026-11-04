@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
-import '../../../../l10n/app_localizations.dart';
-import '../../../design_system/components/day_mark.dart';
 import '../../../design_system/components/month_grid_day.dart';
 import '../../../design_system/components/week_strip_day.dart';
 import '../../application/daily_choice_day_statuses.dart';
 import '../../domain/calendar_date.dart';
+import 'daily_choice_calendar_labels.dart';
 import 'daily_choice_calendar_viewport.dart';
 
 /// Ячейка допустимого дня встроенного календаря каталога.
@@ -61,7 +59,10 @@ final class DailyChoiceCalendarDay extends StatelessWidget {
         dayTexts: [for (var day = 1; day <= 31; day++) '$day'],
         weekdayTexts: [
           for (var day = 1; day <= DateTime.daysPerWeek; day++)
-            _weekdayLabel(context, DateTime.utc(2024, 1, day)),
+            dailyChoiceCalendarWeekdayLabel(
+              context,
+              DateTime.utc(2024, 1, day),
+            ),
         ],
         columnWidth: columnWidth,
       );
@@ -78,14 +79,19 @@ final class DailyChoiceCalendarDay extends StatelessWidget {
     if (mode == DailyChoiceCalendarMode.week) {
       return WeekStripDay(
         dayText: '${date.day}',
-        weekdayText: _weekdayLabel(
+        weekdayText: dailyChoiceCalendarWeekdayLabel(
           context,
           DateTime.utc(date.year, date.month, date.day),
         ),
         isSelected: isSelected,
         isToday: isToday,
-        mark: _mark,
-        semanticLabel: _label(context),
+        mark: dailyChoiceCalendarDayMark(status),
+        semanticLabel: dailyChoiceCalendarDayLabel(
+          context,
+          date: date,
+          isToday: isToday,
+          status: status,
+        ),
         onTap: onSelected,
       );
     }
@@ -94,42 +100,14 @@ final class DailyChoiceCalendarDay extends StatelessWidget {
       isSelected: isSelected,
       isToday: isToday,
       isOutsideMonth: isOutsideMonth,
-      mark: _mark,
-      semanticLabel: _label(context),
+      mark: dailyChoiceCalendarDayMark(status),
+      semanticLabel: dailyChoiceCalendarDayLabel(
+        context,
+        date: date,
+        isToday: isToday,
+        status: status,
+      ),
       onTap: onSelected,
     );
   }
-
-  DayMark get _mark => switch (status) {
-    null => DayMark.none,
-    DailyChoiceDayStatus.hasIncomplete => DayMark.todo,
-    DailyChoiceDayStatus.allCompleted => DayMark.done,
-  };
-
-  /// Полная дата с днём недели по текущей локали и, у сегодняшнего дня,
-  /// отметка «сегодня», затем состояние дня, если оно известно.
-  String _label(BuildContext context) {
-    // Технический `DateTime` в UTC нужен только для форматирования
-    // календарных частей и не задаёт часовой пояс даты.
-    final fullDate = MaterialLocalizations.of(context)
-        .formatFullDate(DateTime.utc(date.year, date.month, date.day));
-    final localizations = AppLocalizations.of(context);
-    return [
-      fullDate,
-      if (isToday) localizations.dailyChoiceCalendarToday,
-      ?switch (status) {
-        null => null,
-        DailyChoiceDayStatus.allCompleted =>
-          localizations.dailyChoiceCalendarDayAllCompleted,
-        DailyChoiceDayStatus.hasIncomplete =>
-          localizations.dailyChoiceCalendarDayHasIncomplete,
-      },
-    ].join(', ');
-  }
-}
-
-String _weekdayLabel(BuildContext context, DateTime day) {
-  final label = DateFormat.E(Localizations.localeOf(context).toLanguageTag())
-      .format(day);
-  return label[0].toUpperCase() + label.substring(1);
 }

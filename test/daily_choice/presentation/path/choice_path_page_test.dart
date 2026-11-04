@@ -7,7 +7,9 @@ import 'package:doable/src/daily_choice/application/choice_path_continuations.da
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
+import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
@@ -29,6 +31,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/daily_choice_creation_controls.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 
@@ -220,7 +223,7 @@ void main() {
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('daily-choice-date')), findsOneWidget);
+      await awaitDailyChoiceConfirmation(tester);
       expect(find.textContaining('Намерение 1'), findsWidgets);
       expect(find.textContaining('Намерение 2'), findsWidgets);
       await tester.scrollUntilVisible(
@@ -274,9 +277,9 @@ void main() {
         find.byKey(const ValueKey('choice-path-open-confirmation')),
       );
       await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-date')),
-        '2026-12-31',
+      await setDailyChoiceCreationDate(
+        tester,
+        CalendarDate.fromParts(2026, 12, 31),
       );
       await tester.scrollUntilVisible(
         find.byKey(const ValueKey('daily-choice-submit')),
@@ -860,6 +863,14 @@ final class _PathRepository
     creationRequests.add(request);
     return await request.future as GraphCommandResult<TSuccess, TFailure>;
   }
+
+  /// Лист даты подтверждения читает отметки дней; их отказ ничего не меняет.
+  @override
+  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
+    DailyChoiceDayStatusQuery query,
+  ) async => const DailyChoiceDayStatusesReadError(
+    DailyChoiceDayStatusesReadFailure(),
+  );
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

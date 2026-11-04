@@ -14,6 +14,8 @@ import 'package:doable/src/daily_choice/presentation/details/daily_choice_detail
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_view_model.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/design_system/components/day_mark.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -22,13 +24,19 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/daily_choice_catalog_controls.dart';
+import '../../../support/daily_choice_detail_fields_controls.dart';
+import '../../../support/daily_choice_details_controls.dart';
+import '../../../support/daily_choice_durability_fixture.dart';
 import '../../../support/daily_choice_local_date.dart';
 import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
+import 'daily_choice_catalog_page_test_support.dart';
 
 String _uuid(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
@@ -120,8 +128,6 @@ void main() {
       addTearDown(otherSubscription.close);
       final otherModel = container.read(otherProvider.notifier);
       otherModel.selectDate(sourceDay);
-      otherModel.toggleSection(false);
-      otherModel.toggleSection(true);
       DailyChoiceCatalogLoaded otherCatalog() =>
           container.read(otherProvider) as DailyChoiceCatalogLoaded;
       final coordinator = container.read(
@@ -134,6 +140,7 @@ void main() {
             container.read(catalogProvider) is DailyChoiceCatalogLoaded &&
             container.read(otherProvider) is DailyChoiceCatalogLoaded,
       );
+      otherModel.toggleSection(false);
       expect(catalog().selection.date, sourceDay);
       expect(catalog().totalCount, 51);
       expect(catalog().items, hasLength(51));
@@ -147,7 +154,11 @@ void main() {
       expect(catalog().items.last.id, _choice(251));
       await expectMarks({sourceDay: DailyChoiceDayStatus.hasIncomplete});
 
-      final details = DailyChoiceDetailsViewModel(repository, _choice(201));
+      final details = DailyChoiceDetailsViewModel(
+        repository,
+        container.read(graphCommandCoordinatorProvider.notifier),
+        _choice(201),
+      );
       addTearDown(details.dispose);
       await _until(() => details.state is DailyChoiceDetailsLoaded);
       DailyChoiceDetailsLoaded opened() =>
@@ -185,7 +196,7 @@ void main() {
         });
         expect(catalog().selection.date, sourceDay);
         expect(catalog().selection.incompleteExpanded, isTrue);
-        expect(catalog().selection.completedExpanded, isFalse);
+        expect(catalog().selection.completedExpanded, isTrue);
         expect(otherCatalog().selection.date, sourceDay);
         expect(otherCatalog().selection.incompleteExpanded, isFalse);
         expect(otherCatalog().selection.completedExpanded, isTrue);
@@ -488,9 +499,8 @@ void main() {
       expect(catalog().incomplete.totalCount, 51);
       expect(ids(), isNot(contains(_choice(401))));
 
-      // Раскрытие выполненных сохраняет обе прочитанные секции того же дня.
+      // Раскрытые выполненные сохраняют обе прочитанные секции того же дня.
       includeCompleted = true;
-      model.toggleSection(true);
       await _until(() => shows(day, null));
       expect(catalog().totalCount, 52);
       expect(ids().last, _choice(253));
@@ -520,12 +530,6 @@ void main() {
     await database.open();
     addTearDown(database.close);
     await _seedGraph(database);
-    await seedGraph(database, () async {
-      await database.customStatement(
-        "INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived, created_at, updated_at) VALUES (?, ?, ?, 'can', 1, 0, 0, 0)",
-        [_uuid(103), _uuid(1), _uuid(3)],
-      );
-    });
     for (var number = 201; number <= 251; number++) {
       await _insertChoice(database, number, day);
       await _insertChoice(database, number + 100, day, completed: true);
@@ -571,7 +575,11 @@ void main() {
     final coordinator = container.read(
       graphCommandCoordinatorProvider.notifier,
     );
-    final details = DailyChoiceDetailsViewModel(repository, _choice(201));
+    final details = DailyChoiceDetailsViewModel(
+      repository,
+      coordinator,
+      _choice(201),
+    );
     addTearDown(details.dispose);
     await _until(() => details.state is DailyChoiceDetailsLoaded);
     DailyChoiceDetailsLoaded opened() =>
@@ -607,26 +615,19 @@ void main() {
       DailyChoiceTime(hour: 18, minute: 0),
     );
 
-    final replace = coordinator.acceptDailyChoiceReplace(
-      ReplaceDailyChoicePath(
+    final secondUpdate = coordinator.acceptDailyChoiceUpdate(
+      UpdateDailyChoiceFields(
         choiceId: _choice(201),
-        sourceIntentionId: _intention(1),
-        selectedIntentionId: _intention(3),
-        path: ConfirmedChoicePath([
-          ConfirmedChoicePathStep(
-            relationId: _relation(103),
-            sourceIntentionId: _intention(1),
-            type: LongTermRelationType.can,
-            relatedIntentionId: _intention(3),
-          ),
-        ]),
+        patch: const DailyChoiceFieldsPatch(
+          priority: DailyChoiceFieldSet(DailyChoicePriority.p1),
+        ),
       ),
     ) as DailyChoiceCommandAccepted;
-    expect((await replace.future).isFailure, isFalse);
+    expect((await secondUpdate.future).isFailure, isFalse);
     await _until(
       () =>
           catalog().freshness == DailyChoiceCatalogFreshness.current &&
-          opened().details.path.length == 1,
+          opened().details.choice.priority == DailyChoicePriority.p1,
     );
     expect(
       (catalog().incomplete.items.length, catalog().completed.items.length),
@@ -640,8 +641,8 @@ void main() {
     final moved = catalog().incomplete.items.last;
     expect(moved.id, _choice(201));
     expect(moved.schedule, DailyChoiceTime(hour: 18, minute: 0));
-    expect(moved.priority, DailyChoicePriority.p2);
-    expect(moved.pathIntentionCount, 2);
+    expect(moved.priority, DailyChoicePriority.p1);
+    expect(moved.pathIntentionCount, 3);
 
     model.changeCompletion(moved.id, true);
     await _until(
@@ -656,8 +657,71 @@ void main() {
       isFalse,
     );
     expect(catalog().completed.items.first.id, moved.id);
-    expect(catalog().completed.items.first.pathIntentionCount, 2);
+    expect(catalog().completed.items.first.pathIntentionCount, 3);
     expect(catalog().completed.items, hasLength(52));
+  });
+
+  testWidgets('перенос даты в панели оставляет её открытой с новой датой, а '
+      'после закрытия каталог и отметки обоих дней согласованы', (
+    tester,
+  ) async {
+    final database = AppDatabase(openInMemoryLocalDatabase());
+    await database.open();
+    addTearDown(database.close);
+    await seedDurabilityGraph(database);
+    final repository = durabilityRepository(database);
+    expect(
+      await repository.execute(durabilityCreate(completed: false)),
+      isA<GraphCommandSucceeded>(),
+    );
+    final targetDay = CalendarDate.fromParts(2026, 9, 27);
+    await pumpCatalogPage(
+      tester,
+      repository,
+      today: durabilityChoiceDate,
+      locale: const Locale('ru'),
+      size: const Size(360, 900),
+    );
+    Future<void> until(bool Function() condition) async {
+      for (var attempt = 0; attempt < 200 && !condition(); attempt++) {
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+      expect(condition(), isTrue);
+    }
+
+    final row = find.byKey(const ValueKey('daily-choice-row-1'));
+    await until(() => row.evaluate().isNotEmpty);
+    await expandDailyChoiceCatalogCalendar(tester);
+    await until(
+      () => dailyChoiceCatalogDayMark(
+        durabilityChoiceDate,
+        mark: DayMark.todo,
+      ).evaluate().isNotEmpty,
+    );
+    await tester.tap(row);
+    await until(() => dailyChoiceDetailsReady.evaluate().isNotEmpty);
+    await tester.pumpAndSettle();
+
+    await setDailyChoiceDate(tester, targetDay);
+    await until(
+      () => dailyChoiceDetailsField('27 сент.').evaluate().isNotEmpty,
+    );
+    await tester.pumpAndSettle();
+
+    expect(dailyChoiceDetails, findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
+    await closeDailyChoiceDetails(tester);
+    await until(() => row.evaluate().isEmpty);
+    await until(
+      () =>
+          dailyChoiceCatalogDayMark(
+            targetDay,
+            mark: DayMark.todo,
+          ).evaluate().isNotEmpty &&
+          dailyChoiceCatalogDayMark(durabilityChoiceDate).evaluate().isEmpty,
+    );
+    expect(shownDailyChoiceCatalogDate(tester), durabilityChoiceDate);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 }
 

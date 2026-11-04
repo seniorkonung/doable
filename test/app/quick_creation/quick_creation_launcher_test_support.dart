@@ -105,9 +105,7 @@ Future<BuildContext> _source(
   if (origin == _Origin.deep) {
     unawaited(
       router.push(
-        DailyChoiceActionPickerRoute(
-          pickerContext: const PathReplacementDailyChoicePickerContext(),
-        ),
+        DailyChoiceActionPickerRoute(launch: TestDailyChoicePickerLaunch()),
       ),
     );
     await tester.pumpAndSettle();

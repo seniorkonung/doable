@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
@@ -21,27 +20,20 @@ import '../../../intention/presentation/catalog/catalog_test_support.dart'
 import '../../../support/app_root_pages.dart';
 import '../../../support/controlled_participant_picker_repository.dart';
 import '../daily_choice_picker_tag_search_test_support.dart';
-import '../daily_choice_picker_context_test_support.dart';
+import '../daily_choice_picker_launch_test_support.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 
 void main() {
-  defineDailyChoicePickerContextTests(
-    route: (pickerContext) =>
-        DailyChoiceSourcePickerRoute(pickerContext: pickerContext),
+  defineDailyChoicePickerLaunchTests(
+    route: (launch) => DailyChoiceSourcePickerRoute(launch: launch),
     keyPrefix: 'daily-choice-source',
     readinessFilter: IntentionReadinessFilter.all,
-    ruTexts: (
-      title: 'Выбор намерения',
-      header: 'Все',
-      pathReplacementCancel: 'Отменить выбор намерения',
-    ),
+    ruTexts: (title: 'Выбор намерения', header: 'Все'),
     purposeTexts: {
       'ru': (
         title: 'Выбор намерения',
         creationSubtitle: 'Новый дневной выбор: исходное намерение',
         creationLine: 'Новый дневной выбор, от намерения',
-        replacementSubtitle: 'Замена пути: исходное намерение',
-        replacementLine: 'Замена пути, от намерения',
         startStep: 'Исходное намерение',
         pathStep: 'Путь вниз к действию',
         pathNote:
@@ -51,8 +43,6 @@ void main() {
         title: 'Choose an intention',
         creationSubtitle: 'New daily choice: source intention',
         creationLine: 'New daily choice, from an intention',
-        replacementSubtitle: 'Path replacement: source intention',
-        replacementLine: 'Path replacement, from an intention',
         startStep: 'Source intention',
         pathStep: 'Path down to an action',
         pathNote: 'Each next step is what the previous one needs or can use',
@@ -64,7 +54,7 @@ void main() {
   defineDailyChoicePickerTagSearchTests(
     DailyChoicePickerTagSearchCase(
       route: DailyChoiceSourcePickerRoute(
-        pickerContext: const PathReplacementDailyChoicePickerContext(),
+        launch: TestDailyChoicePickerLaunch(),
       ),
       keyPrefix: 'daily-choice-source',
       readinessFilter: IntentionReadinessFilter.all,
@@ -87,9 +77,7 @@ void main() {
 
     unawaited(
       router.push<IntentionId>(
-        DailyChoiceSourcePickerRoute(
-          pickerContext: const PathReplacementDailyChoicePickerContext(),
-        ),
+        DailyChoiceSourcePickerRoute(launch: TestDailyChoicePickerLaunch()),
       ),
     );
     await _settleRoute(tester);
@@ -116,9 +104,7 @@ void main() {
       final router = await _pumpApp(tester, repository);
       addTearDown(router.dispose);
       final selection = router.push<IntentionId>(
-        DailyChoiceSourcePickerRoute(
-          pickerContext: const PathReplacementDailyChoicePickerContext(),
-        ),
+        DailyChoiceSourcePickerRoute(launch: TestDailyChoicePickerLaunch()),
       );
       await _settleRoute(tester);
       _completeFirst(repository, 1, [

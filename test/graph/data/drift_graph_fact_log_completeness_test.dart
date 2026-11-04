@@ -292,8 +292,8 @@ void main() {
     await confirm(DeleteLongTermRelation(relation.id));
   });
 
-  test('команды дневных выборов: создание, изменение полей, замена пути и '
-      'удаление вместе с шагами', () async {
+  test('команды дневных выборов: создание, изменение полей и удаление '
+      'вместе с шагами', () async {
     final health = await createIntention('Здоровье');
     final running = await createIntention(
       'Бегать',
@@ -303,17 +303,8 @@ void main() {
       'Пробежка утром',
       readiness: IntentionReadiness.ready,
     );
-    final swimming = await createIntention(
-      'Плавать',
-      readiness: IntentionReadiness.ready,
-    );
     final needRunning = await relate(health, running);
     final needMorning = await relate(running, morning);
-    final canSwim = await relate(
-      health,
-      swimming,
-      group: IntentionRelationGroup.canUse,
-    );
     final choice = (await confirm<DailyChoiceCreated>(
       CreateDailyChoice(
         sourceIntentionId: health.id,
@@ -347,14 +338,6 @@ void main() {
           schedule: const DailyChoiceFieldSet(DailyChoiceAllDay()),
           priority: const DailyChoiceFieldSet(DailyChoicePriority.p1),
         ),
-      ),
-    );
-    await confirm(
-      ReplaceDailyChoicePath(
-        choiceId: choice.id,
-        sourceIntentionId: health.id,
-        selectedIntentionId: swimming.id,
-        path: _path([canSwim]),
       ),
     );
     await confirm(DeleteDailyChoice(choice.id));

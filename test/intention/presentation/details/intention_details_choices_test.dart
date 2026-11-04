@@ -29,6 +29,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../long_term_relation/presentation/relation_graph_test_support.dart'
     show TestRelationGroupCursor;
+import '../../../support/daily_choice_details_controls.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import 'details_test_support.dart';
 
@@ -189,11 +190,7 @@ void main() {
           revision: const TestDetailsRevision(0),
         ),
       );
-      final router = await _openPage(
-        tester,
-        repository,
-        locale: const Locale('ru'),
-      );
+      await _openPage(tester, repository, locale: const Locale('ru'));
       repository.detailRequests.single.add(ResultSuccess(owner));
       await tester.pumpAndSettle();
       final pageWatches = repository.detailRequests.length;
@@ -213,8 +210,8 @@ void main() {
 
       await tester.tap(row);
       await tester.pumpAndSettle();
-      expect(router.current.name, DailyChoiceDetailsRoute.name);
-      // Вкладка остаётся выбранной под открытой страницей, и модель живёт.
+      expect(dailyChoiceDetails, findsOneWidget);
+      // Вкладка остаётся выбранной под открытой панелью, и модель живёт.
       expect(choicesWatch.cancellationCount, 0);
       semantics.dispose();
     },

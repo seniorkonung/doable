@@ -1858,32 +1858,27 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceCreated => 'Дневной выбор создан.';
 
   @override
-  String get dailyChoiceUpdated => 'Дневной выбор изменён.';
-
-  @override
-  String get dailyChoicePathReplaced => 'Путь дневного выбора заменён.';
-
-  @override
   String get dailyChoiceDeleted => 'Дневной выбор удалён.';
 
   @override
-  String get dailyChoiceDeleteAction => 'Удалить дневной выбор навсегда';
+  String get dailyChoiceSheetOptionEditDescription => 'Изменить описание';
 
   @override
-  String get dailyChoiceDeleteConfirmationTitle =>
-      'Удалить дневной выбор навсегда?';
+  String get dailyChoiceSheetOptionDelete => 'Удалить дневной выбор';
 
   @override
-  String dailyChoiceDeleteConfirmationMessage(
-    String phrase,
-    String date,
-    String choiceId,
-  ) {
-    return 'Выбор: $phrase\nДата: $date\nИдентификатор выбора: $choiceId\n\nЭто действие нельзя отменить. Намерения, долговременные связи и другие дневные выборы сохранятся.';
+  String get dailyChoiceDeleteDialogTitle => 'Удалить дневной выбор?';
+
+  @override
+  String get dailyChoiceDeleteDialogBefore => 'Выбор ';
+
+  @override
+  String dailyChoiceDeleteDialogAfter(String date) {
+    return ' на $date будет удалён. Это действие нельзя отменить.';
   }
 
   @override
-  String get dailyChoiceDeleteConfirmAction => 'Удалить навсегда';
+  String get dailyChoiceDeleteDialogAction => 'Удалить';
 
   @override
   String get dailyChoiceSourceInvalid =>
@@ -2048,7 +2043,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get relationDeleteReferencedByDailyPath =>
-      'Связь используется в сохранённом дневном пути. Сначала удалите или замените использующие её дневные выборы.';
+      'Связь используется в сохранённом дневном пути. Сначала удалите использующие её дневные выборы.';
 
   @override
   String get relationDeleteUnavailable =>
@@ -2196,9 +2191,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationSheetDeleteDialogConfirm => 'Удалить';
 
   @override
-  String get actionPickerCancel => 'Отменить выбор действия';
-
-  @override
   String get actionPickerLoading => 'Загружаем действия…';
 
   @override
@@ -2217,9 +2209,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить действия из-за непредвиденной ошибки.';
 
   @override
-  String get sourcePickerCancel => 'Отменить выбор намерения';
-
-  @override
   String get sourcePickerEmpty => 'Доступных активных намерений нет.';
 
   @override
@@ -2231,28 +2220,12 @@ class AppLocalizationsRu extends AppLocalizations {
       'Новый дневной выбор: конечное действие';
 
   @override
-  String get dailyChoicePickerPurposeReplacementSource =>
-      'Замена пути: исходное намерение';
-
-  @override
-  String get dailyChoicePickerPurposeReplacementAction =>
-      'Замена пути: конечное действие';
-
-  @override
   String get dailyChoicePickerFlowCreationFromSource =>
       'Новый дневной выбор, от намерения';
 
   @override
   String get dailyChoicePickerFlowCreationFromAction =>
       'Новый дневной выбор, от действия';
-
-  @override
-  String get dailyChoicePickerFlowReplacementFromSource =>
-      'Замена пути, от намерения';
-
-  @override
-  String get dailyChoicePickerFlowReplacementFromAction =>
-      'Замена пути, от действия';
 
   @override
   String get dailyChoicePickerStepCurrent => 'Вы здесь';
@@ -2279,13 +2252,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get dailyChoicePickerStepDetails =>
       'Дата, время, приоритет и описание';
-
-  @override
-  String get dailyChoicePickerStepReplacement => 'Подтверждение замены';
-
-  @override
-  String get dailyChoicePickerStepReplacementNote =>
-      'Дата, запланированное время, приоритет, описание и выполнение останутся прежними';
 
   @override
   String get intentionPickerArchived => 'в архиве';
@@ -2768,18 +2734,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceCreationTitle => 'Подтвердить дневной выбор';
 
   @override
-  String get dailyChoiceScheduleLabel => 'Запланированное время';
-
-  @override
   String get dailyChoiceAllDay => 'Весь день';
-
-  @override
-  String get dailyChoiceSetTime => 'Указать время';
-
-  @override
-  String dailyChoiceTimeLabel(String time) {
-    return 'Время: $time';
-  }
 
   @override
   String get dailyChoicePriorityLabel => 'Приоритет';
@@ -2844,31 +2799,30 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceCalendarNextYear => 'Следующий год';
 
   @override
-  String get dailyChoiceCatalogIncomplete => 'Не выполненные';
+  String get dailyChoiceCatalogIncomplete => 'Невыполненные';
 
   @override
   String get dailyChoiceCatalogCompleted => 'Выполненные';
 
   @override
-  String dailyChoiceCatalogTotalCount(int count) {
-    return 'Всего дневных выборов: $count';
-  }
+  String get dailyChoiceCatalogEmptyTitle => 'Выборов на эту дату нет';
 
   @override
-  String get dailyChoiceCatalogEmpty => 'На этот день нет дневных выборов.';
+  String get dailyChoiceCatalogEmptyText =>
+      'Создайте выбор из действия и назначьте эту дату. Он появится здесь.';
 
   @override
-  String get dailyChoiceCatalogRefreshing => 'Обновляем дневные выборы…';
+  String get dailyChoiceCatalogRefreshing => 'Обновляем…';
+
+  @override
+  String get dailyChoiceCatalogScrollToTop => 'Вернуться к началу';
 
   @override
   String get dailyChoiceCatalogLoadingMore => 'Загружаем ещё дневные выборы…';
 
   @override
-  String get dailyChoiceCatalogLoadMore => 'Показать ещё дневные выборы';
-
-  @override
   String get dailyChoiceCatalogUnavailable =>
-      'Не удалось загрузить дневные выборы. Повторите попытку.';
+      'Не удалось загрузить дневные выборы.';
 
   @override
   String get dailyChoiceCatalogCorruption =>
@@ -2883,14 +2837,14 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить дневные выборы из-за непредвиденной ошибки.';
 
   @override
-  String dailyChoiceCatalogPathIntentionCount(int count) {
+  String dailyChoiceCatalogPathStepCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count намерения в пути',
-      many: '$count намерений в пути',
-      few: '$count намерения в пути',
-      one: '$count намерение в пути',
+      other: '$count шага в пути',
+      many: '$count шагов в пути',
+      few: '$count шага в пути',
+      one: '$count шаг в пути',
     );
     return '$_temp0';
   }
@@ -2898,44 +2852,32 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String dailyChoiceCatalogCompletionLabel(
     int number,
-    String phrase,
-    String date,
+    String action,
+    String priority,
   ) {
-    return 'Выполнение выбора № $number. $phrase. $date';
+    return 'Выполнение выбора № $number. $action. $priority';
   }
-
-  @override
-  String get dailyChoiceCompletionSaving => 'Сохраняем выполнение…';
-
-  @override
-  String get dailyChoiceCompletionSynchronizing =>
-      'Выполнение сохранено. Обновляем каталог…';
 
   @override
   String get dailyChoiceCompletionRefresh => 'Обновить выбор';
 
   @override
-  String dailyChoiceCatalogRowLabel(
-    int number,
-    String phrase,
-    String date,
-    String completion,
-  ) {
-    return 'Выбор № $number. $phrase. $date. $completion';
+  String dailyChoiceCatalogRowLabel(int number, String action) {
+    return 'Выбор № $number. $action';
+  }
+
+  @override
+  String dailyChoiceCatalogRowSource(String source) {
+    return 'Исходное намерение: $source';
+  }
+
+  @override
+  String dailyChoiceCatalogRowTime(String time) {
+    return 'В $time';
   }
 
   @override
   String get dailyChoiceDetailsTitle => 'Дневной выбор';
-
-  @override
-  String get dailyChoiceEditTitle => 'Редактировать дневной выбор';
-
-  @override
-  String get dailyChoiceEditSave => 'Сохранить изменения';
-
-  @override
-  String get dailyChoiceEditRefresh =>
-      'Вернуться к подробностям и обновить данные';
 
   @override
   String get dailyChoiceDetailsLoading => 'Загружаем дневной выбор…';
@@ -2973,12 +2915,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceDetailsNotCompleted => 'Не выполнено';
 
   @override
-  String get dailyChoiceDetailsDescription => 'Описание';
-
-  @override
-  String get dailyChoiceDetailsPath => 'Сохранённый путь';
-
-  @override
   String get dailyChoiceDetailsSource => 'Основание';
 
   @override
@@ -2994,15 +2930,118 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceDetailsActive => 'Активно';
 
   @override
-  String get dailyChoiceDetailsReady => 'Готово к действию';
-
-  @override
-  String get dailyChoiceDetailsNotReady => 'Не готово к действию';
-
-  @override
   String dailyChoiceDetailsStep(int number) {
     return 'Переход $number';
   }
+
+  @override
+  String get dailyChoiceSheetExpand => 'Раскрыть панель дневного выбора';
+
+  @override
+  String get dailyChoiceSheetCollapse => 'Свернуть панель дневного выбора';
+
+  @override
+  String dailyChoiceSheetCompletionLabel(String action, String priority) {
+    return 'Выполнение выбора. $action. $priority';
+  }
+
+  @override
+  String get dailyChoiceSheetOptionsLabel => 'Параметры дневного выбора';
+
+  @override
+  String get dailyChoiceSheetTabsLabel => 'Разделы дневного выбора';
+
+  @override
+  String get dailyChoiceSheetPathTab => 'Путь';
+
+  @override
+  String dailyChoiceSheetPathTabLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Путь, $count шага',
+      many: 'Путь, $count шагов',
+      few: 'Путь, $count шага',
+      one: 'Путь, $count шаг',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String dailyChoiceSheetPathTabArchivedLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Путь, $count шага, в пути есть архив',
+      many: 'Путь, $count шагов, в пути есть архив',
+      few: 'Путь, $count шага, в пути есть архив',
+      one: 'Путь, $count шаг, в пути есть архив',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get dailyChoiceSheetPathArchivedNote =>
+      'В пути есть архивированные намерения или связи.';
+
+  @override
+  String get dailyChoiceSheetDescriptionTitle => 'Описание';
+
+  @override
+  String get dailyChoiceSheetDescriptionBack => 'Назад к дневному выбору';
+
+  @override
+  String get dailyChoiceSheetDescriptionSave => 'Сохранить';
+
+  @override
+  String get dailyChoiceSheetDescriptionDiscardTitle => 'Отменить изменения?';
+
+  @override
+  String get dailyChoiceSheetDescriptionDiscardMessage =>
+      'Изменения описания не сохранятся.';
+
+  @override
+  String get dailyChoiceSheetDescriptionDiscardAction => 'Отменить';
+
+  @override
+  String get dailyChoiceSheetDescriptionContinueAction => 'Продолжить правку';
+
+  @override
+  String get dailyChoiceFieldDate => 'Дата';
+
+  @override
+  String get dailyChoiceFieldTime => 'Время';
+
+  @override
+  String dailyChoiceFieldDateLabel(String date) {
+    return 'Дата: $date. Изменить дату';
+  }
+
+  @override
+  String dailyChoiceFieldTimeLabel(String time) {
+    return 'Время: $time. Изменить время';
+  }
+
+  @override
+  String get dailyChoiceDateSheetLabel => 'Дата дневного выбора';
+
+  @override
+  String get dailyChoiceTimeSheetLabel => 'Время дневного выбора';
+
+  @override
+  String get dailyChoiceTimeHalfSwitchLabel => 'Половина суток';
+
+  @override
+  String get dailyChoiceTimeAmLabel => 'До полудня';
+
+  @override
+  String get dailyChoiceTimePmLabel => 'После полудня';
+
+  @override
+  String get dailyChoiceDateTomorrow => 'Завтра';
+
+  @override
+  String get dailyChoiceDateYesterday => 'Вчера';
 
   @override
   String get dailyChoiceCreationPath => 'Подтверждаемый путь';
@@ -3011,13 +3050,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String dailyChoiceCreationAction(String action) {
     return 'Выбранное действие: $action';
   }
-
-  @override
-  String get dailyChoiceCreationDate => 'Дата дневного выбора';
-
-  @override
-  String get dailyChoiceCreationDateHint =>
-      'Введите дату в формате ГГГГ-ММ-ДД (0001–9999)';
 
   @override
   String get dailyChoiceCreationDescription => 'Описание (необязательно)';
@@ -3041,62 +3073,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get dailyChoiceCreationRefreshPath =>
       'Вернуться к пути и актуализировать его';
-
-  @override
-  String get dailyChoiceReplaceTitle => 'Подтвердить замену пути';
-
-  @override
-  String get dailyChoiceReplacePreparing =>
-      'Готовим подтверждение нового пути…';
-
-  @override
-  String get dailyChoiceReplaceCurrent => 'Заменяемый дневной выбор';
-
-  @override
-  String get dailyChoiceReplaceNewPath => 'Новый путь от основания к действию';
-
-  @override
-  String get dailyChoiceReplaceNoDescription => 'Без описания';
-
-  @override
-  String get dailyChoiceReplaceFieldsPreserved =>
-      'Дата, описание и выполнение сохранятся без изменений при замене пути.';
-
-  @override
-  String get dailyChoiceReplaceCompletionPreserved =>
-      'Выполнение останется включённым, даже если выбрано другое действие.';
-
-  @override
-  String get dailyChoiceReplaceConfirm => 'Заменить только путь';
-
-  @override
-  String get dailyChoiceReplaceSubmitting => 'Заменяем путь…';
-
-  @override
-  String get dailyChoiceReplaceChooseAgain => 'Вернуться к выбору пути';
-
-  @override
-  String get dailyChoiceReplaceOpen => 'Заменить путь';
-
-  @override
-  String get dailyChoiceReplaceChooseDirection =>
-      'Выбрать направление нового пути';
-
-  @override
-  String get dailyChoiceReplaceChooseDirectionDescription =>
-      'Выберите новое основание или действие для замены сохранённого пути.';
-
-  @override
-  String get dailyChoiceReplaceFromSource => 'Начать с нового основания';
-
-  @override
-  String get dailyChoiceReplaceFromAction => 'Начать с нового действия';
-
-  @override
-  String get dailyChoiceReplaceSelectPath => 'Выбрать путь для замены';
-
-  @override
-  String get dailyChoiceReplaceOpenConfirmation => 'Подтвердить замену пути';
 
   @override
   String get choicePathOpenConfirmation => 'Перейти к подтверждению выбора';

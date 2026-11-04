@@ -11,6 +11,7 @@ import 'package:doable/src/daily_choice/presentation/path/choice_path_view_model
 import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/priority_picker.dart';
+import 'package:doable/src/design_system/doable_priority.dart';
 import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:doable/src/design_system/components/relation_row.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
@@ -101,16 +102,11 @@ Future<AppRuntime> _start(
       ),
     );
   } else {
-    final page = purpose == ChoicePathPurpose.refreshCreation
-        ? ChoicePathPage.forCreationRefresh(
-            startingIntentionId: startingId,
-            direction: direction,
-            pathInstance: ChoicePathPageInstance(),
-          )
-        : ChoicePathPage.forReplacement(
-            startingIntentionId: startingId,
-            direction: direction,
-          );
+    final page = ChoicePathPage.forCreationRefresh(
+      startingIntentionId: startingId,
+      direction: direction,
+      pathInstance: ChoicePathPageInstance(),
+    );
     unawaited(
       Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => page)),
     );
@@ -360,32 +356,26 @@ void main() {
     expect(find.byKey(const ValueKey('choice-path-empty')), findsOneWidget);
   });
 
-  for (final purpose in [
-    ChoicePathPurpose.refreshCreation,
-    ChoicePathPurpose.replace,
-  ]) {
-    testWidgets(
-      'построение для ${purpose.name} возвращается из связей к прежнему пути',
-      (tester) async {
-        await _start(
-          tester,
-          ChoicePathDraftDirection.topDown,
-          purpose: purpose,
-          locale: const Locale('en'),
-        );
-        await _tap(tester, _continuation(101));
-        await _tap(tester, _continuation(102));
-        await _tap(tester, find.text('Open relations'));
-        final l10n = lookupAppLocalizations(const Locale('en'));
-        await _until(tester, find.text(l10n.detailsRelationsNeedsHint));
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
-        expect(find.textContaining('Намерение 2'), findsWidgets);
-        expect(find.textContaining('Намерение 3'), findsWidgets);
-        expect(find.text('Open relations'), findsOneWidget);
-      },
+  testWidgets('пересчёт построения возвращается из связей к прежнему пути', (
+    tester,
+  ) async {
+    await _start(
+      tester,
+      ChoicePathDraftDirection.topDown,
+      purpose: ChoicePathPurpose.refreshCreation,
+      locale: const Locale('en'),
     );
-  }
+    await _tap(tester, _continuation(101));
+    await _tap(tester, _continuation(102));
+    await _tap(tester, find.text('Open relations'));
+    final l10n = lookupAppLocalizations(const Locale('en'));
+    await _until(tester, find.text(l10n.detailsRelationsNeedsHint));
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Намерение 2'), findsWidgets);
+    expect(find.textContaining('Намерение 3'), findsWidgets);
+    expect(find.text('Open relations'), findsOneWidget);
+  });
 
   testWidgets(
     'удаление добавленной в тупике связи возвращает прежний путь без продолжений',

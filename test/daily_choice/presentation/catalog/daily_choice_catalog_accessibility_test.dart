@@ -1,7 +1,6 @@
 import 'dart:ui' show Tristate, CheckedState;
 
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
@@ -9,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/daily_choice_details_controls.dart';
 import 'daily_choice_calendar_test_support.dart';
 import 'daily_choice_catalog_page_test_support.dart';
 
@@ -60,12 +60,6 @@ void main() {
         repository.completeFirst(0, [item], total: 1);
         await tester.pumpAndSettle();
         final l10n = _l10n(tester);
-        if (completed) {
-          tester.semantics.tap(
-            find.semantics.byLabel(l10n.dailyChoiceCatalogCompleted),
-          );
-          await tester.pumpAndSettle();
-        }
         final checkbox = find.semantics.byLabel(_completionLabel(l10n, 1));
         final initial = checkbox.evaluate().single;
         expect(
@@ -95,23 +89,17 @@ void main() {
         repository.failCompletion(0, const DailyChoiceUnavailableFailure());
         await tester.pumpAndSettle();
         _expectLiveRegion(tester, l10n.dailyChoiceOperationUnavailable);
-        final opening = find.semantics.byLabel(
-          _rowLabel(l10n, 1, null, completed),
-        );
+        final opening = find.semantics.byLabel(_rowLabel(l10n, 1, completed));
         expect(opening.evaluate().single.flagsCollection.isButton, isTrue);
         tester.semantics.tap(opening);
         await tester.pump();
-        expect(router.current.name, DailyChoiceDetailsRoute.name);
-        expect(
-          router.current.argsAs<DailyChoiceDetailsRouteArgs>().choiceId,
-          item.id,
-        );
+        expect(shownDailyChoice(tester), item.id);
         expect(repository.completionCommands, hasLength(1));
         semantics.dispose();
       });
 
       testWidgets('обе секции доступны при переходе по заголовкам; '
-          'читает дни календаря, заголовок дня, секции, количество, '
+          'читает дни календаря, заголовок дня, секции, '
           'строки и подгрузку по порядку, затем общую панель, '
           'без отдельных чисел дней', (tester) async {
         final semantics = tester.ensureSemantics();
@@ -123,12 +111,10 @@ void main() {
           locale: texts.locale,
           size: _phone,
         );
-        repository.completeFirst(
-          0,
-          [catalogPageItem(1, date: _today), catalogPageItem(2, date: _today)],
-          total: 3,
-          cursor: const CatalogPageCursor(),
-        );
+        repository.completeFirst(0, [
+          catalogPageItem(1, date: _today),
+          catalogPageItem(2, date: _today),
+        ], total: 2);
         await tester.pumpAndSettle();
         final l10n = _l10n(tester);
 
@@ -138,14 +124,12 @@ void main() {
           l10n.dailyChoiceCalendarExpand,
           '${texts.weekday}\n${texts.badge}',
           texts.selectedToday,
-          l10n.dailyChoiceCatalogTotalCount(3),
-          l10n.dailyChoiceCatalogIncomplete,
-          _rowLabel(l10n, 1),
+          _sectionLabel(l10n, completed: false, count: 2),
           _completionLabel(l10n, 1),
-          _rowLabel(l10n, 2),
+          _rowLabel(l10n, 1),
           _completionLabel(l10n, 2),
-          l10n.dailyChoiceCatalogLoadMore,
-          l10n.dailyChoiceCatalogCompleted,
+          _rowLabel(l10n, 2),
+          _sectionLabel(l10n, completed: true, count: 0),
         ];
         final announced = _announced(tester);
         expect(announced.take(page.length), page);
@@ -167,8 +151,14 @@ void main() {
         _expectEveryActionNamed(tester);
 
         for (final section in [
-          (label: l10n.dailyChoiceCatalogIncomplete, expanded: true),
-          (label: l10n.dailyChoiceCatalogCompleted, expanded: false),
+          (
+            label: _sectionLabel(l10n, completed: false, count: 2),
+            expanded: true,
+          ),
+          (
+            label: _sectionLabel(l10n, completed: true, count: 0),
+            expanded: true,
+          ),
         ]) {
           final command = find.semantics.byLabel(section.label);
           for (final expanded in [section.expanded, !section.expanded]) {
@@ -200,9 +190,9 @@ void main() {
       // страницы по языкам проверяет тест выше.
       if (texts != _texts.first) return;
 
-      testWidgets('читает отказы с повтором на месте выдачи и выполняет '
-          'повтор, подгрузку, раскрытие секций доступной '
-          'активацией для выбранного дня', (tester) async {
+      testWidgets('читает подгрузку и отказы с повтором на месте выдачи и '
+          'выполняет повтор и раскрытие секций доступной активацией для '
+          'выбранного дня', (tester) async {
         final semantics = tester.ensureSemantics();
         final repository = CatalogPageRepository();
         await pumpCatalogPage(
@@ -213,15 +203,10 @@ void main() {
           size: _phone,
         );
         final l10n = _l10n(tester);
-        final filters = [
-          l10n.dailyChoiceCatalogIncomplete,
-          l10n.dailyChoiceCatalogCompleted,
-        ];
 
         repository.failUnavailable(0);
         await tester.pumpAndSettle();
         expect(_afterDayHeading(tester), [
-          ...filters,
           l10n.dailyChoiceCatalogUnavailable,
           l10n.commonRetry,
         ]);
@@ -239,20 +224,17 @@ void main() {
           total: 2,
           cursor: const CatalogPageCursor(),
         );
-        await tester.pumpAndSettle();
-        expect(_afterDayHeading(tester), [
-          l10n.dailyChoiceCatalogTotalCount(2),
-          l10n.dailyChoiceCatalogIncomplete,
-          _rowLabel(l10n, 1),
-          _completionLabel(l10n, 1),
-          l10n.dailyChoiceCatalogLoadMore,
-          l10n.dailyChoiceCatalogCompleted,
-        ]);
-
-        tester.semantics.tap(
-          find.semantics.byLabel(l10n.dailyChoiceCatalogLoadMore),
-        );
         await tester.pump();
+        await tester.pump();
+        expect(_afterDayHeading(tester), [
+          _sectionLabel(l10n, completed: false, count: 2),
+          _completionLabel(l10n, 1),
+          _rowLabel(l10n, 1),
+          l10n.dailyChoiceCatalogLoadingMore,
+          _sectionLabel(l10n, completed: true, count: 0),
+        ]);
+        _expectLiveRegion(tester, l10n.dailyChoiceCatalogLoadingMore);
+
         expect(repository.queries, hasLength(3));
         expect(repository.queries[2].date, _today);
         expect(repository.queries[2].cursor, isA<CatalogPageCursor>());
@@ -260,13 +242,12 @@ void main() {
         await tester.pumpAndSettle();
         // Отказ подгрузки читается после загруженной строки.
         expect(_afterDayHeading(tester), [
-          l10n.dailyChoiceCatalogTotalCount(2),
-          l10n.dailyChoiceCatalogIncomplete,
-          _rowLabel(l10n, 1),
+          _sectionLabel(l10n, completed: false, count: 2),
           _completionLabel(l10n, 1),
+          _rowLabel(l10n, 1),
           l10n.dailyChoiceCatalogUnavailable,
           l10n.commonRetry,
-          l10n.dailyChoiceCatalogCompleted,
+          _sectionLabel(l10n, completed: true, count: 0),
         ]);
         _expectLiveRegion(tester, l10n.dailyChoiceCatalogUnavailable);
 
@@ -278,36 +259,38 @@ void main() {
         repository.completeMore(3, [catalogPageItem(2, date: _today)]);
         await tester.pumpAndSettle();
         expect(_afterDayHeading(tester), [
-          l10n.dailyChoiceCatalogTotalCount(2),
-          l10n.dailyChoiceCatalogIncomplete,
-          _rowLabel(l10n, 1),
+          _sectionLabel(l10n, completed: false, count: 2),
           _completionLabel(l10n, 1),
-          _rowLabel(l10n, 2),
+          _rowLabel(l10n, 1),
           _completionLabel(l10n, 2),
-          l10n.dailyChoiceCatalogCompleted,
+          _rowLabel(l10n, 2),
+          _sectionLabel(l10n, completed: true, count: 0),
         ]);
 
         tester.semantics.tap(
-          find.semantics.byLabel(l10n.dailyChoiceCatalogIncomplete),
+          find.semantics.byLabel(
+            _sectionLabel(l10n, completed: false, count: 2),
+          ),
         );
         await tester.pumpAndSettle();
         tester.semantics.tap(
-          find.semantics.byLabel(l10n.dailyChoiceCatalogCompleted),
+          find.semantics.byLabel(
+            _sectionLabel(l10n, completed: true, count: 0),
+          ),
         );
         await tester.pumpAndSettle();
         expect(repository.queries, hasLength(4));
         expect(_afterDayHeading(tester), [
-          l10n.dailyChoiceCatalogTotalCount(2),
-          l10n.dailyChoiceCatalogIncomplete,
-          l10n.dailyChoiceCatalogCompleted,
+          _sectionLabel(l10n, completed: false, count: 2),
+          _sectionLabel(l10n, completed: true, count: 0),
         ]);
         expect(_announced(tester), contains(texts.selectedToday));
         semantics.dispose();
       });
 
       testWidgets('прокрутка страницы диктором '
-          'проходит заголовок дня, секции, строки и подгрузку по порядку, '
-          'и подгрузка выполняется', (tester) async {
+          'проходит заголовок дня, секции, строки и подгрузку по порядку '
+          'и сама запрашивает порцию', (tester) async {
         final semantics = tester.ensureSemantics();
         final repository = CatalogPageRepository();
         await pumpCatalogPage(
@@ -333,13 +316,12 @@ void main() {
         final page = [
           '${texts.weekday}\n${texts.badge}',
           texts.selectedToday,
-          l10n.dailyChoiceCatalogTotalCount(21),
-          l10n.dailyChoiceCatalogIncomplete,
+          _sectionLabel(l10n, completed: false, count: 21),
           for (var number = 1; number <= 20; number++) ...[
-            _rowLabel(l10n, number),
             _completionLabel(l10n, number),
+            _rowLabel(l10n, number),
           ],
-          l10n.dailyChoiceCatalogLoadMore,
+          l10n.dailyChoiceCatalogLoadingMore,
         ];
 
         // Диктор продвигается по странице командой прокрутки, как при
@@ -349,23 +331,22 @@ void main() {
           for (final name in _announcedInScroll(tester)) {
             if (!visited.contains(name)) visited.add(name);
           }
-          if (visited.contains(l10n.dailyChoiceCatalogLoadMore)) break;
+          if (visited.contains(l10n.dailyChoiceCatalogLoadingMore)) break;
           tester.semantics.scrollUp(
             scrollable: find.semantics.scrollable(axis: Axis.vertical),
           );
-          await tester.pumpAndSettle();
+          // Кольцо подгрузки не даёт дождаться покоя всех анимаций.
+          await tester.pump();
+          await tester.pump(const Duration(seconds: 1));
+          await tester.pump();
         }
 
         final start = visited.indexOf(page.first);
-        final end = visited.indexOf(l10n.dailyChoiceCatalogLoadMore);
+        final end = visited.indexOf(l10n.dailyChoiceCatalogLoadingMore);
         expect(start, isNonNegative);
         expect(end, greaterThan(start));
         expect(visited.sublist(start, end + 1), page);
 
-        tester.semantics.tap(
-          find.semantics.byLabel(l10n.dailyChoiceCatalogLoadMore),
-        );
-        await tester.pump();
         expect(repository.queries, hasLength(2));
         expect(repository.queries[1].date, _today);
         expect(repository.queries[1].cursor, isA<CatalogPageCursor>());
@@ -457,31 +438,27 @@ String _fullDate(WidgetTester tester, CalendarDate value) =>
     MaterialLocalizations.of(tester.element(find.byType(DailyChoiceCalendar)))
         .formatFullDate(DateTime.utc(value.year, value.month, value.day));
 
-/// Доступное название строки выдачи [number] за [day], по умолчанию — за
-/// сегодняшний день.
-String _rowLabel(
-  AppLocalizations l10n,
-  int number, [
-  CalendarDate? day,
-  bool completed = false,
-]) => [
-  l10n.dailyChoiceCatalogRowLabel(
-    number,
-    l10n.dailyChoiceDetailsPhrase('Основание', 'Действие'),
-    (day ?? _today).toCanonicalString(),
-    completed
-        ? l10n.dailyChoiceDetailsCompleted
-        : l10n.dailyChoiceDetailsNotCompleted,
-  ),
-  l10n.dailyChoiceAllDay,
-  l10n.dailyChoicePriorityOption('P4'),
-  l10n.dailyChoiceCatalogPathIntentionCount(2),
-].join('\n');
+/// Доступное название строки выдачи [number].
+String _rowLabel(AppLocalizations l10n, int number, [bool completed = false]) =>
+    [
+      l10n.dailyChoiceCatalogRowLabel(number, 'Действие'),
+      l10n.dailyChoiceCatalogRowSource('Основание'),
+      l10n.dailyChoiceCatalogPathStepCount(1),
+      l10n.dailyChoiceAllDay,
+      completed
+          ? l10n.dailyChoiceDetailsCompleted
+          : l10n.dailyChoiceDetailsNotCompleted,
+    ].join('\n');
 
-String _completionLabel(AppLocalizations l10n, int number) {
-  final phrase = l10n.dailyChoiceDetailsPhrase('Основание', 'Действие');
-  final day = _today.toCanonicalString();
-  return l10n.localeName == 'ru'
-      ? 'Выполнение выбора № $number. $phrase. $day'
-      : 'Completion of choice #$number. $phrase. $day';
-}
+/// Доступное название заголовка секции: название и число выборов.
+String _sectionLabel(
+  AppLocalizations l10n, {
+  required bool completed,
+  required int count,
+}) =>
+    '${completed ? l10n.dailyChoiceCatalogCompleted : l10n.dailyChoiceCatalogIncomplete}\n$count';
+
+String _completionLabel(AppLocalizations l10n, int number) =>
+    l10n.localeName == 'ru'
+    ? 'Выполнение выбора № $number. Действие. Приоритет P4'
+    : 'Completion of choice #$number. Действие. Priority P4';

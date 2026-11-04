@@ -19,7 +19,6 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalo
     as daily_page;
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
-import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/calendar_handle.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
@@ -57,6 +56,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
+
+import '../../support/daily_choice_detail_fields_controls.dart';
+import '../../support/daily_choice_details_controls.dart';
 
 import '../../support/app_root_pages.dart';
 import '../../support/daily_choice_catalog_controls.dart';
@@ -184,9 +186,9 @@ void main() {
       await _select(tester, AppDestination.dailyChoices);
       expectPreserved();
       await tester.tap(_dailyChoiceRows.hitTestable().first);
-      await _until(tester, find.byType(DailyChoiceDetailsPage));
+      await _until(tester, dailyChoiceDetails);
       await tester.pumpAndSettle();
-      await _closeTop(tester, DailyChoiceDetailsPage);
+      await closeDailyChoiceDetails(tester);
       expectPreserved();
 
       await _tap(
@@ -380,13 +382,11 @@ void main() {
       final before = _intentionCatalogParameters(tester);
 
       await _select(tester, AppDestination.dailyChoices);
-      await _selectDay(tester, app, _choiceDate, total: _choiceCount);
-      await _open(tester, _dailyChoiceRows.first, DailyChoiceDetailsPage);
-      await _open(
-        tester,
-        find.byKey(const ValueKey('daily-choice-intention-2')),
-        IntentionDetailsPage,
-      );
+      await _selectDay(tester, app, _choiceDate, incomplete: _choiceCount ~/ 2);
+      await _tap(tester, _dailyChoiceRows.first);
+      await _until(tester, dailyChoiceDetails);
+      await openDailyChoicePathIntention(tester, 2, tap: _tap);
+      await _until(tester, find.byType(IntentionDetailsPage));
       await _open(tester, intentionHeadTitle, IntentionEditPage);
       await tester.enterText(intentionEditTitleField, newTitle);
       await _tap(tester, intentionEditSave);
@@ -444,29 +444,14 @@ void main() {
         IntentionDetailsPage,
       );
       await _tap(tester, find.text('Choices').first);
-      await _open(
-        tester,
-        find.byKey(ValueKey('intention-choices-row-${tagFixtureId(changed)}')),
-        DailyChoiceDetailsPage,
-      );
-      await _tap(tester, find.byKey(const ValueKey('daily-choice-edit-open')));
-      await _until(
-        tester,
-        find.byKey(const ValueKey('daily-choice-edit-date')),
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey('daily-choice-edit-date')),
-        _viewedDate.toCanonicalString(),
-      );
       await _tap(
         tester,
-        find.byKey(const ValueKey('daily-choice-edit-submit')),
+        find.byKey(ValueKey('intention-choices-row-${tagFixtureId(changed)}')),
       );
-      await _until(
-        tester,
-        find.byKey(const ValueKey('daily-choice-edit-open')),
-      );
-      await _closeTop(tester, DailyChoiceDetailsPage);
+      await _until(tester, dailyChoiceDetailsReady);
+      await setDailyChoiceDate(tester, _viewedDate, tap: _tap);
+      await _waitFor(tester, () => shownDailyChoiceDate(tester) == _viewedDate);
+      await closeDailyChoiceDetails(tester);
       await _tap(tester, find.text(app.l10n.statisticsSectionTitle).first);
       // Флажок доступен в другом каталоге; корневой остаётся скрытым.
       final dayLabel = app.l10n.statisticsCalendarDaySemantics(
@@ -493,7 +478,7 @@ void main() {
         ValueKey('daily-choice-completion-${tagFixtureId(changed)}'),
       );
       await _until(tester, completion);
-      expect(tester.widget<Checkbox>(completion).value, isFalse);
+      expect(dailyChoiceCompletionState(tester, completion).completed, isFalse);
       await _tap(tester, completion);
       // Существующая модель скрытого каталога согласуется до возврата.
       await _waitFor(tester, () {
@@ -535,8 +520,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(_dailyChoiceParameters(tester, app), before);
       expect(
-        find.text(
-          app.l10n.dailyChoiceCatalogTotalCount(_choiceCount - 1),
+        dailyChoiceSectionWithCount(
+          completed: false,
+          count: _choiceCount ~/ 2 - 1,
           skipOffstage: false,
         ),
         findsOneWidget,
@@ -550,19 +536,7 @@ void main() {
 
       // Продолжение новой ревизии дополняет выдачу без пропусков и повторов.
       await _closeMessage(tester);
-      final position = _dailyChoicePosition(tester);
-      position.jumpTo(position.maxScrollExtent);
-      await tester.pumpAndSettle();
-      expect(
-        find
-            .byKey(const ValueKey('daily-choice-load-more-false'))
-            .hitTestable(),
-        findsOneWidget,
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('daily-choice-load-more-false')),
-      );
+      await scrollToDailyChoiceCatalogPageEnd(tester, false);
       await _waitFor(
         tester,
         () => app.dailyChoiceCatalog.incomplete.items.length == expected.length,
@@ -576,14 +550,15 @@ void main() {
         expected,
       );
       expect(
-        find.text(
-          app.l10n.dailyChoiceCatalogTotalCount(_choiceCount - 1),
+        dailyChoiceSectionWithCount(
+          completed: false,
+          count: _choiceCount ~/ 2 - 1,
           skipOffstage: false,
         ),
         findsOneWidget,
       );
       expect(
-        find.byKey(const ValueKey('daily-choice-load-more-false')),
+        dailyChoiceCatalogPageFooter(completed: false, skipOffstage: false),
         findsNothing,
       );
       await showDailyChoiceCatalogPeriod(tester, _viewedDate, tap: _tap);
@@ -604,9 +579,9 @@ void main() {
 
       // Строка в видимой части открывается нажатием без прокрутки страницы.
       await tester.tap(_dailyChoiceRows.hitTestable().first);
-      await _until(tester, find.byType(DailyChoiceDetailsPage));
+      await _until(tester, dailyChoiceDetails);
       await tester.pumpAndSettle();
-      await _closeTop(tester, DailyChoiceDetailsPage);
+      await closeDailyChoiceDetails(tester);
 
       expect(_dailyChoiceCatalogView(tester, app), before);
       expect(tester.takeException(), isNull);
@@ -631,7 +606,7 @@ void main() {
       });
       const wasCompleted = false;
       await _select(tester, AppDestination.dailyChoices);
-      await _selectDay(tester, app, _choiceDate, total: _choiceCount);
+      await _selectDay(tester, app, _choiceDate, incomplete: 1);
       await _until(tester, dailyChoiceCatalogDayMark(_choiceDate));
       expect(
         dailyChoiceCatalogDayMark(_choiceDate, mark: DayMark.todo),
@@ -654,26 +629,26 @@ void main() {
           mode: DailyChoiceCalendarMode.month,
         ),
       );
+      final completion = find.byKey(
+        ValueKey('daily-choice-completion-${tagFixtureId(changed)}'),
+      );
       expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('daily-choice-row-1')),
-          matching: find.text(_completion(app.l10n, wasCompleted)),
-        ),
-        findsOneWidget,
+        dailyChoiceCompletionState(tester, completion).completed,
+        wasCompleted,
       );
       final before = _dailyChoiceParameters(tester, app);
 
       // Строка открывается нажатием без прокрутки страницы.
       await tester.tap(find.byKey(const ValueKey('daily-choice-row-1')));
-      await _until(tester, find.byType(DailyChoiceDetailsPage));
+      await _until(tester, dailyChoiceDetails);
       await tester.pumpAndSettle();
-      await _closeTop(tester, DailyChoiceDetailsPage);
-      await _tap(
-        tester,
-        find.byKey(
-          ValueKey('daily-choice-completion-${tagFixtureId(changed)}'),
-        ),
-      );
+      await closeDailyChoiceDetails(tester);
+      // Флажок нажимается там, где он есть: прокрутка к нему изменила бы
+      // позицию, которую проверяет тест.
+      await _until(tester, completion);
+      await tester.pumpAndSettle();
+      await tester.tap(completion);
+      await tester.pump();
       final marksProvider = openedDailyChoiceDayMarksProvider(app.container);
       await _waitFor(tester, () {
         expect(app.container.exists(marksProvider), isTrue);
@@ -760,15 +735,11 @@ void main() {
             );
           }
         }
-        // Формулировка строки собирается из системных слов языка и прежних
-        // названий намерений.
+        // Карточка показывает прежние названия намерений на любом языке.
         expect(
           find.descendant(
             of: _dailyChoiceRows.hitTestable().first,
-            matching: find.text(
-              lookupAppLocalizations(resolved)
-                  .dailyChoiceDetailsPhrase(_activeTitle(1), _activeTitle(2)),
-            ),
+            matching: find.text(_activeTitle(2)),
           ),
           findsOneWidget,
           reason: reason,
@@ -1137,19 +1108,13 @@ Future<void> _prepareIntentionCatalog(WidgetTester tester, _App app) async {
 Future<void> _prepareDailyChoiceCatalog(WidgetTester tester, _App app) async {
   final incomplete = _choiceCount ~/ 2;
   await _select(tester, AppDestination.dailyChoices);
-  await _selectDay(tester, app, _choiceDate, total: _choiceCount);
+  await _selectDay(tester, app, _choiceDate, incomplete: incomplete);
   await showDailyChoiceCatalogSection(tester, false);
 
   // Неделя даты просмотра раскрывается в её месяц.
   await showDailyChoiceCatalogPeriod(tester, _viewedDate, tap: _tap);
   await expandDailyChoiceCatalogCalendar(tester, tap: _tap);
-  final position = _dailyChoicePosition(tester);
-  position.jumpTo(position.maxScrollExtent);
-  await tester.pumpAndSettle();
-  await _tap(
-    tester,
-    find.byKey(const ValueKey('daily-choice-load-more-false')),
-  );
+  await scrollToDailyChoiceCatalogPageEnd(tester, false);
   await _waitFor(
     tester,
     () =>
@@ -1158,6 +1123,7 @@ Future<void> _prepareDailyChoiceCatalog(WidgetTester tester, _App app) async {
         app.dailyChoiceCatalog.freshness == DailyChoiceCatalogFreshness.current,
   );
   await tester.pumpAndSettle();
+  final position = _dailyChoicePosition(tester);
   position.jumpTo(position.maxScrollExtent / 2);
   await _settle(tester);
 
@@ -1233,26 +1199,16 @@ Map<String, Object?> _languageIndependent(Map<String, Object?> view) =>
     Map.of(view)..remove('секции');
 
 /// Системные подписи подготовленного каталога дневных выборов на каждом
-/// языке: выбранный день, месяц и дни недели календаря, название фильтра
-/// выполнения и количество.
+/// языке: выбранный день, месяц и дни недели календаря и название секции
+/// выполнения.
 final _catalogLabels = {
   Locale('ru'): (
     calendar: ['Август 2026', 'Пн', 'Вс'],
-    content: [
-      'Пятница',
-      '25 сентября 2026',
-      'Не выполненные',
-      'Всего дневных выборов: 240',
-    ],
+    content: ['Пятница', '25 сентября 2026', 'Невыполненные'],
   ),
   Locale('en'): (
     calendar: ['August 2026', 'Mon', 'Sun'],
-    content: [
-      'Friday',
-      '25 September 2026',
-      'Not completed',
-      'Total daily choices: 240',
-    ],
+    content: ['Friday', '25 September 2026', 'Not completed'],
   ),
 };
 
@@ -1297,10 +1253,6 @@ final _dailyChoiceRows = find.byWidgetPredicate(
   },
 );
 
-String _completion(AppLocalizations l10n, bool completed) =>
-    '${l10n.dailyChoiceDetailsDate(_choiceDate.toCanonicalString())} · '
-    '${completed ? l10n.dailyChoiceDetailsCompleted : l10n.dailyChoiceDetailsNotCompleted}';
-
 /// Сообщения общей поверхности в дереве, включая невыбранные вкладки.
 final _builtMessages = find.byKey(_message, skipOffstage: false);
 
@@ -1329,16 +1281,20 @@ Future<void> _enterTitle(
 }
 
 /// Выбирает [date] днём каталога дневных выборов, когда выдача начального
-/// дня уже получена, и ждёт выдачу выбранного дня с [total] записями.
+/// дня уже получена, и ждёт выдачу выбранного дня с [incomplete] невыполненными
+/// записями.
 Future<void> _selectDay(
   WidgetTester tester,
   _App app,
   CalendarDate date, {
-  required int total,
+  required int incomplete,
 }) async {
   await _waitFor(tester, () => app.hasDailyChoiceCatalogResult);
   await selectDailyChoiceCatalogDate(tester, date, tap: _tap);
-  await _until(tester, find.text(app.l10n.dailyChoiceCatalogTotalCount(total)));
+  await _until(
+    tester,
+    dailyChoiceSectionWithCount(completed: false, count: incomplete),
+  );
   await tester.pumpAndSettle();
 }
 

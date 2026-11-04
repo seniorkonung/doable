@@ -2,19 +2,17 @@ import 'package:flutter/material.dart';
 
 import '../doable_colors.dart';
 import '../doable_metrics.dart';
+import '../doable_priority.dart';
 import '../doable_type.dart';
-
-/// Приоритет, который выбирает [PriorityPicker]: P1 — высший, P4 — низший.
-/// Цвет приоритета берётся из темы.
-enum DoablePriority { p1, p2, p3, p4 }
 
 /// Выбор приоритета четырьмя пилюлями P1–P4: кольцо пилюли цвета приоритета,
 /// выбранная лежит на `fill`. Выбрана всегда одна пилюля: нажатие на выбранную
 /// ничего не делает, поэтому приоритет нельзя снять.
 ///
-/// Цвет приоритета не заливает пилюлю и не красит подпись. Видимые подписи
-/// пилюль, название группы и доступное название каждой пилюли задаёт
-/// потребитель.
+/// Цвет приоритета не заливает пилюлю и не красит подпись. Пилюли, которым не
+/// хватает ширины, например при крупном шрифте, переносятся и прижаты к концу
+/// строки. Видимые подписи пилюль, название группы и доступное название каждой
+/// пилюли задаёт потребитель.
 final class PriorityPicker extends StatelessWidget {
   const PriorityPicker({
     required this.value,
@@ -47,8 +45,8 @@ final class PriorityPicker extends StatelessWidget {
     container: true,
     explicitChildNodes: true,
     label: label,
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
+    child: Wrap(
+      alignment: WrapAlignment.end,
       children: [
         for (final priority in DoablePriority.values)
           _Pill(
@@ -107,12 +105,7 @@ final class _PillState extends State<_Pill> {
     final colors = Theme.of(context).extension<DoableColors>()!;
     final chosen = widget.chosen;
     final onChange = widget.onChange;
-    final priorityColor = switch (widget.priority) {
-      DoablePriority.p1 => colors.p1,
-      DoablePriority.p2 => colors.p2,
-      DoablePriority.p3 => colors.p3,
-      DoablePriority.p4 => colors.p4,
-    };
+    final priorityColor = widget.priority.color(colors);
     final showsFocus =
         _focused &&
         FocusManager.instance.highlightMode == FocusHighlightMode.traditional;

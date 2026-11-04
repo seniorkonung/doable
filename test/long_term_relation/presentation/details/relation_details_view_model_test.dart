@@ -77,7 +77,7 @@ void main() {
       expect(loaded.permissions.canEditDescriptionAndPriority, isTrue);
       expect(loaded.permissions.canChangeArchiveState, isTrue);
       if (number == 2) {
-        harness.viewModel.delete();
+        harness.viewModel.delete(RelationDeletionInitiator());
         expect(harness.repository.relationCommands, hasLength(1));
         harness.repository
             .watchAt(0)

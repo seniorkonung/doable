@@ -102,6 +102,37 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('шеврон выбора рисуется только у заголовка-кнопки', (
+    tester,
+  ) async {
+    CalendarHeader header({
+      ({String semanticLabel, bool isExpanded, VoidCallback onTap})? action,
+    }) => CalendarHeader(
+      title: 'Октябрь 2026',
+      titleAction: action,
+      previousLabel: 'Предыдущий месяц',
+      nextLabel: 'Следующий месяц',
+      onPrevious: () {},
+      onNext: () {},
+    );
+    final paints = find.descendant(
+      of: find.byType(CalendarHeader),
+      matching: find.byType(CustomPaint),
+    );
+
+    await tester.pumpWidget(_host(header()));
+    final withoutAction = tester.widgetList(paints).length;
+    await tester.pumpWidget(
+      _host(
+        header(
+          action: (semanticLabel: 'Выбрать', isExpanded: false, onTap: () {}),
+        ),
+      ),
+    );
+
+    expect(tester.widgetList(paints).length, withoutAction + 1);
+  });
+
   for (final disablePrevious in [true, false]) {
     testWidgets(
       '${disablePrevious ? 'Предыдущая' : 'Следующая'} стрелка недоступна без команды',

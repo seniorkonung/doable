@@ -6,7 +6,6 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart';
 import 'package:doable/src/design_system/components/calendar_handle.dart';
 import 'package:doable/src/design_system/components/day_heading.dart';
 import 'package:doable/src/design_system/components/month_grid_day.dart';
@@ -45,6 +44,42 @@ void main() {
         await _expectUsableCatalog(tester, repository, initialDate: selected);
       });
     }
+  }
+
+  // Отметка «Сегодня» может стоять на второй строке, поэтому высота заголовка
+  // не годится: проверяется, что символы дня недели занимают одну строку
+  // абзаца. Место строки обновления при крупном шрифте сужено до кольца.
+  for (final (locale, selected, weekday) in [
+    (const Locale('ru'), date(2026, 10, 5), 'Понедельник'),
+    (const Locale('ru'), date(2026, 10, 4), 'Воскресенье'),
+    (const Locale('en'), date(2026, 10, 7), 'Wednesday'),
+  ]) {
+    testWidgets('при масштабе 200% в окне 360 день недели «$weekday» не '
+        'разрывается внутри слова', (tester) async {
+      await _loadInter();
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final repository = CatalogPageRepository();
+      await pumpCatalogPage(
+        tester,
+        repository,
+        today: selected,
+        locale: locale,
+        size: const Size(360, 2000),
+      );
+      repository.completeFirst(0, [
+        catalogPageItem(1, date: selected),
+      ], total: 1);
+      await tester.pumpAndSettle();
+
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.textContaining(weekday),
+      );
+      final boxes = paragraph.getBoxesForSelection(
+        TextSelection(baseOffset: 0, extentOffset: weekday.length),
+      );
+      expect({for (final box in boxes) box.top}, hasLength(1));
+    });
   }
 }
 
@@ -93,11 +128,14 @@ Future<void> _setSupportBoundary(WidgetTester tester) async {
     ..viewPadding = const FakeViewPadding(top: 24, bottom: 48);
   addTearDown(tester.view.reset);
   // Реальный шрифт нужен для проверки переносов сообщения в обеих локалях.
-  await (FontLoader('Inter')..addFont(
-        rootBundle.load('lib/src/design_system/fonts/InterVariable.ttf'),
-      ))
-      .load();
+  await _loadInter();
 }
+
+Future<void> _loadInter() =>
+    (FontLoader('Inter')..addFont(
+          rootBundle.load('lib/src/design_system/fonts/InterVariable.ttf'),
+        ))
+        .load();
 
 /// Общий сценарий доступности закреплённого блока в обоих каталогах.
 /// Начальное чтение выдачи и отметок ещё не завершено; выбран октябрь 2026.
@@ -117,7 +155,7 @@ Future<void> _expectUsableCatalog(
   repository.failDayStatuses(0);
   await tester.pumpAndSettle();
 
-  final body = find.byType(DailyChoiceCatalogBody);
+  final body = _catalogContent;
   final media = MediaQuery.of(tester.element(body));
   expect(media.size, const Size(360, 720));
   expect(media.devicePixelRatio, 1);
@@ -377,12 +415,19 @@ void _expectTransitionLayout(
   expect(tester.takeException(), isNull);
 }
 
+/// Содержимое каталога в области тела страницы: под `AppBar` и над панелью.
+final _catalogContent = find
+    .ancestor(
+      of: find.byType(DailyChoiceCalendar),
+      matching: find.byType(SafeArea),
+    )
+    .first;
+
 /// Отступ и ручка сохраняют прежние 52 dp во всех представлениях каталогов.
 void _expectCalendarSpacing(WidgetTester tester) {
-  final body = find.byType(DailyChoiceCatalogBody);
   final safeTop =
-      tester.getTopLeft(body).dy +
-      MediaQuery.paddingOf(tester.element(body)).top;
+      tester.getTopLeft(_catalogContent).dy +
+      MediaQuery.paddingOf(tester.element(_catalogContent)).top;
   final calendarTop = tester.getTopLeft(find.byType(DailyChoiceCalendar)).dy;
   final topPadding = calendarTop - safeTop;
   expect(topPadding, 16);
@@ -390,18 +435,33 @@ void _expectCalendarSpacing(WidgetTester tester) {
 }
 
 Future<void> _scrollToLastRow(WidgetTester tester, Finder list) async {
-  final lastRow = find.byKey(const ValueKey('daily-choice-row-20'));
+  final lastRow = find.byKey(
+    const ValueKey('daily-choice-row-20'),
+    skipOffstage: false,
+  );
   expect(lastRow.hitTestable(), findsNothing);
   final viewport = tester.getRect(list);
-  await tester.dragFrom(viewport.center, const Offset(0, -10000));
-  await tester.pumpAndSettle();
+  // Длину ещё не построенных строк список оценивает, поэтому первый жест может
+  // остановиться раньше конца.
+  for (var drag = 0; drag < 2; drag++) {
+    await tester.dragFrom(viewport.center, const Offset(0, -10000));
+    await tester.pumpAndSettle();
+  }
   final last = tester.getRect(lastRow);
-  expect(last.intersect(viewport).height, greaterThan(0));
   final completedHeader = tester.getRect(
     find.byKey(const ValueKey('daily-choice-section-true')),
   );
-  expect(last.bottom, closeTo(completedHeader.top, 0.01));
-  expect(completedHeader.bottom, closeTo(viewport.bottom, 0.01));
+  // Второй заголовок стоит на 2 ниже строк первой секции.
+  expect(last.bottom, closeTo(completedHeader.top - 2, 0.01));
+  expect(completedHeader.bottom, closeTo(viewport.bottom - 72, 0.01));
+  // Свободное место и заголовок выше этой области, поэтому строка видна чуть
+  // раньше конца выдачи.
+  await tester.dragFrom(
+    viewport.center,
+    Offset(0, viewport.bottom - last.bottom),
+  );
+  await tester.pumpAndSettle();
+  expect(lastRow.hitTestable(), findsOneWidget);
 }
 
 void _expectCalendarTextsWhole(

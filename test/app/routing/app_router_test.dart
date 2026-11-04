@@ -6,7 +6,6 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
-import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
 import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -27,6 +26,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../daily_choice/presentation/daily_choice_picker_launch_test_support.dart'
+    show TestDailyChoicePickerLaunch;
 import '../../intention/presentation/catalog/catalog_test_support.dart';
 import '../../long_term_relation/presentation/details/relation_details_test_support.dart';
 import '../../long_term_relation/presentation/relation_graph_test_support.dart'
@@ -92,9 +93,7 @@ void main() {
 
       unawaited(
         router.push<IntentionId>(
-          DailyChoiceSourcePickerRoute(
-            pickerContext: const PathReplacementDailyChoicePickerContext(),
-          ),
+          DailyChoiceSourcePickerRoute(launch: TestDailyChoicePickerLaunch()),
         ),
       );
       await tester.pump();

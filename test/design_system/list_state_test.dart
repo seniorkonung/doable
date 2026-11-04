@@ -96,6 +96,67 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('обновление — кольцо 14 и текст caption цвета muted с отступом '
+      'space-2', (tester) async {
+    await tester.pumpWidget(
+      _app(state: const ListState.refreshing(text: 'Обновляем…')),
+    );
+
+    final spinner = tester.getRect(_spinner);
+    expect(spinner.size, const Size.square(14));
+    final text = tester.getRect(find.text('Обновляем…'));
+    expect(text.left - spinner.right, DoableMetrics.space2);
+    expect(spinner.center.dy, text.center.dy);
+    final style = _textStyle(tester, 'Обновляем…');
+    expect(style.color, DoableColors.light.muted);
+    expect(style.fontSize, DoableType.caption.fontSize);
+    expect(style.fontWeight, DoableType.caption.fontWeight);
+  });
+
+  testWidgets('обновление объявляется как статус текстом без кольца', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _app(state: const ListState.refreshing(text: 'Обновляем…')),
+    );
+
+    expect(
+      tester.getSemantics(find.text('Обновляем…')),
+      isSemantics(label: 'Обновляем…', isLiveRegion: true),
+    );
+    expect(find.semantics.byFlag(SemanticsFlag.isLiveRegion), findsOneWidget);
+    semantics.dispose();
+  });
+
+  testWidgets('при масштабе текста больше 1,5 обновление — одно кольцо без '
+      'видимого слова, а название остаётся в живой области; при 1,5 слово '
+      'видно', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _app(
+        textScale: 1.5,
+        state: const ListState.refreshing(text: 'Обновляем…'),
+      ),
+    );
+    expect(find.text('Обновляем…'), findsOneWidget);
+
+    await tester.pumpWidget(
+      _app(
+        textScale: 1.75,
+        state: const ListState.refreshing(text: 'Обновляем…'),
+      ),
+    );
+    expect(find.text('Обновляем…'), findsNothing);
+    expect(tester.getSize(_spinner), const Size.square(14));
+    expect(
+      tester.getSemantics(_listState),
+      isSemantics(label: 'Обновляем…', isLiveRegion: true),
+    );
+    expect(find.semantics.byFlag(SemanticsFlag.isLiveRegion), findsOneWidget);
+    semantics.dispose();
+  });
+
   for (final brightness in Brightness.values) {
     testWidgets('в ${brightness == Brightness.light ? 'светлой' : 'тёмной'} '
         'теме подгрузка — одно кольцо 18 по центру строки высотой 40 без '

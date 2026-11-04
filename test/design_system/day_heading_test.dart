@@ -53,4 +53,35 @@ void main() {
     );
     semantics.dispose();
   });
+
+  testWidgets('слот стоит в конце строки дня и не меняет вид заголовка', (
+    tester,
+  ) async {
+    Widget heading({Widget? trailing}) => MaterialApp(
+      theme: doableTheme(Brightness.light),
+      home: Scaffold(
+        body: DayHeading(
+          weekday: 'Четверг',
+          date: '8 октября 2026',
+          trailing: trailing,
+        ),
+      ),
+    );
+    await tester.pumpWidget(heading());
+    final weekday = tester.getTopLeft(find.textContaining('Четверг'));
+    final date = tester.getRect(find.text('8 октября 2026'));
+
+    const slot = ValueKey('slot');
+    await tester.pumpWidget(
+      heading(trailing: const SizedBox(key: slot, width: 80, height: 18)),
+    );
+
+    expect(tester.getSize(find.byType(DayHeading)).height, 62);
+    expect(tester.getTopLeft(find.textContaining('Четверг')), weekday);
+    expect(tester.getRect(find.text('8 октября 2026')), date);
+    final bounds = tester.getRect(find.byType(DayHeading));
+    final trailing = tester.getRect(find.byKey(slot));
+    expect(trailing.right, bounds.right);
+    expect(trailing.center.dy, bounds.top + 12);
+  });
 }

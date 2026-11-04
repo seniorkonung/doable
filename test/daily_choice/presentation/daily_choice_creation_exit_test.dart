@@ -10,7 +10,6 @@ import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
@@ -36,6 +35,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'daily_choice_picker_launch_test_support.dart'
+    show TestDailyChoicePickerLaunch;
 import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
@@ -349,9 +350,7 @@ Future<_App> _launch(
   await tester.pumpAndSettle();
   unawaited(
     router.push(
-      DailyChoiceActionPickerRoute(
-        pickerContext: const PathReplacementDailyChoicePickerContext(),
-      ),
+      DailyChoiceActionPickerRoute(launch: TestDailyChoicePickerLaunch()),
     ),
   );
   await tester.pumpAndSettle();

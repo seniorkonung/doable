@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import '../../graph/application/graph_command_coordinator.dart';
 import '../../graph/application/graph_command_result.dart';
 import '../application/daily_choice_result.dart';
-import '../domain/daily_choice_id.dart';
 import 'path/choice_path_view_model.dart';
 
 /// Идентичность одного входа в создание, независимая от участников и пути.
@@ -35,9 +34,7 @@ final class DailyChoiceCreationFlowSubmitting
 
 final class DailyChoiceCreationFlowSaved
     extends DailyChoiceCreationFlowActiveState {
-  const DailyChoiceCreationFlowSaved(this.choiceId);
-
-  final DailyChoiceId choiceId;
+  const DailyChoiceCreationFlowSaved();
 }
 
 /// Поздний результат уточняет запись, но не возвращает право продолжения.
@@ -56,7 +53,7 @@ final class DailyChoiceCreationFlowLeft extends DailyChoiceCreationFlowState {
 /// сессия освобождается сборщиком мусора. Глобального реестра нет.
 ///
 /// Сессия не выполняет команды, не предъявляет результаты и не меняет стек.
-/// Вспомогательные пересчёт и замена пути такую сессию не создают.
+/// Вспомогательный пересчёт пути такую сессию не создаёт.
 final class DailyChoiceCreationFlowSession {
   DailyChoiceCreationFlowSession({
     required this.rootMatchId,
@@ -76,7 +73,6 @@ final class DailyChoiceCreationFlowSession {
     const DailyChoiceCreationFlowEditing(),
   );
   var _accepting = false;
-  var _openingAttempted = false;
 
   DailyChoiceCreationFlowState get state => _state.value;
   ValueListenable<DailyChoiceCreationFlowState> get changes => _state;
@@ -86,19 +82,6 @@ final class DailyChoiceCreationFlowSession {
   /// в [acceptSubmission]. Ошибки полей и допустимость повтора остаются у формы.
   bool get canContinue =>
       !_accepting && state is DailyChoiceCreationFlowEditing;
-
-  /// Одна попытка открытия подтверждённого результата на весь поток.
-  /// Удаление отдельных страниц не разрешает повтор.
-  bool claimOpening(DailyChoiceId choiceId) {
-    if (_openingAttempted) return false;
-    if (state case DailyChoiceCreationFlowSaved(choiceId: final savedId)
-        when savedId == choiceId) {
-      _openingAttempted = true;
-      return true;
-    } else {
-      return false;
-    }
-  }
 
   /// Синхронно вызывает принятие команды координатором только у живого
   /// редактируемого потока. Отклонённый вызов не выполняется и не ставится
@@ -143,8 +126,8 @@ final class DailyChoiceCreationFlowSession {
       return false;
     }
     final next = switch (completion.result) {
-      GraphResultSuccess(value: DailyChoiceCreated(:final choice)) =>
-        DailyChoiceCreationFlowSaved(choice.id),
+      GraphResultSuccess(value: DailyChoiceCreated()) =>
+        const DailyChoiceCreationFlowSaved(),
       GraphResultFailure() => const DailyChoiceCreationFlowEditing(),
       GraphResultSuccess() => null,
     };

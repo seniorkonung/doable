@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
@@ -10,8 +11,10 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
+import 'package:doable/src/design_system/components/empty_state.dart';
 import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/design_system/components/relation_row.dart';
@@ -31,7 +34,8 @@ import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/quick_creation.dart';
 import '../../support/tag_storage_fixture.dart';
 
-/// Намерение страницы, над которой открыта панель связи.
+/// Намерение страницы, над которой открыта панель связи, и страницы, которую
+/// открывает лист над корневым каталогом дневных выборов.
 const _origin = 1;
 
 /// Намерение страницы, которую панель открывает поверх себя.
@@ -45,6 +49,10 @@ const _relation = 10;
 const _originTitle = 'Исходное';
 const _otherTitle = 'Другое';
 const _createdTitle = 'Созданное';
+
+const _catalogSheetTitle = 'Лист над каталогом';
+const _openPageLabel = 'Открыть страницу';
+const _countLabel = 'Счёт';
 
 final _l10n = lookupAppLocalizations(const Locale('en'));
 
@@ -130,6 +138,53 @@ void main() {
     expect(_shownIntention(tester), _originTitle);
     expect(tester.takeException(), isNull);
   });
+
+  for (final (name, back) in [
+    ('кнопка «Назад»', _tapBackButton),
+    ('системное «назад»', _systemBack),
+  ]) {
+    testWidgets('$name со страницы над листом, открытым над корневым каталогом '
+        'дневных выборов, возвращает тот же лист с его состоянием, а '
+        'следующее «назад» показывает каталог', (tester) async {
+      final router = await _start(tester);
+      await _openPageAboveCatalogSheet(tester, router);
+
+      await back(tester);
+
+      expect(find.text('$_countLabel: 1').hitTestable(), findsOneWidget);
+      expect(_allIntentionPages, findsNothing);
+
+      await _systemBack(tester);
+
+      expect(_allSheets, findsNothing);
+      expect(_allIntentionPages, findsNothing);
+      expectDailyChoicesRootPage(router);
+      expect(find.byType(DailyChoiceCatalogPage), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('выбор пункта панели навигации на странице над листом, '
+      'открытым над корневым каталогом дневных выборов, убирает из истории '
+      'и страницу, и лист', (tester) async {
+    final router = await _start(tester);
+    await _openPageAboveCatalogSheet(tester, router);
+
+    await tester.tap(appNavigationDestination(AppDestination.intentionGraph));
+    await _until(tester, find.byType(IntentionCatalogPage));
+    await tester.pumpAndSettle();
+
+    expect(_allSheets, findsNothing);
+    expect(_allIntentionPages, findsNothing);
+    expectIntentionGraphRootPage(router);
+
+    await _systemBack(tester);
+
+    expect(_allSheets, findsNothing);
+    expect(_allIntentionPages, findsNothing);
+    expect(router.canPop(), isFalse);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 /// Панель вместе с закрытой страницей над ней.
@@ -191,6 +246,81 @@ Future<void> _openPageAboveSheet(WidgetTester tester, AppRouter router) async {
   expect(find.byType(Sheet), findsNothing);
   expect(_allSheets, findsOneWidget);
   expect(appNavigationDestinations().hitTestable(), findsExactly(3));
+}
+
+/// Открывает дневные выборы корневой страницей, показывает над каталогом лист
+/// с состоянием «Счёт: 1» и открывает из листа страницу намерения [_origin],
+/// которая встаёт над листом.
+Future<void> _openPageAboveCatalogSheet(
+  WidgetTester tester,
+  AppRouter router,
+) async {
+  await openDailyChoices(tester);
+  // Пустой день показан, когда первая загрузка закончилась и ничто не движется.
+  await _until(tester, find.byType(EmptyState));
+  await tester.pumpAndSettle();
+  expectDailyChoicesRootPage(router);
+
+  unawaited(
+    showDoableSheet<void>(
+      context: tester.element(find.byType(DailyChoiceCatalogPage)),
+      builder: (_, presentation) => Sheet(
+        presentation,
+        title: _catalogSheetTitle,
+        child: _CountingSheetBody(intentionId: _intentionId(_origin)),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+  expect(_allSheets, findsOneWidget);
+
+  // Состояние отличает тот же лист от построенного заново.
+  await _tap(tester, find.text('$_countLabel: 0'));
+  await tester.pumpAndSettle();
+  expect(find.text('$_countLabel: 1'), findsOneWidget);
+  await _tap(tester, find.text(_openPageLabel));
+  await _waitFor(tester, () => _allIntentionPages.evaluate().length == 1);
+  await _until(tester, _intentionTitle);
+  await tester.pumpAndSettle();
+
+  expect(_shownIntention(tester), _originTitle);
+  expect(find.byType(Sheet), findsNothing);
+  expect(_allSheets, findsOneWidget);
+  expect(appNavigationDestinations().hitTestable(), findsExactly(3));
+}
+
+/// Тело листа над каталогом: считает нажатия и открывает страницу намерения
+/// через `context.router.push`, как шаг пути панели выбора.
+final class _CountingSheetBody extends StatefulWidget {
+  const _CountingSheetBody({required this.intentionId});
+
+  final IntentionId intentionId;
+
+  @override
+  State<_CountingSheetBody> createState() => _CountingSheetBodyState();
+}
+
+final class _CountingSheetBodyState extends State<_CountingSheetBody> {
+  var _count = 0;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      TextButton(
+        onPressed: () => setState(() => _count++),
+        child: Text('$_countLabel: $_count'),
+      ),
+      TextButton(
+        onPressed: () => unawaited(
+          context.router.push(
+            IntentionDetailsRoute(intentionId: widget.intentionId),
+          ),
+        ),
+        child: const Text(_openPageLabel),
+      ),
+    ],
+  );
 }
 
 /// Строка связи на вкладке «Связи» страницы [_origin].

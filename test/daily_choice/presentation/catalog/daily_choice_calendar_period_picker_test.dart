@@ -693,13 +693,12 @@ void main() {
       expect(repository.queries, hasLength(1));
       expect(repository.dayStatusQueries, hasLength(1));
       expect(find.text('8 октября 2026'), findsOneWidget);
-      expect(find.text('Не выполненные'), findsOneWidget);
+      expect(find.text('Невыполненные'), findsOneWidget);
       await tester.tap(find.text('Март'));
       await tester.pumpAndSettle();
       expect(visibleWeeks(tester), weeksFrom(date(2047, 2, 25), 6));
       expect(find.text('8 октября 2026'), findsOneWidget);
-      expect(find.text('Не выполненные'), findsOneWidget);
-      expect(find.text('Всего дневных выборов: 1'), findsOneWidget);
+      expect(find.text('Невыполненные'), findsOneWidget);
       expect(repository.queries, hasLength(1));
       expect(repository.queries.last.date, selected);
       expect(repository.queries.last.isCompleted, isFalse);

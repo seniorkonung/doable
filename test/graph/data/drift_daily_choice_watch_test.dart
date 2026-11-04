@@ -87,17 +87,10 @@ void main() {
           [_uuid(number), 'Намерение $number', number >= 3 ? 1 : 0],
         );
       }
-      await database.customStatement(
-        '''INSERT INTO intentions
-         (id, title, is_action_ready, is_archived, created_at, updated_at)
-         VALUES (?, 'Новое основание', 0, 0, 1, 1)''',
-        [_uuid(5)],
-      );
       for (final (number, source, target) in [
         (101, 1, 2),
         (102, 2, 3),
         (103, 1, 4),
-        (104, 5, 4),
       ]) {
         await database.customStatement(
           '''INSERT INTO long_term_relations
@@ -213,7 +206,7 @@ void main() {
     );
   });
 
-  test('меняет зависимости наблюдаемого пути вместе со снимком', () async {
+  test('обновляет снимок пути при изменении участника и связи', () async {
     await create();
     final events = <GraphSnapshot<DailyChoiceDetails?>>[];
     final subscription = repository
@@ -243,94 +236,61 @@ void main() {
     await repository.execute(ArchiveLongTermRelation(_relation(102)));
     await waitFor(3);
     expect(events.last.value!.path.last.relation.scope, RelationScope.archived);
-
-    await repository.execute(
-      ReplaceDailyChoicePath(
-        choiceId: _choice(201),
-        sourceIntentionId: _intention(1),
-        selectedIntentionId: _intention(4),
-        path: path([(103, 1, 4)]),
-      ),
-    );
-    await waitFor(4);
-    expect(events.last.value!.path.single.relation.id, _relation(103));
-    expect(
-      events.last.value!.choice.schedule,
-      DailyChoiceTime(hour: 18, minute: 0),
-    );
-    expect(events.last.value!.choice.priority, DailyChoicePriority.p2);
-
-    await repository.execute(
-      UpdateIntention(
-        id: _intention(2),
-        title: 'Старый участник изменён снова',
-        description: null,
-      ),
-    );
-    await pumpEventQueue();
-    expect(events, hasLength(4));
-
-    await repository.execute(ArchiveLongTermRelation(_relation(103)));
-    await waitFor(5);
-    expect(
-      events.last.value!.path.single.relation.scope,
-      RelationScope.archived,
-    );
     await subscription.cancel().timeout(const Duration(seconds: 2));
   });
 
-  test(
-    'согласует счётчики прежнего и нового действия при замене пути',
-    () async {
-      final oldAction = StreamIterator(
-        repository.watchIntention(_intention(3)),
-      );
-      final newAction = StreamIterator(
-        repository.watchIntention(_intention(4)),
-      );
-      addTearDown(oldAction.cancel);
-      addTearDown(newAction.cancel);
-      expect(await oldAction.moveNext(), isTrue);
-      expect(await newAction.moveNext(), isTrue);
+  test('согласует счётчики прежнего и нового действия при удалении выбора и '
+      'создании нового', () async {
+    final oldAction = StreamIterator(repository.watchIntention(_intention(3)));
+    final newAction = StreamIterator(repository.watchIntention(_intention(4)));
+    addTearDown(oldAction.cancel);
+    addTearDown(newAction.cancel);
+    expect(await oldAction.moveNext(), isTrue);
+    expect(await newAction.moveNext(), isTrue);
 
-      GraphSnapshot<IntentionDetails?> snapshot(
-        Result<GraphSnapshot<IntentionDetails?>> result,
-      ) => (result as ResultSuccess<GraphSnapshot<IntentionDetails?>>).value;
+    GraphSnapshot<IntentionDetails?> snapshot(
+      Result<GraphSnapshot<IntentionDetails?>> result,
+    ) => (result as ResultSuccess<GraphSnapshot<IntentionDetails?>>).value;
 
-      final beforeOld = snapshot(oldAction.current);
-      final beforeNew = snapshot(newAction.current);
-      expect(beforeOld.value!.relationCounts.dailySelected, 0);
-      expect(beforeNew.value!.relationCounts.dailySelected, 0);
+    final beforeOld = snapshot(oldAction.current);
+    final beforeNew = snapshot(newAction.current);
+    expect(beforeOld.value!.relationCounts.dailySelected, 0);
+    expect(beforeNew.value!.relationCounts.dailySelected, 0);
 
-      await create();
-      expect(await oldAction.moveNext(), isTrue);
-      final occupied = snapshot(oldAction.current);
-      expect(occupied.value!.relationCounts.dailySelected, 1);
-      expect(
-        occupied.revision.compareTo(beforeOld.revision),
-        GraphRevisionOrder.newer,
-      );
+    await create();
+    expect(await oldAction.moveNext(), isTrue);
+    final occupied = snapshot(oldAction.current);
+    expect(occupied.value!.relationCounts.dailySelected, 1);
+    expect(
+      occupied.revision.compareTo(beforeOld.revision),
+      GraphRevisionOrder.newer,
+    );
 
+    expect(
+      await repository.execute(DeleteDailyChoice(_choice(201))),
+      isA<GraphCommandSucceeded>(),
+    );
+    expect(await oldAction.moveNext(), isTrue);
+    final released = snapshot(oldAction.current);
+    expect(released.value!.relationCounts.dailySelected, 0);
+
+    expect(
       await repository.execute(
-        ReplaceDailyChoicePath(
-          choiceId: _choice(201),
+        CreateDailyChoice(
           sourceIntentionId: _intention(1),
           selectedIntentionId: _intention(4),
           path: path([(103, 1, 4)]),
+          date: CalendarDate.fromParts(2026, 9, 23),
+          description: null,
+          isCompleted: false,
         ),
-      );
-      expect(await oldAction.moveNext(), isTrue);
-      expect(await newAction.moveNext(), isTrue);
-      final released = snapshot(oldAction.current);
-      final selected = snapshot(newAction.current);
-      expect(released.value!.relationCounts.dailySelected, 0);
-      expect(selected.value!.relationCounts.dailySelected, 1);
-      expect(
-        released.revision.compareTo(selected.revision),
-        GraphRevisionOrder.same,
-      );
-    },
-  );
+      ),
+      isA<GraphCommandSucceeded>(),
+    );
+    expect(await newAction.moveNext(), isTrue);
+    final selected = snapshot(newAction.current);
+    expect(selected.value!.relationCounts.dailySelected, 1);
+  });
 
   test('поздний снимок помечен прежней ревизией перед удалением', () async {
     await create();
@@ -367,90 +327,4 @@ void main() {
       GraphRevisionOrder.same,
     );
   });
-
-  test(
-    'замена обоих участников переключает наблюдение на новый путь',
-    () async {
-      await create();
-      final events = <GraphSnapshot<DailyChoiceDetails?>>[];
-      final subscription = repository
-          .watchDailyChoice(_choice(201))
-          .listen((result) => events.add(_snapshot(result)));
-      addTearDown(subscription.cancel);
-
-      Future<void> waitFor(int count) async {
-        for (
-          var attempt = 0;
-          attempt < 100 && events.length < count;
-          attempt++
-        ) {
-          await Future<void>.delayed(const Duration(milliseconds: 1));
-        }
-        expect(events, hasLength(count));
-      }
-
-      await waitFor(1);
-      final replaced = await repository.execute(
-        ReplaceDailyChoicePath(
-          choiceId: _choice(201),
-          sourceIntentionId: _intention(5),
-          selectedIntentionId: _intention(4),
-          path: path([(104, 5, 4)]),
-        ),
-      );
-      expect(replaced, isA<GraphCommandSucceeded>());
-      await waitFor(2);
-      final replacementRevision =
-          (replaced as GraphCommandSucceeded).value.revision;
-      expect(
-        events.last.revision.compareTo(replacementRevision),
-        GraphRevisionOrder.same,
-      );
-      expect(events.last.value!.source.id, _intention(5));
-      expect(events.last.value!.selected.id, _intention(4));
-      expect(events.last.value!.path.single.relation.id, _relation(104));
-
-      for (final number in [1, 2, 3]) {
-        expect(
-          await repository.execute(
-            UpdateIntention(
-              id: _intention(number),
-              title: 'Прежний участник $number',
-              description: null,
-            ),
-          ),
-          isA<GraphCommandSucceeded>(),
-        );
-      }
-      await pumpEventQueue();
-      expect(events, hasLength(2));
-
-      expect(
-        await repository.execute(
-          UpdateIntention(
-            id: _intention(5),
-            title: 'Актуальное основание',
-            description: null,
-          ),
-        ),
-        isA<GraphCommandSucceeded>(),
-      );
-      await waitFor(3);
-      expect(events.last.value!.source.title, 'Актуальное основание');
-      expect(
-        events.last.value!.path.single.source.title,
-        'Актуальное основание',
-      );
-
-      expect(
-        await repository.execute(ArchiveLongTermRelation(_relation(104))),
-        isA<GraphCommandSucceeded>(),
-      );
-      await waitFor(4);
-      expect(
-        events.last.value!.path.single.relation.scope,
-        RelationScope.archived,
-      );
-    },
-  );
 }

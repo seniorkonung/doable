@@ -39,6 +39,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/daily_choice_catalog_provider.dart';
 import '../support/daily_choice_catalog_controls.dart';
+import '../support/daily_choice_creation_controls.dart';
 import '../support/daily_choice_durability_fixture.dart';
 import '../support/daily_choice_local_date.dart';
 import '../support/graph_seed.dart';
@@ -107,27 +108,31 @@ void main() {
       );
       await showDailyChoiceCatalogSection(tester, false);
       await showDailyChoiceCatalogSection(tester, true);
+      final semantics = tester.ensureSemantics();
+      void expectSections() {
+        expect(
+          tester
+              .getSemantics(_key('daily-choice-section-false'))
+              .flagsCollection
+              .isExpanded,
+          Tristate.isFalse,
+        );
+        expect(
+          tester
+              .getSemantics(_key('daily-choice-section-true'))
+              .flagsCollection
+              .isExpanded,
+          Tristate.isTrue,
+        );
+      }
+
+      expectSections();
       final position = _dailyChoiceScrollPosition(tester);
       position.jumpTo(position.maxScrollExtent / 2);
       await tester.pumpAndSettle();
       expect(position.pixels, greaterThan(0));
       final offset = position.pixels;
       expect(shownDailyChoiceCatalogDate(tester), date);
-      final semantics = tester.ensureSemantics();
-      expect(
-        tester
-            .getSemantics(_key('daily-choice-section-false'))
-            .flagsCollection
-            .isExpanded,
-        Tristate.isFalse,
-      );
-      expect(
-        tester
-            .getSemantics(_key('daily-choice-section-true'))
-            .flagsCollection
-            .isExpanded,
-        Tristate.isTrue,
-      );
       await _Flow.intention.open(
         tester,
         app,
@@ -140,25 +145,16 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(shownDailyChoiceCatalogDate(tester), date);
-      expect(
-        tester
-            .getSemantics(_key('daily-choice-section-false'))
-            .flagsCollection
-            .isExpanded,
-        Tristate.isFalse,
-      );
-      expect(
-        tester
-            .getSemantics(_key('daily-choice-section-true'))
-            .flagsCollection
-            .isExpanded,
-        Tristate.isTrue,
-      );
-      expect(_dailyChoiceScrollPosition(tester).pixels, offset);
+      final restored = _dailyChoiceScrollPosition(tester);
+      expect(restored.pixels, offset);
       expect(
         tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
         AppDestination.dailyChoices,
       );
+      // Заголовок невыполненных над прокрученной выдачей не построен.
+      restored.jumpTo(0);
+      await tester.pumpAndSettle();
+      expectSections();
       semantics.dispose();
     },
   );
@@ -248,20 +244,54 @@ void main() {
   });
 
   // Варианты потоков связи и дневного выбора принадлежат их собственным
-  // тестам. Здесь намерение проверяется над корневой и глубокой историей, а
-  // дневной выбор от действия — как одна связка общей кнопки с другим потоком.
-  for (final (flow, origin) in const [
-    (_Flow.intention, IntentionCreationOrigin.dailyChoices),
-    (_Flow.intention, IntentionCreationOrigin.deep),
-    (_Flow.bottomUp, IntentionCreationOrigin.deep),
+  // тестам. Здесь дневной выбор от действия — одна связка общей кнопки с другим
+  // потоком, а намерение проверяется над корневой и глубокой историей.
+  testWidgets('дневной выбор от действия: успех над глубокой историей '
+      'возвращает на исходную страницу и сохраняет параметры каталогов', (
+    tester,
+  ) async {
+    const flow = _Flow.bottomUp;
+    const origin = IntentionCreationOrigin.deep;
+    final app = await _start(tester, fileBacked: true);
+    final history = await origin.open(
+      tester,
+      app.router,
+      participantId: durabilityIntention(2),
+      waitFor: (tester, finder) =>
+          _until(tester, () => finder.evaluate().isNotEmpty),
+    );
+    final catalogs = app.catalogs;
+    await flow.open(tester, app, origin);
+    history.expectPrefix(app.router);
+    await flow.fill(tester);
+    app.observer.observe(flow.table);
+    await _tap(tester, _key(flow.submit));
+    await _until(
+      tester,
+      () => app.router.stackData.length == history.routes.length,
+    );
+    await tester.pumpAndSettle();
+    history.expectRestored(tester, app.router);
+    final rows = (await tester.runAsync(
+      () => durabilityRows(app.database, flow.table),
+    ))!;
+    expect(rows, hasLength(flow.initialRows + 1));
+    expect(app.observer.attempts, 1);
+    flow.expectStored(rows.last);
+    expect(find.textContaining('Дневной выбор создан'), findsOneWidget);
+    expect(app.catalogs, catalogs);
+    await history.expectUnderlyingTask(tester, app.router);
+    expect(tester.takeException(), isNull);
+  });
+
+  const flow = _Flow.intention;
+  for (final origin in const [
+    IntentionCreationOrigin.dailyChoices,
+    IntentionCreationOrigin.deep,
   ]) {
     testWidgets('${flow.label}: успех над ${origin.description} сохраняет '
         'ID, историю, выбранный пункт и параметры каталогов', (tester) async {
-      final app = await _start(
-        tester,
-        fileBacked:
-            flow == _Flow.bottomUp && origin == IntentionCreationOrigin.deep,
-      );
+      final app = await _start(tester);
       final history = await origin.open(
         tester,
         app.router,
@@ -292,8 +322,6 @@ void main() {
       final resultId = switch (app.router.current.args) {
         IntentionDetailsRouteArgs(:final intentionId) =>
           intentionId.toCanonicalString(),
-        DailyChoiceDetailsRouteArgs(:final choiceId) =>
-          choiceId.toCanonicalString(),
         _ => throw StateError('Ожидался маршрут созданной сущности.'),
       };
       expect(resultId, created['id']);
@@ -306,7 +334,6 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
-  const flow = _Flow.intention;
   for (final origin in const [
     IntentionCreationOrigin.dailyChoices,
     IntentionCreationOrigin.deep,

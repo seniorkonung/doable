@@ -10,7 +10,6 @@ import 'package:doable/src/app/quick_creation/quick_creation_button.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
-import 'package:doable/src/daily_choice/presentation/daily_choice_picker_context.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
@@ -34,6 +33,8 @@ import 'package:doable/src/long_term_relation/application/relation_group_page.da
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../daily_choice/presentation/daily_choice_picker_launch_test_support.dart'
+    show TestDailyChoicePickerLaunch;
 import '../../intention/presentation/details/details_test_support.dart';
 import '../../intention/presentation/picker/intention_picker_test_support.dart';
 import '../../long_term_relation/presentation/details/relation_details_test_support.dart'
@@ -521,9 +522,7 @@ Future<void> _openActionSearch(
 ) async {
   unawaited(
     router.push(
-      DailyChoiceActionPickerRoute(
-        pickerContext: const PathReplacementDailyChoicePickerContext(),
-      ),
+      DailyChoiceActionPickerRoute(launch: TestDailyChoicePickerLaunch()),
     ),
   );
   await _until(

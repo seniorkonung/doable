@@ -1,21 +1,33 @@
-import 'package:auto_route/auto_route.dart';
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollDirection;
-import 'package:flutter/semantics.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent, ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../l10n/app_localizations.dart';
-import '../../../app/routing/app_router.gr.dart';
+import '../../../design_system/components/choice_row.dart';
 import '../../../design_system/components/day_heading.dart';
+import '../../../design_system/components/empty_state.dart';
+import '../../../design_system/components/list_state.dart';
+import '../../../design_system/components/notice.dart';
+import '../../../design_system/components/scroll_top_button.dart';
+import '../../../design_system/components/section_header.dart';
+import '../../../design_system/doable_colors.dart';
+import '../../../design_system/doable_icon.dart';
 import '../../../design_system/doable_metrics.dart';
+import '../../../design_system/doable_priority.dart';
+import '../../../design_system/doable_type.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../application/daily_choice_catalog.dart';
 import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice_id.dart';
+import '../../domain/daily_choice_priority.dart';
 import '../../domain/daily_choice_schedule.dart';
 import '../daily_choice_command_failure_message.dart';
+import '../details/daily_choice_field_labels.dart';
+import '../details/daily_choice_sheet.dart';
 import 'daily_choice_calendar.dart';
 import 'daily_choice_calendar_day_marks_view_model.dart';
 import 'daily_choice_calendar_viewport.dart';
@@ -25,15 +37,30 @@ import 'daily_choice_catalog_view_model.dart';
 import 'daily_choice_local_date_provider.dart';
 import 'daily_choice_local_day_observer.dart';
 
-/// Содержимое каталога без каркаса страницы.
+/// Строит каркас страницы вокруг [body] и кнопки возврата к началу.
+///
+/// [scrollTopButton] равна `null`, пока кнопка не нужна. Она стоит в слоте
+/// плавающей кнопки `Scaffold` страницы: тогда сообщение встаёт над ней, а
+/// вложенный `Scaffold` показал бы сообщение второй раз.
+typedef DailyChoiceCatalogScaffoldBuilder = Widget Function(
+  Widget body,
+  Widget? scrollTopButton,
+);
+
+/// Содержимое каталога; каркас страницы строит [scaffoldBuilder].
 ///
 /// Страница создаёт и удерживает [instance], передавая его также в [ObjectKey].
 /// Тело владеет просмотром календаря, наблюдателем местного дня и хранилищем
 /// прокрутки; модели выбранного дня, выдачи и отметок живут с этим экземпляром.
 final class DailyChoiceCatalogBody extends ConsumerStatefulWidget {
-  const DailyChoiceCatalogBody({required this.instance, super.key});
+  const DailyChoiceCatalogBody({
+    required this.instance,
+    required this.scaffoldBuilder,
+    super.key,
+  });
 
   final DailyChoiceCatalogInstance instance;
+  final DailyChoiceCatalogScaffoldBuilder scaffoldBuilder;
 
   @override
   ConsumerState<DailyChoiceCatalogBody> createState() =>
@@ -59,6 +86,20 @@ final class _DailyChoiceCatalogBodyState
   final _scrollController = ScrollController();
 
   _CalendarTransitionScrollSnapshot? _scrollSnapshot;
+
+  /// Выдача прокручена дальше высоты своей видимой области.
+  var _isPastViewport = false;
+
+  /// Плавный возврат к началу выдачи.
+  static const _returnToStartDuration = Duration(milliseconds: 300);
+
+  /// Свободное место под последней строкой выдачи.
+  static const double _listEndSpace = 72;
+
+  /// Запас построения строк за краем выдачи: подвал секции строится и
+  /// запрашивает порцию, когда конец её загруженной части подошёл на это
+  /// расстояние.
+  static const double _pageRequestDistance = 160;
 
   /// Текущий местный день, отмеченный в календаре и заголовке дня.
   ///
@@ -116,7 +157,7 @@ final class _DailyChoiceCatalogBodyState
     final dayMarks = ref.watch(
       dailyChoiceCalendarDayMarksViewModelProvider(widget.instance),
     );
-    return PageStorage(
+    final body = PageStorage(
       bucket: _pageStorage,
       child: SafeArea(
         // Календарь определяет свою высоту; выдаче остаётся остальное место:
@@ -145,35 +186,83 @@ final class _DailyChoiceCatalogBodyState
               ),
             ),
             Expanded(
-              child: NotificationListener<ScrollNotification>(
-                onNotification: _onScrollNotification,
-                child: CustomScrollView(
-                  controller: _scrollController,
-                  physics: const _CalendarResizeScrollPhysics(),
-                  key: const PageStorageKey<String>('daily-choice-catalog'),
-                  slivers: [
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                        child: DayHeading(
-                          weekday:
-                              weekday[0].toUpperCase() + weekday.substring(1),
-                          // Явный формат сохраняет порядок и не добавляет «г.»:
-                          // https://pub.dev/documentation/intl/latest/intl/DateFormat-class.html
-                          date: DateFormat('d MMMM y', locale).format(date),
-                          todayLabel: selectedDate == _localDay.today
-                              ? l10n.dailyChoiceCalendarToday
-                              : null,
+              // Календарь и новая выдача двигают границу и без прокрутки:
+              // https://api.flutter.dev/flutter/widgets/ScrollMetricsNotification-class.html
+              child: NotificationListener<ScrollMetricsNotification>(
+                onNotification: _onScrollMetricsNotification,
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: _onScrollNotification,
+                  child: CustomScrollView(
+                    controller: _scrollController,
+                    physics: const _CalendarResizeScrollPhysics(),
+                    // https://api.flutter.dev/flutter/widgets/ScrollView/scrollCacheExtent.html
+                    scrollCacheExtent: const ScrollCacheExtent.pixels(
+                      _pageRequestDistance,
+                    ),
+                    key: const PageStorageKey<String>('daily-choice-catalog'),
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            DoableMetrics.space5,
+                            DoableMetrics.space4,
+                            DoableMetrics.space5,
+                            0,
+                          ),
+                          child: DayHeading(
+                            weekday:
+                                weekday[0].toUpperCase() + weekday.substring(1),
+                            // Явный формат сохраняет порядок и не добавляет
+                            // «г.»:
+                            // https://pub.dev/documentation/intl/latest/intl/DateFormat-class.html
+                            date: DateFormat('d MMMM y', locale).format(date),
+                            todayLabel: selectedDate == _localDay.today
+                                ? l10n.dailyChoiceCalendarToday
+                                : null,
+                            trailing: _refreshLine(state, l10n),
+                          ),
                         ),
                       ),
-                    ),
-                    ..._content(state, model, l10n),
-                  ],
+                      ..._content(state, model, l10n),
+                    ],
+                  ),
                 ),
               ),
             ),
           ],
         ),
+      ),
+    );
+    return widget.scaffoldBuilder(
+      body,
+      _isPastViewport
+          ? ScrollTopButton(
+              label: l10n.dailyChoiceCatalogScrollToTop,
+              onPressed: _returnToStart,
+            )
+          : null,
+    );
+  }
+
+  /// Строка обновления занимает место всегда, поэтому её появление не меняет
+  /// заголовок дня и не двигает выдачу.
+  ///
+  /// Сохранение размера требует сохранить анимацию, поэтому вне обновления
+  /// кольцо останавливает отдельный [TickerMode]: иначе скрытая строка
+  /// запрашивала бы кадры постоянно.
+  /// https://api.flutter.dev/flutter/widgets/Visibility/maintainSize.html
+  Widget _refreshLine(DailyChoiceCatalogState state, AppLocalizations l10n) {
+    final isRefreshing =
+        state is DailyChoiceCatalogLoaded &&
+        state.freshness == DailyChoiceCatalogFreshness.refreshing;
+    return Visibility(
+      visible: isRefreshing,
+      maintainState: true,
+      maintainAnimation: true,
+      maintainSize: true,
+      child: TickerMode(
+        enabled: isRefreshing,
+        child: ListState.refreshing(text: l10n.dailyChoiceCatalogRefreshing),
       ),
     );
   }
@@ -210,9 +299,42 @@ final class _DailyChoiceCatalogBodyState
         : null;
   }
 
+  /// Новая цель, как и прокрутка пользователя, отменяет отложенное
+  /// восстановление позиции после перехода календаря.
+  void _returnToStart() {
+    _scrollSnapshot = null;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _scrollController.jumpTo(0);
+    } else {
+      unawaited(
+        _scrollController.animateTo(
+          0,
+          duration: _returnToStartDuration,
+          curve: Curves.easeOut,
+        ),
+      );
+    }
+  }
+
+  void _updatePastViewport(ScrollMetrics metrics) {
+    final isPastViewport = metrics.pixels > metrics.viewportDimension;
+    if (isPastViewport != _isPastViewport) {
+      setState(() => _isPastViewport = isPastViewport);
+    }
+  }
+
+  bool _onScrollMetricsNotification(ScrollMetricsNotification notification) {
+    if (notification.depth == 0) _updatePastViewport(notification.metrics);
+    return false;
+  }
+
   bool _onScrollNotification(ScrollNotification notification) {
+    if (notification.depth != 0) return false;
+    if (notification is ScrollUpdateNotification) {
+      _updatePastViewport(notification.metrics);
+    }
     final snapshot = _scrollSnapshot;
-    if (notification.depth != 0 || snapshot == null) return false;
+    if (snapshot == null) return false;
     // Коррекция геометрии не является пользовательской прокруткой:
     // https://api.flutter.dev/flutter/widgets/UserScrollNotification-class.html
     final isUserScroll = switch (notification) {
@@ -263,82 +385,99 @@ final class _DailyChoiceCatalogBodyState
   }
 
   /// Слайверы согласованной пары под заголовком дня.
+  ///
+  /// Заголовки секций стоят только над подтверждёнными данными: пока их нет
+  /// или день пуст, под заголовком дня стоит одно состояние.
   List<Widget> _content(
     DailyChoiceCatalogState state,
     DailyChoiceCatalogViewModel model,
     AppLocalizations l10n,
-  ) {
-    final loaded = state is DailyChoiceCatalogLoaded ? state : null;
-    return [
-      if (loaded != null)
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Semantics(
-              liveRegion: true,
-              child: Text(l10n.dailyChoiceCatalogTotalCount(loaded.totalCount)),
-            ),
-          ),
+  ) => switch (state) {
+    DailyChoiceCatalogInitialLoad() => [
+      _status(ListState.loading(text: l10n.dailyChoiceCatalogLoading)),
+    ],
+    DailyChoiceCatalogInitialFailure(:final failure, :final canRetry) => [
+      _status(
+        ListState.error(
+          message: _failureMessage(failure, l10n),
+          retry: canRetry
+              ? (label: l10n.commonRetry, onPressed: model.retryFirstPage)
+              : null,
         ),
-      if (loaded?.freshness == DailyChoiceCatalogFreshness.refreshing)
-        SliverToBoxAdapter(
-          child: _Banner(
-            message: l10n.dailyChoiceCatalogRefreshing,
-            loading: true,
+      ),
+    ],
+    final DailyChoiceCatalogLoaded loaded => _loadedContent(
+      loaded,
+      model,
+      l10n,
+    ),
+  };
+
+  SliverPadding _status(Widget status) => SliverPadding(
+    padding: const EdgeInsets.fromLTRB(
+      DoableMetrics.space5,
+      DoableMetrics.space4,
+      DoableMetrics.space5,
+      0,
+    ),
+    sliver: SliverToBoxAdapter(child: status),
+  );
+
+  List<Widget> _loadedContent(
+    DailyChoiceCatalogLoaded state,
+    DailyChoiceCatalogViewModel model,
+    AppLocalizations l10n,
+  ) => [
+    if (state.refreshFailure case final failure?)
+      _status(
+        Notice.content(
+          message: Semantics(
+            container: true,
+            liveRegion: true,
+            child: Text(_failureMessage(failure, l10n)),
           ),
+          action: state.canRetryRefresh
+              ? (label: l10n.commonRetry, onPressed: model.retryRefresh)
+              : null,
         ),
-      if (loaded?.freshness == DailyChoiceCatalogFreshness.stale)
-        SliverToBoxAdapter(
-          child: _Banner(
-            message: _failureMessage(loaded!.refreshFailure!, l10n),
-            onRetry:
-                loaded.refreshFailure is DailyChoiceCatalogUnavailableFailure
-                ? model.retryRefresh
-                : null,
-          ),
+      ),
+    if (state.totalCount == 0)
+      SliverFillRemaining(
+        hasScrollBody: false,
+        child: EmptyState(
+          icon: DoableIconData.calendar,
+          title: l10n.dailyChoiceCatalogEmptyTitle,
+          text: l10n.dailyChoiceCatalogEmptyText,
         ),
+      )
+    else ...[
       for (final isCompleted in [false, true]) ...[
         SliverToBoxAdapter(
-          child: Semantics(
-            header: true,
-            expanded: state.selection.isExpanded(isCompleted),
-            child: ListTile(
+          child: Padding(
+            // Второй заголовок стоит на 2 ниже строк первой секции.
+            padding: EdgeInsets.fromLTRB(
+              DoableMetrics.space5,
+              isCompleted ? 2 : 0,
+              DoableMetrics.space5,
+              0,
+            ),
+            child: SectionHeader(
               key: ValueKey('daily-choice-section-$isCompleted'),
-              title: Text(
-                isCompleted
-                    ? l10n.dailyChoiceCatalogCompleted
-                    : l10n.dailyChoiceCatalogIncomplete,
-              ),
-              trailing: Icon(
-                state.selection.isExpanded(isCompleted)
-                    ? Icons.expand_less
-                    : Icons.expand_more,
-              ),
-              onTap: () => model.toggleSection(isCompleted),
+              title: isCompleted
+                  ? l10n.dailyChoiceCatalogCompleted
+                  : l10n.dailyChoiceCatalogIncomplete,
+              count: state.section(isCompleted).totalCount,
+              open: state.selection.isExpanded(isCompleted),
+              onToggle: () => model.toggleSection(isCompleted),
             ),
           ),
         ),
-        if (loaded != null && state.selection.isExpanded(isCompleted))
-          ..._section(loaded, isCompleted, model, l10n),
+        if (state.selection.isExpanded(isCompleted))
+          ..._section(state, isCompleted, model, l10n),
       ],
-      if (state is DailyChoiceCatalogInitialLoad)
-        _SliverStatus(
-          _Status(message: l10n.dailyChoiceCatalogLoading, loading: true),
-        ),
-      if (state case DailyChoiceCatalogInitialFailure(
-        :final failure,
-        :final canRetry,
-      ))
-        _SliverStatus(
-          _Status(
-            message: _failureMessage(failure, l10n),
-            onRetry: canRetry ? model.retryFirstPage : null,
-          ),
-        ),
-      if (loaded?.totalCount == 0)
-        _SliverStatus(_Status(message: l10n.dailyChoiceCatalogEmpty)),
-    ];
-  }
+      const SliverToBoxAdapter(child: SizedBox(height: _listEndSpace)),
+    ],
+  ];
 
   List<Widget> _section(
     DailyChoiceCatalogLoaded state,
@@ -353,42 +492,38 @@ final class _DailyChoiceCatalogBodyState
     };
     return [
       SliverList.builder(
-        itemCount: section.items.length,
+        itemCount: section.items.length + (section.nextCursor == null ? 0 : 1),
         // При смене порядка Flutter находит карточку по идентификатору:
         // https://api.flutter.dev/flutter/widgets/SliverChildBuilderDelegate/findChildIndexCallback.html
         findChildIndexCallback: (key) => indices[key],
         itemBuilder: (context, index) {
+          if (index == section.items.length) {
+            _requestPage(model, isCompleted);
+            return _pageFooter(state, isCompleted, model, l10n);
+          }
           final item = section.items[index];
           final number =
               index + 1 + (isCompleted ? state.incomplete.items.length : 0);
-          final phrase = l10n.dailyChoiceDetailsPhrase(
-            item.source.title,
-            item.selected.title,
-          );
-          final date = item.date.toCanonicalString();
+          final action = item.selected.title;
           final completion = item.isCompleted
               ? l10n.dailyChoiceDetailsCompleted
               : l10n.dailyChoiceDetailsNotCompleted;
-          void open() =>
-              context.router.push(DailyChoiceDetailsRoute(choiceId: item.id));
-          final schedule = switch (item.schedule) {
-            DailyChoiceAllDay() => l10n.dailyChoiceAllDay,
-            DailyChoiceTime(:final hour, :final minute) => TimeOfDay(
-              hour: hour,
-              minute: minute,
-            ).format(context),
-          };
+          void open() => unawaited(showDailyChoiceSheet(context, item.id));
+          final schedule = dailyChoiceTimeValue(context, item.schedule);
           final priority = l10n.dailyChoicePriorityOption(
             item.priority.name.toUpperCase(),
           );
-          final pathCount = l10n.dailyChoiceCatalogPathIntentionCount(
-            item.pathIntentionCount,
-          );
+          final steps = item.pathIntentionCount - 1;
           final startsGroup =
               index == 0 || section.items[index - 1].schedule != item.schedule;
           final showGroup =
               startsGroup &&
-              (item.schedule is DailyChoiceTime || section.hasTimedChoices);
+              (item.schedule is DailyChoiceTime || state.hasTimedChoices);
+          final gap = index == 0
+              ? 0.0
+              : startsGroup
+              ? DoableMetrics.space4
+              : DoableMetrics.space2;
           return _CompletionSurface(
             key: ValueKey(item.id),
             id: item.id,
@@ -396,196 +531,200 @@ final class _DailyChoiceCatalogBodyState
             builder: (changeCompletion) => Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (showGroup)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                    child: Semantics(
-                      container: true,
-                      header: true,
-                      child: Text(
-                        schedule,
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                    ),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    DoableMetrics.space5,
+                    gap,
+                    DoableMetrics.space5,
+                    0,
                   ),
-                // Сначала читаются данные карточки, затем отдельный флажок:
-                // https://api.flutter.dev/flutter/semantics/SemanticsProperties/sortKey.html
-                Semantics(
-                  container: true,
-                  explicitChildNodes: true,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    spacing: 6,
                     children: [
-                      Expanded(
-                        child: Semantics(
-                          key: ValueKey('daily-choice-row-$number'),
-                          sortKey: const OrdinalSortKey(0),
+                      if (showGroup)
+                        Semantics(
                           container: true,
-                          button: true,
-                          label: [
-                            l10n.dailyChoiceCatalogRowLabel(
-                              number,
-                              phrase,
-                              date,
-                              completion,
-                            ),
+                          header: true,
+                          child: Text(
                             schedule,
-                            priority,
-                            pathCount,
-                            if (item.description case final description?)
-                              description.value,
-                          ].join('\n'),
-                          onTap: open,
-                          child: ExcludeSemantics(
-                            child: ListTile(
-                              title: Text(phrase),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Text(
-                                    '${l10n.dailyChoiceDetailsDate(date)} · $completion',
-                                  ),
-                                  Text(schedule),
-                                  Text(priority),
-                                  Text(pathCount),
-                                  if (item.description case final description?)
-                                    // Ограничение относится только к карточке:
-                                    // https://api.flutter.dev/flutter/widgets/Text/maxLines.html
-                                    Text(
-                                      description.value,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                ],
-                              ),
-                              onTap: open,
+                            style: DoableType.label.copyWith(
+                              color: Theme.of(context)
+                                  .extension<DoableColors>()!
+                                  .muted,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
                             ),
                           ),
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8, right: 8),
-                        // Флажок остаётся вне исключённого содержимого открытия:
-                        // https://api.flutter.dev/flutter/material/Checkbox-class.html
-                        child: Semantics(
-                          sortKey: const OrdinalSortKey(1),
-                          child: Checkbox(
-                            key: ValueKey(
-                              'daily-choice-completion-${item.id.toCanonicalString()}',
-                            ),
-                            semanticLabel: l10n
-                                .dailyChoiceCatalogCompletionLabel(
-                                  number,
-                                  phrase,
-                                  date,
-                                ),
-                            value: item.isCompleted,
-                            onChanged: state.canChangeCompletion(item.id)
-                                ? (_) => changeCompletion(!item.isCompleted)
-                                : null,
-                          ),
+                      ChoiceRow(
+                        openKey: ValueKey('daily-choice-row-$number'),
+                        checkKey: ValueKey(
+                          'daily-choice-completion-${item.id.toCanonicalString()}',
                         ),
+                        goal: item.source.title,
+                        action: action,
+                        note: item.description?.value,
+                        priority: switch (item.priority) {
+                          DailyChoicePriority.p1 => DoablePriority.p1,
+                          DailyChoicePriority.p2 => DoablePriority.p2,
+                          DailyChoicePriority.p3 => DoablePriority.p3,
+                          DailyChoicePriority.p4 => DoablePriority.p4,
+                        },
+                        reasons: steps,
+                        done: item.isCompleted,
+                        checkLabel: l10n.dailyChoiceCatalogCompletionLabel(
+                          number,
+                          action,
+                          priority,
+                        ),
+                        label: [
+                          l10n.dailyChoiceCatalogRowLabel(number, action),
+                          if (item.description case final description?)
+                            description.value,
+                          l10n.dailyChoiceCatalogRowSource(item.source.title),
+                          l10n.dailyChoiceCatalogPathStepCount(steps),
+                          if (item.schedule is DailyChoiceTime)
+                            l10n.dailyChoiceCatalogRowTime(schedule)
+                          else
+                            schedule,
+                          completion,
+                        ].join('\n'),
+                        onToggle: state.canChangeCompletion(item.id)
+                            ? () => changeCompletion(!item.isCompleted)
+                            : null,
+                        onOpen: open,
                       ),
                     ],
                   ),
                 ),
-                if (state.completionOperations[item.id] case final operation?)
-                  _completionFeedback(
-                    item.id,
-                    item.isCompleted,
-                    operation,
-                    model,
-                    l10n,
-                    changeCompletion,
+                if (_completionNotice(
+                      item,
+                      state.completionOperations[item.id],
+                      model,
+                      l10n,
+                      changeCompletion,
+                    )
+                    case final notice?)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      DoableMetrics.space5,
+                      DoableMetrics.space2,
+                      DoableMetrics.space5,
+                      0,
+                    ),
+                    child: notice,
                   ),
               ],
             ),
           );
         },
       ),
-      if (section.nextCursor != null)
-        SliverToBoxAdapter(child: _pageFooter(state, isCompleted, model, l10n)),
     ];
   }
 
-  Widget _completionFeedback(
-    DailyChoiceId id,
-    bool isCompleted,
-    DailyChoiceCompletionOperation operation,
+  /// Уведомление у карточки при отказе записи выполнения.
+  ///
+  /// Пока запись и согласование идут, под карточкой ничего нет: флажок
+  /// недоступен, а строки не сдвигаются. Уведомление несёт одно действие:
+  /// повтор при доказанно временном отказе, иначе актуализацию. Сообщение и
+  /// повтор принадлежат только сессии, получившей отказ; вернувшейся карточке
+  /// остаётся действие, без которого флажок недоступен.
+  Widget? _completionNotice(
+    DailyChoiceCatalogItem item,
+    DailyChoiceCompletionOperation? operation,
     DailyChoiceCatalogViewModel model,
     AppLocalizations l10n,
     ValueChanged<bool> changeCompletion,
-  ) => switch (operation) {
-    DailyChoiceCompletionSubmitting() => _Banner(
-      message: l10n.dailyChoiceCompletionSaving,
-      loading: true,
-    ),
-    DailyChoiceCompletionAwaitingSnapshot() => _Banner(
-      message: l10n.dailyChoiceCompletionSynchronizing,
-      loading: true,
-    ),
-    // Сообщение и его повтор принадлежат только сессии, получившей отказ;
-    // вернувшейся карточке остаётся действие, без которого флажок недоступен.
-    DailyChoiceCompletionFailed(
-      :final failure,
-      :final inline,
-      :final canRetry,
-      :final requiresRefresh,
-    )
-        when (inline?.session.isOpen ?? false) || requiresRefresh =>
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (inline != null && inline.session.isOpen) ...[
-              OperationFailurePresentation(
-                claim: inline.claim,
-                message: dailyChoiceCommandFailureMessage(l10n, failure),
-              ),
-              if (canRetry)
-                TextButton(
-                  onPressed: () => changeCompletion(!isCompleted),
-                  child: Text(l10n.commonRetry),
-                ),
-            ],
-            if (requiresRefresh)
-              TextButton(
-                onPressed: () => model.refreshCompletion(id),
-                child: Text(l10n.dailyChoiceCompletionRefresh),
-              ),
-          ],
+  ) {
+    final refresh = (
+      label: l10n.dailyChoiceCompletionRefresh,
+      onPressed: () => model.refreshCompletion(item.id),
+    );
+    return switch (operation) {
+      null ||
+      DailyChoiceCompletionSubmitting() ||
+      DailyChoiceCompletionAwaitingSnapshot() => null,
+      DailyChoiceCompletionFailed(
+        :final failure,
+        :final inline,
+        :final canRetry,
+      )
+          when inline != null && inline.session.isOpen =>
+        Notice.content(
+          message: OperationFailurePresentation(
+            claim: inline.claim,
+            message: dailyChoiceCommandFailureMessage(l10n, failure),
+            inheritsColor: true,
+          ),
+          action: canRetry
+              ? (
+                  label: l10n.commonRetry,
+                  onPressed: () => changeCompletion(!item.isCompleted),
+                )
+              : refresh,
         ),
+      DailyChoiceCompletionFailed(requiresRefresh: true) => Notice.content(
+        message: const SizedBox.shrink(),
+        action: refresh,
       ),
-    DailyChoiceCompletionFailed() => const SizedBox.shrink(),
-  };
+      DailyChoiceCompletionFailed() => null,
+    };
+  }
 
+  /// Подвал — последний элемент ленивого списка, поэтому его построение
+  /// означает, что конец загруженной части подошёл к видимой области. Модель
+  /// сама пропускает запрос при неактуальной выдаче или занятой порции, а
+  /// каждая новая выдача заново строит подвал на виду.
+  void _requestPage(DailyChoiceCatalogViewModel model, bool isCompleted) {
+    // https://api.flutter.dev/flutter/scheduler/SchedulerBinding/addPostFrameCallback.html
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(model.loadMore(isCompleted: isCompleted));
+    });
+  }
+
+  /// Устаревшая выдача не запрашивает порцию и не обновляется сама, поэтому
+  /// кольцо в её подвале вращалось бы вечно: пока есть отказ обновления,
+  /// подвал показывает его, а повтор несёт только доказанно временный.
   Widget _pageFooter(
     DailyChoiceCatalogLoaded state,
     bool isCompleted,
     DailyChoiceCatalogViewModel model,
     AppLocalizations l10n,
-  ) => switch (state.section(isCompleted).pageStatus) {
-    DailyChoiceCatalogPageLoading() => _Status(
-      message: l10n.dailyChoiceCatalogLoadingMore,
-      loading: true,
+  ) => Padding(
+    key: ValueKey('daily-choice-page-footer-$isCompleted'),
+    padding: const EdgeInsets.fromLTRB(
+      DoableMetrics.space5,
+      DoableMetrics.space4,
+      DoableMetrics.space5,
+      0,
     ),
-    DailyChoiceCatalogPageFailure(:final failure, :final canRetry) => _Status(
-      message: _failureMessage(failure, l10n),
-      onRetry: canRetry
-          ? () => model.retryLoadMore(isCompleted: isCompleted)
-          : null,
-    ),
-    DailyChoiceCatalogPageIdle() => Center(
-      child: TextButton(
-        key: ValueKey('daily-choice-load-more-$isCompleted'),
-        onPressed: state.freshness == DailyChoiceCatalogFreshness.current
-            ? () => model.loadMore(isCompleted: isCompleted)
+    child: switch ((
+      state.refreshFailure,
+      state.section(isCompleted).pageStatus,
+    )) {
+      (final failure?, _) => ListState.error(
+        message: _failureMessage(failure, l10n),
+        retry: state.canRetryRefresh
+            ? (label: l10n.commonRetry, onPressed: model.retryRefresh)
             : null,
-        child: Text(l10n.dailyChoiceCatalogLoadMore),
       ),
-    ),
-  };
+      (null, DailyChoiceCatalogPageFailure(:final failure, :final canRetry)) =>
+        ListState.error(
+          message: _failureMessage(failure, l10n),
+          retry: canRetry
+              ? (
+                  label: l10n.commonRetry,
+                  onPressed: () =>
+                      unawaited(model.retryLoadMore(isCompleted: isCompleted)),
+                )
+              : null,
+        ),
+      (null, DailyChoiceCatalogPageIdle() || DailyChoiceCatalogPageLoading()) =>
+        ListState.more(text: l10n.dailyChoiceCatalogLoadingMore),
+    },
+  );
 
   String _failureMessage(
     DailyChoiceCatalogReadFailure failure,
@@ -662,9 +801,9 @@ bool _hasSameScrollContent(
     (DailyChoiceCatalogLoaded before, DailyChoiceCatalogLoaded after) =>
       _hasSameSectionContent(before.incomplete, after.incomplete) &&
           _hasSameSectionContent(before.completed, after.completed) &&
-          before.freshness == after.freshness &&
+          // Место строки обновления занято всегда, а отказ добавляет карточку.
           before.refreshFailure == after.refreshFailure &&
-          // Ход и отказ изменения выполнения выводятся внутри карточек.
+          // Отказ изменения выполнения выводится внутри карточки.
           mapEquals(before.completionOperations, after.completionOperations),
     _ => identical(previous, next),
   };
@@ -678,80 +817,6 @@ bool _hasSameSectionContent(
     before.totalCount == after.totalCount &&
     (before.nextCursor != null) == (after.nextCursor != null) &&
     before.pageStatus == after.pageStatus;
-
-/// Состояние без строк выдачи занимает остаток высоты под секциями.
-final class _SliverStatus extends StatelessWidget {
-  const _SliverStatus(this.status);
-
-  final _Status status;
-
-  @override
-  Widget build(BuildContext context) =>
-      SliverFillRemaining(hasScrollBody: false, child: status);
-}
-
-final class _Status extends StatelessWidget {
-  const _Status({required this.message, this.loading = false, this.onRetry});
-
-  final String message;
-  final bool loading;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Semantics(
-      liveRegion: true,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (loading) const CircularProgressIndicator(),
-            Text(message, textAlign: TextAlign.center),
-            if (onRetry != null)
-              TextButton(
-                onPressed: onRetry,
-                child: Text(AppLocalizations.of(context).commonRetry),
-              ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-final class _Banner extends StatelessWidget {
-  const _Banner({required this.message, this.loading = false, this.onRetry});
-
-  final String message;
-  final bool loading;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    liveRegion: true,
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          if (loading)
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          const SizedBox(width: 8),
-          Expanded(child: Text(message)),
-          if (onRetry != null)
-            TextButton(
-              onPressed: onRetry,
-              child: Text(AppLocalizations.of(context).commonRetry),
-            ),
-        ],
-      ),
-    ),
-  );
-}
 
 /// Карточка удерживает только право будущей ошибки в своей экранной сессии;
 /// команда живёт в координаторе.
