@@ -1330,10 +1330,6 @@
   "@dailyChoiceCreated": {
     "description": "Подтверждение создания дневного выбора"
   },
-  "dailyChoiceUpdated": "Daily choice updated.",
-  "@dailyChoiceUpdated": {
-    "description": "Подтверждение изменения дневного выбора"
-  },
   "dailyChoiceDeleted": "Daily choice deleted.",
   "@dailyChoiceDeleted": {
     "description": "Подтверждение удаления дневного выбора"

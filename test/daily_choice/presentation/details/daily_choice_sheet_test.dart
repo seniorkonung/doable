@@ -640,13 +640,7 @@ void main() {
     repository.emit(_details(isCompleted: true));
     await tester.pumpAndSettle();
     expect(_actionDecoration(tester), TextDecoration.lineThrough);
-    expect(
-      find.descendant(
-        of: find.byType(Sheet),
-        matching: find.textContaining('Дневной выбор изменён.'),
-      ),
-      findsOneWidget,
-    );
+    expect(find.byType(SnackBar), findsNothing);
     expect(
       tester.getSemantics(_check),
       isSemantics(hasEnabledState: true, isEnabled: true),

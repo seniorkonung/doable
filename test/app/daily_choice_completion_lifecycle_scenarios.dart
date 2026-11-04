@@ -111,10 +111,8 @@ void _completionLifecycleScenarios() {
         isTrue,
       );
       final message = find.byKey(const ValueKey('graph-operation-message'));
-      await _until(tester, () => message.evaluate().isNotEmpty);
       await tester.pumpAndSettle();
-      ScaffoldMessenger.of(tester.element(message.first)).hideCurrentSnackBar();
-      await tester.pumpAndSettle();
+      expect(message, findsNothing);
       await openHome(tester);
       await openDailyChoices(tester, tap: _tap);
       await tester.pumpAndSettle();

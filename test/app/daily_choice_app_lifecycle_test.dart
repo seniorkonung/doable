@@ -444,7 +444,6 @@ void main() {
             .evaluate()
             .isNotEmpty,
       );
-      expect(find.textContaining('Дневной выбор изменён'), findsNothing);
       expect(
         find.byKey(const ValueKey('graph-operation-message')),
         findsWidgets,
@@ -512,24 +511,6 @@ void main() {
         findsNothing,
       );
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      await _until(
-        tester,
-        () => find
-            .byKey(const ValueKey('graph-operation-message'))
-            .evaluate()
-            .isNotEmpty,
-      );
-      expect(find.textContaining('Дневной выбор изменён'), findsWidgets);
-      expect(
-        find.byKey(const ValueKey('graph-operation-message')),
-        findsWidgets,
-      );
-      await tester.pumpAndSettle();
-      ScaffoldMessenger.of(
-        tester.element(
-          find.byKey(const ValueKey('graph-operation-message')).first,
-        ),
-      ).hideCurrentSnackBar();
       await tester.pumpAndSettle();
       expect(
         find.byKey(const ValueKey('graph-operation-message')),

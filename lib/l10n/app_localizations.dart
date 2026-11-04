@@ -2827,12 +2827,6 @@ abstract class AppLocalizations {
   /// **'Daily choice created.'**
   String get dailyChoiceCreated;
 
-  /// Подтверждение изменения дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Daily choice updated.'**
-  String get dailyChoiceUpdated;
-
   /// Подтверждение удаления дневного выбора
   ///
   /// In en, this message translates to:

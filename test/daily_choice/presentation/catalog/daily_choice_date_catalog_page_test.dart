@@ -33,6 +33,69 @@ import '../../../support/daily_choice_catalog_controls.dart';
 import 'daily_choice_catalog_page_test_support.dart';
 
 void main() {
+  for (final onDate in [false, true]) {
+    testWidgets(
+      '${onDate ? "каталог на дату" : "корневой каталог"}: успех флажка не '
+      'объявляется сообщением, а счётчик свёрнутой секции выполненных растёт',
+      (tester) async {
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        final repository = CatalogPageRepository();
+        final selected = date(2026, 10, 7);
+        final router = await _start(
+          tester,
+          repository,
+          ControlledDailyChoiceLocalDate(selected),
+        );
+        if (onDate) {
+          await _pushDate(tester, router, selected);
+        } else {
+          await openDailyChoices(tester);
+        }
+        final open = catalogPageItem(1, date: selected);
+        final doneFirst = catalogPageItem(2, date: selected, isCompleted: true);
+        final doneSecond = catalogPageItem(
+          3,
+          date: selected,
+          isCompleted: true,
+        );
+        repository.completeFirst(0, [open, doneFirst, doneSecond], total: 3);
+        repository.completeDayStatuses(0, {});
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('daily-choice-section-true')),
+        );
+        await tester.pumpAndSettle();
+        expect(dailyChoiceSectionCount(tester, completed: false), '1');
+        expect(dailyChoiceSectionCount(tester, completed: true), '2');
+
+        await tester.tap(dailyChoiceCompletionControl);
+        await tester.pump();
+        repository.confirmCompletion(0, open, isCompleted: true, revision: 1);
+        await tester.pump();
+        await tester.pump();
+        repository.completeFirst(
+          1,
+          [
+            catalogPageItem(1, date: selected, isCompleted: true),
+            doneFirst,
+            doneSecond,
+          ],
+          total: 3,
+          revision: 1,
+        );
+        await tester.pumpAndSettle();
+
+        expect(dailyChoiceSectionCount(tester, completed: false), '0');
+        expect(dailyChoiceSectionCount(tester, completed: true), '3');
+        expect(find.byType(SnackBar), findsNothing);
+        expect(repository.completionCommands, hasLength(1));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final closePage in [false, true]) {
     testWidgets(
       'флажок: ${closePage ? 'закрытие каталога на дату' : 'уход из корневого каталога'} сохраняет поздний отказ без смены маршрута',

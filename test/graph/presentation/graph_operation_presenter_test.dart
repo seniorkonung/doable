@@ -856,30 +856,40 @@ void main() {
     },
   );
 
-  for (final scenario in <({DailyChoiceCommandKind kind, String message})>[
-    (
-      kind: DailyChoiceCommandKind.create,
-      message: 'Create — “daily choice”: Daily choice created.',
-    ),
-    (
-      kind: DailyChoiceCommandKind.update,
-      message: 'Edit — “daily choice”: Daily choice updated.',
-    ),
-  ]) {
-    testWidgets(
-      'успех дневной команды ${scenario.kind.name} предъявляется один раз',
-      (tester) async {
-        final harness = await _pumpPresenterApp(tester);
-        final accepted = harness.startDailyChoice(scenario.kind);
-        harness.completeDailyChoiceSuccess(accepted, scenario.kind);
-        await tester.pumpAndSettle();
+  testWidgets('успех создания дневного выбора предъявляется один раз', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester);
+    final accepted = harness.startDailyChoice(DailyChoiceCommandKind.create);
+    harness.completeDailyChoiceSuccess(accepted, DailyChoiceCommandKind.create);
+    await tester.pumpAndSettle();
 
-        expect(find.text(scenario.message), findsOneWidget);
-        await _closeMessage(tester);
-        expect(find.byType(SnackBar), findsNothing);
-      },
+    expect(
+      find.text('Create — “daily choice”: Daily choice created.'),
+      findsOneWidget,
     );
-  }
+    await _closeMessage(tester);
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
+  testWidgets(
+    'успех изменения дневного выбора не объявляется сообщением и не занимает '
+    'очередь',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final intention = harness.startDelete(index: 1, title: 'Намерение');
+      final update = harness.startDailyChoice(DailyChoiceCommandKind.update);
+      harness.completeDeleted(intention);
+      harness.completeDailyChoiceSuccess(update, DailyChoiceCommandKind.update);
+      await update.future;
+      await tester.pumpAndSettle();
+
+      expect(find.text(_deleted('Намерение')), findsOneWidget);
+
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
 
   for (final scenario in <({Locale locale, String message})>[
     (

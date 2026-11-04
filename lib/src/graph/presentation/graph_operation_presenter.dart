@@ -313,7 +313,7 @@ GraphOperationMessage _messageFor(
   LongTermRelationPresentableCompletion() => GraphOperationMessage(
     _relationMessage(localizations, completion),
   ),
-  DailyChoiceCommandCompletion() => GraphOperationMessage(
+  DailyChoicePresentableCompletion() => GraphOperationMessage(
     _dailyChoiceMessage(localizations, completion),
   ),
   TagCommandFailedCompletion() => GraphOperationMessage(
@@ -402,7 +402,7 @@ String _tagFailureMessage(
 
 String _dailyChoiceMessage(
   AppLocalizations localizations,
-  DailyChoiceCommandCompletion completion,
+  DailyChoicePresentableCompletion completion,
 ) => localizations.graphOperationMessage(
   switch (completion.kind) {
     DailyChoiceCommandKind.create => localizations.graphOperationCreate,
@@ -413,7 +413,9 @@ String _dailyChoiceMessage(
   switch (completion.result) {
     GraphResultSuccess() => switch (completion.kind) {
       DailyChoiceCommandKind.create => localizations.dailyChoiceCreated,
-      DailyChoiceCommandKind.update => localizations.dailyChoiceUpdated,
+      DailyChoiceCommandKind.update => throw StateError(
+        'Успех изменения дневного выбора не образует права предъявления.',
+      ),
       DailyChoiceCommandKind.delete => localizations.dailyChoiceDeleted,
     },
     GraphResultFailure(:final failure) => dailyChoiceCommandFailureMessage(

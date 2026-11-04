@@ -529,7 +529,6 @@
   "tagCorruption": "Сохранённые данные тега повреждены. Тег не изменён.",
   "tagUnexpected": "Действие с тегом не выполнено из-за непредвиденной ошибки.",
   "dailyChoiceCreated": "Дневной выбор создан.",
-  "dailyChoiceUpdated": "Дневной выбор изменён.",
   "dailyChoiceDeleted": "Дневной выбор удалён.",
   "dailyChoiceSheetOptionDelete": "Удалить дневной выбор",
   "dailyChoiceDeleteDialogTitle": "Удалить дневной выбор?",
