@@ -140,7 +140,6 @@ final class _DailyChoiceSheetState extends ConsumerState<DailyChoiceSheet> {
       ),
     );
     if (!mounted || !(ModalRoute.isCurrentOf(context) ?? false)) return;
-    if (_model.operation is DailyChoiceDetailsOperationWriting) return;
     final state = _model.state;
     if (state is! DailyChoiceDetailsLoaded || state.details.path.isEmpty) {
       return;
