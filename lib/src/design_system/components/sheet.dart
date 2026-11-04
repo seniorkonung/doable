@@ -618,15 +618,21 @@ final class Sheet extends StatelessWidget {
   /// потребитель, потому что области нажатия шапки выбора и полоса вкладок
   /// выходят за поле содержимого, а список обрезал бы их и нажатия по ним.
   /// [expandLabel] и [collapseLabel] — доступные названия ручки.
+  ///
+  /// [bar] — полоса редактирования на месте ручки: её появление раскрывает
+  /// лист на весь экран, и пока она стоит, лист не перетаскивается, а
+  /// [slivers] только прокручиваются. После снятия полосы лист остаётся
+  /// раскрытым, а на её месте стоит ручка.
   Sheet.expandableUntitled(
     this._presentation, {
     required String label,
     required List<Widget> slivers,
     required String expandLabel,
     required String collapseLabel,
+    TopBar? bar,
     super.key,
   }) : _parts = _ExpandableParts(
-         head: _LabeledHead(label: label),
+         head: _LabeledHead(label: label, bar: bar),
          compactHeight: SheetCompactHeight.limit,
          slivers: slivers,
          footer: null,
@@ -1028,11 +1034,13 @@ final class _TitledHead extends _ExpandableHead {
   final SheetAction? action;
 }
 
-/// Только название листа для диктора: на экране над списком одна ручка.
+/// Только название листа для диктора: на экране над списком одна ручка или
+/// полоса [bar] на её месте.
 final class _LabeledHead extends _ExpandableHead {
-  const _LabeledHead({required this.label});
+  const _LabeledHead({required this.label, required this.bar});
 
   final String label;
+  final TopBar? bar;
 }
 
 /// Части листа без заголовка.
@@ -1062,12 +1070,31 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
     with SingleTickerProviderStateMixin {
   final _extents = _ExpandableExtents();
 
+  /// Полоса на месте ручки: с ней лист стоит в полном размере.
+  TopBar? get _bar => switch (widget.parts.head) {
+    _TitledHead() => null,
+    _LabeledHead(:final bar) => bar,
+  };
+
+  late var _isFull = _bar != null;
+
   /// 0 — компактный размер, 1 — весь экран.
   late final _expansion = AnimationController(
     vsync: this,
     duration: _sheetDuration,
+    value: _isFull ? 1 : 0,
   );
-  var _isFull = false;
+
+  @override
+  void didUpdateWidget(_ExpandableSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final hadBar = switch (oldWidget.parts.head) {
+      _TitledHead() => false,
+      _LabeledHead(:final bar) => bar != null,
+    };
+    // Снятие полосы оставляет лист в полном размере.
+    if (_bar != null && !hadBar) _resize(full: true);
+  }
 
   @override
   void dispose() {
@@ -1153,13 +1180,29 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
               if (shrinkWrap) Flexible(child: list) else Expanded(child: list),
             ],
           ),
-          _LabeledHead() => Stack(
+          // Список стоит на том же месте дерева с полосой и без неё, поэтому
+          // её появление и снятие не сбрасывают его прокрутку и состояние.
+          _LabeledHead(:final bar) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Padding(
-                padding: const EdgeInsets.only(top: _untitledBodyTop),
-                child: list,
+              if (bar != null) ...[
+                bar,
+                const SizedBox(height: DoableMetrics.space1),
+              ],
+              Expanded(
+                child: Stack(
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.only(
+                        top: bar == null ? _untitledBodyTop : 0,
+                      ),
+                      child: list,
+                    ),
+                    if (bar == null)
+                      Align(alignment: Alignment.topCenter, child: handle),
+                  ],
+                ),
               ),
-              Align(alignment: Alignment.topCenter, child: handle),
             ],
           ),
         },
@@ -1172,7 +1215,7 @@ final class _ExpandableSheetState extends State<_ExpandableSheet>
 
     return _SheetMotion(
       route: widget.route,
-      isFixed: false,
+      isFixed: _bar != null,
       expansion: _SheetExpansion(
         controller: _expansion,
         extents: _extents,

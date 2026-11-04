@@ -860,7 +860,7 @@
     - меняются `test/graph/application/graph_command_coordinator_daily_choice_test.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/daily_choice/presentation/details/daily_choice_sheet_test.dart`, тест карточки в `test/daily_choice/presentation/catalog/`, `test/app/daily_choice_app_lifecycle_test.dart`.
   - **Размер:** M по логике: политика меняется в одном месте, остальные файлы — её потребители и ожидания.
 
-- [ ] 4.4 Раскрываемый лист без заголовка принимает полосу изменения по дельте `bottom-sheets`
+- [x] 4.4 Раскрываемый лист без заголовка принимает полосу изменения по дельте `bottom-sheets`
   - **Критерии приёмки:**
     - `Sheet.expandableUntitled` получает необязательную полосу `bar`, как `Sheet.untitled`. Это декларативный параметр: метода управления размером наружу нет.
     - Появление полосы переводит лист в полный размер, а полоса стоит вместо ручки. Пока полоса на месте, лист не перетаскивается: жест на его поверхности, в том числе быстрый бросок вниз, не двигает лист, а жест на теле только прокручивает тело. Над открытой клавиатурой тело кончается над ней, и его конец достижим прокруткой.
