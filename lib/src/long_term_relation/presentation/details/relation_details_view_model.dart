@@ -61,7 +61,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
   ProviderSubscription<AsyncValue<LongTermRelationReadResult>>?
   _observationSubscription;
   GraphRevision? _acceptedRevision;
-  LongTermRelationOperationToken? _activeToken;
+  _Command? _command;
 
   /// Значения, с которыми сравнивается правка. После подтверждения они новее
   /// показанного снимка, пока наблюдение не прочитает его заново.
@@ -91,9 +91,9 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
       }),
     );
     ref.onDispose(() {
-      final activeToken = _activeToken;
-      if (activeToken != null) {
-        _coordinator.releaseInitiatorPresentation(activeToken);
+      final active = _command;
+      if (active != null) {
+        _coordinator.releaseInitiatorPresentation(active.token);
       }
       _publishEditFailureClaim(null);
       _observationSubscription?.close();
@@ -185,6 +185,9 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
 
   /// Возвращает успех только собственной принятой команды удаления.
   /// Общее состояние данных по ID не передаёт право закрытия другим страницам.
+  ///
+  /// Снимок без связи до исхода команды не показан, а после подтверждения
+  /// состояние становится [RelationDetailsOwnDeletionConfirmed].
   Future<bool> delete() async {
     final relationId = _relationId;
     final completion = await _startLifecycleChange(
@@ -222,7 +225,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
       UpdateLongTermRelation(relationId: _relationId, patch: patch),
     )) {
       case LongTermRelationCommandAccepted(:final token, :final future):
-        _activeToken = token;
+        _command = _Change(token);
         state = current.copyWith(
           isOperationRunning: true,
           clearEditFailure: true,
@@ -245,11 +248,11 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     Future<LongTermRelationCommandCompletion> future,
   ) async {
     final completion = await future;
-    if (!ref.mounted || !identical(_activeToken, completion.token)) {
+    if (!ref.mounted || !identical(_command?.token, completion.token)) {
       return;
     }
 
-    _activeToken = null;
+    _command = null;
     final failure = switch (completion.result) {
       GraphResultFailure(:final failure) => failure,
       GraphResultSuccess(value: LongTermRelationUpdated()) => null,
@@ -310,7 +313,11 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     };
     switch (start) {
       case LongTermRelationCommandAccepted(:final token, :final future):
-        _activeToken = token;
+        _command = switch (kind) {
+          RelationDetailsLifecycleKind.archive ||
+          RelationDetailsLifecycleKind.restore => _Change(token),
+          RelationDetailsLifecycleKind.delete => _Deletion(token),
+        };
         state = current.copyWith(
           isOperationRunning: true,
           lifecycleChange: RelationDetailsLifecycleRunning(kind),
@@ -352,27 +359,47 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
   ) async {
     try {
       final completion = await future;
-      if (!ref.mounted || !identical(_activeToken, completion.token)) {
+      final command = _command;
+      if (!ref.mounted ||
+          command == null ||
+          !identical(command.token, completion.token)) {
         return;
       }
 
-      _activeToken = null;
-      final current = state;
-      if (current is! RelationDetailsLoaded) {
-        if (completion.isFailure) {
-          _coordinator.releaseInitiatorPresentation(completion.token);
-        }
-        return;
+      _command = null;
+      final RelationDetailsLoaded current;
+      switch ((command, completion.result, state)) {
+        // Подтверждённое удаление сохраняет прежнее содержимое для закрытия.
+        case (
+              _Deletion() || _DeletionRelationMissing(),
+              GraphResultSuccess(
+                value: LongTermRelationDeleted(:final relation),
+              ),
+              final RelationDetailsLoaded shown,
+            )
+            when relation.id == _relationId:
+          state = _terminateAsOwnDeletion(shown);
+          return;
+        // Иначе проявляется отложенный снимок без связи.
+        case (_DeletionRelationMissing(), _, _):
+          if (completion.isFailure) {
+            _coordinator.releaseInitiatorPresentation(completion.token);
+          }
+          state = _terminateAsNotFound();
+          return;
+        case (_Change() || _Deletion(), _, final RelationDetailsLoaded loaded):
+          current = loaded;
+        case (_Change() || _Deletion(), _, _):
+          if (completion.isFailure) {
+            _coordinator.releaseInitiatorPresentation(completion.token);
+          }
+          return;
       }
       state = switch (completion.result) {
         GraphResultSuccess(value: LongTermRelationUpdated(:final relation))
             when relation.id == _relationId &&
                 _scopeMatchesLifecycleKind(relation.scope, kind) =>
           current.copyWith(clearLifecycleChange: true),
-        GraphResultSuccess(value: LongTermRelationDeleted(:final relation))
-            when relation.id == _relationId &&
-                kind == RelationDetailsLifecycleKind.delete =>
-          _terminateAsDeleted(),
         GraphResultSuccess() => current.copyWith(
           lifecycleChange: RelationDetailsLifecycleFailed(
             kind,
@@ -394,10 +421,10 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
       if (!ref.mounted) {
         return;
       }
-      final token = _activeToken;
-      _activeToken = null;
-      if (token != null) {
-        _coordinator.releaseInitiatorPresentation(token);
+      final active = _command;
+      _command = null;
+      if (active != null) {
+        _coordinator.releaseInitiatorPresentation(active.token);
       }
       final current = state;
       if (current is RelationDetailsLoaded) {
@@ -442,6 +469,18 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     if (observation case AsyncData(value: GraphResultSuccess(:final value))) {
       if (!_acceptSnapshotRevision(value.revision)) {
         return;
+      }
+      // Снимок без связи во время собственного удаления ждёт его исхода.
+      if (value.value == null) {
+        switch (_command) {
+          case _Deletion(:final token):
+            _command = _DeletionRelationMissing(token);
+            return;
+          case _DeletionRelationMissing():
+            return;
+          case _Change() || null:
+            break;
+        }
       }
     }
     final current = state;
@@ -506,7 +545,11 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
       return;
     }
     if (deleted) {
-      state = _terminateAsDeleted();
+      // Собственное удаление завершает исход команды, который приходит сразу
+      // после этого пакета.
+      if (!identical(completion.token, _command?.token)) {
+        state = _terminateAsDeleted();
+      }
       return;
     }
     _acceptConfirmedFields(completion, changes);
@@ -669,21 +712,32 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
   }
 
   RelationDetailsNotFound _terminateAsNotFound() {
-    _isTerminated = true;
-    _confirmed = null;
-    _observationSubscription?.close();
-    _observationSubscription = null;
-    unawaited(_completionSubscription.cancel());
+    _terminate();
     return RelationDetailsNotFound(isOperationRunning: _isOperationRunning);
   }
 
   RelationDetailsDeleted _terminateAsDeleted() {
+    _terminate();
+    return const RelationDetailsDeleted();
+  }
+
+  RelationDetailsOwnDeletionConfirmed _terminateAsOwnDeletion(
+    RelationDetailsLoaded shown,
+  ) {
+    _terminate();
+    // Пакет этой команды мог уже снять флаг операции, а закрывающаяся панель
+    // сохраняет кадр записи с выключенными элементами.
+    return RelationDetailsOwnDeletionConfirmed(
+      shown.copyWith(isOperationRunning: true),
+    );
+  }
+
+  void _terminate() {
     _isTerminated = true;
     _confirmed = null;
     _observationSubscription?.close();
     _observationSubscription = null;
     unawaited(_completionSubscription.cancel());
-    return const RelationDetailsDeleted();
   }
 
   bool get _isOperationRunning => _coordinator.isRelationRunning(_relationId);
@@ -700,6 +754,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     ),
     RelationDetailsNotFound() => current,
     RelationDetailsDeleted() => current,
+    RelationDetailsOwnDeletionConfirmed() => current,
     RelationDetailsUnavailable() => RelationDetailsUnavailable(
       isOperationRunning: isOperationRunning,
     ),
@@ -710,4 +765,27 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
       isOperationRunning: isOperationRunning,
     ),
   };
+}
+
+/// Принятая команда просмотра до её исхода.
+sealed class _Command {
+  const _Command(this.token);
+
+  final LongTermRelationOperationToken token;
+}
+
+/// Правка, архивирование или восстановление связи.
+final class _Change extends _Command {
+  const _Change(super.token);
+}
+
+/// Удаление связи, до исхода которого снимок без связи не приходил.
+final class _Deletion extends _Command {
+  const _Deletion(super.token);
+}
+
+/// Удаление связи, во время которого пришёл снимок без связи. Он показан,
+/// только если удаление не подтвердится.
+final class _DeletionRelationMissing extends _Command {
+  const _DeletionRelationMissing(super.token);
 }

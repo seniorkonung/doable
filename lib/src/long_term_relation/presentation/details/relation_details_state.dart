@@ -154,9 +154,18 @@ final class RelationDetailsNotFound extends RelationDetailsState {
   const RelationDetailsNotFound({required super.isOperationRunning});
 }
 
-/// Подтверждённое удаление завершило контекст прежней связи.
+/// Подтверждённое удаление чужой командой завершило контекст прежней связи.
 final class RelationDetailsDeleted extends RelationDetailsState {
   const RelationDetailsDeleted() : super(isOperationRunning: false);
+}
+
+/// Собственная команда просмотра подтвердила удаление связи. Просмотр больше
+/// не наблюдает её и хранит последний показанный снимок для закрытия.
+final class RelationDetailsOwnDeletionConfirmed extends RelationDetailsState {
+  const RelationDetailsOwnDeletionConfirmed(this.shown)
+    : super(isOperationRunning: false);
+
+  final RelationDetailsLoaded shown;
 }
 
 /// Временная недоступность хранилища: повтор уместен.

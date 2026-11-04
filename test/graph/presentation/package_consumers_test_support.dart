@@ -269,6 +269,7 @@ final class PackageConsumerProbes {
           if (probe.loaded) probe.forbiddenStates.add(state);
         case RelationDetailsNotFound() ||
             RelationDetailsDeleted() ||
+            RelationDetailsOwnDeletionConfirmed() ||
             RelationDetailsUnavailable() ||
             RelationDetailsCorruption() ||
             RelationDetailsUnexpected():

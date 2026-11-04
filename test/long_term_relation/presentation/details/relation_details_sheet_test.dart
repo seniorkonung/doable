@@ -27,6 +27,8 @@ import 'relation_details_test_support.dart';
 
 const _relatedPageText = 'Страница намерения';
 
+const _notFound = 'Эта связь больше не существует.';
+
 void main() {
   // Общая поверхность сообщений предъявляет результат только в приложении с
   // фокусом.
@@ -1176,17 +1178,78 @@ void main() {
       semantics.dispose();
     });
 
-    testWidgets('подтверждённое удаление закрывает панель, а сообщение '
-        'называет удаление', (tester) async {
-      final semantics = tester.ensureSemantics();
-      final details = relation();
-      final repository = await openPanel(tester, details);
-
+    /// Подтверждает удаление из меню; запись остаётся незавершённой.
+    Future<void> startDeletion(WidgetTester tester) async {
       await choose(tester, 'Удалить');
       await tester.tap(find.text('Удалить'));
       await tester.pump();
+    }
 
-      expect(repository.relationCommands.single, isA<DeleteLongTermRelation>());
+    for (final (order, missingFirst) in [
+      ('снимок без связи приходит до подтверждения', true),
+      ('снимок без связи приходит после подтверждения', false),
+    ]) {
+      testWidgets('подтверждённое удаление закрывает панель с прежним '
+          'содержимым и сообщает об успехе один раз: $order', (tester) async {
+        final semantics = tester.ensureSemantics();
+        final details = relation();
+        final repository = await openPanel(tester, details);
+        await startDeletion(tester);
+        expect(
+          repository.relationCommands.single,
+          isA<DeleteLongTermRelation>(),
+        );
+        _expectControlsLocked(tester);
+
+        // Поток завершений синхронно выдаёт подтверждённое изменение до
+        // завершения команды, поэтому они приходят вместе.
+        if (missingFirst) {
+          repository
+              .watchAt(0)
+              .emitMissing(revision: const TestGraphRevision(2));
+          await tester.pump();
+          expect(find.text('много ходить'), findsOneWidget);
+          expect(find.text(_notFound), findsNothing);
+          _expectControlsLocked(tester);
+          repository.completeRelationDelete(
+            0,
+            relation: details.relation,
+            revision: const TestGraphRevision(2),
+          );
+        } else {
+          repository.completeRelationDelete(
+            0,
+            relation: details.relation,
+            revision: const TestGraphRevision(2),
+          );
+          await tester.pump();
+          repository
+              .watchAt(0)
+              .emitMissing(revision: const TestGraphRevision(2));
+        }
+
+        await _expectClosingKeepsContent(tester);
+        await tester.pumpAndSettle();
+        expect(find.text('Открыть').hitTestable(), findsOneWidget);
+        expect(find.textContaining('Связь удалена.'), findsOneWidget);
+        semantics.dispose();
+      });
+    }
+
+    testWidgets('панель, перекрытая страницей при подтверждении удаления, сама '
+        'не закрывается и при возврате показывает, что связи нет', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final details = relation();
+      final repository = await openPanel(tester, details);
+      await startDeletion(tester);
+      await tester.tap(find.text('много ходить'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('$_relatedPageText ${testIntentionId(2)}'),
+        findsOneWidget,
+      );
 
       repository.completeRelationDelete(
         0,
@@ -1194,10 +1257,42 @@ void main() {
         revision: const TestGraphRevision(2),
       );
       await tester.pump();
-      await tester.pump(const Duration(seconds: 1));
+      repository.watchAt(0).emitMissing(revision: const TestGraphRevision(2));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('$_relatedPageText ${testIntentionId(2)}'),
+        findsOneWidget,
+      );
 
-      expect(find.text('Открыть').hitTestable(), findsOneWidget);
-      expect(find.textContaining('Связь удалена.'), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(Sheet), findsOneWidget);
+      expect(find.text(_notFound), findsOneWidget);
+      expect(find.byType(RelationHead), findsNothing);
+      expect(
+        find.textContaining('Связь удалена.').hitTestable(),
+        findsOneWidget,
+      );
+      semantics.dispose();
+    });
+
+    testWidgets('отказ удаления связи, которая тем временем исчезла, оставляет '
+        'панель открытой с тем, что связи нет', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = await openPanel(tester, relation());
+      await startDeletion(tester);
+      repository.watchAt(0).emitMissing(revision: const TestGraphRevision(2));
+      await tester.pump();
+      expect(find.text(_notFound), findsNothing);
+
+      repository.failRelationCommand(
+        0,
+        LongTermRelationNotFoundFailure(relationId),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(Sheet), findsOneWidget);
+      expect(find.text(_notFound), findsOneWidget);
+      expect(find.byType(RelationHead), findsNothing);
       semantics.dispose();
     });
 
@@ -1566,4 +1661,37 @@ Future<ControlledRelationDetailsRepository> _openSheet(
   await tester.pump();
   await tester.pump(const Duration(seconds: 1));
   return repository;
+}
+
+/// Переключатель вида и приоритет выключены.
+void _expectControlsLocked(WidgetTester tester) {
+  final head = tester.widget<RelationHead>(find.byType(RelationHead));
+  expect(
+    head.status,
+    isA<RelationHeadActive>().having(
+      (status) => status.kindSwitch?.onChange,
+      'выбор вида',
+      isNull,
+    ),
+  );
+  expect(
+    tester.widget<PriorityPicker>(find.byType(PriorityPicker)).onChange,
+    isNull,
+  );
+}
+
+/// Проходит закрытие панели по кадрам: пока она в дереве, в ней прежняя связь
+/// с выключенными элементами и нет того, что связи нет.
+Future<void> _expectClosingKeepsContent(WidgetTester tester) async {
+  var frames = 0;
+  while (find.byType(Sheet).evaluate().isNotEmpty) {
+    expect(frames, lessThan(60), reason: 'Панель не закрылась.');
+    expect(find.text('быть здоровым'), findsOneWidget);
+    expect(find.text('много ходить'), findsOneWidget);
+    expect(find.text(_notFound), findsNothing);
+    _expectControlsLocked(tester);
+    frames++;
+    await tester.pump(const Duration(milliseconds: 16));
+  }
+  expect(frames, greaterThan(2));
 }
