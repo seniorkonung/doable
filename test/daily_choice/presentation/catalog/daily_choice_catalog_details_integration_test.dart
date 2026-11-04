@@ -14,6 +14,8 @@ import 'package:doable/src/daily_choice/presentation/details/daily_choice_detail
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_view_model.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/design_system/components/day_mark.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -22,13 +24,19 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/daily_choice_catalog_controls.dart';
+import '../../../support/daily_choice_detail_fields_controls.dart';
+import '../../../support/daily_choice_details_controls.dart';
+import '../../../support/daily_choice_durability_fixture.dart';
 import '../../../support/daily_choice_local_date.dart';
 import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
+import 'daily_choice_catalog_page_test_support.dart';
 
 String _uuid(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
@@ -651,6 +659,69 @@ void main() {
     expect(catalog().completed.items.first.id, moved.id);
     expect(catalog().completed.items.first.pathIntentionCount, 3);
     expect(catalog().completed.items, hasLength(52));
+  });
+
+  testWidgets('перенос даты в панели оставляет её открытой с новой датой, а '
+      'после закрытия каталог и отметки обоих дней согласованы', (
+    tester,
+  ) async {
+    final database = AppDatabase(openInMemoryLocalDatabase());
+    await database.open();
+    addTearDown(database.close);
+    await seedDurabilityGraph(database);
+    final repository = durabilityRepository(database);
+    expect(
+      await repository.execute(durabilityCreate(completed: false)),
+      isA<GraphCommandSucceeded>(),
+    );
+    final targetDay = CalendarDate.fromParts(2026, 9, 27);
+    await pumpCatalogPage(
+      tester,
+      repository,
+      today: durabilityChoiceDate,
+      locale: const Locale('ru'),
+      size: const Size(360, 900),
+    );
+    Future<void> until(bool Function() condition) async {
+      for (var attempt = 0; attempt < 200 && !condition(); attempt++) {
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+      expect(condition(), isTrue);
+    }
+
+    final row = find.byKey(const ValueKey('daily-choice-row-1'));
+    await until(() => row.evaluate().isNotEmpty);
+    await expandDailyChoiceCatalogCalendar(tester);
+    await until(
+      () => dailyChoiceCatalogDayMark(
+        durabilityChoiceDate,
+        mark: DayMark.todo,
+      ).evaluate().isNotEmpty,
+    );
+    await tester.tap(row);
+    await until(() => dailyChoiceDetailsReady.evaluate().isNotEmpty);
+    await tester.pumpAndSettle();
+
+    await setDailyChoiceDate(tester, targetDay);
+    await until(
+      () => dailyChoiceDetailsField('27 сент.').evaluate().isNotEmpty,
+    );
+    await tester.pumpAndSettle();
+
+    expect(dailyChoiceDetails, findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
+    await closeDailyChoiceDetails(tester);
+    await until(() => row.evaluate().isEmpty);
+    await until(
+      () =>
+          dailyChoiceCatalogDayMark(
+            targetDay,
+            mark: DayMark.todo,
+          ).evaluate().isNotEmpty &&
+          dailyChoiceCatalogDayMark(durabilityChoiceDate).evaluate().isEmpty,
+    );
+    expect(shownDailyChoiceCatalogDate(tester), durabilityChoiceDate);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 }
 

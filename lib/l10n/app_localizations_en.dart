@@ -2981,7 +2981,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String dailyChoiceFieldDateLabel(String date) {
-    return 'Date: $date';
+    return 'Date: $date. Change date';
+  }
+
+  @override
+  String dailyChoiceFieldTimeLabel(String time) {
+    return 'Time: $time. Change time';
   }
 
   @override

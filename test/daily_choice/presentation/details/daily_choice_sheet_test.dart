@@ -6,6 +6,7 @@ import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/calendar_date.dart';
@@ -16,14 +17,19 @@ import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
+import 'package:doable/src/daily_choice/presentation/details/daily_choice_detail_fields.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_sheet.dart';
 import 'package:doable/src/design_system/components/badge.dart';
+import 'package:doable/src/design_system/components/button.dart';
 import 'package:doable/src/design_system/components/choice_head.dart';
 import 'package:doable/src/design_system/components/choice_path.dart' as ui;
+import 'package:doable/src/design_system/components/date_grid.dart';
+import 'package:doable/src/design_system/components/detail_row.dart';
 import 'package:doable/src/design_system/components/priority_picker.dart';
 import 'package:doable/src/design_system/components/reason_chain.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/components/tabs.dart';
+import 'package:doable/src/design_system/components/time_dial.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_priority.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
@@ -45,6 +51,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/daily_choice_detail_fields_controls.dart';
 import '../../../support/daily_choice_local_date.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
@@ -331,7 +338,7 @@ void main() {
   });
 
   testWidgets('панель открывается на «Обзоре» с шапкой, описанием с переносами '
-      'и полями, которые только показывают значения', (tester) async {
+      'и полями значений', (tester) async {
     final semantics = tester.ensureSemantics();
     final harness = await _openSheet(tester);
 
@@ -365,10 +372,18 @@ void main() {
 
     final picker = tester.widget<PriorityPicker>(find.byType(PriorityPicker));
     expect(picker.value, DoablePriority.p2);
-    expect(picker.onChange, isNull);
+    expect(picker.onChange, isNotNull);
     expect(
-      tester.getSemantics(find.bySemanticsLabel('Время: 18:00')),
-      isSemantics(isButton: true, hasEnabledState: true, isEnabled: false),
+      tester.getSemantics(
+        find.bySemanticsLabel('Время: 18:00. Изменить время'),
+      ),
+      isSemantics(isButton: true, hasEnabledState: true, isEnabled: true),
+    );
+    expect(
+      find.bySemanticsLabel(
+        RegExp(r'^Дата: четверг, 8 октября 2026.*Изменить дату$'),
+      ),
+      findsOneWidget,
     );
     semantics.dispose();
   });
@@ -654,6 +669,195 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('приоритет меняется сразу записью одного поля без сообщения, а '
+      'пока она идёт, поля недоступны и не открывают листы', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final harness = await _openSheet(tester);
+    final repository = harness.repository;
+    repository.emit(_details());
+    await tester.pumpAndSettle();
+
+    await setDailyChoicePriority(tester, DailyChoicePriority.p1);
+    await tester.pump();
+
+    expect(repository.sentPatches.map(_onlyField), [
+      ('priority', DailyChoicePriority.p1),
+    ]);
+    expect(_fields(tester).enabled, isFalse);
+    expect(_head(tester).onToggle, isNull);
+    expect(_head(tester).options, isA<ChoiceHeadOptionsUnavailable>());
+    expect(_picker(tester).value, DoablePriority.p4);
+    expect(_head(tester).priority, DoablePriority.p4);
+
+    await tester.tap(_fieldButton('Дата'));
+    await tester.tap(_fieldButton('Время'));
+    await tester.pumpAndSettle();
+    expect(find.byType(DateGrid), findsNothing);
+    expect(find.byType(TimeDial), findsNothing);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(PriorityPicker),
+        matching: find.text('P2'),
+      ),
+    );
+    await tester.pump();
+    expect(repository.sentPatches, hasLength(1));
+
+    repository.succeedUpdate();
+    repository.emit(_details(priority: DailyChoicePriority.p1));
+    await tester.pumpAndSettle();
+
+    expect(_picker(tester).value, DoablePriority.p1);
+    expect(_head(tester).priority, DoablePriority.p1);
+    expect(
+      tester.widget<ReasonChain>(find.byType(ReasonChain)).priority,
+      DoablePriority.p1,
+    );
+    expect(_fields(tester).enabled, isTrue);
+    expect(find.byType(Sheet), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
+    semantics.dispose();
+  });
+
+  testWidgets('отказ записи поля оставляет прежнее значение и отказ в панели, '
+      'а поле снова меняется', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final harness = await _openSheet(tester);
+    final repository = harness.repository;
+    repository.emit(_details());
+    await tester.pumpAndSettle();
+
+    await setDailyChoicePriority(tester, DailyChoicePriority.p1);
+    await tester.pump();
+    repository.failCommand(const DailyChoiceUnavailableFailure());
+    await tester.pumpAndSettle();
+
+    expect(_picker(tester).value, DoablePriority.p4);
+    expect(find.text(_commandFailure), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
+    expect(_fields(tester).enabled, isTrue);
+
+    await setDailyChoicePriority(tester, DailyChoicePriority.p2);
+    await tester.pump();
+    expect(repository.sentPatches.map(_onlyField), [
+      ('priority', DailyChoicePriority.p1),
+      ('priority', DailyChoicePriority.p2),
+    ]);
+    expect(find.text(_commandFailure), findsNothing);
+    repository.succeedUpdate();
+    await tester.pumpAndSettle();
+    semantics.dispose();
+  });
+
+  for (final use24HourFormat in [false, true]) {
+    testWidgets('час на циферблате ${use24HourFormat ? "24" : "12"}-часового '
+        'устройства записывается временем без минут, а панель остаётся '
+        'открытой', (tester) async {
+      tester.platformDispatcher.alwaysUse24HourFormatTestValue =
+          use24HourFormat;
+      addTearDown(tester.platformDispatcher.clearAlwaysUse24HourTestValue);
+      final harness = await _openSheet(tester);
+      final repository = harness.repository;
+      repository.emit(_details());
+      await tester.pumpAndSettle();
+
+      await setDailyChoiceHour(tester, 18);
+      await tester.pump();
+
+      expect(find.byType(TimeDial), findsNothing);
+      expect(repository.sentPatches.map(_onlyField), [
+        ('schedule', DailyChoiceTime(hour: 18, minute: 0)),
+      ]);
+      repository.succeedUpdate();
+      repository.emit(_details(schedule: DailyChoiceTime(hour: 18, minute: 0)));
+      await tester.pumpAndSettle();
+
+      expect(find.text('18:00'), findsOneWidget);
+      expect(find.byType(Sheet), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+    });
+  }
+
+  testWidgets('«Весь день» возвращает выбору время на весь день', (
+    tester,
+  ) async {
+    final harness = await _openSheet(tester);
+    final repository = harness.repository;
+    repository.emit(_details(schedule: DailyChoiceTime(hour: 18, minute: 0)));
+    await tester.pumpAndSettle();
+
+    await setDailyChoiceAllDay(tester);
+    await tester.pump();
+
+    expect(repository.sentPatches.map(_onlyField), [
+      ('schedule', const DailyChoiceAllDay()),
+    ]);
+    repository.succeedUpdate();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('сохранённые минуты не отмечают час на циферблате, а выбор часа '
+      'заменяет их целым часом', (tester) async {
+    final harness = await _openSheet(tester);
+    final repository = harness.repository;
+    repository.emit(_details(schedule: DailyChoiceTime(hour: 18, minute: 30)));
+    await tester.pumpAndSettle();
+    expect(find.text('18:30'), findsOneWidget);
+
+    await tester.tap(_fieldButton('Время'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<TimeDial>(find.byType(TimeDial)).selection,
+      isA<TimeDialNothingSelected>(),
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(TimeDial), findsNothing);
+    expect(repository.sentPatches, isEmpty);
+
+    await setDailyChoiceHour(tester, 19);
+    await tester.pump();
+    expect(repository.sentPatches.map(_onlyField), [
+      ('schedule', DailyChoiceTime(hour: 19, minute: 0)),
+    ]);
+    repository.succeedUpdate();
+    repository.emit(_details(schedule: DailyChoiceTime(hour: 19, minute: 0)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('19:00'), findsOneWidget);
+    expect(find.text('18:30'), findsNothing);
+  });
+
+  testWidgets('дата выбирается в листе месяца и записывается одним полем, а '
+      'выбор уже показанных значений ничего не записывает', (tester) async {
+    final harness = await _openSheet(tester);
+    final repository = harness.repository;
+    repository.emit(_details());
+    await tester.pumpAndSettle();
+
+    await setDailyChoiceDate(tester, CalendarDate.fromParts(2026, 10, 8));
+    await setDailyChoiceAllDay(tester);
+    await setDailyChoicePriority(tester, DailyChoicePriority.p4);
+    await tester.pump();
+    expect(repository.sentPatches, isEmpty);
+    expect(find.byType(DateGrid), findsNothing);
+    expect(find.byType(TimeDial), findsNothing);
+
+    await setDailyChoiceDate(tester, CalendarDate.fromParts(2026, 11, 12));
+    await tester.pump();
+
+    expect(find.byType(DateGrid), findsNothing);
+    expect(repository.sentPatches.map(_onlyField), [
+      ('date', CalendarDate.fromParts(2026, 11, 12)),
+    ]);
+    repository.succeedUpdate();
+    repository.emit(_details(date: CalendarDate.fromParts(2026, 11, 12)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('12 нояб.'), findsOneWidget);
+    expect(find.byType(Sheet), findsOneWidget);
+  });
+
   testWidgets('отказ стоит над содержимым обеих вкладок, выбор остаётся '
       'подтверждённым, а флажок снова отправляет запись', (tester) async {
     final semantics = tester.ensureSemantics();
@@ -881,6 +1085,35 @@ void _useLowScreen(WidgetTester tester) {
     ..devicePixelRatio = 1;
   addTearDown(tester.view.reset);
 }
+
+DailyChoiceDetailFields _fields(WidgetTester tester) =>
+    tester.widget<DailyChoiceDetailFields>(dailyChoiceDetailFields);
+
+ChoiceHead _head(WidgetTester tester) =>
+    tester.widget<ChoiceHead>(find.byType(ChoiceHead));
+
+PriorityPicker _picker(WidgetTester tester) =>
+    tester.widget<PriorityPicker>(find.byType(PriorityPicker));
+
+/// Пилюля поля с названием [label].
+Finder _fieldButton(String label) => find.descendant(
+  of: find.widgetWithText(DetailRow, label),
+  matching: find.byType(Button),
+);
+
+/// Единственное поле изменения: его имя и значение. Каждый выбор в панели —
+/// отдельная запись одного поля.
+(String, Object) _onlyField(DailyChoiceFieldsPatch patch) => [
+  if (patch.date case DailyChoiceFieldSet(:final value)) ('date', value),
+  if (patch.schedule case DailyChoiceFieldSet(:final value))
+    ('schedule', value),
+  if (patch.priority case DailyChoiceFieldSet(:final value))
+    ('priority', value),
+  if (patch.isCompleted case DailyChoiceFieldSet(:final value))
+    ('completed', value),
+  if (patch.description is! DailyChoiceDescriptionUnchanged)
+    ('description', patch.description),
+].single;
 
 final _check = find.bySemanticsLabel(RegExp('^Выполнение выбора'));
 final _options = find.bySemanticsLabel('Параметры дневного выбора');
@@ -1139,6 +1372,11 @@ final class _Repository
   final _commands = <UpdateDailyChoiceFields>[];
   final _requests = <Completer<DailyChoiceCommandResult>>[];
 
+  /// Изменения полей из отправленных команд.
+  List<DailyChoiceFieldsPatch> get sentPatches => [
+    for (final command in _commands) command.patch,
+  ];
+
   /// Значения выполнения из отправленных команд.
   List<bool> get sentCompletion => [
     for (final command in _commands)
@@ -1198,6 +1436,17 @@ final class _Repository
       ),
     );
   }
+
+  /// Лист даты запрашивает отметки дней; отметок в этих сценариях нет.
+  @override
+  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
+    DailyChoiceDayStatusQuery query,
+  ) async => DailyChoiceDayStatusesReadSuccess(
+    GraphSnapshot(
+      revision: _Revision(_revision),
+      value: DailyChoiceDayStatuses(query: query, statuses: const {}),
+    ),
+  );
 
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) {

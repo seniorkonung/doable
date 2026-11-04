@@ -4594,11 +4594,17 @@ abstract class AppLocalizations {
   /// **'Time'**
   String get dailyChoiceFieldTime;
 
-  /// Доступное название поля даты с полным значением
+  /// Доступное название поля даты: название поля, полное значение и действие
   ///
   /// In en, this message translates to:
-  /// **'Date: {date}'**
+  /// **'Date: {date}. Change date'**
   String dailyChoiceFieldDateLabel(String date);
+
+  /// Доступное название поля времени: название поля, значение и действие
+  ///
+  /// In en, this message translates to:
+  /// **'Time: {time}. Change time'**
+  String dailyChoiceFieldTimeLabel(String time);
 
   /// Доступное название листа даты дневного выбора
   ///

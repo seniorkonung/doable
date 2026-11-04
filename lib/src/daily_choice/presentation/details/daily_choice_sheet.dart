@@ -9,13 +9,11 @@ import '../../../app/routing/app_router.gr.dart';
 import '../../../design_system/components/badge.dart';
 import '../../../design_system/components/choice_head.dart';
 import '../../../design_system/components/choice_path.dart';
-import '../../../design_system/components/detail_row.dart';
 import '../../../design_system/components/half_pinned_sliver.dart';
 import '../../../design_system/components/list_state.dart';
 import '../../../design_system/components/notice.dart';
 import '../../../design_system/components/option_row.dart';
 import '../../../design_system/components/options_menu.dart';
-import '../../../design_system/components/priority_picker.dart';
 import '../../../design_system/components/reason_chain.dart';
 import '../../../design_system/components/sheet.dart';
 import '../../../design_system/components/tabs.dart';
@@ -32,12 +30,10 @@ import '../../../long_term_relation/domain/long_term_relation.dart';
 import '../../../long_term_relation/presentation/details/relation_details_sheet.dart';
 import '../../application/daily_choice_command.dart';
 import '../../application/daily_choice_details.dart';
-import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice_id.dart';
-import '../catalog/daily_choice_local_date_provider.dart';
-import '../catalog/daily_choice_local_day_observer.dart';
 import '../daily_choice_command_failure_message.dart';
 import 'daily_choice_delete_confirmation.dart';
+import 'daily_choice_detail_fields.dart';
 import 'daily_choice_details_state.dart';
 import 'daily_choice_details_view_model.dart';
 import 'daily_choice_field_labels.dart';
@@ -52,9 +48,10 @@ import 'daily_choice_field_labels.dart';
 /// Параметров в нём нет, а закрывает лист пользователь, в том числе когда
 /// выбора больше нет.
 ///
-/// Флажок шапки выключен на время записи, а новое значение приходит из
-/// подписки. Отказ стоит над содержимым обеих вкладок и остаётся за панелью,
-/// пока она открыта, даже перекрытая страницей.
+/// Флажок шапки и поля «Обзора» выключены на время записи, а новое значение
+/// приходит из подписки. Дата, время и приоритет меняются сразу и по одному
+/// полю за запись. Отказ стоит над содержимым обеих вкладок и остаётся за
+/// панелью, пока она открыта, даже перекрытая страницей.
 ///
 /// Подтверждённое удаление из меню закрывает панель, и до конца закрытия она
 /// показывает прежнее содержимое с выключенными флажком и параметрами. Панель,
@@ -86,10 +83,6 @@ final class DailyChoiceSheet extends ConsumerStatefulWidget {
 final class _DailyChoiceSheetState extends ConsumerState<DailyChoiceSheet> {
   late final DailyChoiceDetailsViewModel _model;
 
-  /// Сегодняшний день для подписи даты: панель может оставаться открытой
-  /// после местной полуночи, и тогда «Сегодня» стало бы неверным.
-  late final DailyChoiceLocalDayObserver _localDay;
-
   var _tab = _ChoiceTab.overview;
 
   /// Собственное удаление подтвердилось, когда панель была перекрыта, и она
@@ -104,15 +97,10 @@ final class _DailyChoiceSheetState extends ConsumerState<DailyChoiceSheet> {
       ref.read(graphCommandCoordinatorProvider.notifier),
       widget.choiceId,
     );
-    _localDay = DailyChoiceLocalDayObserver(
-      readLocalDay: ref.read(dailyChoiceLocalDateSourceProvider),
-      onTodayChanged: () => setState(() {}),
-    );
   }
 
   @override
   void dispose() {
-    _localDay.dispose();
     _model.dispose();
     super.dispose();
   }
@@ -254,7 +242,11 @@ final class _DailyChoiceSheetState extends ConsumerState<DailyChoiceSheet> {
         _OperationFailureNotice(operation),
       ...switch (_tab) {
         _ChoiceTab.overview => [
-          _Overview(details: details, today: _localDay.today),
+          _Overview(
+            details: details,
+            enabled: writable,
+            onChange: _model.change,
+          ),
         ],
         _ChoiceTab.path => [_Path(details: details)],
       },
@@ -548,16 +540,21 @@ final class _Path extends StatelessWidget {
   }
 }
 
-/// Вкладка «Обзор»: описание целиком и поля, которые пока только показывают
-/// значения.
+/// Вкладка «Обзор»: описание целиком и поля, которые меняются сразу.
 final class _Overview extends StatelessWidget {
-  const _Overview({required this.details, required this.today});
+  const _Overview({
+    required this.details,
+    required this.enabled,
+    required this.onChange,
+  });
 
   final DailyChoiceDetails details;
-  final CalendarDate today;
 
-  /// Последняя пилюля приоритета выходит за край содержимого.
-  static const double _pickerShift = 2;
+  /// Без него поля не меняются: идёт запись или панель закрывается.
+  final bool enabled;
+
+  /// Каждый выбор значения — отдельная запись одного поля.
+  final ValueChanged<DailyChoiceFieldsPatch> onChange;
 
   /// Вместе с нижним полем полосы вкладок даёт 6 под областью их нажатия.
   static const double _top = 2;
@@ -566,8 +563,6 @@ final class _Overview extends StatelessWidget {
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final choice = details.choice;
-    final time = dailyChoiceTimeValue(context, choice.schedule);
-    final priority = dailyChoiceDesignPriority(choice.priority);
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(
         DoableMetrics.space5,
@@ -588,30 +583,19 @@ final class _Overview extends StatelessWidget {
               ),
               const SizedBox(height: DoableMetrics.space2),
             ],
-            DetailRow(
-              label: localizations.dailyChoiceFieldDate,
-              icon: DoableIconData.calendar,
-              value: dailyChoiceDateValue(context, choice.date, today: today),
-              valueLabel: localizations.dailyChoiceFieldDateLabel(
-                dailyChoiceFullDate(context, choice.date),
+            DailyChoiceDetailFields(
+              date: choice.date,
+              schedule: choice.schedule,
+              priority: choice.priority,
+              enabled: enabled,
+              onDateChanged: (date) => onChange(
+                DailyChoiceFieldsPatch(date: DailyChoiceFieldSet(date)),
               ),
-            ),
-            DetailRow(
-              label: localizations.dailyChoiceFieldTime,
-              icon: DoableIconData.clock,
-              value: time,
-              valueLabel: localizations.dailyChoiceTimeLabel(time),
-            ),
-            DetailRow.slot(
-              label: localizations.dailyChoicePriorityLabel,
-              shift: _pickerShift,
-              child: PriorityPicker(
-                value: priority,
-                onChange: null,
-                label: localizations.dailyChoicePriorityLabel,
-                name: dailyChoicePriorityName,
-                itemLabel: (priority) =>
-                    dailyChoicePriorityItemLabel(localizations, priority),
+              onScheduleChanged: (schedule) => onChange(
+                DailyChoiceFieldsPatch(schedule: DailyChoiceFieldSet(schedule)),
+              ),
+              onPriorityChanged: (priority) => onChange(
+                DailyChoiceFieldsPatch(priority: DailyChoiceFieldSet(priority)),
               ),
             ),
           ],

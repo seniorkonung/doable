@@ -3010,7 +3010,12 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String dailyChoiceFieldDateLabel(String date) {
-    return 'Дата: $date';
+    return 'Дата: $date. Изменить дату';
+  }
+
+  @override
+  String dailyChoiceFieldTimeLabel(String time) {
+    return 'Время: $time. Изменить время';
   }
 
   @override

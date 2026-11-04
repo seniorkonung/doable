@@ -53,6 +53,14 @@ DoablePriority dailyChoiceDesignPriority(DailyChoicePriority priority) =>
       DailyChoicePriority.p4 => DoablePriority.p4,
     };
 
+DailyChoicePriority dailyChoicePriority(DoablePriority priority) =>
+    switch (priority) {
+      DoablePriority.p1 => DailyChoicePriority.p1,
+      DoablePriority.p2 => DailyChoicePriority.p2,
+      DoablePriority.p3 => DailyChoicePriority.p3,
+      DoablePriority.p4 => DailyChoicePriority.p4,
+    };
+
 String dailyChoicePriorityName(DoablePriority priority) => switch (priority) {
   DoablePriority.p1 => 'P1',
   DoablePriority.p2 => 'P2',
