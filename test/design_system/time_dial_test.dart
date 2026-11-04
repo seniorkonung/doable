@@ -1,4 +1,4 @@
-import 'dart:ui' show Tristate;
+import 'dart:ui' show SemanticsRole, Tristate;
 
 import 'package:doable/src/design_system/components/tabs.dart';
 import 'package:doable/src/design_system/components/time_dial.dart';
@@ -109,6 +109,7 @@ void main() {
 
     testWidgets('в $themeName теме переключатель стоит над кругом по центру, '
         'пилюли равны по ширине и не меньше 64', (tester) async {
+      final semantics = tester.ensureSemantics();
       await tester.pumpWidget(_app(brightness, _dial(clock: _clock12Pm)));
 
       final face = tester.getRect(_face);
@@ -118,12 +119,12 @@ void main() {
       expect(am.width, greaterThanOrEqualTo(64));
       expect(am.height, 36);
       expect(pm.left - am.right, 4);
-      expect(
-        tester
-            .widget<Tabs<TimeDialHalf>>(find.byType(Tabs<TimeDialHalf>))
-            .semantics,
-        TabsSemantics.toggle,
-      );
+      final half = tester
+          .getSemantics(find.bySemanticsLabel('После полудня'))
+          .getSemanticsData();
+      expect(half.role, isNot(SemanticsRole.tab));
+      expect(half.flagsCollection.isButton, isTrue);
+      expect(half.flagsCollection.isToggled, Tristate.isTrue);
       expect((am.left + pm.right) / 2, closeTo(face.center.dx, .01));
       expect(pm.bottom, lessThanOrEqualTo(face.top));
       expect(
@@ -133,6 +134,7 @@ void main() {
           borderRadius: BorderRadius.circular(9999),
         ),
       );
+      semantics.dispose();
     });
 
     testWidgets('в $themeName теме выбранный час лежит на accent с текстом '

@@ -29,19 +29,19 @@ final class TabItem<T extends Object> {
 /// Плоскость под полосой вкладок: фон полосы и цвет, в который затухают её края.
 enum TabsPlane { page, sheet }
 
-/// Смысл пилюль для экранного диктора.
+/// Смысл пилюль для экранного диктора, который следует из конструктора.
 ///
 /// [tab] — разделы одного вида, выбранный раздел отмечен как выбранная вкладка.
 /// [toggle] — нажатые кнопки вроде «AM» и «PM»: выбранная кнопка отмечена
 /// как включённая.
-enum TabsSemantics { tab, toggle }
+enum _TabsSemantics { tab, toggle }
 
 /// Полоса вкладок или переключатель. Выбором и закреплением управляет страница.
 ///
-/// Вкладки [TabsSemantics.tab] идут прокручиваемой полосой с затухающими
-/// краями. Переключатель [TabsSemantics.toggle] — короткий ряд пилюль без
-/// прокрутки, закрепления и затухающих краёв: он занимает ширину своих пилюль,
-/// а место в раскладке задаёт потребитель.
+/// Вкладки идут прокручиваемой полосой с затухающими краями. Переключатель
+/// [Tabs.toggle] — короткий ряд пилюль без прокрутки, закрепления и
+/// затухающих краёв: он занимает ширину своих пилюль, а место в раскладке
+/// задаёт потребитель.
 final class Tabs<T extends Object> extends StatefulWidget {
   const Tabs({
     required this.items,
@@ -50,12 +50,24 @@ final class Tabs<T extends Object> extends StatefulWidget {
     required this.label,
     this.stuck = false,
     this.plane = TabsPlane.page,
-    this.semantics = TabsSemantics.tab,
-    this.minWidth = DoableMetrics.tapMin,
     super.key,
-  }) : assert(
-         semantics == TabsSemantics.tab || (!stuck && plane == TabsPlane.page),
-       );
+  }) : _semantics = _TabsSemantics.tab,
+       minWidth = DoableMetrics.tapMin;
+
+  /// Переключатель из равных по ширине пилюль: нажатая кнопка объявлена
+  /// включённой, а не выбранной вкладкой.
+  ///
+  /// [minWidth] — наименьшая ширина пилюли: пилюли «AM» и «PM» равны.
+  const Tabs.toggle({
+    required this.items,
+    required this.value,
+    required this.onChange,
+    required this.label,
+    required this.minWidth,
+    super.key,
+  }) : _semantics = _TabsSemantics.toggle,
+       stuck = false,
+       plane = TabsPlane.page;
 
   final List<TabItem<T>> items;
   final T value;
@@ -63,10 +75,8 @@ final class Tabs<T extends Object> extends StatefulWidget {
   final String label;
   final bool stuck;
   final TabsPlane plane;
-  final TabsSemantics semantics;
-
-  /// Наименьшая ширина пилюли: пилюли переключателя «AM» и «PM» равны.
   final double minWidth;
+  final _TabsSemantics _semantics;
 
   /// Высота закреплённой полосы для `SliverPersistentHeader`: 52 при обычном
   /// тексте, с ростом пилюль при увеличении системного масштаба.
@@ -113,7 +123,7 @@ final class _TabsState<T extends Object> extends State<Tabs<T>> {
 
   void _scheduleReveal() {
     // У переключателя нет прокрутки, которую нужно двигать к выбранной пилюле.
-    if (_revealScheduled || widget.semantics == TabsSemantics.toggle) return;
+    if (_revealScheduled || widget._semantics == _TabsSemantics.toggle) return;
     _revealScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _revealScheduled = false;
@@ -141,7 +151,7 @@ final class _TabsState<T extends Object> extends State<Tabs<T>> {
             item: item,
             selected: item.id == widget.value,
             height: Tabs._pillHeight(context),
-            semantics: widget.semantics,
+            semantics: widget._semantics,
             minWidth: widget.minWidth,
             onTap: () => widget.onChange(item.id),
           ),
@@ -155,7 +165,7 @@ final class _TabsState<T extends Object> extends State<Tabs<T>> {
       widget.items.map((item) => item.id).toSet().length == widget.items.length,
     );
     assert(widget.items.any((item) => item.id == widget.value));
-    if (widget.semantics == TabsSemantics.toggle) return _buildToggle();
+    if (widget._semantics == _TabsSemantics.toggle) return _buildToggle();
     _itemKeys.removeWhere(
       (id, _) => !widget.items.any((item) => item.id == id),
     );
@@ -210,7 +220,7 @@ final class _TabsState<T extends Object> extends State<Tabs<T>> {
                               item: item,
                               selected: item.id == widget.value,
                               height: pillHeight,
-                              semantics: widget.semantics,
+                              semantics: widget._semantics,
                               minWidth: widget.minWidth,
                               onTap: () => widget.onChange(item.id),
                             ),
@@ -268,7 +278,7 @@ final class _TabPill<T extends Object> extends StatefulWidget {
   final TabItem<T> item;
   final bool selected;
   final double height;
-  final TabsSemantics semantics;
+  final _TabsSemantics semantics;
   final double minWidth;
   final VoidCallback onTap;
 
@@ -304,7 +314,7 @@ final class _TabPillState<T extends Object> extends State<_TabPill<T>> {
         FocusManager.instance.highlightMode == FocusHighlightMode.traditional;
     // Роль вкладки и готовое название принадлежат одному узлу:
     // https://api.flutter.dev/flutter/dart-ui/SemanticsRole.html
-    final isTab = widget.semantics == TabsSemantics.tab;
+    final isTab = widget.semantics == _TabsSemantics.tab;
     return Semantics(
       container: true,
       role: isTab ? SemanticsRole.tab : SemanticsRole.none,

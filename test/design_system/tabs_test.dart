@@ -339,8 +339,7 @@ void main() {
       _app(
         Brightness.light,
         StatefulBuilder(
-          builder: (context, setState) => Tabs(
-            semantics: TabsSemantics.toggle,
+          builder: (context, setState) => Tabs.toggle(
             minWidth: 64,
             label: 'До или после полудня',
             value: half,

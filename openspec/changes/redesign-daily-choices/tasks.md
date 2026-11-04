@@ -1068,7 +1068,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/daily_choice/presentation/details/daily_choice_field_labels.dart`, `lib/src/daily_choice/presentation/details/daily_choice_time_sheet.dart`, `test/daily_choice/presentation/details/daily_choice_sheet_test.dart`, `test/daily_choice/presentation/details/daily_choice_time_sheet_test.dart`.
   - **Размер:** S.
 
-- [ ] 4.19 Переключатель `Tabs` создаётся отдельным конструктором без параметров полосы
+- [x] 4.19 Переключатель `Tabs` создаётся отдельным конструктором без параметров полосы
   - **Критерии приёмки:**
     - У `Tabs` в `lib/src/design_system/components/tabs.dart` два конструктора. Полоса вкладок принимает `items`, `value`, `onChange`, `label`, `stuck` и `plane`. `Tabs.toggle` принимает `items`, `value`, `onChange`, `label` и `minWidth`, а `stuck` и `plane` у него нет.
     - Переключатель с `stuck` или `plane` не компилируется. `assert` на сочетание переключателя с параметрами полосы удалён.

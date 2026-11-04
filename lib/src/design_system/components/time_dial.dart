@@ -165,8 +165,7 @@ final class _Dial12State extends State<_Dial12> {
         TimeDialHalf.am => _Face.am,
         TimeDialHalf.pm => _Face.pm,
       },
-      period: Tabs<TimeDialHalf>(
-        semantics: TabsSemantics.toggle,
+      period: Tabs<TimeDialHalf>.toggle(
         minWidth: _periodMinWidth,
         label: clock.switchLabel,
         value: _half,
