@@ -30,6 +30,9 @@ final class DailyChoiceDetailsViewModel extends ChangeNotifier {
   DailyChoiceDetailsOperation _operation =
       const DailyChoiceDetailsOperationIdle();
 
+  /// Завершается, когда кончается [DailyChoiceDetailsOperationAwaitingSnapshot].
+  Completer<void>? _snapshotShown;
+
   DailyChoiceDetailsState get state => _state;
   DailyChoiceDetailsOperation get operation => _operation;
 
@@ -40,7 +43,8 @@ final class DailyChoiceDetailsViewModel extends ChangeNotifier {
   }
 
   /// Возвращает успех только собственной подтверждённой записи; новое значение
-  /// приходит из подписки.
+  /// приходит из подписки. Успех возвращается, когда подписка показала снимок
+  /// не старше записи или закончилась иным исходом.
   Future<bool> change(DailyChoiceFieldsPatch patch) async {
     if (!_canStartOperation) return false;
     final completion = await _run(
@@ -74,7 +78,9 @@ final class DailyChoiceDetailsViewModel extends ChangeNotifier {
   }
 
   bool get _canStartOperation =>
-      _command == null && _state is DailyChoiceDetailsLoaded;
+      _command == null &&
+      _operation is! DailyChoiceDetailsOperationAwaitingSnapshot &&
+      _state is DailyChoiceDetailsLoaded;
 
   Future<DailyChoiceCommandCompletion?> _run(
     DailyChoiceCommandStart start,
@@ -89,7 +95,11 @@ final class DailyChoiceDetailsViewModel extends ChangeNotifier {
         if (finished != null && identical(finished.token, token)) {
           _command = null;
           _applyOutcome(finished, completion);
-          _setOperation(_operationAfter(completion));
+          final next = _operationAfter(completion);
+          _setOperation(next);
+          if (next is DailyChoiceDetailsOperationAwaitingSnapshot) {
+            await (_snapshotShown = Completer<void>()).future;
+          }
         }
         return completion;
       case DailyChoiceCommandAlreadyRunning():
@@ -135,21 +145,38 @@ final class DailyChoiceDetailsViewModel extends ChangeNotifier {
 
   DailyChoiceDetailsOperation _operationAfter(
     DailyChoiceCommandCompletion completion,
-  ) => switch (completion.result) {
+  ) => switch (completion.confirmedResult) {
     GraphResultFailure(:final failure) => DailyChoiceDetailsOperationFailed(
       failure,
       failurePresentation: _coordinator.claimInitiatorFailure(completion.token),
     ),
-    GraphResultSuccess(
-      value: DailyChoiceFieldsUpdated(:final choice) ||
-          DailyChoiceDeleted(:final choice),
-    )
-        when choice.id == _id =>
-      const DailyChoiceDetailsOperationIdle(),
-    GraphResultSuccess() => const DailyChoiceDetailsOperationFailed(
-      DailyChoiceUnexpectedFailure(),
-    ),
+    GraphResultSuccess(:final value) => switch (value.value) {
+      DailyChoiceFieldsUpdated(:final choice) when choice.id == _id =>
+        _awaitsSnapshot(value.revision)
+            ? DailyChoiceDetailsOperationAwaitingSnapshot(value.revision)
+            : const DailyChoiceDetailsOperationIdle(),
+      DailyChoiceDeleted(:final choice) when choice.id == _id =>
+        const DailyChoiceDetailsOperationIdle(),
+      _ => const DailyChoiceDetailsOperationFailed(
+        DailyChoiceUnexpectedFailure(),
+      ),
+    },
   };
+
+  /// Записанное значение ещё впереди, только пока показан снимок старше
+  /// записи. Снимок другой эпохи, отсутствие выбора и отказ чтения
+  /// заканчивают ожидание: после них записанное значение может не прийти.
+  bool _awaitsSnapshot(GraphRevision required) => switch (_state) {
+    DailyChoiceDetailsLoaded(:final revision) =>
+      revision.compareTo(required) == GraphRevisionOrder.older,
+    _ => false,
+  };
+
+  void _finishAwaitingSnapshot() {
+    _operation = const DailyChoiceDetailsOperationIdle();
+    _snapshotShown?.complete();
+    _snapshotShown = null;
+  }
 
   /// Передаёт общей поверхности право отказа, который перестал публиковаться.
   /// Право, уже подтверждённое renderer, координатор не возвращает в ожидание.
@@ -225,6 +252,11 @@ final class DailyChoiceDetailsViewModel extends ChangeNotifier {
 
   void _setState(DailyChoiceDetailsState next) {
     _state = next;
+    if (_operation
+        case DailyChoiceDetailsOperationAwaitingSnapshot(:final revision)
+        when !_awaitsSnapshot(revision)) {
+      _finishAwaitingSnapshot();
+    }
     notifyListeners();
   }
 
@@ -235,6 +267,8 @@ final class DailyChoiceDetailsViewModel extends ChangeNotifier {
     _command = null;
     if (active != null) _coordinator.releaseInitiatorPresentation(active.token);
     _releaseFailure();
+    _snapshotShown?.complete();
+    _snapshotShown = null;
     super.dispose();
   }
 }

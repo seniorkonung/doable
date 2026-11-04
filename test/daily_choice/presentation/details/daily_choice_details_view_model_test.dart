@@ -46,27 +46,64 @@ void main() {
     },
   );
 
-  test('изменение отправляет патч этого выбора, а новое значение даёт только подписка', () async {
+  test('изменение отправляет патч этого выбора и завершается успехом только '
+      'со снимком записанной ревизии из подписки', () async {
     final harness = await _Harness.loaded();
     addTearDown(harness.dispose);
     final model = harness.model;
     final confirmed = model.state;
 
-    model.change(_patch);
+    bool? saved;
+    unawaited(model.change(_patch).then((value) => saved = value));
     expect(model.operation, isA<DailyChoiceDetailsOperationWriting>());
     expect(harness.repository.updates.single.choiceId, id);
     expect(harness.repository.updates.single.patch, same(_patch));
 
     harness.repository.succeedUpdate(id);
     await pumpEventQueue();
-    expect(model.operation, isA<DailyChoiceDetailsOperationIdle>());
+    expect(model.operation, isA<DailyChoiceDetailsOperationAwaitingSnapshot>());
     expect(model.state, same(confirmed));
+    expect(saved, isNull);
 
     harness.repository.emit(_details(id), revision: 2);
     await pumpEventQueue();
     expect(model.state, isNot(same(confirmed)));
     expect(model.state, isA<DailyChoiceDetailsLoaded>());
+    expect(model.operation, isA<DailyChoiceDetailsOperationIdle>());
+    expect(saved, isTrue);
   });
+
+  for (final (outcome, finish) in <(String, void Function(_Repository))>[
+    ('выбор не найден', (repository) => repository.emit(null, revision: 3)),
+    (
+      'отказ чтения',
+      (repository) => repository.controller.add(
+        const DailyChoiceReadError(DailyChoiceReadUnavailableFailure()),
+      ),
+    ),
+  ]) {
+    test(
+      'исход подписки «$outcome» тоже заканчивает ожидание снимка',
+      () async {
+        final harness = await _Harness.loaded();
+        addTearDown(harness.dispose);
+        final model = harness.model;
+
+        final saved = model.change(_patch);
+        harness.repository.succeedUpdate(id);
+        await pumpEventQueue();
+        expect(
+          model.operation,
+          isA<DailyChoiceDetailsOperationAwaitingSnapshot>(),
+        );
+
+        finish(harness.repository);
+
+        expect(await saved, isTrue);
+        expect(model.operation, isA<DailyChoiceDetailsOperationIdle>());
+      },
+    );
+  }
 
   test('изменение и удаление делят одну операцию', () async {
     final harness = await _Harness.loaded();
@@ -80,6 +117,11 @@ void main() {
     expect(model.operation, isA<DailyChoiceDetailsOperationWriting>());
 
     harness.repository.succeedUpdate(id);
+    await pumpEventQueue();
+    expect(await model.delete(), isFalse);
+    expect(harness.repository.commands, hasLength(1));
+
+    harness.repository.emit(_details(id), revision: 2);
     await pumpEventQueue();
     final deletion = model.delete();
     model.change(_patch);

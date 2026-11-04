@@ -711,7 +711,8 @@ void main() {
   });
 
   testWidgets('приоритет меняется сразу записью одного поля без сообщения, а '
-      'пока она идёт, поля недоступны и не открывают листы', (tester) async {
+      'пока она идёт и до снимка с записанным значением, поля недоступны и не '
+      'открывают листы', (tester) async {
     final semantics = tester.ensureSemantics();
     final harness = await _openSheet(tester);
     final repository = harness.repository;
@@ -745,6 +746,12 @@ void main() {
     expect(repository.sentPatches, hasLength(1));
 
     repository.succeedUpdate();
+    await tester.pumpAndSettle();
+    expect(_picker(tester).value, DoablePriority.p4);
+    expect(_fields(tester).enabled, isFalse);
+    expect(_head(tester).onToggle, isNull);
+    expect(_head(tester).options, isA<ChoiceHeadOptionsUnavailable>());
+
     repository.emit(_details(priority: DailyChoicePriority.p1));
     await tester.pumpAndSettle();
 
@@ -1237,6 +1244,48 @@ void main() {
     expect(find.byType(SnackBar), findsNothing);
     expect(_editedText(tester), 'Новое');
     expect(tester.getSemantics(_save), isSemantics(isEnabled: true));
+    semantics.dispose();
+  });
+
+  testWidgets('подтверждённое описание закрывается только со снимком '
+      'записанного значения, а до него панель недоступна', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final harness = await _openSheet(tester);
+    final repository = harness.repository;
+    repository.emit(_details());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Пояснение'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(EditableText), 'Новое');
+    await tester.pump();
+    await tester.tap(_save);
+    await tester.pump();
+
+    repository.succeedUpdate();
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(TopBar, 'Описание'), findsOneWidget);
+    expect(_editedText(tester), 'Новое');
+    expect(
+      tester.widget<EditableText>(find.byType(EditableText)).readOnly,
+      isTrue,
+    );
+    expect(tester.getSemantics(_save), isSemantics(isEnabled: false));
+    expect(tester.getSemantics(_back), isSemantics(isEnabled: false));
+
+    repository.emit(_details(description: 'Новое'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TopBar), findsNothing);
+    expect(find.text('Новое'), findsOneWidget);
+    expect(find.text('Пояснение'), findsNothing);
+    expect(_fields(tester).enabled, isTrue);
+    expect(_head(tester).options, isA<ChoiceHeadOptionsAvailable>());
+    expect(
+      tester.getSemantics(_check),
+      isSemantics(hasEnabledState: true, isEnabled: true),
+    );
+    expect(find.byType(SnackBar), findsNothing);
     semantics.dispose();
   });
 }

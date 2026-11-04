@@ -283,7 +283,13 @@ final class _DailyChoiceSheetState extends ConsumerState<DailyChoiceSheet> {
         state is DailyChoiceDetailsLoaded && state.details.path.isNotEmpty
         ? _edit
         : null;
-    final isRunning = _model.operation is DailyChoiceDetailsOperationWriting;
+    // До снимка с записанным значением панель недоступна, как во время записи.
+    final isRunning = switch (_model.operation) {
+      DailyChoiceDetailsOperationWriting() ||
+      DailyChoiceDetailsOperationAwaitingSnapshot() => true,
+      DailyChoiceDetailsOperationIdle() ||
+      DailyChoiceDetailsOperationFailed() => false,
+    };
     final isChanged = edit != null && _isChanged(edit);
     return PopScope<void>(
       // Во время сохранения запись продолжится и без панели, а её отказ

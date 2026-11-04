@@ -58,6 +58,15 @@ final class DailyChoiceDetailsOperationWriting
   const DailyChoiceDetailsOperationWriting();
 }
 
+/// Собственное изменение подтверждено, но подписка ещё не показала снимок с
+/// ревизией не старше [revision]. Панель недоступна, как во время записи.
+final class DailyChoiceDetailsOperationAwaitingSnapshot
+    extends DailyChoiceDetailsOperation {
+  const DailyChoiceDetailsOperationAwaitingSnapshot(this.revision);
+
+  final GraphRevision revision;
+}
+
 final class DailyChoiceDetailsOperationFailed
     extends DailyChoiceDetailsOperation {
   const DailyChoiceDetailsOperationFailed(
