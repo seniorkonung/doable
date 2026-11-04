@@ -154,18 +154,32 @@ final class RelationDetailsNotFound extends RelationDetailsState {
   const RelationDetailsNotFound({required super.isOperationRunning});
 }
 
-/// Подтверждённое удаление чужой командой завершило контекст прежней связи.
+/// Подтверждённое удаление завершило контекст прежней связи, и её прежнее
+/// содержимое не показывает ни одна панель.
 final class RelationDetailsDeleted extends RelationDetailsState {
   const RelationDetailsDeleted() : super(isOperationRunning: false);
 }
 
 /// Собственная команда просмотра подтвердила удаление связи. Просмотр больше
-/// не наблюдает её и хранит последний показанный снимок для закрытия.
+/// не наблюдает её и хранит последний показанный снимок для закрытия панели,
+/// начавшей удаление.
 final class RelationDetailsOwnDeletionConfirmed extends RelationDetailsState {
-  const RelationDetailsOwnDeletionConfirmed(this.shown)
-    : super(isOperationRunning: false);
+  const RelationDetailsOwnDeletionConfirmed(
+    this.shown, {
+    required this.initiator,
+  }) : super(isOperationRunning: false);
 
   final RelationDetailsLoaded shown;
+
+  /// Только эта панель показывает [shown]; другие панели той же связи
+  /// показывают, что её больше нет.
+  final RelationDeletionInitiator initiator;
+}
+
+/// Непрозрачный идентификатор панели, начавшей удаление связи. Сравнивается
+/// только по тождеству.
+final class RelationDeletionInitiator {
+  RelationDeletionInitiator();
 }
 
 /// Временная недоступность хранилища: повтор уместен.

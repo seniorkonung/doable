@@ -29,6 +29,8 @@ const _relatedPageText = 'Страница намерения';
 
 const _notFound = 'Эта связь больше не существует.';
 
+const _openRelationAgain = 'Открыть связь со страницы';
+
 void main() {
   // Общая поверхность сообщений предъявляет результат только в приложении с
   // фокусом.
@@ -1276,6 +1278,68 @@ void main() {
       semantics.dispose();
     });
 
+    for (final (order, missingFirst) in [
+      ('снимок без связи приходит до подтверждения', true),
+      ('снимок без связи приходит после подтверждения', false),
+    ]) {
+      testWidgets(
+        'удаление из второй панели той же связи закрывает только её с '
+        'прежним содержимым, а первая при возврате показывает, что связи '
+        'нет: $order',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          final details = relation();
+          final repository = await openPanel(tester, details);
+          await tester.tap(find.text('много ходить'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text(_openRelationAgain));
+          await tester.pumpAndSettle();
+          expect(find.text('много ходить').hitTestable(), findsOneWidget);
+
+          await startDeletion(tester);
+          if (missingFirst) {
+            repository
+                .watchAt(0)
+                .emitMissing(revision: const TestGraphRevision(2));
+            await tester.pump();
+            repository.completeRelationDelete(
+              0,
+              relation: details.relation,
+              revision: const TestGraphRevision(2),
+            );
+          } else {
+            repository.completeRelationDelete(
+              0,
+              relation: details.relation,
+              revision: const TestGraphRevision(2),
+            );
+            await tester.pump();
+            repository
+                .watchAt(0)
+                .emitMissing(revision: const TestGraphRevision(2));
+          }
+          await _expectClosingKeepsContent(tester);
+          await tester.pumpAndSettle();
+          expect(
+            find.text('$_relatedPageText ${testIntentionId(2)}'),
+            findsOneWidget,
+          );
+
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(find.byType(Sheet), findsOneWidget);
+          expect(find.text(_notFound), findsOneWidget);
+          expect(find.byType(RelationHead), findsNothing);
+          expect(find.bySemanticsLabel('Параметры связи'), findsNothing);
+          expect(
+            find.textContaining('Связь удалена.').hitTestable(),
+            findsOneWidget,
+          );
+          semantics.dispose();
+        },
+      );
+    }
+
     testWidgets('отказ удаления связи, которая тем временем исчезла, оставляет '
         'панель открытой с тем, что связи нет', (tester) async {
       final semantics = tester.ensureSemantics();
@@ -1636,9 +1700,22 @@ Future<ControlledRelationDetailsRepository> _openSheet(
           NamedRouteDef(
             name: IntentionDetailsRoute.name,
             builder: (_, data) => Scaffold(
-              body: Text(
-                '$_relatedPageText '
-                '${data.argsAs<IntentionDetailsRouteArgs>().intentionId}',
+              body: Column(
+                children: [
+                  Text(
+                    '$_relatedPageText '
+                    '${data.argsAs<IntentionDetailsRouteArgs>().intentionId}',
+                  ),
+                  // Вкладка «Связи» страницы намерения открывает ту же связь.
+                  Builder(
+                    builder: (context) => OutlinedButton(
+                      onPressed: () => unawaited(
+                        showRelationDetailsSheet(context, testRelationId(1)),
+                      ),
+                      child: const Text(_openRelationAgain),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

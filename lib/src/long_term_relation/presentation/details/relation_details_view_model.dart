@@ -178,20 +178,24 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
   }
 
   /// Архивирует активную связь независимо от состояния её участников.
-  void archive() => _startLifecycleChange(RelationDetailsLifecycleKind.archive);
+  void archive() =>
+      _startLifecycleChange(RelationDetailsLifecycleKind.archive, _Change.new);
 
   /// Восстанавливает архивную связь, только если оба участника активны.
-  void restore() => _startLifecycleChange(RelationDetailsLifecycleKind.restore);
+  void restore() =>
+      _startLifecycleChange(RelationDetailsLifecycleKind.restore, _Change.new);
 
   /// Возвращает успех только собственной принятой команды удаления.
   /// Общее состояние данных по ID не передаёт право закрытия другим страницам.
   ///
   /// Снимок без связи до исхода команды не показан, а после подтверждения
-  /// состояние становится [RelationDetailsOwnDeletionConfirmed].
-  Future<bool> delete() async {
+  /// состояние становится [RelationDetailsOwnDeletionConfirmed], прежнее
+  /// содержимое которого показывает только [initiator].
+  Future<bool> delete(RelationDeletionInitiator initiator) async {
     final relationId = _relationId;
     final completion = await _startLifecycleChange(
       RelationDetailsLifecycleKind.delete,
+      (token) => _Deletion(token, initiator),
     );
     return switch (completion?.result) {
       GraphResultSuccess(value: LongTermRelationDeleted(:final relation)) =>
@@ -200,14 +204,31 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     };
   }
 
-  /// Повторяет доказанно устранимый отказ той же операции.
+  /// Панель [initiator], перекрытая в момент подтверждения своего удаления,
+  /// сама не закрывается и отказывается от прежнего содержимого.
+  void releaseDeletedContent(RelationDeletionInitiator initiator) {
+    if (state case RelationDetailsOwnDeletionConfirmed(initiator: final owner)
+        when identical(owner, initiator)) {
+      state = const RelationDetailsDeleted();
+    }
+  }
+
+  /// Повторяет доказанно устранимый отказ архивирования или восстановления.
+  /// Удаление повторяет начинающая его панель через [delete].
   void retryLifecycleChange() {
     final current = state;
     final change = current is RelationDetailsLoaded
         ? current.lifecycleChange
         : null;
-    if (change is RelationDetailsLifecycleFailed && change.canRetry) {
-      _startLifecycleChange(change.kind);
+    if (change is! RelationDetailsLifecycleFailed || !change.canRetry) {
+      return;
+    }
+    switch (change.kind) {
+      case RelationDetailsLifecycleKind.archive ||
+          RelationDetailsLifecycleKind.restore:
+        _startLifecycleChange(change.kind, _Change.new);
+      case RelationDetailsLifecycleKind.delete:
+        break;
     }
   }
 
@@ -290,6 +311,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
 
   Future<LongTermRelationCommandCompletion>? _startLifecycleChange(
     RelationDetailsLifecycleKind kind,
+    _Command Function(LongTermRelationOperationToken token) command,
   ) {
     final current = state;
     if (current is! RelationDetailsLoaded ||
@@ -313,11 +335,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     };
     switch (start) {
       case LongTermRelationCommandAccepted(:final token, :final future):
-        _command = switch (kind) {
-          RelationDetailsLifecycleKind.archive ||
-          RelationDetailsLifecycleKind.restore => _Change(token),
-          RelationDetailsLifecycleKind.delete => _Deletion(token),
-        };
+        _command = command(token);
         state = current.copyWith(
           isOperationRunning: true,
           lifecycleChange: RelationDetailsLifecycleRunning(kind),
@@ -371,14 +389,15 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
       switch ((command, completion.result, state)) {
         // Подтверждённое удаление сохраняет прежнее содержимое для закрытия.
         case (
-              _Deletion() || _DeletionRelationMissing(),
+              _Deletion(:final initiator) ||
+                  _DeletionRelationMissing(:final initiator),
               GraphResultSuccess(
                 value: LongTermRelationDeleted(:final relation),
               ),
               final RelationDetailsLoaded shown,
             )
             when relation.id == _relationId:
-          state = _terminateAsOwnDeletion(shown);
+          state = _terminateAsOwnDeletion(shown, initiator);
           return;
         // Иначе проявляется отложенный снимок без связи.
         case (_DeletionRelationMissing(), _, _):
@@ -473,8 +492,8 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
       // Снимок без связи во время собственного удаления ждёт его исхода.
       if (value.value == null) {
         switch (_command) {
-          case _Deletion(:final token):
-            _command = _DeletionRelationMissing(token);
+          case _Deletion(:final token, :final initiator):
+            _command = _DeletionRelationMissing(token, initiator);
             return;
           case _DeletionRelationMissing():
             return;
@@ -723,12 +742,14 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
 
   RelationDetailsOwnDeletionConfirmed _terminateAsOwnDeletion(
     RelationDetailsLoaded shown,
+    RelationDeletionInitiator initiator,
   ) {
     _terminate();
     // Пакет этой команды мог уже снять флаг операции, а закрывающаяся панель
     // сохраняет кадр записи с выключенными элементами.
     return RelationDetailsOwnDeletionConfirmed(
       shown.copyWith(isOperationRunning: true),
+      initiator: initiator,
     );
   }
 
@@ -781,11 +802,15 @@ final class _Change extends _Command {
 
 /// Удаление связи, до исхода которого снимок без связи не приходил.
 final class _Deletion extends _Command {
-  const _Deletion(super.token);
+  const _Deletion(super.token, this.initiator);
+
+  final RelationDeletionInitiator initiator;
 }
 
 /// Удаление связи, во время которого пришёл снимок без связи. Он показан,
 /// только если удаление не подтвердится.
 final class _DeletionRelationMissing extends _Command {
-  const _DeletionRelationMissing(super.token);
+  const _DeletionRelationMissing(super.token, this.initiator);
+
+  final RelationDeletionInitiator initiator;
 }

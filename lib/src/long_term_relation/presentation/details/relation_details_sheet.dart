@@ -92,9 +92,9 @@ final class _RelationDetailsSheetState
 
   _DescriptionEdit? _edit;
 
-  /// Собственное удаление подтвердилось, когда панель была перекрыта, и она
-  /// осталась открытой без связи.
-  var _deletedWhileCovered = false;
+  /// Прежнее содержимое после подтверждённого удаления показывает только
+  /// панель, начавшая его, хотя модель связи общая для всех её панелей.
+  final _deletionInitiator = RelationDeletionInitiator();
 
   RelationDetailsViewModelProvider get _provider =>
       relationDetailsViewModelProvider(widget.relationId);
@@ -227,7 +227,8 @@ final class _RelationDetailsSheetState
   }
 
   Future<void> _delete() async {
-    final deleted = await ref.read(_provider.notifier).delete();
+    final viewModel = ref.read(_provider.notifier);
+    final deleted = await viewModel.delete(_deletionInitiator);
     // Закрытие принадлежит принявшей команду панели, а не общему Deleted. После
     // ожидания сброшенный или перекрытый маршрут теряет это право.
     // https://api.flutter.dev/flutter/widgets/Route/isCurrent.html
@@ -237,7 +238,7 @@ final class _RelationDetailsSheetState
     if (ModalRoute.of(context)?.isCurrent ?? false) {
       Navigator.of(context).pop();
     } else {
-      setState(() => _deletedWhileCovered = true);
+      viewModel.releaseDeletedContent(_deletionInitiator);
     }
   }
 
@@ -306,8 +307,8 @@ final class _RelationDetailsSheetState
             localizations,
             details,
           ),
-          RelationDetailsOwnDeletionConfirmed(:final shown)
-              when !_deletedWhileCovered =>
+          RelationDetailsOwnDeletionConfirmed(:final shown, :final initiator)
+              when identical(initiator, _deletionInitiator) =>
             _sheetLabel(localizations, shown.details),
           _ => localizations.relationDetailsTitle,
         },
@@ -336,8 +337,8 @@ final class _RelationDetailsSheetState
             final RelationDetailsLoaded loaded => loadedRelation(loaded),
             // Закрывающаяся после собственного удаления панель показывает
             // прежнюю связь: её элементы выключены, пока шла запись.
-            RelationDetailsOwnDeletionConfirmed(:final shown)
-                when !_deletedWhileCovered =>
+            RelationDetailsOwnDeletionConfirmed(:final shown, :final initiator)
+                when identical(initiator, _deletionInitiator) =>
               loadedRelation(shown),
             RelationDetailsNotFound() ||
             RelationDetailsDeleted() ||
