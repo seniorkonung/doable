@@ -763,3 +763,16 @@
   - **Зависимости:** 3.1: общий компонент `RelationHead` уже в ветке; задача выполняется после 3.19 по порядку файла.
   - **Предполагаемые файлы:** `lib/src/design_system/components/relation_head.dart`, `test/design_system/relation_head_test.dart`.
   - **Размер:** S.
+
+- [ ] 3.21 Неиспользуемая строка `dailyChoiceDeleteAction` удалена из локализации
+  - **Критерии приёмки:**
+    - Ключ `dailyChoiceDeleteAction` удалён из `lib/l10n/app_ru.arb` и `lib/l10n/app_en.arb`, в английском файле вместе с описанием `@dailyChoiceDeleteAction`. Его единственным потребителем была страница подробного просмотра, удалённая в задаче 3.16.
+    - `app_localizations.dart`, `app_localizations_ru.dart` и `app_localizations_en.dart` получены только `mise run codegen`, без ручных правок.
+    - У каждой оставшейся строки удаления дневного выбора есть действующий потребитель. Действующие `dailyChoiceSheetOptionDelete` и `dailyChoiceDeleteDialogAction` не затронуты.
+    - Поведение и видимый текст не меняются, новые тесты не нужны. Отдельный поиск других неиспользуемых строк в эту задачу не входит.
+  - **Проверка:**
+    - `mise run codegen-check`.
+    - `git grep dailyChoiceDeleteAction -- lib test` ничего не находит.
+  - **Зависимости:** 3.16; задача выполняется после 3.20 по порядку файла.
+  - **Предполагаемые файлы:** `lib/l10n/app_ru.arb`, `lib/l10n/app_en.arb`, созданные `lib/l10n/app_localizations.dart`, `app_localizations_ru.dart`, `app_localizations_en.dart`.
+  - **Размер:** XS.
