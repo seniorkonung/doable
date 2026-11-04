@@ -2712,18 +2712,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceCreationTitle => 'Confirm daily choice';
 
   @override
-  String get dailyChoiceScheduleLabel => 'Scheduled time';
-
-  @override
   String get dailyChoiceAllDay => 'All day';
-
-  @override
-  String get dailyChoiceSetTime => 'Set time';
-
-  @override
-  String dailyChoiceTimeLabel(String time) {
-    return 'Time: $time';
-  }
 
   @override
   String get dailyChoicePriorityLabel => 'Priority';
@@ -2865,15 +2854,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dailyChoiceDetailsTitle => 'Daily choice';
-
-  @override
-  String get dailyChoiceEditTitle => 'Edit daily choice';
-
-  @override
-  String get dailyChoiceEditSave => 'Save changes';
-
-  @override
-  String get dailyChoiceEditRefresh => 'Return to details and refresh';
 
   @override
   String get dailyChoiceDetailsLoading => 'Loading daily choice…';
@@ -3042,12 +3022,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String dailyChoiceCreationAction(String action) {
     return 'Selected action: $action';
   }
-
-  @override
-  String get dailyChoiceCreationDate => 'Daily choice date';
-
-  @override
-  String get dailyChoiceCreationDateHint => 'Enter YYYY-MM-DD (0001–9999)';
 
   @override
   String get dailyChoiceCreationDescription => 'Description (optional)';

@@ -4176,29 +4176,11 @@ abstract class AppLocalizations {
   /// **'Confirm daily choice'**
   String get dailyChoiceCreationTitle;
 
-  /// Подпись запланированного времени дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Scheduled time'**
-  String get dailyChoiceScheduleLabel;
-
   /// Планирование на весь день без конкретного времени
   ///
   /// In en, this message translates to:
   /// **'All day'**
   String get dailyChoiceAllDay;
-
-  /// Открыть выбор конкретного времени
-  ///
-  /// In en, this message translates to:
-  /// **'Set time'**
-  String get dailyChoiceSetTime;
-
-  /// Подтверждённое время дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Time: {time}'**
-  String dailyChoiceTimeLabel(String time);
 
   /// Собственный приоритет дневного выбора
   ///
@@ -4425,24 +4407,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Daily choice'**
   String get dailyChoiceDetailsTitle;
-
-  /// Заголовок редактора дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Edit daily choice'**
-  String get dailyChoiceEditTitle;
-
-  /// Сохранение правок дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Save changes'**
-  String get dailyChoiceEditSave;
-
-  /// Возврат к актуальным подробностям после конфликта
-  ///
-  /// In en, this message translates to:
-  /// **'Return to details and refresh'**
-  String get dailyChoiceEditRefresh;
 
   /// Загрузка подробностей дневного выбора
   ///
@@ -4707,18 +4671,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Selected action: {action}'**
   String dailyChoiceCreationAction(String action);
-
-  /// Подпись даты выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Daily choice date'**
-  String get dailyChoiceCreationDate;
-
-  /// Подсказка полного диапазона дат
-  ///
-  /// In en, this message translates to:
-  /// **'Enter YYYY-MM-DD (0001–9999)'**
-  String get dailyChoiceCreationDateHint;
 
   /// Подпись необязательного описания
   ///

@@ -1007,7 +1007,7 @@
     - меняются `test/app/daily_choice_app_flow_test.dart`, `daily_choice_app_lifecycle_test.dart`, `intention_statistics_catalog_scenarios.dart`, `test/app/navigation/app_shell_page_matrix.dart`, `app_shell_state_test.dart`.
   - **Размер:** M по логике: в `lib/` меняется только меню, остальное — перевод сценариев.
 
-- [ ] 4.15 Форма изменения дневного выбора удалена вместе с маршрутом
+- [x] 4.15 Форма изменения дневного выбора удалена вместе с маршрутом
   - **Критерии приёмки:**
     - Удалены `DailyChoiceEditPage`, её состояние и модель, `DailyChoiceEditRoute`, `DailyChoicePlanningFields` с `_TimeInputDialog` и их тесты. Каждый сценарий удалённых тестов уже подтверждён панелью, блоком полей или построением изменения описания из задачи 4.12 либо проверял поведение формы, которого больше нет.
     - Строки, которые читали только удалённые файлы, удалены из обоих файлов локализации, а созданные файлы получены `mise run codegen`.

@@ -2734,18 +2734,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceCreationTitle => 'Подтвердить дневной выбор';
 
   @override
-  String get dailyChoiceScheduleLabel => 'Запланированное время';
-
-  @override
   String get dailyChoiceAllDay => 'Весь день';
-
-  @override
-  String get dailyChoiceSetTime => 'Указать время';
-
-  @override
-  String dailyChoiceTimeLabel(String time) {
-    return 'Время: $time';
-  }
 
   @override
   String get dailyChoicePriorityLabel => 'Приоритет';
@@ -2889,16 +2878,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get dailyChoiceDetailsTitle => 'Дневной выбор';
-
-  @override
-  String get dailyChoiceEditTitle => 'Редактировать дневной выбор';
-
-  @override
-  String get dailyChoiceEditSave => 'Сохранить изменения';
-
-  @override
-  String get dailyChoiceEditRefresh =>
-      'Вернуться к подробностям и обновить данные';
 
   @override
   String get dailyChoiceDetailsLoading => 'Загружаем дневной выбор…';
@@ -3071,13 +3050,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String dailyChoiceCreationAction(String action) {
     return 'Выбранное действие: $action';
   }
-
-  @override
-  String get dailyChoiceCreationDate => 'Дата дневного выбора';
-
-  @override
-  String get dailyChoiceCreationDateHint =>
-      'Введите дату в формате ГГГГ-ММ-ДД (0001–9999)';
 
   @override
   String get dailyChoiceCreationDescription => 'Описание (необязательно)';
