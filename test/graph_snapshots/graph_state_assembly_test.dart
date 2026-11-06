@@ -1,5 +1,11 @@
 import 'dart:convert';
 
+import 'package:doable/src/action/domain/action.dart';
+import 'package:doable/src/action/domain/action_id.dart';
+import 'package:doable/src/action/domain/action_path.dart';
+import 'package:doable/src/action/domain/action_priority.dart';
+import 'package:doable/src/action/domain/action_schedule.dart';
+import 'package:doable/src/action/domain/action_text.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
@@ -428,6 +434,59 @@ void main() {
       );
     });
 
+    test('созданные надгробия встают по ключу между надгробиями базы, '
+        'созданные действия — после действий базы', () async {
+      final state = await GraphStateAssembly.assemble(
+        GraphStateBase(
+          position: 3,
+          readRecords: () => Stream.fromIterable([
+            _deletedIntention(2),
+            _deletedIntention(4),
+            _deletedPair(from: 1, to: 3),
+            _deletedPair(from: 3, to: 1),
+            _action(2, 'Размяться', path: [3]),
+          ]),
+        ),
+        Stream.fromIterable([
+          GraphFactPackage(
+            position: 4,
+            facts: [
+              GraphEntityCreated(_deletedIntention(3)),
+              GraphEntityCreated(_deletedIntention(1)),
+              GraphEntityDeleted(DeletedIntentionKey(_intentionId(4))),
+              GraphEntityCreated(_deletedPair(from: 2, to: 1)),
+              GraphEntityCreated(_deletedPair(from: 1, to: 2)),
+              GraphEntityCreated(_action(1, 'Пробежка', path: [1, 2])),
+              GraphEntityChanged(_action(2, 'Разминка', path: [3])),
+            ],
+          ),
+        ]),
+      );
+
+      expect(
+        [
+          state.counts.deletedIntentions,
+          state.counts.deletedRelationPairs,
+          state.counts.actions,
+        ],
+        [3, 4, 2],
+      );
+      expect(
+        _lines(await state.records.toList()),
+        _lines([
+          _deletedIntention(1),
+          _deletedIntention(2),
+          _deletedIntention(3),
+          _deletedPair(from: 1, to: 2),
+          _deletedPair(from: 1, to: 3),
+          _deletedPair(from: 2, to: 1),
+          _deletedPair(from: 3, to: 1),
+          _action(2, 'Разминка', path: [3]),
+          _action(1, 'Пробежка', path: [1, 2]),
+        ]),
+      );
+    });
+
     test('записи базового состояния выдаются по мере чтения, не дожидаясь '
         'его конца', () async {
       const tagCount = 100000;
@@ -542,6 +601,34 @@ LongTermRelationRecord _relation(
   createdAt: RelationTimestamp(DateTime.utc(2026, 10, 17, 9)),
   updatedAt: RelationTimestamp(DateTime.utc(2026, 10, 17, 9)),
 );
+
+DeletedIntentionRecord _deletedIntention(int number) => DeletedIntentionRecord(
+  id: _intentionId(number),
+  title: 'Удалённое $number',
+);
+
+DeletedRelationPairRecord _deletedPair({required int from, required int to}) =>
+    DeletedRelationPairRecord(
+      sourceIntentionId: _intentionId(from),
+      relatedIntentionId: _intentionId(to),
+      type: LongTermRelationType.can,
+    );
+
+ActionRecord _action(int number, String title, {required List<int> path}) =>
+    ActionRecord(
+      id: (ActionId.decode(
+        _uuid('5e6f7a8b', number),
+      ) as ActionIdDecodingSuccess).id,
+      title: ActionTitle(title),
+      description: null,
+      path: ActionPath([for (final intention in path) _intentionId(intention)]),
+      date: CalendarDate.fromParts(2026, 10, 2),
+      schedule: const ActionAllDay(),
+      priority: ActionPriority.p4,
+      isCompleted: false,
+      createdAt: ActionTimestamp(_morning),
+      updatedAt: ActionTimestamp(_morning),
+    );
 
 DailyChoiceRecord _dailyChoice(
   int number, {

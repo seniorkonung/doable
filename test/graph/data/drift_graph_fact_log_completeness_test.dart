@@ -1,5 +1,10 @@
 import 'dart:convert';
 
+import 'package:doable/src/action/application/action_command.dart';
+import 'package:doable/src/action/domain/action_id.dart';
+import 'package:doable/src/action/domain/action_priority.dart';
+import 'package:doable/src/action/domain/action_schedule.dart';
+import 'package:doable/src/action/domain/action_text.dart';
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
@@ -30,6 +35,7 @@ import 'package:drift/drift.dart' show ComparableExpr, OrderingTerm;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/graph_log_completeness_reference.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -42,7 +48,12 @@ void main() {
   late DriftPersonalGraphRepository repository;
   late DateTime now;
 
+  /// Состояние, заполненное в обход лога; без него лог сверяется от
+  /// позиции 0.
+  _GraphCheckpoint? seeded;
+
   setUp(() async {
+    seeded = null;
     harness = LocalDatabaseHarness.inMemory();
     database = await harness.openReadyDatabase();
     now = DateTime.utc(2026, 10, 17, 9);
@@ -63,19 +74,17 @@ void main() {
     records: await referenceGraphRecords(database),
   );
 
-  /// Сверяет выгрузку базы с состоянием, собранным из лога от позиции 0 и
-  /// от промежуточного состояния [base].
+  /// Сверяет выгрузку базы с состоянием, собранным из лога от позиции 0, а
+  /// после заполнения в обход лога — от заполненного состояния, и от
+  /// промежуточного состояния [base].
   Future<void> expectLogMatchesDatabase(_GraphCheckpoint base) async {
     final expected = await referenceGraphRecords(database);
     for (final (description, assemblyBase) in [
-      ('от позиции 0', const GraphStateBase.empty()),
-      (
-        'от позиции ${base.position}',
-        GraphStateBase(
-          position: base.position,
-          readRecords: () => Stream.fromIterable(base.records),
-        ),
-      ),
+      switch (seeded) {
+        null => ('от позиции 0', const GraphStateBase.empty()),
+        final origin => ('от заполненного состояния', _baseOf(origin)),
+      },
+      ('от позиции ${base.position}', _baseOf(base)),
     ]) {
       final state = await GraphStateAssembly.assemble(
         assemblyBase,
@@ -292,6 +301,73 @@ void main() {
     await confirm(DeleteLongTermRelation(relation.id));
   });
 
+  test('команды действий и удаления в путях: изменение и удаление действий, '
+      'появление и снятие надгробий намерения и пар', () async {
+    final health = await createIntention('Здоровье');
+    final running = await createIntention('Бегать');
+    final morning = await createIntention('Пробежка утром');
+    final healthRunning = await relate(health, running);
+    final runningMorning = await relate(running, morning);
+    final full = _actionId(1);
+    final short = _actionId(2);
+    await seedGraph(database, () async {
+      await _insertAction(database, full, 'Пробежка в парке', [
+        health,
+        running,
+        morning,
+      ]);
+      await _insertAction(database, short, 'Размяться', [health, running]);
+      await _insertAction(database, _actionId(3), 'Выйти пораньше', [morning]);
+    });
+    seeded = await checkpoint();
+
+    await confirm(
+      UpdateActionFields(
+        actionId: full,
+        patch: ActionFieldsPatch(
+          title: ActionFieldSet(ActionTitle('Пробежка у реки')),
+          description: ActionFieldSet(ActionDescription.fromInput('Не спеша')),
+          date: ActionFieldSet(CalendarDate.fromParts(2026, 10, 19)),
+          schedule: ActionFieldSet(ActionAtHour(7)),
+          priority: const ActionFieldSet(ActionPriority.p1),
+          isCompleted: const ActionFieldSet(true),
+        ),
+      ),
+    );
+    await confirm(DeleteLongTermRelation(healthRunning.id));
+    final restored = await relate(health, running);
+    // Удаление намерения со связями запрещено, поэтому связи удаляются
+    // раньше.
+    await confirm(DeleteLongTermRelation(restored.id));
+    await confirm(DeleteLongTermRelation(runningMorning.id));
+    await confirm(DeleteIntention(running.id));
+    final deletion = _factKinds(await _lastPackageFacts(database));
+    expect(
+      deletion.where((kind) => kind == 'created DeletedIntentionRecord'),
+      hasLength(1),
+      reason: 'удаление намерения из двух путей даёт одно его надгробие',
+    );
+    expect(
+      deletion,
+      everyElement(isNot(contains('Action'))),
+      reason: 'удаление намерения из путей не меняет действия',
+    );
+    await confirm(DeleteAction(short));
+    await confirm(DeleteAction(full));
+    expect(
+      await referenceGraphRecords(database),
+      everyElement(
+        isNot(
+          anyOf(
+            isA<DeletedIntentionRecord>(),
+            isA<DeletedRelationPairRecord>(),
+          ),
+        ),
+      ),
+      reason: 'удаление последнего пути снимает надгробия',
+    );
+  });
+
   test('команды дневных выборов: создание, изменение полей и удаление '
       'вместе с шагами', () async {
     final health = await createIntention('Здоровье');
@@ -355,6 +431,64 @@ ConfirmedChoicePath _path(List<LongTermRelation> relations) =>
         ),
     ]);
 
+GraphStateBase _baseOf(_GraphCheckpoint checkpoint) => GraphStateBase(
+  position: checkpoint.position,
+  readRecords: () => Stream.fromIterable(checkpoint.records),
+);
+
+ActionId _actionId(int number) => (ActionId.decode(
+  '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}',
+) as ActionIdDecodingSuccess).id;
+
+/// Вставляет действие с путём [path]; вызывать внутри `seedGraph`.
+Future<void> _insertAction(
+  AppDatabase database,
+  ActionId id,
+  String title,
+  List<Intention> path,
+) async {
+  await database.customStatement(
+    'INSERT INTO actions (id, title, date, priority, is_completed, '
+    "created_at, updated_at) VALUES (?, ?, '2026-10-17', 4, 0, 1, 1)",
+    [id.toCanonicalString(), title],
+  );
+  for (final (position, intention) in path.indexed) {
+    await database.customStatement(
+      'INSERT INTO action_path_items '
+      '(action_id, position, intention_id, previous_intention_id) '
+      'VALUES (?, ?, ?, ?)',
+      [
+        id.toCanonicalString(),
+        position,
+        intention.id.toCanonicalString(),
+        position == 0 ? null : path[position - 1].id.toCanonicalString(),
+      ],
+    );
+  }
+}
+
+Future<List<GraphFact>> _lastPackageFacts(AppDatabase database) async {
+  final package =
+      await (database.select(database.graphLogPackages)
+            ..orderBy([(package) => OrderingTerm.desc(package.position)])
+            ..limit(1))
+          .getSingle();
+  return GraphFormatCodec.decodePackage(
+    package.facts!,
+    GraphFormatVersion.ofCarrier(package.formatVersion!),
+  );
+}
+
+/// Вид факта и тип сущности, например `created DeletedIntentionRecord`.
+List<String> _factKinds(List<GraphFact> facts) => [
+  for (final fact in facts)
+    switch (fact) {
+      GraphEntityCreated(:final record) => 'created ${record.runtimeType}',
+      GraphEntityChanged(:final record) => 'changed ${record.runtimeType}',
+      GraphEntityDeleted(:final entity) => 'deleted ${entity.runtimeType}',
+    },
+];
+
 Future<int> _lastPosition(AppDatabase database) async =>
     (await database
             .customSelect(
@@ -393,23 +527,32 @@ List<String> _lines(List<GraphEntityRecord> records) => [
 typedef _Counts = ({
   int tags,
   int intentions,
+  int deletedIntentions,
   int tagAssignments,
   int longTermRelations,
+  int deletedRelationPairs,
+  int actions,
   int dailyChoices,
 });
 
 _Counts _counts(GraphRecordCounts counts) => (
   tags: counts.tags,
   intentions: counts.intentions,
+  deletedIntentions: counts.deletedIntentions,
   tagAssignments: counts.tagAssignments,
   longTermRelations: counts.longTermRelations,
+  deletedRelationPairs: counts.deletedRelationPairs,
+  actions: counts.actions,
   dailyChoices: counts.dailyChoices,
 );
 
 _Counts _countsOf(List<GraphEntityRecord> records) => (
   tags: records.whereType<TagRecord>().length,
   intentions: records.whereType<IntentionRecord>().length,
+  deletedIntentions: records.whereType<DeletedIntentionRecord>().length,
   tagAssignments: records.whereType<TagAssignmentRecord>().length,
   longTermRelations: records.whereType<LongTermRelationRecord>().length,
+  deletedRelationPairs: records.whereType<DeletedRelationPairRecord>().length,
+  actions: records.whereType<ActionRecord>().length,
   dailyChoices: records.whereType<DailyChoiceRecord>().length,
 );

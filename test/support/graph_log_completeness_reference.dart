@@ -1,3 +1,9 @@
+import 'package:doable/src/action/domain/action.dart';
+import 'package:doable/src/action/domain/action_id.dart';
+import 'package:doable/src/action/domain/action_path.dart';
+import 'package:doable/src/action/domain/action_priority.dart';
+import 'package:doable/src/action/domain/action_schedule.dart';
+import 'package:doable/src/action/domain/action_text.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
@@ -26,9 +32,10 @@ import 'tag_positions.dart';
 /// фактов.
 ///
 /// Записи идут в каноническом порядке файла формата: секции тегов,
-/// намерений, назначений, долговременных связей и дневных выборов, внутри
-/// секции — по последовательности создания, а намерения — по времени
-/// создания и идентификатору.
+/// намерений, надгробий намерений, назначений, долговременных связей,
+/// надгробий пар, действий и дневных выборов, внутри секции — по
+/// последовательности создания, намерения — по времени создания и
+/// идентификатору, а надгробия — по ключу.
 Future<List<GraphEntityRecord>> referenceGraphRecords(
   local.AppDatabase database,
 ) async {
@@ -41,12 +48,33 @@ Future<List<GraphEntityRecord>> referenceGraphRecords(
             (row) => OrderingTerm.asc(row.id),
           ]))
           .get();
+  final deletedIntentions = await (database.select(
+    database.deletedIntentions,
+  )..orderBy([(row) => OrderingTerm.asc(row.intentionId)])).get();
   final assignments = await (database.select(
     database.tagAssignments,
   )..orderBy([(row) => OrderingTerm.asc(row.creationSequence)])).get();
   final relations = await (database.select(
     database.longTermRelations,
   )..orderBy([(row) => OrderingTerm.asc(row.creationSequence)])).get();
+  final deletedPairs =
+      await (database.select(database.deletedRelationPairs)..orderBy([
+            (row) => OrderingTerm.asc(row.sourceIntentionId),
+            (row) => OrderingTerm.asc(row.relatedIntentionId),
+          ]))
+          .get();
+  final actions = await (database.select(
+    database.actions,
+  )..orderBy([(row) => OrderingTerm.asc(row.creationSequence)])).get();
+  final pathItems = await (database.select(
+    database.actionPathItems,
+  )..orderBy([(row) => OrderingTerm.asc(row.position)])).get();
+  final pathByAction = <String, List<IntentionId>>{};
+  for (final item in pathItems) {
+    pathByAction
+        .putIfAbsent(item.actionId, () => [])
+        .add(_intentionId(item.intentionId));
+  }
   final choices = await (database.select(
     database.dailyChoices,
   )..orderBy([(row) => OrderingTerm.asc(row.creationSequence)])).get();
@@ -70,6 +98,11 @@ Future<List<GraphEntityRecord>> referenceGraphRecords(
         ),
       ),
     for (final row in intentions) IntentionRecord(_intention(row)),
+    for (final row in deletedIntentions)
+      DeletedIntentionRecord(
+        id: _intentionId(row.intentionId),
+        title: row.title,
+      ),
     for (final row in assignments)
       TagAssignmentRecord(
         TagAssignment(
@@ -78,6 +111,14 @@ Future<List<GraphEntityRecord>> referenceGraphRecords(
         ),
       ),
     for (final row in relations) _relation(row),
+    for (final row in deletedPairs)
+      DeletedRelationPairRecord(
+        sourceIntentionId: _intentionId(row.sourceIntentionId),
+        relatedIntentionId: _intentionId(row.relatedIntentionId),
+        type: LongTermRelationType.values.byName(row.type),
+      ),
+    for (final row in actions)
+      _action(row, ActionPath(pathByAction[row.id] ?? const [])),
     for (final row in choices)
       DailyChoiceRecord(
         choice: _dailyChoice(row),
@@ -123,6 +164,25 @@ LongTermRelationRecord _relation(local.LongTermRelation row) =>
       createdAt: RelationTimestamp(_instant(row.createdAt)),
       updatedAt: RelationTimestamp(_instant(row.updatedAt)),
     );
+
+ActionRecord _action(local.Action row, ActionPath path) => ActionRecord(
+  id: (ActionId.decode(row.id) as ActionIdDecodingSuccess).id,
+  title: ActionTitle(row.title),
+  description: switch (row.description) {
+    final description? => ActionDescription.fromInput(description),
+    null => null,
+  },
+  path: path,
+  date: CalendarDate.parseCanonical(row.date),
+  schedule: switch (row.scheduledHour) {
+    final hour? => ActionAtHour(hour),
+    null => const ActionAllDay(),
+  },
+  priority: ActionPriority.values.byName('p${row.priority}'),
+  isCompleted: row.isCompleted,
+  createdAt: ActionTimestamp(_instant(row.createdAt)),
+  updatedAt: ActionTimestamp(_instant(row.updatedAt)),
+);
 
 DailyChoice _dailyChoice(local.DailyChoice row) => DailyChoice(
   id: _dailyChoiceId(row.id),

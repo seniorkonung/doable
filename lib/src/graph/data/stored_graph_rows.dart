@@ -253,11 +253,7 @@ final class StoredLongTermRelation {
     if (creationSequence <= 0) throw const StoredGraphCorruption();
     final id = decodeStoredRelationId(requiredStoredString(data, 'id'));
     final ends = decodeStoredRelationEnds(data);
-    final type = switch (requiredStoredString(data, 'type')) {
-      'need' => LongTermRelationType.need,
-      'can' => LongTermRelationType.can,
-      _ => throw const StoredGraphCorruption(),
-    };
+    final type = decodeStoredRelationType(data);
     final priority = switch (requiredStoredInteger(data, 'priority')) {
       1 => RelationPriority.p1,
       2 => RelationPriority.p2,
@@ -352,6 +348,14 @@ final class StoredLongTermRelation {
     requiredStoredString(data, 'related_intention_id'),
   ),
 );
+
+/// Тип связи из столбца `type`.
+LongTermRelationType decodeStoredRelationType(Map<String, Object?> data) =>
+    switch (requiredStoredString(data, 'type')) {
+      'need' => LongTermRelationType.need,
+      'can' => LongTermRelationType.can,
+      _ => throw const StoredGraphCorruption(),
+    };
 
 /// Охват связи из столбца `is_archived`.
 RelationScope decodeStoredRelationScope(Map<String, Object?> data) =>

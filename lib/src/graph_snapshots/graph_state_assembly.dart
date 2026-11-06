@@ -70,9 +70,9 @@ abstract final class GraphStateAssembly {
   ///
   /// Изменённые сущности базы остаются на своих местах, удалённые
   /// выбрасываются. Созданные встают в порядок, в каком сущности перечисляет
-  /// база: намерения — по времени создания и идентификатору, остальные —
-  /// после сущностей базы своей секции по месту последнего создания в
-  /// пакетах. Сущность, удалённая и снова созданная с тем же ключом,
+  /// база: намерения — по времени создания и идентификатору, надгробия —
+  /// по ключу, остальные — после сущностей базы своей секции по месту
+  /// последнего создания в пакетах. Сущность, удалённая и снова созданная с тем же ключом,
   /// покидает прежнее место, как строка базы с новой последовательностью
   /// создания. Запись базы, после позиции которой сущность удалялась,
   /// освобождает своё место, а запись, прочитанная после удаления, — уже
@@ -252,26 +252,48 @@ final class _Creations {
 
 /// Порядок созданных записей одной секции.
 int _compareCreated(_Life first, _Life second) =>
-    switch ((first.record, second.record)) {
-      (
-        IntentionRecord(intention: final firstIntention),
-        IntentionRecord(intention: final secondIntention),
-      ) =>
-        compareIntentionsInFormatOrder(firstIntention, secondIntention),
-      _ => first.creation.compareTo(second.creation),
-    };
+    _compareByContent(first.record, second.record) ??
+    first.creation.compareTo(second.creation);
 
 /// Встаёт ли созданная запись [created] перед записью базы [base] той же
 /// секции. Остальные секции упорядочены последовательностью создания, и
 /// созданные встают в них после записей базы.
 bool _precedes(GraphEntityRecord created, GraphEntityRecord base) =>
-    switch ((created, base)) {
+    switch (_compareByContent(created, base)) {
+      final order? => order < 0,
+      null => false,
+    };
+
+/// Порядок записей одной секции, которую база перечисляет по данным записей:
+/// намерения — по времени создания и идентификатору, надгробия — по ключу.
+/// `null` — секция упорядочена последовательностью создания.
+int? _compareByContent(GraphEntityRecord first, GraphEntityRecord second) =>
+    switch ((first, second)) {
       (
-        IntentionRecord(intention: final createdIntention),
-        IntentionRecord(intention: final baseIntention),
+        IntentionRecord(intention: final firstIntention),
+        IntentionRecord(intention: final secondIntention),
       ) =>
-        compareIntentionsInFormatOrder(createdIntention, baseIntention) < 0,
-      _ => false,
+        compareIntentionsInFormatOrder(firstIntention, secondIntention),
+      (
+        DeletedIntentionRecord(id: final firstId),
+        DeletedIntentionRecord(id: final secondId),
+      ) =>
+        firstId.compareTo(secondId),
+      (
+        DeletedRelationPairRecord(
+          sourceIntentionId: final firstSource,
+          relatedIntentionId: final firstRelated,
+        ),
+        DeletedRelationPairRecord(
+          sourceIntentionId: final secondSource,
+          relatedIntentionId: final secondRelated,
+        ),
+      ) =>
+        switch (firstSource.compareTo(secondSource)) {
+          0 => firstRelated.compareTo(secondRelated),
+          final order => order,
+        },
+      _ => null,
     };
 
 /// Секции в порядке файла формата.
