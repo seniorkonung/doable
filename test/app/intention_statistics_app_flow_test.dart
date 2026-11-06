@@ -6,15 +6,17 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/action/application/action_day.dart';
+import 'package:doable/src/action/application/action_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
+import 'package:doable/src/action/presentation/day/action_day_calendar.dart';
+import 'package:doable/src/action/presentation/day/action_day_calendar_day.dart';
+import 'package:doable/src/action/presentation/day/action_day_marks_view_model.dart';
+import 'package:doable/src/action/presentation/day/action_day_body.dart';
+import 'package:doable/src/action/presentation/day/action_day_state.dart';
+import 'package:doable/src/action/presentation/day/action_day_view_model.dart';
+import 'package:doable/src/action/presentation/day/action_day_date_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/data/contribution_reachability.dart';
@@ -47,11 +49,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/controlled_local_date.dart';
-import '../support/daily_choice_detail_fields_controls.dart';
-import '../support/daily_choice_details_controls.dart';
 import '../support/daily_choice_durability_fixture.dart';
+import '../support/action_day_controls.dart';
+import '../support/action_panel_controls.dart';
+import '../support/action_panel_edit_controls.dart';
+import '../support/action_seed.dart';
 import '../support/app_root_pages.dart';
-import '../support/daily_choice_catalog_controls.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
@@ -656,7 +659,7 @@ final class _StatisticsProbe extends LocalDatabaseConnectionObserver {
     final catalog = _nextCatalogRead;
     if (catalog != null &&
         rows.isNotEmpty &&
-        rows.first.containsKey('choice_date') &&
+        rows.first.containsKey('root_title') &&
         rows.first.containsKey('creation_sequence')) {
       catalog.started.complete();
       await catalog.release.future;

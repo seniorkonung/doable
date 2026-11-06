@@ -7,7 +7,7 @@ import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
+import 'package:doable/src/action/presentation/day/action_day_date_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
@@ -293,14 +293,10 @@ void main() {
         find.byType(IntentionDetailsPage),
       ).position.pixels;
       await _tap(tester, day);
-      await _untilFound(tester, find.byType(DailyChoiceDateCatalogPage));
+      await _untilFound(tester, find.byType(ActionDayDatePage));
       expect(app.router.stack, hasLength(depth + 1));
       expect(
-        tester
-            .widget<DailyChoiceDateCatalogPage>(
-              find.byType(DailyChoiceDateCatalogPage),
-            )
-            .date,
+        tester.widget<ActionDayDatePage>(find.byType(ActionDayDatePage)).date,
         CalendarDate.fromParts(2025, 8, 1),
       );
       expect(

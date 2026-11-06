@@ -22,7 +22,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get appDestinationHome => 'Главная';
 
   @override
-  String get appDestinationDailyChoices => 'Дневные выборы';
+  String get appDestinationActions => 'Действия';
 
   @override
   String get appDestinationIntentionGraph => 'Граф намерений';
@@ -2761,128 +2761,105 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dailyChoiceCreateFromAction => 'Создать выбор от действия';
 
   @override
-  String get dailyChoiceCatalogLoading => 'Загружаем дневные выборы…';
+  String get actionDayLoading => 'Загружаем действия…';
 
   @override
   String get dailyChoiceCalendarToday => 'Сегодня';
 
   @override
-  String get dailyChoiceCalendarDayAllCompleted =>
-      'Все дневные выборы выполнены';
+  String get actionCalendarDayMarksUnavailable => 'Отметки дней не загружены.';
 
   @override
-  String get dailyChoiceCalendarDayHasIncomplete =>
-      'Есть невыполненный дневной выбор';
+  String get actionCalendarExpand => 'Развернуть календарь';
 
   @override
-  String get dailyChoiceCalendarDayMarksUnavailable =>
-      'Отметки дней не загружены.';
+  String get actionCalendarCollapse => 'Свернуть календарь';
 
   @override
-  String get dailyChoiceCalendarExpand => 'Развернуть календарь';
+  String get actionCalendarChooseYearAndMonth => 'Выбрать год и месяц';
 
   @override
-  String get dailyChoiceCalendarCollapse => 'Свернуть календарь';
+  String get actionCalendarBackToMonthDays => 'Вернуться к дням месяца';
 
   @override
-  String get dailyChoiceCalendarPreviousMonth => 'Предыдущий месяц';
+  String get actionCalendarPreviousYears => 'Предыдущие годы';
 
   @override
-  String get dailyChoiceCalendarNextMonth => 'Следующий месяц';
+  String get actionCalendarNextYears => 'Следующие годы';
 
   @override
-  String get dailyChoiceCalendarChooseYearAndMonth => 'Выбрать год и месяц';
+  String get actionCalendarPreviousYear => 'Предыдущий год';
 
   @override
-  String get dailyChoiceCalendarBackToMonthDays => 'Вернуться к дням месяца';
+  String get actionCalendarNextYear => 'Следующий год';
 
   @override
-  String get dailyChoiceCalendarPreviousYears => 'Предыдущие годы';
+  String get actionDaySectionIncomplete => 'Невыполненные';
 
   @override
-  String get dailyChoiceCalendarNextYears => 'Следующие годы';
+  String get actionDaySectionCompleted => 'Выполненные';
 
   @override
-  String get dailyChoiceCalendarPreviousYear => 'Предыдущий год';
+  String get actionDayEmptyTitle => 'Нет действий на эту дату';
 
   @override
-  String get dailyChoiceCalendarNextYear => 'Следующий год';
+  String get actionDayEmptyText =>
+      'Каждое действие здесь служит одному из ваших намерений.';
 
   @override
-  String get dailyChoiceCatalogIncomplete => 'Невыполненные';
+  String get actionDayRefreshing => 'Обновляем…';
 
   @override
-  String get dailyChoiceCatalogCompleted => 'Выполненные';
+  String get actionDayScrollToTop => 'Вернуться к началу';
 
   @override
-  String get dailyChoiceCatalogEmptyTitle => 'Выборов на эту дату нет';
+  String get actionDayLoadingMore => 'Загружаем ещё действия…';
 
   @override
-  String get dailyChoiceCatalogEmptyText =>
-      'Создайте выбор из действия и назначьте эту дату. Он появится здесь.';
+  String get actionDayUnavailable => 'Не удалось загрузить действия.';
 
   @override
-  String get dailyChoiceCatalogRefreshing => 'Обновляем…';
+  String get actionDayCorruption =>
+      'Сохранённые данные действий повреждены и не могут быть показаны.';
 
   @override
-  String get dailyChoiceCatalogScrollToTop => 'Вернуться к началу';
+  String get actionDayExpired =>
+      'Список изменился. Обновите его, чтобы продолжить.';
 
   @override
-  String get dailyChoiceCatalogLoadingMore => 'Загружаем ещё дневные выборы…';
+  String get actionDayUnexpected =>
+      'Не удалось загрузить действия из-за непредвиденной ошибки.';
 
   @override
-  String get dailyChoiceCatalogUnavailable =>
-      'Не удалось загрузить дневные выборы.';
-
-  @override
-  String get dailyChoiceCatalogCorruption =>
-      'Сохранённые данные дневных выборов повреждены и не могут быть показаны.';
-
-  @override
-  String get dailyChoiceCatalogExpired =>
-      'Каталог изменился. Обновите его, чтобы продолжить.';
-
-  @override
-  String get dailyChoiceCatalogUnexpected =>
-      'Не удалось загрузить дневные выборы из-за непредвиденной ошибки.';
-
-  @override
-  String dailyChoiceCatalogPathStepCount(int count) {
+  String actionDayPathIntentionCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count шага в пути',
-      many: '$count шагов в пути',
-      few: '$count шага в пути',
-      one: '$count шаг в пути',
+      other: '$count намерения в пути',
+      many: '$count намерений в пути',
+      few: '$count намерения в пути',
+      one: '$count намерение в пути',
     );
     return '$_temp0';
   }
 
   @override
-  String dailyChoiceCatalogCompletionLabel(
-    int number,
-    String action,
-    String priority,
-  ) {
-    return 'Выполнение выбора № $number. $action. $priority';
+  String actionDayCompletionLabel(int number, String action, String priority) {
+    return 'Выполнение действия № $number. $action. $priority';
   }
 
   @override
-  String get dailyChoiceCompletionRefresh => 'Обновить выбор';
-
-  @override
-  String dailyChoiceCatalogRowLabel(int number, String action) {
-    return 'Выбор № $number. $action';
+  String actionDayRowLabel(int number, String action) {
+    return 'Действие № $number. $action';
   }
 
   @override
-  String dailyChoiceCatalogRowSource(String source) {
-    return 'Исходное намерение: $source';
+  String actionDayRowRoot(String root) {
+    return 'Корневое намерение: $root';
   }
 
   @override
-  String dailyChoiceCatalogRowTime(String time) {
+  String actionDayRowTime(String time) {
     return 'В $time';
   }
 
@@ -2919,10 +2896,10 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get dailyChoiceDetailsCompleted => 'Выполнено';
+  String get actionCompleted => 'Выполнено';
 
   @override
-  String get dailyChoiceDetailsNotCompleted => 'Не выполнено';
+  String get actionNotCompleted => 'Не выполнено';
 
   @override
   String get dailyChoiceDetailsSource => 'Основание';

@@ -1,13 +1,13 @@
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_instance.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
-import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_state.dart';
-import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_view_model.dart';
+import 'package:doable/src/action/application/action_details.dart';
+import 'package:doable/src/action/application/action_list_item.dart';
+import 'package:doable/src/action/domain/action_id.dart';
+import 'package:doable/src/action/presentation/day/action_day_instance.dart';
+import 'package:doable/src/action/presentation/day/action_day_state.dart';
+import 'package:doable/src/action/presentation/day/action_day_view_model.dart';
+import 'package:doable/src/action/presentation/panel/action_panel_state.dart';
+import 'package:doable/src/action/presentation/panel/action_panel_view_model.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -29,18 +29,13 @@ import 'package:doable/src/long_term_relation/presentation/details/relation_deta
 import 'package:doable/src/long_term_relation/presentation/intention_relations/intention_relations_state.dart';
 import 'package:doable/src/long_term_relation/presentation/intention_relations/intention_relations_view_model.dart';
 import 'package:doable/src/long_term_relation/presentation/relation_list_reconciliation.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../support/controlled_local_date.dart';
-import '../../support/daily_choice_durability_fixture.dart';
-
-/// Локальное сегодня потребителей пакетов: день дневного выбора фикстуры.
-/// Подставляется в контейнер до первого открытия каталога дневных выборов.
-Override packageConsumersLocalDate() =>
-    ControlledLocalDate(durabilityChoiceDate).override;
+/// День действия потребителей пакетов и начальная дата экрана дня.
+final packageConsumersActionDate = CalendarDate.fromParts(2026, 9, 23);
 
 /// Номер объекта фикстуры по его UUID.
 int _label(String uuid) => int.parse(uuid.split('-').last, radix: 16);
@@ -69,8 +64,8 @@ final class PackageConsumerProbe {
 final class PackageConsumerProbes {
   PackageConsumerProbes(this._container, this._repository);
 
-  final dailyCatalogProvider = dailyChoiceCatalogViewModelProvider(
-    DailyChoiceCatalogInstance(initialDate: durabilityChoiceDate),
+  final actionDayProvider = actionDayViewModelProvider(
+    ActionDayInstance(initialDate: packageConsumersActionDate),
   );
 
   final ProviderContainer _container;
@@ -111,10 +106,10 @@ final class PackageConsumerProbes {
     );
   }
 
-  void watchDailyChoice(DailyChoiceId id, {required bool observes}) {
-    final probe = _add('чтение дневного выбора', observes: observes);
+  void watchAction(ActionId id, {required bool observes}) {
+    final probe = _add('чтение действия', observes: observes);
     _subscriptions.add(
-      _repository.watchDailyChoice(id).listen((result) {
+      _repository.watchAction(id).listen((result) {
         probe
           ..updates += 1
           ..loaded = true;
@@ -122,7 +117,7 @@ final class PackageConsumerProbes {
           case GraphResultSuccess(:final value) when value.value != null:
             probe
               ..revision = value.revision
-              ..content = () => _dailyChoiceContent(value.value!);
+              ..content = () => _actionContent(value.value!);
           case GraphResultSuccess() || GraphResultFailure():
             probe.forbiddenStates.add(result);
         }
@@ -288,14 +283,18 @@ final class PackageConsumerProbes {
     );
   }
 
-  void dailyChoiceCatalog() {
-    final probe = _add('каталог дневных выборов', observes: true);
-    void observe(DailyChoiceCatalogState state) {
+  /// Экран дня действий. Его строки зависят от самих действий дня и от
+  /// корневых намерений путей, поэтому пакеты остальных намерений новую
+  /// ревизию на экране дня не публикуют, и такой экран нужно регистрировать
+  /// с `observes: false`.
+  void actionDay({required bool observes}) {
+    final probe = _add('экран дня действий', observes: observes);
+    void observe(ActionDayState state) {
       switch (state) {
-        case DailyChoiceCatalogLoaded():
+        case ActionDayLoaded():
           probe
             ..loaded = true
-            ..content = () => _dailyCatalogContent(state);
+            ..content = () => _actionDayContent(state);
           final order = probe.revision == null
               ? null
               : state.revision.compareTo(probe.revision!);
@@ -304,30 +303,27 @@ final class PackageConsumerProbes {
           }
           probe.revision = state.revision;
           if (state.refreshFailure != null ||
-              state.incomplete.pageStatus is DailyChoiceCatalogPageFailure ||
-              state.completed.pageStatus is DailyChoiceCatalogPageFailure) {
+              state.incomplete.pageStatus is ActionDayContinuationFailure ||
+              state.completed.pageStatus is ActionDayContinuationFailure) {
             probe.forbiddenStates.add(state);
           }
-        case DailyChoiceCatalogInitialLoad():
+        case ActionDayInitialLoad():
           if (probe.loaded) probe.forbiddenStates.add(state);
-        case DailyChoiceCatalogInitialFailure():
+        case ActionDayInitialFailure():
           probe.forbiddenStates.add(state);
       }
     }
 
     _providerSubscriptions.add(
-      _container.listen<DailyChoiceCatalogState>(dailyCatalogProvider, (
-        _,
-        next,
-      ) {
+      _container.listen<ActionDayState>(actionDayProvider, (_, next) {
         observe(next);
       }, fireImmediately: true),
     );
   }
 
-  void dailyChoiceDetails(DailyChoiceId id) {
-    final probe = _add('модель подробностей дневного выбора', observes: true);
-    final model = DailyChoiceDetailsViewModel(
+  void actionPanel(ActionId id, {required bool observes}) {
+    final probe = _add('панель действия', observes: observes);
+    final model = ActionPanelViewModel(
       _repository,
       _container.read(graphCommandCoordinatorProvider.notifier),
       id,
@@ -336,10 +332,10 @@ final class PackageConsumerProbes {
     model.addListener(() {
       final state = model.state;
       switch (state) {
-        case DailyChoiceDetailsLoaded():
+        case ActionPanelLoaded():
           probe
             ..loaded = true
-            ..content = () => _dailyChoiceContent(state.details);
+            ..content = () => _actionContent(state.details);
           final order = probe.revision == null
               ? null
               : state.revision.compareTo(probe.revision!);
@@ -347,13 +343,13 @@ final class PackageConsumerProbes {
             probe.updates += 1;
           }
           probe.revision = state.revision;
-        case DailyChoiceDetailsLoading():
+        case ActionPanelLoading():
           if (probe.loaded) probe.forbiddenStates.add(state);
-        case DailyChoiceDetailsNotFound() ||
-            DailyChoiceDetailsDeleted() ||
-            DailyChoiceDetailsUnavailable() ||
-            DailyChoiceDetailsCorruption() ||
-            DailyChoiceDetailsUnexpected():
+        case ActionPanelNotFound() ||
+            ActionPanelDeleted() ||
+            ActionPanelUnavailable() ||
+            ActionPanelCorruption() ||
+            ActionPanelUnexpected():
           probe.forbiddenStates.add(state);
       }
     });
@@ -361,14 +357,14 @@ final class PackageConsumerProbes {
 
   bool get allLoaded => all.every((probe) => probe.loaded);
 
-  /// Каталог дневных выборов загружен для явно выбранного дня выбора
-  /// фикстуры и охвата выполненных.
-  bool get dailyCatalogSelected =>
-      dailyCatalogSelection == (durabilityChoiceDate, false, true) &&
-      _container.read(dailyCatalogProvider) is DailyChoiceCatalogLoaded;
+  /// Экран дня загружен для дня действия потребителей со свёрнутой секцией
+  /// невыполненных и раскрытой секцией выполненных.
+  bool get actionDaySelected =>
+      actionDaySelection == (packageConsumersActionDate, false, true) &&
+      _container.read(actionDayProvider) is ActionDayLoaded;
 
-  (Object?, bool, bool) get dailyCatalogSelection {
-    final selection = _container.read(dailyCatalogProvider).selection;
+  (Object?, bool, bool) get actionDaySelection {
+    final selection = _container.read(actionDayProvider).selection;
     return (
       selection.date,
       selection.incompleteExpanded,
@@ -465,45 +461,56 @@ Object _relationContent(LongTermRelationDetails details) => (
   details.description,
 );
 
-Object _pathContent(List<DailyChoicePathStepDetails> path) => [
-  for (final step in path)
-    (
-      step.step.id,
-      step.relation.id,
-      step.description,
-      _intention(step.source),
-      _intention(step.related),
-    ),
+Object _pathIntention(ActionPathIntention intention) => switch (intention) {
+  ExistingActionPathIntention(:final intention) => _intention(intention),
+  DeletedActionPathIntention(:final id, :final title) => (id, title),
+};
+
+Object _pathLink(ActionPathLink link) => switch (link) {
+  ExistingActionPathLink(:final relation) => (
+    relation.id,
+    relation.type,
+    relation.priority,
+    relation.scope,
+  ),
+  DeletedActionPathLink(:final type) => type,
+};
+
+Object _pathContent(ActionSavedPath path) => [
+  _pathIntention(path.root),
+  for (final step in path.steps)
+    (_pathLink(step.link), _pathIntention(step.intention)),
 ];
 
-Object _dailyChoiceContent(DailyChoiceDetails details) => [
-  details.choice.id,
-  details.choice.date,
-  details.choice.description,
-  details.choice.isCompleted,
-  _intention(details.source),
-  _intention(details.selected),
+Object _actionContent(ActionDetails details) => [
+  details.action.id,
+  details.action.title,
+  details.action.description,
+  details.action.date,
+  details.action.schedule,
+  details.action.priority,
+  details.action.isCompleted,
   _pathContent(details.path),
 ];
 
-Object _catalogParticipant(DailyChoiceCatalogParticipant participant) => (
-  participant.id,
-  participant.title,
-  participant.archiveState,
-  participant.readiness,
-);
-
-Object _dailyItem(DailyChoiceCatalogItem item) => (
+Object _actionListItem(ActionListItem item) => (
   item.id,
-  _catalogParticipant(item.source),
-  _catalogParticipant(item.selected),
+  item.title,
+  item.description,
   item.date,
+  item.schedule,
+  item.priority,
   item.isCompleted,
+  item.rootIntentionId,
+  item.rootTitle,
+  item.pathIntentionCount,
 );
 
-Object _dailyCatalogContent(DailyChoiceCatalogLoaded state) => [
-  [for (final item in state.items) _dailyItem(item)],
-  state.totalCount,
+Object _actionDayContent(ActionDayLoaded state) => [
+  [for (final item in state.items) _actionListItem(item)],
+  state.incomplete.totalCount,
+  state.completed.totalCount,
+  state.hasTimedActions,
   state.incomplete.nextCursor == null && state.completed.nextCursor == null,
 ];
 

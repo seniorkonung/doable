@@ -86,9 +86,7 @@ void main() {
       if (variant.deep) {
         unawaited(
           router.push<void>(
-            DailyChoiceDateCatalogRoute(
-              date: CalendarDate.fromParts(2026, 9, 25),
-            ),
+            ActionDayDateRoute(date: CalendarDate.fromParts(2026, 9, 25)),
           ),
         );
         await tester.pumpAndSettle();

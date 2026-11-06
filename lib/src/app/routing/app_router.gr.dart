@@ -11,13 +11,13 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
 import 'package:auto_route/auto_route.dart' as _i13;
-import 'package:doable/src/app/home/home_page.dart' as _i4;
-import 'package:doable/src/app/navigation/app_shell_page.dart' as _i1;
-import 'package:doable/src/app/settings/settings_page.dart' as _i12;
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart'
+import 'package:doable/src/action/presentation/day/action_day_date_page.dart'
+    as _i1;
+import 'package:doable/src/action/presentation/day/action_day_root_page.dart'
     as _i2;
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart'
-    as _i3;
+import 'package:doable/src/app/home/home_page.dart' as _i4;
+import 'package:doable/src/app/navigation/app_shell_page.dart' as _i3;
+import 'package:doable/src/app/settings/settings_page.dart' as _i12;
 import 'package:doable/src/intention/domain/intention_id.dart' as _i16;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
     as _i5;
@@ -41,7 +41,70 @@ import 'package:flutter/material.dart' as _i15;
 import 'package:flutter/widgets.dart' as _i19;
 
 /// generated route for
-/// [_i1.AppShellPage]
+/// [_i1.ActionDayDatePage]
+class ActionDayDateRoute extends _i13.PageRouteInfo<ActionDayDateRouteArgs> {
+  ActionDayDateRoute({
+    required _i14.CalendarDate date,
+    _i15.Key? key,
+    List<_i13.PageRouteInfo>? children,
+  }) : super(
+         ActionDayDateRoute.name,
+         args: ActionDayDateRouteArgs(date: date, key: key),
+         initialChildren: children,
+       );
+
+  static const String name = 'ActionDayDateRoute';
+
+  static _i13.PageInfo page = _i13.PageInfo(
+    name,
+    builder: (data) {
+      final args = data.argsAs<ActionDayDateRouteArgs>();
+      return _i1.ActionDayDatePage(date: args.date, key: args.key);
+    },
+  );
+}
+
+class ActionDayDateRouteArgs {
+  const ActionDayDateRouteArgs({required this.date, this.key});
+
+  final _i14.CalendarDate date;
+
+  final _i15.Key? key;
+
+  @override
+  String toString() {
+    return 'ActionDayDateRouteArgs{date: $date, key: $key}';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! ActionDayDateRouteArgs) return false;
+    return date == other.date && key == other.key;
+  }
+
+  @override
+  int get hashCode => date.hashCode ^ key.hashCode;
+}
+
+/// generated route for
+/// [_i2.ActionDayRootPage]
+class ActionDayRootRoute extends _i13.PageRouteInfo<void> {
+  const ActionDayRootRoute({List<_i13.PageRouteInfo>? children})
+    : super(ActionDayRootRoute.name, initialChildren: children);
+
+  static const String name = 'ActionDayRootRoute';
+
+  static _i13.PageInfo page = _i13.PageInfo(
+    name,
+    builder: (data) {
+      return const _i2.ActionDayRootPage();
+    },
+  );
+}
+
+/// generated route for
+/// [_i3.AppShellPage]
 class AppShellRoute extends _i13.PageRouteInfo<void> {
   const AppShellRoute({List<_i13.PageRouteInfo>? children})
     : super(AppShellRoute.name, initialChildren: children);
@@ -51,73 +114,9 @@ class AppShellRoute extends _i13.PageRouteInfo<void> {
   static _i13.PageInfo page = _i13.PageInfo(
     name,
     builder: (data) {
-      return const _i1.AppShellPage();
+      return const _i3.AppShellPage();
     },
   );
-}
-
-/// generated route for
-/// [_i2.DailyChoiceCatalogPage]
-class DailyChoiceCatalogRoute extends _i13.PageRouteInfo<void> {
-  const DailyChoiceCatalogRoute({List<_i13.PageRouteInfo>? children})
-    : super(DailyChoiceCatalogRoute.name, initialChildren: children);
-
-  static const String name = 'DailyChoiceCatalogRoute';
-
-  static _i13.PageInfo page = _i13.PageInfo(
-    name,
-    builder: (data) {
-      return const _i2.DailyChoiceCatalogPage();
-    },
-  );
-}
-
-/// generated route for
-/// [_i3.DailyChoiceDateCatalogPage]
-class DailyChoiceDateCatalogRoute
-    extends _i13.PageRouteInfo<DailyChoiceDateCatalogRouteArgs> {
-  DailyChoiceDateCatalogRoute({
-    required _i14.CalendarDate date,
-    _i15.Key? key,
-    List<_i13.PageRouteInfo>? children,
-  }) : super(
-         DailyChoiceDateCatalogRoute.name,
-         args: DailyChoiceDateCatalogRouteArgs(date: date, key: key),
-         initialChildren: children,
-       );
-
-  static const String name = 'DailyChoiceDateCatalogRoute';
-
-  static _i13.PageInfo page = _i13.PageInfo(
-    name,
-    builder: (data) {
-      final args = data.argsAs<DailyChoiceDateCatalogRouteArgs>();
-      return _i3.DailyChoiceDateCatalogPage(date: args.date, key: args.key);
-    },
-  );
-}
-
-class DailyChoiceDateCatalogRouteArgs {
-  const DailyChoiceDateCatalogRouteArgs({required this.date, this.key});
-
-  final _i14.CalendarDate date;
-
-  final _i15.Key? key;
-
-  @override
-  String toString() {
-    return 'DailyChoiceDateCatalogRouteArgs{date: $date, key: $key}';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    if (other is! DailyChoiceDateCatalogRouteArgs) return false;
-    return date == other.date && key == other.key;
-  }
-
-  @override
-  int get hashCode => date.hashCode ^ key.hashCode;
 }
 
 /// generated route for

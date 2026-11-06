@@ -143,8 +143,8 @@ void _registerPageMatrixTests() {
         .element(find.byType(IntentionDetailsPage, skipOffstage: false))
         .markNeedsBuild();
     await tester.pump();
-    unawaited(router.push(DailyChoiceDateCatalogRoute(date: _choiceDate)));
-    await _until(tester, find.byType(DailyChoiceDateCatalogPage));
+    unawaited(router.push(ActionDayDateRoute(date: _choiceDate)));
+    await _until(tester, find.byType(ActionDayDatePage));
     await tester.pumpAndSettle();
     expect(find.byType(AppNavigationBar), findsOneWidget);
     await tester.binding.handlePopRoute();
@@ -166,17 +166,17 @@ void _registerPageMatrixTests() {
     final router = await _start(tester);
     await _select(tester, AppDestination.intentionGraph);
     await _open(tester, intentionCatalogRow('Читать'), IntentionDetailsPage);
-    unawaited(router.push(DailyChoiceDateCatalogRoute(date: _choiceDate)));
-    await _until(tester, find.byType(DailyChoiceDateCatalogPage));
+    unawaited(router.push(ActionDayDateRoute(date: _choiceDate)));
+    await _until(tester, find.byType(ActionDayDatePage));
     await tester.pumpAndSettle();
     _expectAboveShell(
       tester,
-      DailyChoiceDateCatalogPage,
+      ActionDayDatePage,
       AppDestination.intentionGraph,
       expectedPanel: true,
     );
     expect(find.byTooltip('Back').hitTestable(), findsOneWidget);
-    await _close(tester, DailyChoiceDateCatalogPage);
+    await _close(tester, ActionDayDatePage);
     _expectAboveShell(
       tester,
       IntentionDetailsPage,

@@ -6,7 +6,7 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_shell_page.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/action/presentation/day/action_day_root_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show
         AppDatabase,
@@ -228,7 +228,7 @@ void _expectNoRootPages() {
     AppShellPage,
     AppNavigationBar,
     HomePage,
-    DailyChoiceCatalogPage,
+    ActionDayRootPage,
     IntentionCatalogPage,
   ]) {
     expect(

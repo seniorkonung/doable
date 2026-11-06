@@ -14,8 +14,8 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/app/settings/settings_page.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/action/presentation/day/action_day_calendar_viewport.dart';
+import 'package:doable/src/action/presentation/day/action_day_root_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data_transfer/application/graph_replacement.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -40,7 +40,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/app_root_pages.dart';
 import '../../support/controlled_local_date.dart';
-import '../../support/daily_choice_catalog_controls.dart';
+import '../../support/action_day_controls.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
@@ -80,7 +80,7 @@ void main() {
       'как при новом запуске', (tester) async {
     final app = await _start(tester);
     await _prepareIntentionCatalog(tester);
-    await _prepareDailyChoiceCatalog(tester);
+    await _prepareActionDay(tester);
     await _prepareHome(tester, app);
     await _open(tester, find.byTooltip(_l10n.settingsTitle), SettingsPage);
     app.localDate.today = _replacementDay;
@@ -131,13 +131,13 @@ void main() {
       findsOneWidget,
     );
 
-    await _select(tester, AppDestination.dailyChoices);
-    expect(shownDailyChoiceCatalogDate(tester), _replacementDay);
+    await _select(tester, AppDestination.actions);
+    expect(shownActionDayDate(tester), _replacementDay);
     expect(
-      shownDailyChoiceCatalogViewport(tester),
-      DailyChoiceCalendarViewport(
+      shownActionDayViewport(tester),
+      ActionDayCalendarViewport(
         focusedDate: _replacementDay,
-        mode: DailyChoiceCalendarMode.week,
+        mode: ActionDayCalendarMode.week,
       ),
     );
     expect(tester.takeException(), isNull);
@@ -265,18 +265,15 @@ Future<void> _prepareIntentionCatalog(WidgetTester tester) async {
 }
 
 /// Каталог дневных выборов: выбран прошлый день, а календарь раскрыт.
-Future<void> _prepareDailyChoiceCatalog(WidgetTester tester) async {
-  await _select(tester, AppDestination.dailyChoices);
-  await selectDailyChoiceCatalogDate(tester, _pastDay, tap: _tap);
+Future<void> _prepareActionDay(WidgetTester tester) async {
+  await _select(tester, AppDestination.actions);
+  await selectActionDayDate(tester, _pastDay, tap: _tap);
   await _settle(tester);
-  await expandDailyChoiceCatalogCalendar(tester, tap: _tap);
+  await expandActionDayCalendar(tester, tap: _tap);
   await _settle(tester);
 
-  expect(shownDailyChoiceCatalogDate(tester), _pastDay);
-  expect(
-    shownDailyChoiceCatalogViewport(tester).mode,
-    DailyChoiceCalendarMode.month,
-  );
+  expect(shownActionDayDate(tester), _pastDay);
+  expect(shownActionDayViewport(tester).mode, ActionDayCalendarMode.month);
 }
 
 /// Главная: вкладка «Год», прошлый год и вид «Выбранные действия».
@@ -410,7 +407,7 @@ AppDestination _selected(WidgetTester tester) =>
 /// Корневая страница каждого пункта.
 const _rootPages = {
   AppDestination.home: HomePage,
-  AppDestination.dailyChoices: DailyChoiceCatalogPage,
+  AppDestination.actions: ActionDayRootPage,
   AppDestination.intentionGraph: IntentionCatalogPage,
 };
 

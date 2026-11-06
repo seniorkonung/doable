@@ -14,7 +14,7 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_store.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
+import 'package:doable/src/action/presentation/day/action_day_date_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
@@ -308,14 +308,10 @@ Future<void> _openOrdinaryPage(WidgetTester tester) async {
         .element(find.byType(IntentionCatalogPage))
         .router
         .root
-        .push(
-          DailyChoiceDateCatalogRoute(
-            date: CalendarDate.fromParts(2026, 9, 25),
-          ),
-        ),
+        .push(ActionDayDateRoute(date: CalendarDate.fromParts(2026, 9, 25))),
   );
   await _settle(tester);
-  expect(find.byType(DailyChoiceDateCatalogPage), findsOneWidget);
+  expect(find.byType(ActionDayDatePage), findsOneWidget);
 }
 
 Future<void> _openMenu(WidgetTester tester) async {

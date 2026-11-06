@@ -1,12 +1,12 @@
 import 'dart:async';
 
+import 'package:doable/src/action/application/action_day_statuses.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
@@ -1762,12 +1762,12 @@ final class _Repository
 
   /// Лист даты запрашивает отметки дней; отметок в этих сценариях нет.
   @override
-  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
-    DailyChoiceDayStatusQuery query,
-  ) async => DailyChoiceDayStatusesReadSuccess(
+  Future<ActionDayStatusesReadResult> getActionDayStatuses(
+    ActionDayStatusQuery query,
+  ) async => ActionDayStatusesReadSuccess(
     GraphSnapshot(
       revision: _Revision(_revision),
-      value: DailyChoiceDayStatuses(query: query, statuses: const {}),
+      value: ActionDayStatuses(query: query, statuses: const {}),
     ),
   );
 

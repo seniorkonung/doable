@@ -22,7 +22,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appDestinationHome => 'Home';
 
   @override
-  String get appDestinationDailyChoices => 'Daily choices';
+  String get appDestinationActions => 'Actions';
 
   @override
   String get appDestinationIntentionGraph => 'Intention graph';
@@ -2730,126 +2730,103 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailyChoiceCreateFromAction => 'Create a choice from an action';
 
   @override
-  String get dailyChoiceCatalogLoading => 'Loading daily choices…';
+  String get actionDayLoading => 'Loading actions…';
 
   @override
   String get dailyChoiceCalendarToday => 'Today';
 
   @override
-  String get dailyChoiceCalendarDayAllCompleted =>
-      'All daily choices are completed';
-
-  @override
-  String get dailyChoiceCalendarDayHasIncomplete =>
-      'There is an incomplete daily choice';
-
-  @override
-  String get dailyChoiceCalendarDayMarksUnavailable =>
+  String get actionCalendarDayMarksUnavailable =>
       'Day marks could not be loaded.';
 
   @override
-  String get dailyChoiceCalendarExpand => 'Expand calendar';
+  String get actionCalendarExpand => 'Expand calendar';
 
   @override
-  String get dailyChoiceCalendarCollapse => 'Collapse calendar';
+  String get actionCalendarCollapse => 'Collapse calendar';
 
   @override
-  String get dailyChoiceCalendarPreviousMonth => 'Previous month';
+  String get actionCalendarChooseYearAndMonth => 'Choose year and month';
 
   @override
-  String get dailyChoiceCalendarNextMonth => 'Next month';
+  String get actionCalendarBackToMonthDays => 'Back to the days of the month';
 
   @override
-  String get dailyChoiceCalendarChooseYearAndMonth => 'Choose year and month';
+  String get actionCalendarPreviousYears => 'Previous years';
 
   @override
-  String get dailyChoiceCalendarBackToMonthDays =>
-      'Back to the days of the month';
+  String get actionCalendarNextYears => 'Next years';
 
   @override
-  String get dailyChoiceCalendarPreviousYears => 'Previous years';
+  String get actionCalendarPreviousYear => 'Previous year';
 
   @override
-  String get dailyChoiceCalendarNextYears => 'Next years';
+  String get actionCalendarNextYear => 'Next year';
 
   @override
-  String get dailyChoiceCalendarPreviousYear => 'Previous year';
+  String get actionDaySectionIncomplete => 'Not completed';
 
   @override
-  String get dailyChoiceCalendarNextYear => 'Next year';
+  String get actionDaySectionCompleted => 'Completed';
 
   @override
-  String get dailyChoiceCatalogIncomplete => 'Not completed';
+  String get actionDayEmptyTitle => 'No actions for this date';
 
   @override
-  String get dailyChoiceCatalogCompleted => 'Completed';
+  String get actionDayEmptyText =>
+      'Every action here serves one of your intentions.';
 
   @override
-  String get dailyChoiceCatalogEmptyTitle => 'No choices for this date';
+  String get actionDayRefreshing => 'Refreshing…';
 
   @override
-  String get dailyChoiceCatalogEmptyText =>
-      'Create a choice from an action and set this date. It will appear here.';
+  String get actionDayScrollToTop => 'Back to top';
 
   @override
-  String get dailyChoiceCatalogRefreshing => 'Refreshing…';
+  String get actionDayLoadingMore => 'Loading more actions…';
 
   @override
-  String get dailyChoiceCatalogScrollToTop => 'Back to top';
+  String get actionDayUnavailable => 'Could not load actions.';
 
   @override
-  String get dailyChoiceCatalogLoadingMore => 'Loading more daily choices…';
+  String get actionDayCorruption =>
+      'Stored action data is damaged and cannot be shown.';
 
   @override
-  String get dailyChoiceCatalogUnavailable => 'Could not load daily choices.';
+  String get actionDayExpired => 'The list changed. Refresh it to continue.';
 
   @override
-  String get dailyChoiceCatalogCorruption =>
-      'Stored daily choice data is damaged and cannot be shown.';
+  String get actionDayUnexpected =>
+      'Could not load actions because of an unexpected error.';
 
   @override
-  String get dailyChoiceCatalogExpired =>
-      'The catalog changed. Refresh it to continue.';
-
-  @override
-  String get dailyChoiceCatalogUnexpected =>
-      'Could not load daily choices because of an unexpected error.';
-
-  @override
-  String dailyChoiceCatalogPathStepCount(int count) {
+  String actionDayPathIntentionCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count steps in path',
-      one: '$count step in path',
+      other: '$count intentions in path',
+      one: '$count intention in path',
     );
     return '$_temp0';
   }
 
   @override
-  String dailyChoiceCatalogCompletionLabel(
-    int number,
-    String action,
-    String priority,
-  ) {
-    return 'Completion of choice #$number. $action. $priority';
+  String actionDayCompletionLabel(int number, String action, String priority) {
+    return 'Completion of action #$number. $action. $priority';
   }
 
   @override
-  String get dailyChoiceCompletionRefresh => 'Refresh choice';
-
-  @override
-  String dailyChoiceCatalogRowLabel(int number, String action) {
-    return 'Choice #$number. $action';
+  String actionDayRowLabel(int number, String action) {
+    return 'Action #$number. $action';
   }
 
   @override
-  String dailyChoiceCatalogRowSource(String source) {
-    return 'Source intention: $source';
+  String actionDayRowRoot(String root) {
+    return 'Root intention: $root';
   }
 
   @override
-  String dailyChoiceCatalogRowTime(String time) {
+  String actionDayRowTime(String time) {
     return 'At $time';
   }
 
@@ -2886,10 +2863,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get dailyChoiceDetailsCompleted => 'Completed';
+  String get actionCompleted => 'Completed';
 
   @override
-  String get dailyChoiceDetailsNotCompleted => 'Not completed';
+  String get actionNotCompleted => 'Not completed';
 
   @override
   String get dailyChoiceDetailsSource => 'Source intention';

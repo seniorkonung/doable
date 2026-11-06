@@ -122,11 +122,11 @@ abstract class AppLocalizations {
   /// **'Home'**
   String get appDestinationHome;
 
-  /// Название пункта основной навигации и заголовок каталога дневных выборов
+  /// Название пункта основной навигации и заголовок экрана дня как корневой страницы
   ///
   /// In en, this message translates to:
-  /// **'Daily choices'**
-  String get appDestinationDailyChoices;
+  /// **'Actions'**
+  String get appDestinationActions;
 
   /// Название пункта основной навигации и заголовок каталога намерений как корневой страницы
   ///
@@ -4223,11 +4223,11 @@ abstract class AppLocalizations {
   /// **'Create a choice from an action'**
   String get dailyChoiceCreateFromAction;
 
-  /// Начальная загрузка дневного каталога
+  /// Начальная загрузка экрана дня
   ///
   /// In en, this message translates to:
-  /// **'Loading daily choices…'**
-  String get dailyChoiceCatalogLoading;
+  /// **'Loading actions…'**
+  String get actionDayLoading;
 
   /// Доступное состояние дня календаря, совпадающего с текущим локальным днём устройства, а не с выбранной датой
   ///
@@ -4235,189 +4235,155 @@ abstract class AppLocalizations {
   /// **'Today'**
   String get dailyChoiceCalendarToday;
 
-  /// Доступное состояние дня с отметкой: все дневные выборы этой даты выполнены
-  ///
-  /// In en, this message translates to:
-  /// **'All daily choices are completed'**
-  String get dailyChoiceCalendarDayAllCompleted;
-
-  /// Доступное состояние дня с отметкой: на эту дату есть хотя бы один невыполненный дневной выбор
-  ///
-  /// In en, this message translates to:
-  /// **'There is an incomplete daily choice'**
-  String get dailyChoiceCalendarDayHasIncomplete;
-
   /// Единая пассивная строка отказа получения отметок дней под шапкой календаря, без предложения повтора или другого действия
   ///
   /// In en, this message translates to:
   /// **'Day marks could not be loaded.'**
-  String get dailyChoiceCalendarDayMarksUnavailable;
+  String get actionCalendarDayMarksUnavailable;
 
   /// Команда раскрытия календаря из недели в сетку месяца даты просмотра
   ///
   /// In en, this message translates to:
   /// **'Expand calendar'**
-  String get dailyChoiceCalendarExpand;
+  String get actionCalendarExpand;
 
   /// Команда сворачивания календаря из сетки месяца в неделю даты просмотра
   ///
   /// In en, this message translates to:
   /// **'Collapse calendar'**
-  String get dailyChoiceCalendarCollapse;
-
-  /// Команда просмотра предыдущего месяца в раскрытом календаре без выбора дня
-  ///
-  /// In en, this message translates to:
-  /// **'Previous month'**
-  String get dailyChoiceCalendarPreviousMonth;
-
-  /// Команда просмотра следующего месяца в раскрытом календаре без выбора дня
-  ///
-  /// In en, this message translates to:
-  /// **'Next month'**
-  String get dailyChoiceCalendarNextMonth;
+  String get actionCalendarCollapse;
 
   /// Доступное название команды заголовка месяца, открывающей выбор года и месяца
   ///
   /// In en, this message translates to:
   /// **'Choose year and month'**
-  String get dailyChoiceCalendarChooseYearAndMonth;
+  String get actionCalendarChooseYearAndMonth;
 
   /// Доступное название команды заголовка, закрывающей выбор года и месяца и возвращающей сетку дней месяца просмотра
   ///
   /// In en, this message translates to:
   /// **'Back to the days of the month'**
-  String get dailyChoiceCalendarBackToMonthDays;
+  String get actionCalendarBackToMonthDays;
 
   /// Доступное название команды перехода к предыдущей странице из двенадцати лет в выборе года
   ///
   /// In en, this message translates to:
   /// **'Previous years'**
-  String get dailyChoiceCalendarPreviousYears;
+  String get actionCalendarPreviousYears;
 
   /// Доступное название команды перехода к следующей странице из двенадцати лет в выборе года
   ///
   /// In en, this message translates to:
   /// **'Next years'**
-  String get dailyChoiceCalendarNextYears;
+  String get actionCalendarNextYears;
 
   /// Доступное название команды перехода к месяцам предыдущего года в выборе месяца
   ///
   /// In en, this message translates to:
   /// **'Previous year'**
-  String get dailyChoiceCalendarPreviousYear;
+  String get actionCalendarPreviousYear;
 
   /// Доступное название команды перехода к месяцам следующего года в выборе месяца
   ///
   /// In en, this message translates to:
   /// **'Next year'**
-  String get dailyChoiceCalendarNextYear;
+  String get actionCalendarNextYear;
 
-  /// Фильтр невыполненных выборов
+  /// Заголовок секции невыполненных действий дня
   ///
   /// In en, this message translates to:
   /// **'Not completed'**
-  String get dailyChoiceCatalogIncomplete;
+  String get actionDaySectionIncomplete;
 
-  /// Фильтр выполненных выборов
+  /// Заголовок секции выполненных действий дня
   ///
   /// In en, this message translates to:
   /// **'Completed'**
-  String get dailyChoiceCatalogCompleted;
+  String get actionDaySectionCompleted;
 
-  /// Заголовок пустого состояния дня без дневных выборов
+  /// Заголовок пустого состояния дня без действий
   ///
   /// In en, this message translates to:
-  /// **'No choices for this date'**
-  String get dailyChoiceCatalogEmptyTitle;
+  /// **'No actions for this date'**
+  String get actionDayEmptyTitle;
 
-  /// Текст пустого состояния дня без дневных выборов
+  /// Текст пустого состояния дня без действий
   ///
   /// In en, this message translates to:
-  /// **'Create a choice from an action and set this date. It will appear here.'**
-  String get dailyChoiceCatalogEmptyText;
+  /// **'Every action here serves one of your intentions.'**
+  String get actionDayEmptyText;
 
-  /// Обновление подтверждённого снимка каталога
+  /// Обновление подтверждённого снимка экрана дня
   ///
   /// In en, this message translates to:
   /// **'Refreshing…'**
-  String get dailyChoiceCatalogRefreshing;
+  String get actionDayRefreshing;
 
   /// Доступное название кнопки возврата выдачи к заголовку дня
   ///
   /// In en, this message translates to:
   /// **'Back to top'**
-  String get dailyChoiceCatalogScrollToTop;
+  String get actionDayScrollToTop;
 
   /// Загрузка следующей порции
   ///
   /// In en, this message translates to:
-  /// **'Loading more daily choices…'**
-  String get dailyChoiceCatalogLoadingMore;
+  /// **'Loading more actions…'**
+  String get actionDayLoadingMore;
 
-  /// Временная ошибка чтения дневного каталога
+  /// Временная ошибка чтения действий дня
   ///
   /// In en, this message translates to:
-  /// **'Could not load daily choices.'**
-  String get dailyChoiceCatalogUnavailable;
+  /// **'Could not load actions.'**
+  String get actionDayUnavailable;
 
-  /// Повреждение данных дневного каталога
+  /// Повреждение данных действий дня
   ///
   /// In en, this message translates to:
-  /// **'Stored daily choice data is damaged and cannot be shown.'**
-  String get dailyChoiceCatalogCorruption;
+  /// **'Stored action data is damaged and cannot be shown.'**
+  String get actionDayCorruption;
 
-  /// Устаревший снимок каталога
+  /// Устаревший снимок выдачи дня
   ///
   /// In en, this message translates to:
-  /// **'The catalog changed. Refresh it to continue.'**
-  String get dailyChoiceCatalogExpired;
+  /// **'The list changed. Refresh it to continue.'**
+  String get actionDayExpired;
 
-  /// Непредвиденная ошибка чтения дневного каталога
+  /// Непредвиденная ошибка чтения действий дня
   ///
   /// In en, this message translates to:
-  /// **'Could not load daily choices because of an unexpected error.'**
-  String get dailyChoiceCatalogUnexpected;
+  /// **'Could not load actions because of an unexpected error.'**
+  String get actionDayUnexpected;
 
-  /// Число шагов сохранённого пути в доступном названии карточки
+  /// Число намерений сохранённого пути в доступном названии строки
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, one{{count} step in path} other{{count} steps in path}}'**
-  String dailyChoiceCatalogPathStepCount(int count);
+  /// **'{count, plural, one{{count} intention in path} other{{count} intentions in path}}'**
+  String actionDayPathIntentionCount(int count);
 
-  /// Доступное название отдельного флажка с принадлежностью выбору и приоритетом; состояние сообщает сам флажок
+  /// Доступное название отдельного флажка с принадлежностью действию и приоритетом; состояние сообщает сам флажок
   ///
   /// In en, this message translates to:
-  /// **'Completion of choice #{number}. {action}. {priority}'**
-  String dailyChoiceCatalogCompletionLabel(
-    int number,
-    String action,
-    String priority,
-  );
-
-  /// Актуализация карточки после отказа без явного повтора перед новым подтверждением выполнения
-  ///
-  /// In en, this message translates to:
-  /// **'Refresh choice'**
-  String get dailyChoiceCompletionRefresh;
+  /// **'Completion of action #{number}. {action}. {priority}'**
+  String actionDayCompletionLabel(int number, String action, String priority);
 
   /// Начало доступного названия строки с порядковым номером текущей выдачи
   ///
   /// In en, this message translates to:
-  /// **'Choice #{number}. {action}'**
-  String dailyChoiceCatalogRowLabel(int number, String action);
+  /// **'Action #{number}. {action}'**
+  String actionDayRowLabel(int number, String action);
 
-  /// Исходное намерение в доступном названии карточки
+  /// Корневое намерение в доступном названии строки
   ///
   /// In en, this message translates to:
-  /// **'Source intention: {source}'**
-  String dailyChoiceCatalogRowSource(String source);
+  /// **'Root intention: {root}'**
+  String actionDayRowRoot(String root);
 
-  /// Запланированное время в доступном названии карточки
+  /// Запланированное время в доступном названии строки
   ///
   /// In en, this message translates to:
   /// **'At {time}'**
-  String dailyChoiceCatalogRowTime(String time);
+  String actionDayRowTime(String time);
 
   /// Заголовок подробностей дневного выбора
   ///
@@ -4467,17 +4433,17 @@ abstract class AppLocalizations {
   /// **'Daily choice date: {date}'**
   String dailyChoiceDetailsDate(String date);
 
-  /// Дневной выбор выполнен
+  /// Действие выполнено
   ///
   /// In en, this message translates to:
   /// **'Completed'**
-  String get dailyChoiceDetailsCompleted;
+  String get actionCompleted;
 
-  /// Дневной выбор не выполнен
+  /// Действие не выполнено
   ///
   /// In en, this message translates to:
   /// **'Not completed'**
-  String get dailyChoiceDetailsNotCompleted;
+  String get actionNotCompleted;
 
   /// Роль исходного намерения
   ///

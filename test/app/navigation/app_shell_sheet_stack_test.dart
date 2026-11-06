@@ -11,7 +11,7 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/action/presentation/day/action_day_root_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/design_system/components/empty_state.dart';
@@ -158,8 +158,8 @@ void main() {
 
       expect(_allSheets, findsNothing);
       expect(_allIntentionPages, findsNothing);
-      expectDailyChoicesRootPage(router);
-      expect(find.byType(DailyChoiceCatalogPage), findsOneWidget);
+      expectActionsRootPage(router);
+      expect(find.byType(ActionDayRootPage), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }
@@ -255,15 +255,15 @@ Future<void> _openPageAboveCatalogSheet(
   WidgetTester tester,
   AppRouter router,
 ) async {
-  await openDailyChoices(tester);
+  await openActions(tester);
   // Пустой день показан, когда первая загрузка закончилась и ничто не движется.
   await _until(tester, find.byType(EmptyState));
   await tester.pumpAndSettle();
-  expectDailyChoicesRootPage(router);
+  expectActionsRootPage(router);
 
   unawaited(
     showDoableSheet<void>(
-      context: tester.element(find.byType(DailyChoiceCatalogPage)),
+      context: tester.element(find.byType(ActionDayRootPage)),
       builder: (_, presentation) => Sheet(
         presentation,
         title: _catalogSheetTitle,

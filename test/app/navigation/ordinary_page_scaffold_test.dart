@@ -59,10 +59,10 @@ void main() {
       'безымянную историю без подтверждения', (tester) async {
     final semantics = tester.ensureSemantics();
     final router = await _start(tester);
-    await _select(tester, AppDestination.dailyChoices);
+    await _select(tester, AppDestination.actions);
     unawaited(
       router.push<void>(
-        DailyChoiceDateCatalogRoute(date: CalendarDate.fromParts(2026, 9, 25)),
+        ActionDayDateRoute(date: CalendarDate.fromParts(2026, 9, 25)),
       ),
     );
     await tester.pumpAndSettle();
@@ -81,7 +81,7 @@ void main() {
     await tester.pumpAndSettle();
     unawaited(router.pushNativeRoute<void>(_ordinaryRoute()));
     await tester.pumpAndSettle();
-    _expectSelected(tester, AppDestination.dailyChoices);
+    _expectSelected(tester, AppDestination.actions);
 
     await _select(tester, destination);
 

@@ -1,7 +1,7 @@
+import 'package:doable/src/action/application/action_day.dart';
 import 'package:doable/src/data/local/app_database.dart'
     hide Intention, LongTermRelation, TagAssignment;
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
-import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -21,7 +21,10 @@ import 'package:doable/src/tag/presentation/assignments/tag_assignments_state.da
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/action_panel_fixture.dart';
+import '../../support/action_seed.dart';
 import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
@@ -34,11 +37,13 @@ import 'package_consumers_test_support.dart';
 /// страницы намерения.
 ///
 /// Граф фикстуры: связи 101 (1→2), 102 (2→3), 103 (1→4), 104 (1→5),
-/// дневной выбор 201 от 1 к 3 по пути 101, 102 и отдельное намерение 6.
-/// Намерение 3 наблюдают потребители выбора 201, связи 102 и самого
-/// намерения, а его вкладка «Связи» показывает группу связи 102; намерение 6
-/// не наблюдает никто.
+/// действие 201 с путём из намерений 1, 2, 3 по связям 101, 102 и отдельное
+/// намерение 6. Намерение 3 наблюдают потребители действия 201, связи 102 и
+/// самого намерения, а его вкладка «Связи» показывает группу связи 102;
+/// намерение 6 не наблюдает никто. Корень пути — намерение 1, поэтому экран
+/// дня действия перечитывается только при его изменении.
 void main() {
+  late sqlite.Database raw;
   late AppDatabase database;
   late InMemoryDiagnosticsSink diagnostics;
   late DriftPersonalGraphRepository repository;
@@ -51,10 +56,10 @@ void main() {
   final isolated = durabilityIntention(6);
   final observedRelation = durabilityRelation(102);
   final unobservedRelation = durabilityRelation(104);
-  final choice = durabilityChoice(201);
+  final action = actionIdOf(201);
 
   setUp(() async {
-    database = AppDatabase(openInMemoryLocalDatabase());
+    database = AppDatabase(openInMemoryLocalDatabase(setup: (db) => raw = db));
     await database.open();
     await seedDurabilityGraph(database);
     await seedGraph(
@@ -72,12 +77,16 @@ void main() {
       UuidV7IntentionIdGenerator(),
       () => DateTime.utc(2026, 9, 30),
       diagnostics,
-      dailyChoiceIdGenerator: FixedChoiceIds(choice),
-      choicePathStepIdGenerator: SequentialStepIds(301),
     );
-    expect(
-      await repository.execute(durabilityCreate()),
-      isA<GraphCommandSucceeded>(),
+    seedRawGraph(
+      raw,
+      () => seedAction(
+        raw,
+        id: seedUuid(201),
+        path: [seedUuid(1), seedUuid(2), seedUuid(3)],
+        date: packageConsumersActionDate.toCanonicalString(),
+        isCompleted: true,
+      ),
     );
     final created = await repository.execute(
       CreateTag(
@@ -91,7 +100,6 @@ void main() {
     container = ProviderContainer(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(repository),
-        packageConsumersLocalDate(),
       ],
       retry: (retryCount, error) => null,
     );
@@ -99,15 +107,15 @@ void main() {
     probes = PackageConsumerProbes(container, repository)
       ..watchIntention(observed, observes: true)
       ..watchIntention(durabilityIntention(5), observes: false)
-      ..watchDailyChoice(choice, observes: true)
+      ..watchAction(action, observes: true)
       ..watchRelation(observedRelation, observes: true)
       ..watchRelation(unobservedRelation, observes: false)
       ..intentionDetails(observed, observes: true)
       ..intentionDetails(durabilityIntention(5), observes: false)
       ..relationDetails(observedRelation, observes: true)
       ..relationDetails(unobservedRelation, observes: false)
-      ..dailyChoiceCatalog()
-      ..dailyChoiceDetails(choice);
+      ..actionDay(observes: false)
+      ..actionPanel(action, observes: true);
     await settlePackageConsumersUntil(
       () => probes.allLoaded,
       diagnostics: probes.describe,
@@ -125,11 +133,11 @@ void main() {
       );
     // Незавершённая форма и выбор фильтров не должны пострадать от пакета.
     probes.openIntentionEdit(observed).changeTitle('Черновик названия');
-    container.read(probes.dailyCatalogProvider.notifier)
-      ..selectDate(durabilityChoiceDate)
-      ..toggleSection(false);
+    container
+        .read(probes.actionDayProvider.notifier)
+        .toggleSection(ActionDaySection.incomplete);
     await settlePackageConsumersUntil(
-      () => probes.allLoaded && probes.dailyCatalogSelected,
+      () => probes.allLoaded && probes.actionDaySelected,
       diagnostics: probes.describe,
     );
   });
@@ -164,7 +172,7 @@ void main() {
     final contentBefore = probes.visibleContent();
     final formBefore = probes.intentionEditDraft(observed);
     expect(formBefore.$1, 'Черновик названия');
-    final selectionBefore = probes.dailyCatalogSelection;
+    final selectionBefore = probes.actionDaySelection;
     final relationsSelectionBefore = probes.relationsSelection(observed);
 
     for (final command in <TagCommand>[
@@ -188,7 +196,7 @@ void main() {
       }
       expect(probes.visibleContent(), contentBefore);
       expect(probes.intentionEditDraft(observed), formBefore);
-      expect(probes.dailyCatalogSelection, selectionBefore);
+      expect(probes.actionDaySelection, selectionBefore);
       expect(probes.relationsSelection(observed), relationsSelectionBefore);
     }
   });
@@ -262,7 +270,7 @@ void main() {
     final searchBefore = search()!;
     final contentBefore = probes.visibleContent();
     final formBefore = probes.intentionEditDraft(observed);
-    final selectionBefore = probes.dailyCatalogSelection;
+    final selectionBefore = probes.actionDaySelection;
 
     probes.reset();
     final completion = await (coordinator.acceptTagUpdate(
@@ -291,7 +299,7 @@ void main() {
     }
     expect(probes.visibleContent(), contentBefore);
     expect(probes.intentionEditDraft(observed), formBefore);
-    expect(probes.dailyCatalogSelection, selectionBefore);
+    expect(probes.actionDaySelection, selectionBefore);
   });
 
   test('перестановка назначенного тега меняет порядок тегов найденного '
@@ -350,7 +358,7 @@ void main() {
     final searchBefore = search()!;
     final contentBefore = probes.visibleContent();
     final formBefore = probes.intentionEditDraft(observed);
-    final selectionBefore = probes.dailyCatalogSelection;
+    final selectionBefore = probes.actionDaySelection;
 
     probes.reset();
     assignmentOrders.clear();
@@ -381,6 +389,6 @@ void main() {
     }
     expect(probes.visibleContent(), contentBefore);
     expect(probes.intentionEditDraft(observed), formBefore);
-    expect(probes.dailyCatalogSelection, selectionBefore);
+    expect(probes.actionDaySelection, selectionBefore);
   });
 }

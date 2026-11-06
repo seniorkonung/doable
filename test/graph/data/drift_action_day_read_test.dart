@@ -11,6 +11,7 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -21,6 +22,9 @@ import '../../support/graph_seed.dart';
 
 ActionId _action(int number) =>
     (ActionId.decode(seedUuid(number)) as ActionIdDecodingSuccess).id;
+
+IntentionId _intention(int number) =>
+    (IntentionId.decode(seedUuid(number)) as IntentionIdDecodingSuccess).id;
 
 /// Отказывает чтению порции дня, пока включён.
 final class _ActionDayReadFailure extends LocalDatabaseConnectionObserver {
@@ -162,6 +166,7 @@ void main() {
     expect(item.schedule, ActionAtHour(18));
     expect(item.priority, ActionPriority.p2);
     expect(item.isCompleted, isFalse);
+    expect(item.rootIntentionId, _intention(1));
     expect(item.rootTitle, 'Намерение 1');
     expect(item.pathIntentionCount, 3);
   });
@@ -183,6 +188,10 @@ void main() {
 
     final page = await read(day, ActionDaySection.incomplete);
 
+    expect(page.items.map((item) => item.rootIntentionId), [
+      _intention(1),
+      _intention(2),
+    ]);
     expect(page.items.map((item) => item.rootTitle), [
       'Намерение 1',
       'Новое название',

@@ -2,25 +2,25 @@ part of 'intention_statistics_app_flow_test.dart';
 
 void _catalogNavigationScenarios() {
   testWidgets(
-    'сброс из каталога на дату сохраняет корень, повторный выбор Главной и позднее чтение не возвращают историю',
+    'сброс с экрана дня на дату сохраняет корень, повторный выбор Главной и позднее чтение не возвращают историю',
     (tester) async {
-      final app = await _start(tester, seed: _seedCatalogChoices);
-      await openDailyChoices(tester);
+      final app = await _start(tester, seed: _seedCatalogActions);
+      await openActions(tester);
       await _wait(
         tester,
-        () => find.byType(DailyChoiceCatalogBody).evaluate().isNotEmpty,
+        () => find.byType(ActionDayBody).evaluate().isNotEmpty,
       );
       final root = _visibleCatalog(tester);
       await _prepareCatalog(
         tester,
         app,
         root,
-        completed: 'Невыполненные',
+        section: ActionDaySection.incomplete,
         total: 121,
       );
       final offset = _catalogScroll(tester).position.pixels;
-      final calendar = tester.widget<DailyChoiceCalendar>(
-        find.byType(DailyChoiceCalendar, skipOffstage: false),
+      final calendar = tester.widget<ActionDayCalendar>(
+        find.byType(ActionDayCalendar, skipOffstage: false),
       );
       final viewport = (calendar.viewport.focusedDate, calendar.viewport.mode);
       final items = _catalogData(
@@ -28,7 +28,7 @@ void _catalogNavigationScenarios() {
         root,
       ).items.map((item) => item.id).toList();
 
-      for (final resetToDaily in [false, true]) {
+      for (final resetToActions in [false, true]) {
         await openHome(tester);
         final section = await app.open(tester);
         await app.ready(tester, section);
@@ -41,51 +41,51 @@ void _catalogNavigationScenarios() {
         expect(_catalogData(app, catalog).completed.items, hasLength(50));
         expect(find.text('Невыполненные'), findsOneWidget);
         expect(
-          find.bySemanticsLabel(app.texts.dailyChoiceCalendarExpand),
+          find.bySemanticsLabel(app.texts.actionCalendarExpand),
           findsOneWidget,
         );
-        await showDailyChoiceCatalogSection(tester, true);
+        await showActionDaySection(tester, ActionDaySection.completed);
         final held = app.probe.holdNextCatalogRead();
-        await scrollToDailyChoiceCatalogPageEnd(tester, true);
+        await scrollToActionDayEnd(tester, ActionDaySection.completed);
         await _wait(tester, () => held.started.isCompleted);
         final finished = _finishedCatalogReads(app);
 
-        if (resetToDaily) {
-          await openDailyChoices(tester);
+        if (resetToActions) {
+          await openActions(tester);
         } else {
           await openHome(tester);
         }
         await tester.pumpAndSettle();
         final router = app.container.read(appRouterProvider);
-        if (resetToDaily) {
-          expectDailyChoicesRootPage(router);
+        if (resetToActions) {
+          expectActionsRootPage(router);
         } else {
           expectHomeRootPage(router);
         }
         held.release.complete();
         await _wait(tester, () => _finishedCatalogReads(app) == finished + 1);
         await tester.pumpAndSettle();
-        if (resetToDaily) {
-          expectDailyChoicesRootPage(router);
+        if (resetToActions) {
+          expectActionsRootPage(router);
         } else {
           expectHomeRootPage(router);
         }
         expect(
-          find.byType(DailyChoiceDateCatalogPage, skipOffstage: false),
+          find.byType(ActionDayDatePage, skipOffstage: false),
           findsNothing,
         );
         expect(
           find.byType(IntentionDetailsPage, skipOffstage: false),
           findsNothing,
         );
-        await openDailyChoices(tester);
+        await openActions(tester);
         await tester.pumpAndSettle();
         expect(_catalogData(app, root).selection.date, _today);
         expect(_catalogData(app, root).selection.completedExpanded, isFalse);
         expect(_catalogData(app, root).items.map((item) => item.id), items);
         expect(_catalogScroll(tester).position.pixels, offset);
-        final restored = tester.widget<DailyChoiceCalendar>(
-          find.byType(DailyChoiceCalendar, skipOffstage: false),
+        final restored = tester.widget<ActionDayCalendar>(
+          find.byType(ActionDayCalendar, skipOffstage: false),
         );
         expect((
           restored.viewport.focusedDate,
@@ -94,9 +94,12 @@ void _catalogNavigationScenarios() {
         _catalogScroll(tester).position.jumpTo(0);
         await tester.pumpAndSettle();
         expect(find.text('Невыполненные'), findsOneWidget);
-        expect(dailyChoiceSectionCount(tester, completed: false), '121');
         expect(
-          find.bySemanticsLabel(app.texts.dailyChoiceCalendarCollapse),
+          actionDaySectionCount(tester, section: ActionDaySection.incomplete),
+          '121',
+        );
+        expect(
+          find.bySemanticsLabel(app.texts.actionCalendarCollapse),
           findsOneWidget,
         );
         _catalogScroll(tester).position.jumpTo(offset);
@@ -107,27 +110,27 @@ void _catalogNavigationScenarios() {
   );
 
   testWidgets(
-    'два каталога одной даты и скрытый корневой согласуют выполнение и перенос, сохраняя порции и просмотр',
+    'два экрана одной даты и скрытый корневой согласуют выполнение и перенос, сохраняя порции и просмотр',
     (tester) async {
-      final app = await _start(tester, seed: _seedCatalogChoices);
+      final app = await _start(tester, seed: _seedCatalogActions);
       final day = CalendarDate.fromParts(2026, 10, 7);
-      await openDailyChoices(tester);
+      await openActions(tester);
       await _wait(
         tester,
-        () => find.byType(DailyChoiceCatalogBody).evaluate().isNotEmpty,
+        () => find.byType(ActionDayBody).evaluate().isNotEmpty,
       );
       final root = _visibleCatalog(tester);
       await _prepareCatalog(
         tester,
         app,
         root,
-        completed: 'Невыполненные',
+        section: ActionDaySection.incomplete,
         total: 121,
       );
       final rootOffset = _catalogScroll(tester).position.pixels;
       final rootViewport = tester
-          .widget<DailyChoiceCalendar>(
-            find.byType(DailyChoiceCalendar, skipOffstage: false),
+          .widget<ActionDayCalendar>(
+            find.byType(ActionDayCalendar, skipOffstage: false),
           )
           .viewport;
       await openHome(tester);
@@ -138,12 +141,13 @@ void _catalogNavigationScenarios() {
         tester,
         app,
         first,
-        completed: 'Выполненные',
+        section: ActionDaySection.completed,
         total: 122,
       );
       final firstOffset = _catalogScroll(tester).position.pixels;
-      await _openChoiceRow(tester, 80);
-      await openDailyChoicePathIntention(tester, 2);
+      await _openActionRow(tester, 80);
+      await showActionPanelPath(tester, waitFor: _waitForFinder);
+      await openActionPanelPathIntention(tester, 'Намерение 2');
       await _wait(
         tester,
         () => find.text(app.texts.statisticsSectionTitle).evaluate().isNotEmpty,
@@ -162,27 +166,32 @@ void _catalogNavigationScenarios() {
           .provider;
       await app.ready(tester, secondSection);
       final (second, _) = await _openStatisticsDay(tester, app, day);
-      // Выбор по прямому пути 1 → 4 не засчитан намерению 2, но доступен в каталоге дня.
-      await showDailyChoiceCatalogSection(tester, true);
+      // Действие с путём 1 → 4 не проходит через намерение 2, но день
+      // показывает все свои действия.
+      await showActionDaySection(tester, ActionDaySection.completed);
       await tester.pumpAndSettle();
-      expect(find.text('Намерение 4'), findsOneWidget);
-      await _openChoiceRow(tester, 1);
-      expect(shownDailyChoiceHead(tester).action, 'Намерение 4');
-      await closeDailyChoiceDetails(tester);
-      await _prepareCatalog(tester, app, second, total: 122);
+      expect(find.text('Действие 122'), findsOneWidget);
+      await _openActionRow(tester, 1);
+      expect(shownActionHead(tester).action, 'Действие 122');
+      await closeActionPanel(tester);
+      await _prepareCatalog(
+        tester,
+        app,
+        second,
+        section: ActionDaySection.completed,
+        total: 122,
+      );
       final reads = app.probe.sourceReads;
       final computations = app.probe.computations;
 
-      final changedChoice = _catalogData(app, second).completed.items[79].id;
+      final changedAction = _catalogData(app, second).completed.items[79].id;
       final completion = find.byKey(
-        ValueKey(
-          'daily-choice-completion-${changedChoice.toCanonicalString()}',
-        ),
+        ValueKey('action-day-completion-${changedAction.toCanonicalString()}'),
       );
       await tester.ensureVisible(completion);
       await tester.pumpAndSettle();
       final secondOffset = _catalogScroll(tester).position.pixels;
-      expect(dailyChoiceCompletionState(tester, completion).completed, isTrue);
+      expect(actionCompletionState(tester, completion).completed, isTrue);
       await tester.tap(completion);
       for (final (provider, count) in [
         (root, 121),
@@ -191,10 +200,13 @@ void _catalogNavigationScenarios() {
       ]) {
         await _catalogReady(tester, app, provider, total: count);
         expect(
-          _catalogData(
-            app,
-            provider,
-          ).section(provider == root ? false : true).items,
+          _catalogData(app, provider)
+              .section(
+                provider == root
+                    ? ActionDaySection.incomplete
+                    : ActionDaySection.completed,
+              )
+              .items,
           hasLength(100),
         );
       }
@@ -202,14 +214,14 @@ void _catalogNavigationScenarios() {
         _catalogData(
           app,
           first,
-        ).completed.items.any((item) => item.id == changedChoice),
+        ).completed.items.any((item) => item.id == changedAction),
         isFalse,
       );
       expect(
         _catalogData(
           app,
           second,
-        ).items.singleWhere((item) => item.id == changedChoice).isCompleted,
+        ).items.singleWhere((item) => item.id == changedAction).isCompleted,
         isFalse,
       );
       for (final provider in [root, first, second]) {
@@ -218,7 +230,7 @@ void _catalogNavigationScenarios() {
           app,
           provider,
           day,
-          DailyChoiceDayStatus.hasIncomplete,
+          ActionDayStatus.hasIncomplete,
         );
       }
 
@@ -229,13 +241,18 @@ void _catalogNavigationScenarios() {
         expect(selection.incompleteExpanded, provider == root);
         expect(selection.completedExpanded, provider != root);
       }
-      // Для отдельной правки даты человек раскрывает новую секцию выбора.
-      await showDailyChoiceCatalogSection(tester, false);
+      // Для отдельной правки даты человек раскрывает новую секцию действия.
+      await showActionDaySection(tester, ActionDaySection.incomplete);
       await tester.pumpAndSettle();
       final editOffset = _catalogScroll(tester).position.pixels;
-      await _openChoiceRow(tester, 1);
-      expect(shownDailyChoice(tester), changedChoice);
-      await _editChoice(tester, date: _today);
+      await _openActionRow(tester, 1);
+      expect(shownActionId(tester), changedAction);
+      await chooseActionPanelDate(tester, _today, from: day);
+      await _wait(
+        tester,
+        () => actionPanelField('Сегодня').evaluate().isNotEmpty,
+      );
+      await tester.pumpAndSettle();
       for (final (provider, count) in [
         (root, 122),
         (first, 121),
@@ -243,10 +260,13 @@ void _catalogNavigationScenarios() {
       ]) {
         await _catalogReady(tester, app, provider, total: count);
         expect(
-          _catalogData(
-            app,
-            provider,
-          ).section(provider == root ? false : true).items,
+          _catalogData(app, provider)
+              .section(
+                provider == root
+                    ? ActionDaySection.incomplete
+                    : ActionDaySection.completed,
+              )
+              .items,
           hasLength(100),
         );
       }
@@ -254,12 +274,12 @@ void _catalogNavigationScenarios() {
         _catalogData(
           app,
           root,
-        ).incomplete.items.any((item) => item.id == changedChoice),
+        ).incomplete.items.any((item) => item.id == changedAction),
         isFalse,
       );
       expect(_catalogData(app, root).incomplete.nextCursor, isNotNull);
       expect(
-        _catalogData(app, second).items.any((item) => item.id == changedChoice),
+        _catalogData(app, second).items.any((item) => item.id == changedAction),
         isFalse,
       );
       for (final provider in [root, first, second]) {
@@ -268,14 +288,14 @@ void _catalogNavigationScenarios() {
           app,
           provider,
           day,
-          DailyChoiceDayStatus.allCompleted,
+          ActionDayStatus.allCompleted,
         );
         await _waitForCatalogMark(
           tester,
           app,
           provider,
           _today,
-          DailyChoiceDayStatus.hasIncomplete,
+          ActionDayStatus.hasIncomplete,
         );
       }
       expect(app.probe.sourceReads, reads);
@@ -288,32 +308,28 @@ void _catalogNavigationScenarios() {
       expect(_catalogData(app, second).selection.incompleteExpanded, isTrue);
       expect(_catalogData(app, second).selection.completedExpanded, isFalse);
 
-      await closeDailyChoiceDetails(tester);
+      await closeActionPanel(tester);
       expect(_catalogScroll(tester).position.pixels, editOffset);
       await _expectVisibleCatalogMarks(tester, day);
       await _catalogBack(tester);
       await app.ready(tester, secondSection);
-      expect(_counts(app.loaded(secondSection)), (242, 120));
       await _catalogBack(tester);
       await _catalogBack(tester);
       expect(_catalogScroll(tester).position.pixels, firstOffset);
       await _expectVisibleCatalogMarks(tester, day);
-      await openDailyChoices(tester);
+      await openActions(tester);
       await tester.pumpAndSettle();
-      expectDailyChoicesRootPage(app.container.read(appRouterProvider));
+      expectActionsRootPage(app.container.read(appRouterProvider));
       expect(_catalogScroll(tester).position.pixels, rootOffset);
       await _expectVisibleCatalogMarks(tester, day);
-      final restored = tester.widget<DailyChoiceCalendar>(
-        find.byType(DailyChoiceCalendar),
+      final restored = tester.widget<ActionDayCalendar>(
+        find.byType(ActionDayCalendar),
       );
       expect(
         (restored.viewport.focusedDate, restored.viewport.mode),
         (rootViewport.focusedDate, rootViewport.mode),
       );
-      expect(
-        find.byType(DailyChoiceDateCatalogPage, skipOffstage: false),
-        findsNothing,
-      );
+      expect(find.byType(ActionDayDatePage, skipOffstage: false), findsNothing);
       expect(
         find.byType(IntentionDetailsPage, skipOffstage: false),
         findsNothing,
@@ -321,114 +337,23 @@ void _catalogNavigationScenarios() {
       expect(tester.takeException(), isNull);
     },
   );
-
-  testWidgets(
-    'флажок и отдельная правка даты завершаются до подсчёта, скрытая статистика не читает до возврата',
-    (tester) async {
-      final app = await _start(tester);
-      final day = CalendarDate.fromParts(2026, 10, 7);
-      await app.choice(tester, durabilityCreate(date: day, completed: false));
-      final section = await app.open(tester);
-      await app.ready(tester, section);
-      final held = app.probe.holdNextComputation();
-      await app.choice(
-        tester,
-        UpdateDailyChoiceFields(
-          choiceId: durabilityChoice(201),
-          patch: const DailyChoiceFieldsPatch(
-            isCompleted: DailyChoiceFieldSet(true),
-          ),
-        ),
-      );
-      await _wait(tester, () => held.started.isCompleted);
-      final (catalog, offset) = await _openStatisticsDay(tester, app, day);
-      final reads = app.probe.sourceReads;
-      final computations = app.probe.computations;
-      await showDailyChoiceCatalogSection(tester, true);
-      await tester.pumpAndSettle();
-      final completion = find.byKey(
-        ValueKey('daily-choice-completion-${durabilityUuid(201)}'),
-      );
-      expect(dailyChoiceCompletionState(tester, completion).completed, isTrue);
-      await tester.tap(completion);
-      await _wait(
-        tester,
-        () => _catalogData(
-          app,
-          catalog,
-        ).incomplete.items.any((item) => item.id == durabilityChoice(201)),
-      );
-      expect(held.finished.isCompleted, isFalse);
-      expect(app.probe.sourceReads, reads);
-      expect(app.probe.computations, computations);
-      await _openChoiceRow(tester, 1);
-      expect(app.probe.sourceReads, reads);
-      final moved = CalendarDate.fromParts(2026, 10, 11);
-      await _editChoice(tester, date: moved);
-      expect(held.finished.isCompleted, isFalse);
-      expect(app.probe.sourceReads, reads);
-      expect(app.probe.computations, computations);
-      final saved = await tester.runAsync(
-        () => durabilityRows(app.database, 'daily_choices'),
-      );
-      expect(saved!.single['choice_date'], moved.toCanonicalString());
-      expect(saved.single['is_completed'], 0);
-
-      final finished = app.finishedSections;
-      held.release.complete();
-      await _wait(tester, () => app.finishedSections == finished + 1);
-      expect(app.probe.sourceReads, reads);
-      expect(app.probe.computations, computations);
-      await closeDailyChoiceDetails(tester);
-      await _catalogReady(tester, app, catalog, total: 0);
-      expect(find.text(app.texts.dailyChoiceCatalogEmptyTitle), findsOneWidget);
-      expect(app.probe.sourceReads, reads);
-
-      await _catalogBack(tester);
-      await app.ready(tester, section);
-      await tester.pumpAndSettle();
-      expect(app.probe.sourceReads, reads + 1);
-      expect(app.probe.computations, computations + 1);
-      expect(_counts(app.loaded(section)), (1, 0));
-      expect(
-        (app.loaded(section).section.calendar
-                as IntentionStatisticsMonthCalendar)
-            .statuses,
-        {moved: DailyChoiceDayStatus.hasIncomplete},
-      );
-      expect(
-        app.container.read(section).selection.view,
-        StatisticsView.throughRelations,
-      );
-      expect(
-        app.container.read(section).selection.period,
-        StatisticsMonth(2026, 10),
-      );
-      expect(_scroll(tester).position.pixels, offset);
-      expect(tester.takeException(), isNull);
-    },
-  );
 }
 
 int _finishedCatalogReads(_App app) => app.diagnostics.events
-    .whereType<DailyChoiceCatalogPageReadDiagnosticsEvent>()
+    .whereType<ActionDayPageReadDiagnosticsEvent>()
     .where((event) => event.status is! DiagnosticsStarted)
     .length;
 
-DailyChoiceCatalogViewModelProvider _visibleCatalog(WidgetTester tester) =>
-    dailyChoiceCatalogViewModelProvider(
-      tester
-          .widget<DailyChoiceCatalogBody>(find.byType(DailyChoiceCatalogBody))
-          .instance,
+ActionDayViewModelProvider _visibleCatalog(WidgetTester tester) =>
+    actionDayViewModelProvider(
+      tester.widget<ActionDayBody>(find.byType(ActionDayBody)).instance,
     );
 
-DailyChoiceCatalogLoaded _catalogData(
-  _App app,
-  DailyChoiceCatalogViewModelProvider provider,
-) => app.container.read(provider) as DailyChoiceCatalogLoaded;
+ActionDayLoaded _catalogData(_App app, ActionDayViewModelProvider provider) =>
+    app.container.read(provider) as ActionDayLoaded;
 
 final _catalogScrollable = find.descendant(
-  of: find.byType(DailyChoiceCatalogBody),
+  of: find.byType(ActionDayBody),
   matching: find.byWidgetPredicate(
     (widget) =>
         widget is Scrollable && widget.axisDirection == AxisDirection.down,
@@ -438,32 +363,37 @@ final _catalogScrollable = find.descendant(
 ScrollableState _catalogScroll(WidgetTester tester) =>
     tester.state<ScrollableState>(_catalogScrollable);
 
+/// Показывает секцию [section] с полной порцией в 100 строк и прокручивает
+/// выдачу ниже восьмидесятой строки.
 Future<void> _prepareCatalog(
   WidgetTester tester,
   _App app,
-  DailyChoiceCatalogViewModelProvider provider, {
-  String? completed,
+  ActionDayViewModelProvider provider, {
+  required ActionDaySection section,
   required int total,
 }) async {
   await _catalogReady(tester, app, provider);
   _catalogScroll(tester).position.jumpTo(0);
   await tester.pumpAndSettle();
-  final isCompleted = completed != 'Невыполненные';
-  await showDailyChoiceCatalogSection(tester, isCompleted);
+  await showActionDaySection(tester, section);
   await _catalogReady(tester, app, provider, total: total);
-  await tester.tap(find.bySemanticsLabel(app.texts.dailyChoiceCalendarExpand));
+  await tester.tap(find.bySemanticsLabel(app.texts.actionCalendarExpand));
   await tester.pumpAndSettle();
-  await scrollToDailyChoiceCatalogPageEnd(tester, isCompleted);
+  await scrollToActionDayEnd(tester, section);
   await _wait(
     tester,
-    () => _catalogData(app, provider).section(isCompleted).items.length == 100,
+    () => _catalogData(app, provider).section(section).items.length == 100,
   );
+  // Строки нумеруются сквозно: у выполненных перед ними стоят невыполненные.
+  final skipped = switch (section) {
+    ActionDaySection.incomplete => 0,
+    ActionDaySection.completed => _catalogData(
+      app,
+      provider,
+    ).incomplete.items.length,
+  };
   await tester.scrollUntilVisible(
-    find.byKey(
-      ValueKey(
-        'daily-choice-row-${80 + (isCompleted ? _catalogData(app, provider).incomplete.items.length : 0)}',
-      ),
-    ),
+    find.byKey(ValueKey('action-day-row-${80 + skipped}')),
     500,
     scrollable: _catalogScrollable,
   );
@@ -474,13 +404,13 @@ Future<void> _prepareCatalog(
 Future<void> _waitForCatalogMark(
   WidgetTester tester,
   _App app,
-  DailyChoiceCatalogViewModelProvider provider,
+  ActionDayViewModelProvider provider,
   CalendarDate date,
-  DailyChoiceDayStatus status,
+  ActionDayStatus status,
 ) => _wait(tester, () {
   final instance = app.container.read(provider.notifier).instance;
   return app.container
-          .read(dailyChoiceCalendarDayMarksViewModelProvider(instance))
+          .read(actionDayMarksViewModelProvider(instance))
           .dayStatuses
           ?.statuses[date] ==
       status;
@@ -493,48 +423,50 @@ Future<void> _expectVisibleCatalogMarks(
   _catalogScroll(tester).position.jumpTo(0);
   await tester.pumpAndSettle();
   for (final (date, status) in [
-    (day, DailyChoiceDayStatus.allCompleted),
-    (_today, DailyChoiceDayStatus.hasIncomplete),
+    (day, ActionDayStatus.allCompleted),
+    (_today, ActionDayStatus.hasIncomplete),
   ]) {
     final cell = find.byKey(
-      ValueKey('daily-choice-calendar-day-${date.toCanonicalString()}'),
+      ValueKey('action-day-calendar-day-${date.toCanonicalString()}'),
     );
-    expect(tester.widget<DailyChoiceCalendarDay>(cell).status, status);
+    expect(tester.widget<ActionDayCalendarDay>(cell).status, status);
   }
 }
 
-Future<void> _seedCatalogChoices(AppDatabase database) =>
+/// 243 действия «Действие N»: первые 121 невыполненные на [_today], остальные
+/// выполненные на 7 октября. Действие 122 идёт по пути 1 → 4, остальные — по
+/// пути 1 → 2 → 3.
+Future<void> _seedCatalogActions(AppDatabase database) =>
     seedGraph(database, () async {
       for (var number = 1; number <= 243; number++) {
-        final id = 1000 + number;
-        final foreign = number == 122;
-        final date = number <= 121 ? '2026-10-12' : '2026-10-07';
+        final id = seedUuid(1000 + number);
+        final path = number == 122 ? [1, 4] : [1, 2, 3];
         await database.customStatement(
-          'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
+          'INSERT INTO actions (id, title, date, priority, is_completed, '
+          'created_at, updated_at) VALUES (?, ?, ?, 4, ?, 1, 1)',
           [
-            durabilityUuid(id),
-            durabilityUuid(1),
-            durabilityUuid(foreign ? 4 : 3),
-            date,
+            id,
+            'Действие $number',
+            number <= 121 ? '2026-10-12' : '2026-10-07',
             number <= 121 ? 0 : 1,
           ],
         );
-        final path = foreign ? [103] : [101, 102];
-        for (var step = 0; step < path.length; step++) {
+        for (final (position, intention) in path.indexed) {
           await database.customStatement(
-            'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id, previous_step_id) VALUES (?, ?, ?, ?)',
+            'INSERT INTO action_path_items (action_id, position, '
+            'intention_id, previous_intention_id) VALUES (?, ?, ?, ?)',
             [
-              durabilityUuid(id * 10 + step),
-              durabilityUuid(id),
-              durabilityUuid(path[step]),
-              step == 0 ? null : durabilityUuid(id * 10 + step - 1),
+              id,
+              position,
+              seedUuid(intention),
+              position == 0 ? null : seedUuid(path[position - 1]),
             ],
           );
         }
       }
     });
 
-Future<(DailyChoiceCatalogViewModelProvider, double)> _openStatisticsDay(
+Future<(ActionDayViewModelProvider, double)> _openStatisticsDay(
   WidgetTester tester,
   _App app,
   CalendarDate day,
@@ -550,13 +482,13 @@ Future<(DailyChoiceCatalogViewModelProvider, double)> _openStatisticsDay(
   await tester.tap(target);
   await _wait(
     tester,
-    () => find.byType(DailyChoiceDateCatalogPage).evaluate().isNotEmpty,
+    () => find.byType(ActionDayDatePage).evaluate().isNotEmpty,
   );
   await tester.pump(const Duration(milliseconds: 400));
   final instance = tester
-      .widget<DailyChoiceCatalogBody>(find.byType(DailyChoiceCatalogBody))
+      .widget<ActionDayBody>(find.byType(ActionDayBody))
       .instance;
-  final provider = dailyChoiceCatalogViewModelProvider(instance);
+  final provider = actionDayViewModelProvider(instance);
   await _catalogReady(tester, app, provider);
   return (provider, offset);
 }
@@ -564,51 +496,43 @@ Future<(DailyChoiceCatalogViewModelProvider, double)> _openStatisticsDay(
 Future<void> _catalogReady(
   WidgetTester tester,
   _App app,
-  DailyChoiceCatalogViewModelProvider provider, {
+  ActionDayViewModelProvider provider, {
   int? total,
 }) => _wait(
   tester,
   () => switch (app.container.read(provider)) {
-    DailyChoiceCatalogLoaded(
-      :final totalCount,
-      freshness: DailyChoiceCatalogFreshness.current,
-    )
+    ActionDayLoaded(:final totalCount, freshness: ActionDayFreshness.current)
         when total == null || total == totalCount =>
       true,
     _ => false,
   },
 );
 
-Future<void> _openChoiceRow(WidgetTester tester, int row) async {
-  final body = tester.widget<DailyChoiceCatalogBody>(
-    find.byType(DailyChoiceCatalogBody),
-  );
+/// Открывает панель действия строки [row] открытого экрана дня.
+Future<void> _openActionRow(WidgetTester tester, int row) async {
+  final body = tester.widget<ActionDayBody>(find.byType(ActionDayBody));
   final container = ProviderScope.containerOf(
-    tester.element(find.byType(DailyChoiceCatalogBody)),
+    tester.element(find.byType(ActionDayBody)),
   );
   final state = container.read(
-    dailyChoiceCatalogViewModelProvider(body.instance),
-  ) as DailyChoiceCatalogLoaded;
-  await showDailyChoiceCatalogSection(
+    actionDayViewModelProvider(body.instance),
+  ) as ActionDayLoaded;
+  await showActionDaySection(
     tester,
-    row > state.incomplete.items.length,
+    row > state.incomplete.items.length
+        ? ActionDaySection.completed
+        : ActionDaySection.incomplete,
   );
-  final target = find.byKey(ValueKey('daily-choice-row-$row'));
+  final target = find.byKey(ValueKey('action-day-row-$row'));
   await tester.scrollUntilVisible(target, 500, scrollable: _catalogScrollable);
   await tester.tap(target);
-  await _wait(tester, () => dailyChoiceDetailsReady.evaluate().isNotEmpty);
+  await _wait(tester, () => actionPanelReady.evaluate().isNotEmpty);
   await tester.pumpAndSettle();
 }
 
-Future<void> _editChoice(
-  WidgetTester tester, {
-  required CalendarDate date,
-}) async {
-  await setDailyChoiceDate(tester, date);
-  await _wait(tester, () => shownDailyChoiceDate(tester) == date);
-  await tester.pumpAndSettle();
-  expect(dailyChoiceDetails, findsOneWidget);
-}
+/// Ожидание сценария для шагов, которые ждут появления элемента.
+Future<void> _waitForFinder(WidgetTester tester, Finder finder) =>
+    _wait(tester, () => finder.evaluate().isNotEmpty);
 
 Future<void> _catalogBack(WidgetTester tester) async {
   await tester.binding.handlePopRoute();

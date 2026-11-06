@@ -10,7 +10,7 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/action/presentation/day/action_day_root_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
@@ -98,7 +98,7 @@ void main() {
 
     expect(app.platform.exits, 1);
     _expectRootPage(tester, app.router, AppDestination.home);
-    expect(_built(DailyChoiceCatalogPage), findsNothing);
+    expect(_built(ActionDayRootPage), findsNothing);
     expect(_built(IntentionCatalogPage), findsNothing);
     expect(app.platform.frameworkHandlesBack, isFalse);
     expect(tester.takeException(), isNull);
@@ -258,7 +258,7 @@ void main() {
 
     for (final destination in [
       AppDestination.home,
-      AppDestination.dailyChoices,
+      AppDestination.actions,
       AppDestination.intentionGraph,
       AppDestination.home,
     ]) {
@@ -284,17 +284,17 @@ void main() {
 }
 
 /// Каталоги — корневые страницы, с которых «назад» ведёт на Главную.
-const _catalogs = [AppDestination.dailyChoices, AppDestination.intentionGraph];
+const _catalogs = [AppDestination.actions, AppDestination.intentionGraph];
 
 const _names = {
-  AppDestination.dailyChoices: 'Дневные выборы',
+  AppDestination.actions: 'Действия',
   AppDestination.intentionGraph: 'Граф намерений',
 };
 
 /// Корневая страница каждого пункта.
 const _rootPages = {
   AppDestination.home: HomePage,
-  AppDestination.dailyChoices: DailyChoiceCatalogPage,
+  AppDestination.actions: ActionDayRootPage,
   AppDestination.intentionGraph: IntentionCatalogPage,
 };
 

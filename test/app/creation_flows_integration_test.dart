@@ -3,6 +3,7 @@ import 'dart:ui' show CheckedState, Tristate;
 
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/action/application/action_day.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
@@ -31,8 +32,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/controlled_local_date.dart';
-import '../support/daily_choice_catalog_provider.dart';
-import '../support/daily_choice_catalog_controls.dart';
+import '../support/action_day_provider.dart';
+import '../support/action_day_controls.dart';
+import '../support/action_seed.dart';
 import '../support/daily_choice_durability_fixture.dart';
 import '../support/graph_seed.dart';
 import '../support/intention_catalog_controls.dart';
@@ -86,29 +88,29 @@ void main() {
   });
 
   testWidgets(
-    'закрытие чистой панели возвращает дату, фильтр и прокрутку каталога дневных выборов',
+    'закрытие чистой панели возвращает дату, секции и прокрутку экрана дня',
     (tester) async {
-      final app = await _start(tester, seed: _seedDailyChoicesForReturn);
+      final app = await _start(tester, seed: _seedActionsForReturn);
       final date = CalendarDate.fromParts(2026, 10, 7);
-      await selectDailyChoiceCatalogDate(tester, date);
+      await selectActionDayDate(tester, date);
       await _until(
         tester,
-        () => _key('daily-choice-section-false').evaluate().isNotEmpty,
+        () => _key('action-day-section-incomplete').evaluate().isNotEmpty,
       );
-      await showDailyChoiceCatalogSection(tester, false);
-      await showDailyChoiceCatalogSection(tester, true);
+      await showActionDaySection(tester, ActionDaySection.incomplete);
+      await showActionDaySection(tester, ActionDaySection.completed);
       final semantics = tester.ensureSemantics();
       void expectSections() {
         expect(
           tester
-              .getSemantics(_key('daily-choice-section-false'))
+              .getSemantics(_key('action-day-section-incomplete'))
               .flagsCollection
               .isExpanded,
           Tristate.isFalse,
         );
         expect(
           tester
-              .getSemantics(_key('daily-choice-section-true'))
+              .getSemantics(_key('action-day-section-completed'))
               .flagsCollection
               .isExpanded,
           Tristate.isTrue,
@@ -116,29 +118,25 @@ void main() {
       }
 
       expectSections();
-      final position = _dailyChoiceScrollPosition(tester);
+      final position = _actionDayScrollPosition(tester);
       position.jumpTo(position.maxScrollExtent / 2);
       await tester.pumpAndSettle();
       expect(position.pixels, greaterThan(0));
       final offset = position.pixels;
-      expect(shownDailyChoiceCatalogDate(tester), date);
-      await _openIntentionEditor(
-        tester,
-        app,
-        IntentionCreationOrigin.dailyChoices,
-      );
+      expect(shownActionDayDate(tester), date);
+      await _openIntentionEditor(tester, app, IntentionCreationOrigin.actions);
       await tester.tap(_key('intention-editor-close'));
       await _until(
         tester,
         () => _key('intention-editor-title').evaluate().isEmpty,
       );
       await tester.pumpAndSettle();
-      expect(shownDailyChoiceCatalogDate(tester), date);
-      final restored = _dailyChoiceScrollPosition(tester);
+      expect(shownActionDayDate(tester), date);
+      final restored = _actionDayScrollPosition(tester);
       expect(restored.pixels, offset);
       expect(
         tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
-        AppDestination.dailyChoices,
+        AppDestination.actions,
       );
       // Заголовок невыполненных над прокрученной выдачей не построен.
       restored.jumpTo(0);
@@ -240,7 +238,7 @@ void main() {
   });
 
   for (final origin in const [
-    IntentionCreationOrigin.dailyChoices,
+    IntentionCreationOrigin.actions,
     IntentionCreationOrigin.deep,
   ]) {
     testWidgets('намерение: успех над ${origin.description} сохраняет '
@@ -292,7 +290,7 @@ void main() {
     });
   }
   for (final origin in const [
-    IntentionCreationOrigin.dailyChoices,
+    IntentionCreationOrigin.actions,
     IntentionCreationOrigin.deep,
   ]) {
     for (final leave in [false, true]) {

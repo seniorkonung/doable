@@ -1,39 +1,37 @@
 part of 'creation_flows_integration_test.dart';
 
-Future<void> _seedDailyChoicesForReturn(AppDatabase database) async {
+/// Граф с тридцатью выполненными действиями 7 октября по пути 1 → 2.
+Future<void> _seedActionsForReturn(AppDatabase database) async {
   await seedDurabilityGraph(database);
   await seedGraph(database, () async {
     for (var index = 0; index < 30; index++) {
+      final id = seedUuid(200 + index);
       await database.customStatement(
-        'INSERT INTO daily_choices (id, source_intention_id, '
-        'selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
-        [
-          durabilityUuid(200 + index),
-          durabilityUuid(1),
-          durabilityUuid(2),
-          '2026-10-07',
-          1,
-        ],
+        'INSERT INTO actions (id, title, date, priority, is_completed, '
+        'created_at, updated_at) VALUES (?, ?, ?, 4, 1, 1, 1)',
+        [id, 'Действие ${index + 1}', '2026-10-07'],
       );
-      await database.customStatement(
-        'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
-        [
-          durabilityUuid(300 + index),
-          durabilityUuid(200 + index),
-          durabilityUuid(101),
-        ],
-      );
+      for (final (position, intention) in [1, 2].indexed) {
+        await database.customStatement(
+          'INSERT INTO action_path_items (action_id, position, '
+          'intention_id, previous_intention_id) VALUES (?, ?, ?, ?)',
+          [
+            id,
+            position,
+            seedUuid(intention),
+            position == 0 ? null : seedUuid(1),
+          ],
+        );
+      }
     }
   });
 }
 
-ScrollPosition _dailyChoiceScrollPosition(WidgetTester tester) => tester
+ScrollPosition _actionDayScrollPosition(WidgetTester tester) => tester
     .state<ScrollableState>(
       find
           .descendant(
-            of: find.byKey(
-              const PageStorageKey<String>('daily-choice-catalog'),
-            ),
+            of: find.byKey(const PageStorageKey<String>('action-day')),
             matching: find.byType(Scrollable),
           )
           .first,
@@ -107,9 +105,7 @@ final class _App {
         .read(intentionCatalogViewModelProvider(const BrowseIntentionCatalog()))
         .requireValue
         .selection;
-    final daily = container
-        .read(openedDailyChoiceCatalogProvider(container))
-        .selection;
+    final daily = container.read(openedActionDayProvider(container)).selection;
     return (
       intentions.scope,
       intentions.titleFilterText,
@@ -218,9 +214,9 @@ Future<_App> _start(
   await tester.pumpAndSettle();
   tabs.setActiveIndex(1);
   await tester.pumpAndSettle();
-  container.read(openedDailyChoiceCatalogProvider(container).notifier)
+  container.read(openedActionDayProvider(container).notifier)
     ..selectDate(CalendarDate.fromParts(2026, 10, 7))
-    ..toggleSection(false);
+    ..toggleSection(ActionDaySection.incomplete);
   await tester.pumpAndSettle();
   return _App(router, container, database, observer);
 }

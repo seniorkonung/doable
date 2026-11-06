@@ -4,7 +4,7 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/action/presentation/day/action_day_root_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
@@ -184,7 +184,7 @@ void _expectStartPage(WidgetTester tester) {
   for (final page in [
     IntentionDetailsPage,
     IntentionCatalogPage,
-    DailyChoiceCatalogPage,
+    ActionDayRootPage,
   ]) {
     expect(
       find.byType(page, skipOffstage: false),

@@ -10,8 +10,8 @@ import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
+import 'package:doable/src/action/presentation/day/action_day_root_page.dart';
+import 'package:doable/src/action/presentation/day/action_day_calendar.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/design_system/doable_icon.dart';
@@ -35,12 +35,12 @@ const _screen = Size(360, 780);
 final _names = {
   const Locale('ru'): {
     AppDestination.home: 'Главная',
-    AppDestination.dailyChoices: 'Дневные выборы',
+    AppDestination.actions: 'Действия',
     AppDestination.intentionGraph: 'Граф намерений',
   },
   const Locale('en'): {
     AppDestination.home: 'Home',
-    AppDestination.dailyChoices: 'Daily choices',
+    AppDestination.actions: 'Actions',
     AppDestination.intentionGraph: 'Intention graph',
   },
 };
@@ -127,7 +127,7 @@ void main() {
     _expectRootContent(tester, names, AppDestination.home);
 
     for (final selected in [
-      AppDestination.dailyChoices,
+      AppDestination.actions,
       AppDestination.intentionGraph,
       AppDestination.home,
     ]) {
@@ -242,7 +242,7 @@ AppDestination _selected(WidgetTester tester) =>
 /// Корневая страница пункта.
 Type _rootPage(AppDestination destination) => switch (destination) {
   AppDestination.home => HomePage,
-  AppDestination.dailyChoices => DailyChoiceCatalogPage,
+  AppDestination.actions => ActionDayRootPage,
   AppDestination.intentionGraph => IntentionCatalogPage,
 };
 
@@ -304,7 +304,7 @@ void _expectAnnounced(
         if (node.flagsCollection.isHeader && names.containsValue(node.label))
           node.label,
     ],
-    rootHeaderVisible && selected != AppDestination.dailyChoices
+    rootHeaderVisible && selected != AppDestination.actions
         ? [names[selected]]
         : <String>[],
   );
@@ -360,7 +360,7 @@ void _expectWholeIcons(
   }
 }
 
-/// Дневные выборы открываются с календарём без заголовка страницы. Главная
+/// Экран дня открывается с календарём без заголовка страницы. Главная
 /// показывает название пункта в шапке, а граф — крупным заголовком страницы;
 /// название видно без обрезки по высоте, а экранный диктор получает его
 /// целиком.
@@ -377,10 +377,10 @@ void _expectRootContent(
   final name = names[destination]!;
   final page = find.byType(_rootPage(destination));
   final appBar = find.descendant(of: page, matching: find.byType(AppBar));
-  if (destination == AppDestination.dailyChoices) {
+  if (destination == AppDestination.actions) {
     expect(appBar, findsNothing);
     expect(find.text(name), findsNothing);
-    expect(find.byType(DailyChoiceCalendar), findsOneWidget);
+    expect(find.byType(ActionDayCalendar), findsOneWidget);
     return;
   }
   final title = find.descendant(of: page, matching: find.text(name));

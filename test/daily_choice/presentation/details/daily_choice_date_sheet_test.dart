@@ -1,7 +1,7 @@
 import 'dart:ui' show Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
+import 'package:doable/src/action/application/action_day_statuses.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_date_sheet.dart';
 import 'package:doable/src/design_system/components/date_grid.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
@@ -77,9 +77,9 @@ void main() {
       tester,
       current: _date(2026, 10, 8),
       marks: {
-        _date(2026, 10, 5): DailyChoiceDayStatus.allCompleted,
-        _date(2026, 10, 6): DailyChoiceDayStatus.hasIncomplete,
-        _date(2026, 12, 15): DailyChoiceDayStatus.hasIncomplete,
+        _date(2026, 10, 5): ActionDayStatus.allCompleted,
+        _date(2026, 10, 6): ActionDayStatus.hasIncomplete,
+        _date(2026, 12, 15): ActionDayStatus.hasIncomplete,
       },
     );
     await app.open(tester);
@@ -88,14 +88,14 @@ void main() {
       find.bySemanticsLabel(
         _full(
           'понедельник, 5 октября 2026 г., Сегодня, '
-          'Все дневные выборы выполнены',
+          'Все действия выполнены',
         ),
       ),
       findsOneWidget,
     );
     expect(
       find.bySemanticsLabel(
-        _full('вторник, 6 октября 2026 г., Есть невыполненный дневной выбор'),
+        _full('вторник, 6 октября 2026 г., Есть невыполненное действие'),
       ),
       findsOneWidget,
     );
@@ -110,7 +110,7 @@ void main() {
     expect(find.text('Декабрь 2026'), findsOneWidget);
     expect(
       find.bySemanticsLabel(
-        _full('вторник, 15 декабря 2026 г., Есть невыполненный дневной выбор'),
+        _full('вторник, 15 декабря 2026 г., Есть невыполненное действие'),
       ),
       findsOneWidget,
     );
@@ -208,7 +208,7 @@ final class _App {
 Future<_App> _pump(
   WidgetTester tester, {
   required CalendarDate current,
-  Map<CalendarDate, DailyChoiceDayStatus> marks = const {},
+  Map<CalendarDate, ActionDayStatus> marks = const {},
   bool marksReadFails = false,
 }) async {
   tester.view.physicalSize = const Size(390, 844);
@@ -254,25 +254,25 @@ Future<_App> _pump(
 final class _Repository implements PersonalGraphRepository {
   _Repository(this._marks, {required this.readFails});
 
-  final Map<CalendarDate, DailyChoiceDayStatus> _marks;
+  final Map<CalendarDate, ActionDayStatus> _marks;
   final bool readFails;
 
   @override
-  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
-    DailyChoiceDayStatusQuery query,
+  Future<ActionDayStatusesReadResult> getActionDayStatuses(
+    ActionDayStatusQuery query,
   ) async {
     if (readFails) {
-      return const DailyChoiceDayStatusesReadError(
-        DailyChoiceDayStatusesReadFailure(),
+      return const ActionDayStatusesReadError(
+        ActionDayStatusesUnexpectedFailure(),
       );
     }
     bool inWindow(CalendarDate date) =>
         _key(date).compareTo(_key(query.firstDate)) >= 0 &&
         _key(date).compareTo(_key(query.lastDate)) <= 0;
-    return DailyChoiceDayStatusesReadSuccess(
+    return ActionDayStatusesReadSuccess(
       GraphSnapshot(
         revision: const _Revision(),
-        value: DailyChoiceDayStatuses(
+        value: ActionDayStatuses(
           query: query,
           statuses: {
             for (final entry in _marks.entries)

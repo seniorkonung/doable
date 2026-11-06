@@ -51,8 +51,8 @@ Future<void> setDailyChoiceDate(
           of: grid,
           matching: find.bySemanticsLabel(
             months > 0
-                ? l10n.dailyChoiceCalendarNextMonth
-                : l10n.dailyChoiceCalendarPreviousMonth,
+                ? l10n.actionCalendarNextMonth
+                : l10n.actionCalendarPreviousMonth,
           ),
         ),
       );

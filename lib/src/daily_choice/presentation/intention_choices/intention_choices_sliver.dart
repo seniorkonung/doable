@@ -265,8 +265,8 @@ final class _DailyChoiceRow extends StatelessWidget {
     );
     final date = l10n.dailyChoiceDetailsDate(item.date.toCanonicalString());
     final completion = item.isCompleted
-        ? l10n.dailyChoiceDetailsCompleted
-        : l10n.dailyChoiceDetailsNotCompleted;
+        ? l10n.actionCompleted
+        : l10n.actionNotCompleted;
     void open() => onOpen(item.id);
     return Card(
       clipBehavior: Clip.antiAlias,

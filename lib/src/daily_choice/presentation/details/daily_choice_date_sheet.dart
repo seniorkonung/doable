@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../action/application/action_day_statuses.dart';
+import '../../../action/presentation/day/action_day_calendar_labels.dart';
+import '../../../action/presentation/day/action_day_calendar_viewport.dart';
+import '../../../action/presentation/day/action_day_instance.dart';
+import '../../../action/presentation/day/action_day_marks_view_model.dart';
 import '../../../design_system/components/date_grid.dart';
 import '../../../design_system/components/sheet.dart';
 import '../../../shared/domain/calendar_date.dart';
 import '../../../shared/presentation/local_day/local_date_provider.dart';
 import '../../../shared/presentation/local_day/local_day_observer.dart';
-import '../../application/daily_choice_day_statuses.dart';
-import '../catalog/daily_choice_calendar_day_marks_view_model.dart';
-import '../catalog/daily_choice_calendar_labels.dart';
-import '../catalog/daily_choice_calendar_viewport.dart';
-import '../catalog/daily_choice_catalog_instance.dart';
 
 /// Показывает лист даты дневного выбора с месяцем [current].
 ///
@@ -42,7 +42,7 @@ final class _DailyChoiceDateSheetState
     extends ConsumerState<_DailyChoiceDateSheet> {
   /// Лист держит собственный ключ отметок всё время жизни: его отметки не
   /// зависят от каталога и не меняют его (ADR-0028).
-  late final DailyChoiceCatalogInstance _instance;
+  late final ActionDayInstance _instance;
 
   /// Лист может остаться открытым после местной полуночи, и тогда прежний день
   /// был бы неверно назван сегодняшним.
@@ -54,7 +54,7 @@ final class _DailyChoiceDateSheetState
   @override
   void initState() {
     super.initState();
-    _instance = DailyChoiceCatalogInstance(initialDate: widget.current);
+    _instance = ActionDayInstance(initialDate: widget.current);
     _month = CalendarDate.fromParts(
       widget.current.year,
       widget.current.month,
@@ -78,11 +78,11 @@ final class _DailyChoiceDateSheetState
       _month = CalendarDate.fromParts(month.year, month.month, 1);
     });
     ref
-        .read(dailyChoiceCalendarDayMarksViewModelProvider(_instance).notifier)
+        .read(actionDayMarksViewModelProvider(_instance).notifier)
         .setViewport(
-          DailyChoiceCalendarViewport(
+          ActionDayCalendarViewport(
             focusedDate: _month,
-            mode: DailyChoiceCalendarMode.month,
+            mode: ActionDayCalendarMode.month,
           ),
         );
   }
@@ -92,7 +92,7 @@ final class _DailyChoiceDateSheetState
     final localizations = AppLocalizations.of(context);
     // Отказ получения отметок ничего не показывает: дни остаются без отметок.
     final statuses = ref
-        .watch(dailyChoiceCalendarDayMarksViewModelProvider(_instance))
+        .watch(actionDayMarksViewModelProvider(_instance))
         .dayStatuses
         ?.statuses;
     final month = DateTime.utc(_month.year, _month.month);
@@ -100,9 +100,9 @@ final class _DailyChoiceDateSheetState
       widget.sheet,
       label: localizations.dailyChoiceDateSheetLabel,
       child: DateGrid(
-        title: dailyChoiceCalendarMonthTitle(context, _month),
-        previousLabel: localizations.dailyChoiceCalendarPreviousMonth,
-        nextLabel: localizations.dailyChoiceCalendarNextMonth,
+        title: actionDayCalendarMonthTitle(context, _month),
+        previousLabel: localizations.actionCalendarPreviousMonth,
+        nextLabel: localizations.actionCalendarNextMonth,
         onPrevious: _technical(CalendarDate.earliest).isBefore(month)
             ? () => _showMonth(-1)
             : null,
@@ -113,7 +113,7 @@ final class _DailyChoiceDateSheetState
             : null,
         weekdays: [
           for (var offset = 0; offset < DateTime.daysPerWeek; offset++)
-            dailyChoiceCalendarWeekdayLabel(
+            actionDayCalendarWeekdayLabel(
               context,
               // Названия не зависят от недели: подойдёт любая с понедельника.
               DateTime.utc(2024, 1, 1 + offset),
@@ -138,7 +138,7 @@ final class _DailyChoiceDateSheetState
   DateGridDay _day(
     BuildContext context,
     DateTime day, {
-    required Map<CalendarDate, DailyChoiceDayStatus>? statuses,
+    required Map<CalendarDate, ActionDayStatus>? statuses,
   }) {
     if (day.isBefore(_technical(CalendarDate.earliest)) ||
         day.isAfter(_technical(CalendarDate.latest))) {
@@ -158,7 +158,7 @@ final class _DailyChoiceDateSheetState
     final isToday = date == _localDay.today;
     return DateGridDay(
       text: '${date.day}',
-      semanticLabel: dailyChoiceCalendarDayLabel(
+      semanticLabel: actionDayCalendarDayLabel(
         context,
         date: date,
         isToday: isToday,
@@ -168,7 +168,7 @@ final class _DailyChoiceDateSheetState
       isSelected: date == widget.current,
       isToday: isToday,
       isOutsideMonth: isOutsideMonth,
-      mark: dailyChoiceCalendarDayMark(status),
+      mark: actionDayCalendarDayMark(status),
     );
   }
 }

@@ -164,7 +164,7 @@ extension _ActionDayReading on DriftPersonalGraphRepository {
 const _actionListItemColumns = '''
   a.creation_sequence, a.id, a.title, a.description, a.date,
   a.scheduled_hour, a.priority, a.is_completed,
-  COALESCE(i.title, d.title) AS root_title,
+  r.intention_id AS root_id, COALESCE(i.title, d.title) AS root_title,
   (SELECT MAX(position) + 1 FROM action_path_items
    WHERE action_id = a.id) AS path_length''';
 
@@ -185,6 +185,9 @@ ActionListItem _decodeActionListItem(Map<String, Object?> data) {
       schedule: fields.schedule,
       priority: fields.priority,
       isCompleted: fields.isCompleted,
+      rootIntentionId: decodeStoredIntentionId(
+        requiredStoredString(data, 'root_id'),
+      ),
       rootTitle: decodeStoredIntentionTitle(data, 'root_title'),
       pathIntentionCount: requiredStoredInteger(data, 'path_length'),
     );

@@ -134,19 +134,19 @@ Future<void> openIntentionGraph(
 ///
 /// Шаг нажимает вход и не ждёт содержимого каталога: его дожидается сам
 /// сценарий. [tap] — нажатие сценария; по умолчанию [tapWhenFound].
-Future<void> openDailyChoices(
+Future<void> openActions(
   WidgetTester tester, {
   RootPageTap tap = tapWhenFound,
-}) => tap(tester, appNavigationDestination(AppDestination.dailyChoices));
+}) => tap(tester, appNavigationDestination(AppDestination.actions));
 
 /// Открывает дневные выборы переходом маршрутизатора, без нажатия.
 ///
 /// Для страничных проверок, которые показывают каталог дневных выборов до
 /// первого кадра и поэтому не могут нажать вход: переход начинается сразу, а
 /// кадры продвигает сам сценарий.
-void openDailyChoicesOn(StackRouter router) {
+void openActionsOn(StackRouter router) {
   unawaited(
-    router.navigate(const AppShellRoute(children: [DailyChoiceCatalogRoute()])),
+    router.navigate(const AppShellRoute(children: [ActionDayRootRoute()])),
   );
 }
 
@@ -196,8 +196,8 @@ Future<void> returnToIntentionGraphAfterCreation(
 }
 
 /// Проверяет, что все страницы поверх закрыты и открыты дневные выборы.
-void expectDailyChoicesRootPage(StackRouter router) {
-  _expectRootPage(router, DailyChoiceCatalogRoute.name);
+void expectActionsRootPage(StackRouter router) {
+  _expectRootPage(router, ActionDayRootRoute.name);
 }
 
 /// Нижний маршрут — оболочка, а её выбранный пункт показывает [rootPage].

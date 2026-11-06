@@ -13,7 +13,7 @@ import 'app_root_pages.dart';
 /// Исходные страницы самостоятельного создания, включая глубокую страницу.
 enum IntentionCreationOrigin {
   home('Главной', AppDestination.home),
-  dailyChoices('каталогом дневных выборов', AppDestination.dailyChoices),
+  actions('экраном дня', AppDestination.actions),
   graph('каталогом намерений', AppDestination.intentionGraph),
   deep('страницей намерения над каталогом', AppDestination.intentionGraph);
 
@@ -34,8 +34,8 @@ enum IntentionCreationOrigin {
       switch (destination) {
         case AppDestination.home:
           await openHome(tester, waitFor: waitFor);
-        case AppDestination.dailyChoices:
-          await openDailyChoices(tester);
+        case AppDestination.actions:
+          await openActions(tester);
         case AppDestination.intentionGraph:
           await openIntentionGraph(tester, waitFor: waitFor);
       }

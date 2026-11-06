@@ -195,10 +195,10 @@ void main() {
       'из взаимодействия, фокуса и семантики', (tester) async {
     final app = await _openApp(tester);
     expect(find.semantics.byLabel('Очистить ввод'), findsOneWidget);
-    expect(find.semantics.byLabel(RegExp('Дневные выборы')), findsOneWidget);
+    expect(find.semantics.byLabel(RegExp('Действия')), findsOneWidget);
     await _openMenu(tester);
     expect(find.semantics.byLabel('Очистить ввод'), findsNothing);
-    expect(find.semantics.byLabel(RegExp('Дневные выборы')), findsNothing);
+    expect(find.semantics.byLabel(RegExp('Действия')), findsNothing);
 
     for (var i = 0; i < 10; i++) {
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
@@ -219,14 +219,14 @@ void main() {
       tester.getCenter(appNavigationDestination(AppDestination.home)),
     );
     await tester.pumpAndSettle();
-    expect(app.selected.value, AppDestination.dailyChoices);
+    expect(app.selected.value, AppDestination.actions);
     if (find.byType(BottomSheet).evaluate().isNotEmpty) {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
     }
     app.expectOrigin(tester);
     expect(find.semantics.byLabel('Очистить ввод'), findsOneWidget);
-    expect(find.semantics.byLabel(RegExp('Дневные выборы')), findsOneWidget);
+    expect(find.semantics.byLabel(RegExp('Действия')), findsOneWidget);
     await tester.tap(find.text('Очистить ввод'));
     expect(app.input.text, isEmpty);
   });
@@ -272,7 +272,7 @@ final class _TestApp {
   final store = _ControlledModeStore();
   final input = TextEditingController();
   final inputFocus = FocusNode();
-  final selected = ValueNotifier(AppDestination.dailyChoices);
+  final selected = ValueNotifier(AppDestination.actions);
   late final ProviderContainer container;
 
   QuickCreationMode get mode =>
@@ -335,7 +335,7 @@ final class _TestApp {
 
   void expectOrigin(WidgetTester tester) {
     expect(find.byType(BottomSheet), findsNothing);
-    expect(selected.value, AppDestination.dailyChoices);
+    expect(selected.value, AppDestination.actions);
     expect(input.text, 'Несохранённое название');
     expect(find.text('Открыть меню'), findsOneWidget);
     expect(tester.takeException(), isNull);
