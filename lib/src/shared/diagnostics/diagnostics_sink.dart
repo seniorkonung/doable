@@ -267,6 +267,20 @@ final class ActionCommandDiagnosticsEvent extends DiagnosticsEvent {
   final ActionCommandDiagnosticsStage stage;
 }
 
+/// Чтение порции дня: размер порции, первая это порция или продолжение, исход
+/// и безопасная категория отказа. Дата, секция, идентификаторы, пользовательский
+/// текст и исходное исключение не входят в контракт события.
+final class ActionDayPageReadDiagnosticsEvent extends DiagnosticsEvent {
+  const ActionDayPageReadDiagnosticsEvent({
+    required this.pageSize,
+    required this.isContinuation,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final int pageSize;
+  final bool isContinuation;
+}
+
 final class BootstrapDiagnosticsEvent extends DiagnosticsEvent {
   const BootstrapDiagnosticsEvent({
     required DiagnosticsStatus status,

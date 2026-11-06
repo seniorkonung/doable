@@ -45,6 +45,7 @@ import '../support/intention_type_counts.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/intention_options.dart';
 import '../support/tag_read_contract_test_fallback.dart';
+import '../support/action_read_contract_test_fallback.dart';
 import '../support/statistics_read_contract_test_fallback.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/quick_creation.dart';
@@ -758,7 +759,10 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
 }
 
 final class _DelayedPersonalGraphRepository
-    with StatisticsReadContractTestFallback, TagReadContractTestFallback
+    with
+        ActionReadContractTestFallback,
+        StatisticsReadContractTestFallback,
+        TagReadContractTestFallback
     implements PersonalGraphRepository {
   /// Панель тегов над панелью создания показывает пустой каталог и строку
   /// создания по запросу.

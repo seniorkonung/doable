@@ -30,13 +30,17 @@ import 'package:doable/src/shared/domain/calendar_date.dart';
 
 import '../../support/daily_choice_reconciliation_fixture.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
+import '../../support/action_read_contract_test_fallback.dart';
 import '../../support/statistics_read_contract_test_fallback.dart';
 import '../../support/intention_description_preview.dart';
 import '../../support/intention_title_order_key.dart';
 
 /// Управляемый граф: каждое чтение группы завершается тестом вручную.
 final class ControlledRelationGraphRepository
-    with StatisticsReadContractTestFallback, TagReadContractTestFallback
+    with
+        ActionReadContractTestFallback,
+        StatisticsReadContractTestFallback,
+        TagReadContractTestFallback
     implements PersonalGraphRepository {
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(

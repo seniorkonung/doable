@@ -413,25 +413,30 @@ DailyChoice decodeStoredDailyChoice(Map<String, Object?> data) {
   }
 }
 
-/// Действие из столбцов таблицы `actions` и строк его пути из
-/// `action_path_items` в порядке позиций. Название и описание хранятся в той
-/// форме, к которой их приводит ввод; путь непуст, позиции идут подряд с
-/// нуля, а `previous_intention_id` повторяет намерение предыдущей позиции.
-Action decodeStoredAction(
-  Map<String, Object?> data,
-  Iterable<Map<String, Object?>> pathRows,
-) {
+/// Поля действия из столбцов таблицы `actions`, общие для полного действия и
+/// строки выдачи дня.
+typedef StoredActionFields = ({
+  ActionId id,
+  ActionTitle title,
+  ActionDescription? description,
+  CalendarDate date,
+  ActionSchedule schedule,
+  ActionPriority priority,
+  bool isCompleted,
+});
+
+/// Название и описание хранятся в той форме, к которой их приводит ввод.
+StoredActionFields decodeStoredActionFields(Map<String, Object?> data) {
   final title = requiredStoredString(data, 'title');
   final description = _nullableStoredString(data, 'description');
   try {
-    final action = Action(
+    final fields = (
       id: decodeStoredActionId(requiredStoredString(data, 'id')),
       title: ActionTitle(title),
       description: description == null
           ? null
           : ActionDescription.fromInput(description) ??
                 (throw const StoredGraphCorruption()),
-      path: _decodeStoredActionPath(pathRows),
       date: CalendarDate.parseCanonical(requiredStoredString(data, 'date')),
       schedule: switch (data['scheduled_hour']) {
         null => const ActionAllDay(),
@@ -450,21 +455,45 @@ Action decodeStoredAction(
         1 => true,
         _ => throw const StoredGraphCorruption(),
       },
+    );
+    if (fields.title.value != title ||
+        fields.description?.value != description) {
+      throw const StoredGraphCorruption();
+    }
+    return fields;
+  } on IntentionTextValidationException {
+    throw const StoredGraphCorruption();
+  } on CalendarDateValidationException {
+    throw const StoredGraphCorruption();
+  } on ArgumentError {
+    throw const StoredGraphCorruption();
+  }
+}
+
+/// Действие из столбцов таблицы `actions` и строк его пути из
+/// `action_path_items` в порядке позиций. Путь непуст, позиции идут подряд с
+/// нуля, а `previous_intention_id` повторяет намерение предыдущей позиции.
+Action decodeStoredAction(
+  Map<String, Object?> data,
+  Iterable<Map<String, Object?>> pathRows,
+) {
+  final fields = decodeStoredActionFields(data);
+  try {
+    return Action(
+      id: fields.id,
+      title: fields.title,
+      description: fields.description,
+      path: _decodeStoredActionPath(pathRows),
+      date: fields.date,
+      schedule: fields.schedule,
+      priority: fields.priority,
+      isCompleted: fields.isCompleted,
       creationSequence: ActionCreationSequence(
         requiredStoredInteger(data, 'creation_sequence'),
       ),
       createdAt: ActionTimestamp(_decodeStoredInstant(data, 'created_at')),
       updatedAt: ActionTimestamp(_decodeStoredInstant(data, 'updated_at')),
     );
-    if (action.title.value != title ||
-        action.description?.value != description) {
-      throw const StoredGraphCorruption();
-    }
-    return action;
-  } on IntentionTextValidationException {
-    throw const StoredGraphCorruption();
-  } on CalendarDateValidationException {
-    throw const StoredGraphCorruption();
   } on ArgumentError {
     throw const StoredGraphCorruption();
   }

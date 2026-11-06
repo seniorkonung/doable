@@ -96,6 +96,13 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     'stage': stage.name,
     ..._encodeStatus(event.status),
   },
+  ActionDayPageReadDiagnosticsEvent(:final pageSize, :final isContinuation) => {
+    'operation': 'actionDayPageRead',
+    'stage': 'read',
+    'pageSize': pageSize,
+    'isContinuation': isContinuation,
+    ..._encodeStatus(event.status),
+  },
   BootstrapDiagnosticsEvent(:final schemaVersion) => {
     'operation': 'bootstrap',
     ..._encodeStatus(event.status),

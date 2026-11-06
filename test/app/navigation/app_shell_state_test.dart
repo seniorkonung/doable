@@ -8,6 +8,7 @@ import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
+import 'package:doable/src/action/application/action_day.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
@@ -1415,6 +1416,10 @@ final class _ObservedRepository implements PersonalGraphRepository {
     final gate = _gate;
     if (gate != null && !gate.isCompleted) gate.complete();
   }
+
+  @override
+  Future<ActionDayPageResult> getActionDayPage(ActionDayQuery query) =>
+      _delegate.getActionDayPage(query);
 
   @override
   Future<StatisticsPageResult> getStatisticsPage(StatisticsQuery query) =>

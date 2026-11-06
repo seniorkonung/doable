@@ -1,3 +1,4 @@
+import '../../action/application/action_read_contract.dart';
 import '../../daily_choice/application/daily_choice_details.dart';
 import '../../daily_choice/application/daily_choice_catalog.dart';
 import '../../daily_choice/application/daily_choice_day_statuses.dart';
@@ -22,7 +23,11 @@ abstract interface class GraphCommandRepository {
 }
 
 abstract interface class PersonalGraphRepository
-    implements GraphCommandRepository, TagReadContract, StatisticsReadContract {
+    implements
+        GraphCommandRepository,
+        ActionReadContract,
+        TagReadContract,
+        StatisticsReadContract {
   /// Возвращает null в снимке, если выбор отсутствует на момент чтения.
   Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id);
 

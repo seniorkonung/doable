@@ -29,6 +29,7 @@ import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/statistics/application/intention_statistics_read_contract.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
+import '../../../support/action_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
 import '../../../support/intention_description_preview.dart';
 import '../../../support/intention_title_order_key.dart';
@@ -81,7 +82,10 @@ final class ControlledDetailRequest {
 }
 
 final class ControlledDetailsRepository
-    with StatisticsReadContractTestFallback, TagReadContractTestFallback
+    with
+        ActionReadContractTestFallback,
+        StatisticsReadContractTestFallback,
+        TagReadContractTestFallback
     implements PersonalGraphRepository {
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(

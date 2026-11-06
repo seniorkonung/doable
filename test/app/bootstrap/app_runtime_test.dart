@@ -38,6 +38,7 @@ import 'package:sqlite3/sqlite3.dart';
 import '../../support/controlled_local_date.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
+import '../../support/action_read_contract_test_fallback.dart';
 import '../../support/statistics_read_contract_test_fallback.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
@@ -328,7 +329,10 @@ CalendarDate _dateOf(DateTime moment) =>
     CalendarDate.fromParts(moment.year, moment.month, moment.day);
 
 final class _ControlledPersonalGraphRepository
-    with StatisticsReadContractTestFallback, TagReadContractTestFallback
+    with
+        ActionReadContractTestFallback,
+        StatisticsReadContractTestFallback,
+        TagReadContractTestFallback
     implements PersonalGraphRepository {
   @override
   Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
