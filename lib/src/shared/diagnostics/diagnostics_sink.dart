@@ -298,6 +298,21 @@ final class ActionReadDiagnosticsEvent extends DiagnosticsEvent {
     : super(status);
 }
 
+/// Чтение порции действий намерения: размер порции, первая это порция или
+/// продолжение, исход и безопасная категория отказа. Намерение, роль,
+/// идентификаторы, пользовательский текст и исходное исключение не входят в
+/// контракт события.
+final class IntentionActionsPageReadDiagnosticsEvent extends DiagnosticsEvent {
+  const IntentionActionsPageReadDiagnosticsEvent({
+    required this.pageSize,
+    required this.isContinuation,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final int pageSize;
+  final bool isContinuation;
+}
+
 final class BootstrapDiagnosticsEvent extends DiagnosticsEvent {
   const BootstrapDiagnosticsEvent({
     required DiagnosticsStatus status,

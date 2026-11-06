@@ -172,7 +172,7 @@
   - **Предполагаемые файлы:** добавляются `lib/src/action/application/action_details.dart`, `lib/src/graph/data/drift_personal_graph_repository_action_reads.dart`, `test/graph/data/drift_action_watch_test.dart`, `file_backed_action_durability_test.dart`; меняются `lib/src/action/application/action_read_contract.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`.
   - **Размер:** M.
 
-- [ ] 1.14 Вкладка «Действия» читает действия намерения по его ролям в путях
+- [x] 1.14 Вкладка «Действия» читает действия намерения по его ролям в путях
   - **Критерии приёмки:**
     - `getIntentionActionsPage(intentionId, role, pageSize, cursor)` в первой странице возвращает числа ролей «Корневое», «Промежуточное», «Конечное» и число действий с намерением в пути, считая каждое один раз, вместе со строками на одной ревизии; путь из одного намерения засчитывается корневым и конечным (D10).
     - Строки идут в порядке требования «Список действий роли намерения» ограниченными порциями без повторов и пропусков и несут название корня и число намерений пути; план запроса использует индекс `(intention_id, action_id)` строк пути.

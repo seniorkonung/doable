@@ -2,6 +2,7 @@ import '../domain/action_id.dart';
 import 'action_day.dart';
 import 'action_day_statuses.dart';
 import 'action_details.dart';
+import 'intention_actions.dart';
 
 /// Чтения действий. Подмешивается в `PersonalGraphRepository`: отдельного
 /// репозитория действий нет (ADR-0009).
@@ -23,4 +24,13 @@ abstract interface class ActionReadContract {
   /// намерений и связей последнего прочитанного пути. Успех со значением
   /// `null` — действия нет.
   Stream<ActionReadResult> watchAction(ActionId id);
+
+  /// Читает ограниченную порцию действий, в сохранённых путях которых
+  /// намерение играет выбранную роль; архивное намерение читается как
+  /// активное. Первая порция несёт числа всех ролей и число действий с
+  /// намерением в пути на одной ревизии; продолжение привязано к ревизии
+  /// первой порции, а смена ревизии — конфликт.
+  Future<IntentionActionsPageResult> getIntentionActionsPage(
+    IntentionActionsQuery query,
+  );
 }

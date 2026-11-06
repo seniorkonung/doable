@@ -8,7 +8,9 @@ import '../../action/application/action_command.dart';
 import '../../action/application/action_day.dart';
 import '../../action/application/action_day_statuses.dart';
 import '../../action/application/action_details.dart';
+import '../../action/application/action_list_item.dart';
 import '../../action/application/action_result.dart';
+import '../../action/application/intention_actions.dart';
 import '../../action/domain/action.dart';
 import '../../action/domain/action_id.dart';
 import '../../action/domain/action_path.dart';
@@ -115,6 +117,7 @@ part 'drift_personal_graph_repository_action_commands.dart';
 part 'drift_personal_graph_repository_action_day.dart';
 part 'drift_personal_graph_repository_action_day_statuses.dart';
 part 'drift_personal_graph_repository_action_reads.dart';
+part 'drift_personal_graph_repository_intention_actions.dart';
 part 'drift_personal_graph_repository_relation_commands.dart';
 part 'drift_personal_graph_repository_relation_details.dart';
 part 'drift_personal_graph_repository_relation_groups.dart';
@@ -334,6 +337,11 @@ final class DriftPersonalGraphRepository
 
   @override
   Stream<ActionReadResult> watchAction(ActionId id) => _watchAction(id);
+
+  @override
+  Future<IntentionActionsPageResult> getIntentionActionsPage(
+    IntentionActionsQuery query,
+  ) => _readIntentionActionsPage(query);
 
   @override
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(

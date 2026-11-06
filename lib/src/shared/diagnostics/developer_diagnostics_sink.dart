@@ -113,6 +113,17 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     'stage': 'read',
     ..._encodeStatus(event.status),
   },
+  IntentionActionsPageReadDiagnosticsEvent(
+    :final pageSize,
+    :final isContinuation,
+  ) =>
+    {
+      'operation': 'intentionActionsPageRead',
+      'stage': 'read',
+      'pageSize': pageSize,
+      'isContinuation': isContinuation,
+      ..._encodeStatus(event.status),
+    },
   BootstrapDiagnosticsEvent(:final schemaVersion) => {
     'operation': 'bootstrap',
     ..._encodeStatus(event.status),

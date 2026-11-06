@@ -67,20 +67,11 @@ extension _ActionDayReading on DriftPersonalGraphRepository {
         Variable<int>(cursor.boundary.sequence),
       ]);
     }
-    // Корень и число намерений пути читаются по первичному ключу строк пути,
-    // без загрузки самого пути.
     final rawRows = await _database
         .customSelect(
-          '''SELECT a.creation_sequence, a.id, a.title, a.description, a.date,
-                a.scheduled_hour, a.priority, a.is_completed,
-                COALESCE(i.title, d.title) AS root_title,
-                (SELECT MAX(position) + 1 FROM action_path_items
-                 WHERE action_id = a.id) AS path_length
+          '''SELECT $_actionListItemColumns
          FROM actions a
-         LEFT JOIN action_path_items r
-           ON r.action_id = a.id AND r.position = 0
-         LEFT JOIN intentions i ON i.id = r.intention_id
-         LEFT JOIN deleted_intentions d ON d.intention_id = r.intention_id
+         $_actionListItemRootJoins
          WHERE ${filters.join(' AND ')}
          ORDER BY COALESCE(a.scheduled_hour, -1), a.priority,
                   a.creation_sequence
@@ -98,7 +89,9 @@ extension _ActionDayReading on DriftPersonalGraphRepository {
     final selectedRows = [
       for (final row in rawRows.take(query.pageSize)) row.data,
     ];
-    final items = [for (final data in selectedRows) _decodeActionDayItem(data)];
+    final items = [
+      for (final data in selectedRows) _decodeActionListItem(data),
+    ];
     final revision = _currentRevision;
     final nextCursor = hasNext
         ? _DriftActionDayCursor(
@@ -165,10 +158,26 @@ extension _ActionDayReading on DriftPersonalGraphRepository {
   }
 }
 
-ActionDayItem _decodeActionDayItem(Map<String, Object?> data) {
+/// Столбцы строки списка над `actions a` и [_actionListItemRootJoins].
+/// Корень и число намерений пути читаются по первичному ключу строк пути, без
+/// загрузки самого пути.
+const _actionListItemColumns = '''
+  a.creation_sequence, a.id, a.title, a.description, a.date,
+  a.scheduled_hour, a.priority, a.is_completed,
+  COALESCE(i.title, d.title) AS root_title,
+  (SELECT MAX(position) + 1 FROM action_path_items
+   WHERE action_id = a.id) AS path_length''';
+
+/// Корневое намерение действия `a`: текущее или из надгробия.
+const _actionListItemRootJoins = '''
+  LEFT JOIN action_path_items r ON r.action_id = a.id AND r.position = 0
+  LEFT JOIN intentions i ON i.id = r.intention_id
+  LEFT JOIN deleted_intentions d ON d.intention_id = r.intention_id''';
+
+ActionListItem _decodeActionListItem(Map<String, Object?> data) {
   final fields = decodeStoredActionFields(data);
   try {
-    return ActionDayItem(
+    return ActionListItem(
       id: fields.id,
       title: fields.title,
       description: fields.description,
