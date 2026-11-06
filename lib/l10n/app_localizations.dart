@@ -332,11 +332,53 @@ abstract class AppLocalizations {
   /// **'There are no items in the “{view}” view for this period.'**
   String statisticsViewEmpty(String view);
 
-  /// Подтверждённый пустой вид, в том числе при непустой сводке периода
+  /// Заголовок раздела статистики намерения без действий вида «Корневое»
   ///
   /// In en, this message translates to:
-  /// **'No daily choices are credited to this view for the selected period.'**
-  String get statisticsEmpty;
+  /// **'No actions with it as the root in {period}'**
+  String statisticsIntentionEmptyRootTitle(String period);
+
+  /// Заголовок раздела статистики намерения без действий вида «Промежуточное»
+  ///
+  /// In en, this message translates to:
+  /// **'No actions through it in {period}'**
+  String statisticsIntentionEmptyIntermediateTitle(String period);
+
+  /// Заголовок раздела статистики намерения без действий вида «Конечное»
+  ///
+  /// In en, this message translates to:
+  /// **'No actions with it as the final one in {period}'**
+  String statisticsIntentionEmptyTerminalTitle(String period);
+
+  /// Заголовок раздела статистики намерения без действий вида «Через связи»
+  ///
+  /// In en, this message translates to:
+  /// **'No actions through relations in {period}'**
+  String statisticsIntentionEmptyThroughRelationsTitle(String period);
+
+  /// Объяснение, какие действия посчитает пустой вид «Корневое»
+  ///
+  /// In en, this message translates to:
+  /// **'An action of the selected period whose path starts from this intention will be counted here.'**
+  String get statisticsIntentionEmptyRootText;
+
+  /// Объяснение, какие действия посчитает пустой вид «Промежуточное»
+  ///
+  /// In en, this message translates to:
+  /// **'An action of the selected period whose path passes through this intention between the root and the final one will be counted here.'**
+  String get statisticsIntentionEmptyIntermediateText;
+
+  /// Объяснение, какие действия посчитает пустой вид «Конечное»
+  ///
+  /// In en, this message translates to:
+  /// **'An action of the selected period whose path ends at this intention will be counted here.'**
+  String get statisticsIntentionEmptyTerminalText;
+
+  /// Объяснение, какие действия посчитает пустой вид «Через связи»
+  ///
+  /// In en, this message translates to:
+  /// **'An action of the selected period that this intention serves through its relations will be counted here.'**
+  String get statisticsIntentionEmptyThroughRelationsText;
 
   /// Обновление статистики с сохранением прежних подтверждённых чисел
   ///
@@ -410,22 +452,10 @@ abstract class AppLocalizations {
   /// **'Statistics'**
   String get statisticsSectionTitle;
 
-  /// Заголовок разбивки вклада намерения по исходным намерениям
+  /// Заголовок разбивки действий вида по исходящим связям намерения; архивная отметка связи использует relationNeighborhoodRelationArchived, намерения — detailsArchived
   ///
   /// In en, this message translates to:
-  /// **'By source intentions'**
-  String get statisticsBreakdownSourceIntentions;
-
-  /// Заголовок разбивки вклада намерения по выбранным действиям
-  ///
-  /// In en, this message translates to:
-  /// **'By selected actions'**
-  String get statisticsBreakdownSelectedActions;
-
-  /// Заголовок разбивки вклада по исходящим связям намерения; архивная отметка связи использует relationNeighborhoodRelationArchived, намерения — detailsArchived
-  ///
-  /// In en, this message translates to:
-  /// **'By relations'**
+  /// **'Comes through'**
   String get statisticsBreakdownRelations;
 
   /// Сколько действий вида «Через связи» содержат намерение на сохранённом пути, из всех действий этого вида; учитываются выполненные и невыполненные
@@ -458,23 +488,23 @@ abstract class AppLocalizations {
   /// **'Update error.'**
   String get statisticsRefreshUnexpectedShort;
 
-  /// Значение галочки календаря статистики: выполнены все выборы дня, засчитанные намерению в выбранном виде; остальные выборы дня не учитываются
+  /// Значение галочки календаря статистики: выполнены все действия дня, засчитанные намерению в выбранном виде; остальные действия дня не учитываются
   ///
   /// In en, this message translates to:
-  /// **'All credited daily choices are completed'**
+  /// **'All actions of this view are completed'**
   String get statisticsCalendarDayAllCompleted;
 
-  /// Значение кружка календаря статистики: среди засчитанных намерению выборов дня есть невыполненный
+  /// Значение кружка календаря статистики: среди действий дня, засчитанных намерению в выбранном виде, есть невыполненное
   ///
   /// In en, this message translates to:
-  /// **'There is an incomplete credited daily choice'**
+  /// **'There is an incomplete action of this view'**
   String get statisticsCalendarDayHasIncomplete;
 
-  /// Доступное состояние дня без отметки: выбранный вид не засчитывает намерению выборов этой даты
+  /// Доступное состояние дня без отметки: выбранный вид не засчитывает намерению действий этой даты
   ///
   /// In en, this message translates to:
-  /// **'No credited daily choices'**
-  String get statisticsCalendarDayNoChoices;
+  /// **'No actions of this view'**
+  String get statisticsCalendarDayNoActions;
 
   /// Доступная подпись дня статистики с полной датой и локализованным состоянием; календарь раздела не выбирает день
   ///
@@ -488,11 +518,65 @@ abstract class AppLocalizations {
   /// **'{month}. {counts}'**
   String statisticsMonthBarSemantics(DateTime month, String counts);
 
-  /// Доступная подпись карточки вида: локализованные вид, период и обе меры; выбранное состояние передаётся свойством Semantics.selected. Доля выбранного вида использует statisticsPeriodActionsShare; название намерения не переводится, архивная отметка использует detailsArchived
+  /// Доступное название группы плиток видов статистики на странице намерения
   ///
   /// In en, this message translates to:
-  /// **'{view}. {period}. {counts}'**
-  String statisticsViewCardSemantics(String view, String period, String counts);
+  /// **'How the actions are counted for this intention'**
+  String get statisticsTilesLabel;
+
+  /// Плитка действий, путь которых начинается с намерения, в разделе статистики
+  ///
+  /// In en, this message translates to:
+  /// **'Root'**
+  String get statisticsTileRoot;
+
+  /// Плитка действий, путь которых проходит через намерение между корневым и конечным, в разделе статистики
+  ///
+  /// In en, this message translates to:
+  /// **'Intermediate'**
+  String get statisticsTileIntermediate;
+
+  /// Плитка действий, путь которых заканчивается намерением, в разделе статистики
+  ///
+  /// In en, this message translates to:
+  /// **'Final'**
+  String get statisticsTileTerminal;
+
+  /// Плитка на всю ширину: действия, засчитанные намерению по текущим активным связям
+  ///
+  /// In en, this message translates to:
+  /// **'Through relations, as they are now'**
+  String get statisticsTileThroughRelations;
+
+  /// Доступное название плитки вида: название, число действий и период; выбранное состояние передаёт сама плитка
+  ///
+  /// In en, this message translates to:
+  /// **'{view}: {actions} in {period}'**
+  String statisticsTileSemantics(String view, String actions, String period);
+
+  /// Пояснение выбранной плитки «Корневое» под плитками раздела статистики
+  ///
+  /// In en, this message translates to:
+  /// **'Actions whose path starts from this intention.'**
+  String get statisticsIntentionRootHint;
+
+  /// Пояснение выбранной плитки «Промежуточное» под плитками раздела статистики
+  ///
+  /// In en, this message translates to:
+  /// **'Actions whose path passes through this intention between the root and the final one.'**
+  String get statisticsIntentionIntermediateHint;
+
+  /// Пояснение выбранной плитки «Конечное» под плитками раздела статистики
+  ///
+  /// In en, this message translates to:
+  /// **'Actions whose path ends at this intention: it is their final one.'**
+  String get statisticsIntentionTerminalHint;
+
+  /// Пояснение выбранной плитки «Через связи, как сейчас»: число меняется вместе со связями
+  ///
+  /// In en, this message translates to:
+  /// **'Actions that this intention serves through its relations. The count changes when the relations do.'**
+  String get statisticsIntentionThroughRelationsHint;
 
   /// Доступное название кнопки быстрого создания
   ///

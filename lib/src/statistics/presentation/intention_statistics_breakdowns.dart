@@ -63,10 +63,9 @@ final class IntentionStatisticsBreakdownsSliver extends StatelessWidget {
     ) => _BreakdownSliver<StatisticsItem>(
       key: ValueKey(kind),
       title: switch (kind) {
-        StatisticsBreakdown.rootIntentions =>
-          texts.statisticsBreakdownSourceIntentions,
+        StatisticsBreakdown.rootIntentions => texts.statisticsRootIntentions,
         StatisticsBreakdown.terminalIntentions =>
-          texts.statisticsBreakdownSelectedActions,
+          texts.statisticsTerminalIntentions,
         StatisticsBreakdown.relations => texts.statisticsBreakdownRelations,
       },
       state: breakdown,
@@ -81,15 +80,12 @@ final class IntentionStatisticsBreakdownsSliver extends StatelessWidget {
             : () => onOpenIntention!(item.id, kind),
       ),
     );
+    // Разбивка без элементов не показывается ни заголовком, ни нулём.
     return SliverMainAxisGroup(
       slivers: [
-        if (read is IntentionStatisticsEmpty)
-          SliverToBoxAdapter(
-            child: StatisticsReadNotice(message: texts.statisticsEmpty),
-          ),
-        if (breakdowns.rootIntentions case final roots?)
+        if (breakdowns.rootIntentions case final roots? when roots.hasItems)
           intentions(StatisticsBreakdown.rootIntentions, roots),
-        if (breakdowns.relations case final relations?)
+        if (breakdowns.relations case final relations? when relations.hasItems)
           _BreakdownSliver<StatisticsRelationItem>(
             key: const ValueKey(StatisticsBreakdown.relations),
             title: texts.statisticsBreakdownRelations,
@@ -110,7 +106,8 @@ final class IntentionStatisticsBreakdownsSliver extends StatelessWidget {
                     ),
             ),
           ),
-        if (breakdowns.terminalIntentions case final terminals?)
+        if (breakdowns.terminalIntentions case final terminals?
+            when terminals.hasItems)
           intentions(StatisticsBreakdown.terminalIntentions, terminals),
       ],
     );

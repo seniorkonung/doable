@@ -55,6 +55,13 @@ const _canBeUsed = CountTile(
   ),
 );
 const _groups = [_needs, _canUse, _needed, _canBeUsed];
+const _reach = CountTileWide(
+  id: _Group.canBeUsed,
+  count: 13,
+  name: 'Через связи, как сейчас',
+  semanticLabel: 'Через связи: 13 действий',
+  icon: DoableIconData.graph,
+);
 
 const _started = CountTile(
   id: _Group.needs,
@@ -261,6 +268,94 @@ void main() {
       for (final name in ['Нужно', 'Нужно для', 'Можно использовать для']) {
         expect(_archiveIcon(_tile(name)), findsNothing);
       }
+    });
+
+    testWidgets('в $themeName теме широкая плитка стоит под сеткой на всю '
+        'ширину в 8, число и подпись слева, значок graph цвета muted в '
+        'конце строки', (tester) async {
+      final picked = <_Group>[];
+      await tester.pumpWidget(
+        _app(
+          brightness,
+          CountTiles(
+            tiles: const [_started, _onPath, _ended],
+            columns: CountTileColumns.three,
+            wide: _reach,
+            value: _Group.needs,
+            onPick: picked.add,
+            label: 'Выборы намерения',
+          ),
+        ),
+      );
+
+      final grid = tester.getRect(_tile('Закончены здесь'));
+      final wide = tester.getRect(_tile(_reach.name));
+      expect(wide.left, 0);
+      expect(wide.right, 390);
+      expect(wide.top - grid.bottom, 8);
+      expect(tester.getRect(find.text('13')).left - wide.left, 12);
+      final icon = tester.widget<DoableIcon>(
+        find.descendant(
+          of: _tile(_reach.name),
+          matching: find.byType(DoableIcon),
+        ),
+      );
+      expect(icon.icon, DoableIconData.graph);
+      expect(icon.size, 24);
+      expect(icon.color, colors.muted);
+      expect(
+        wide.right -
+            tester
+                .getRect(
+                  find.descendant(
+                    of: _tile(_reach.name),
+                    matching: find.byType(DoableIcon),
+                  ),
+                )
+                .right,
+        12,
+      );
+      expect(_plane(tester, _reach.name).color, isNull);
+      expect(
+        _ring(tester, _reach.name).border,
+        Border.all(color: colors.hairline),
+      );
+
+      await tester.tap(find.text(_reach.name));
+      expect(picked, [_Group.canBeUsed]);
+    });
+
+    testWidgets('в $themeName теме широкая плитка открывается и слышится как '
+        'ещё одна плитка той же радиогруппы', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await tester.pumpWidget(
+        _app(
+          brightness,
+          CountTiles(
+            tiles: const [_started, _onPath, _ended],
+            columns: CountTileColumns.three,
+            wide: _reach,
+            value: _Group.canBeUsed,
+            onPick: (_) {},
+            label: 'Выборы намерения',
+          ),
+        ),
+      );
+
+      expect(_plane(tester, _reach.name).color, colors.fill);
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Выборы намерения')),
+        matchesSemantics(
+          label: 'Выборы намерения',
+          children: [
+            _tileSemantics('Начаты здесь: 81', selected: false),
+            _tileSemantics('На пути: 5', selected: false),
+            _tileSemantics('Закончены здесь: 0', selected: false),
+            _tileSemantics('Через связи: 13 действий', selected: true),
+          ],
+        ),
+      );
+      semantics.dispose();
     });
 
     testWidgets('в $themeName теме плитка без глифа не рисует отметку '

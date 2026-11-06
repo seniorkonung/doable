@@ -3,6 +3,12 @@ import 'dart:ui' show SemanticsRole;
 import 'package:flutter/material.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../design_system/components/count_tiles.dart';
+import '../../design_system/components/empty_state.dart';
+import '../../design_system/doable_colors.dart';
+import '../../design_system/doable_icon.dart';
+import '../../design_system/doable_metrics.dart';
+import '../../design_system/doable_type.dart';
 import '../../shared/domain/calendar_date.dart';
 import '../application/intention_statistics_read_contract.dart';
 import '../application/statistics_period.dart';
@@ -124,30 +130,42 @@ final class IntentionStatisticsOverview extends StatelessWidget {
             ),
           ],
         ),
-        if (state.read case IntentionStatisticsLoaded(:final section)) ...[
-          const SizedBox(height: 8),
-          _Cards(
-            section: section,
+        if (state.read case final IntentionStatisticsLoaded loaded) ...[
+          const SizedBox(height: 4),
+          _ViewTiles(
+            section: loaded.section,
             periodLabel: periodLabel,
             onViewSelected: onViewSelected,
           ),
-          const SizedBox(height: 16),
-          _Summary(section: section),
-          const SizedBox(height: 16),
-          IntentionStatisticsCalendarView(
-            calendar: section.calendar,
-            localDate: selection.localDate,
-            onMonthSelected: onMonthSelected,
-            onDaySelected: onDaySelected,
-          ),
+          _ViewHint(view: loaded.section.view),
+          // Без действий вида сводку, календарь и столбики заменяет сообщение,
+          // а плитки остаются; пустые разбивки не показываются.
+          ...switch (loaded) {
+            IntentionStatisticsData(:final section) => [
+              const SizedBox(height: 16),
+              _Summary(section: section),
+              const SizedBox(height: 16),
+              IntentionStatisticsCalendarView(
+                calendar: section.calendar,
+                localDate: selection.localDate,
+                onMonthSelected: onMonthSelected,
+                onDaySelected: onDaySelected,
+              ),
+            ],
+            IntentionStatisticsEmpty(:final section) => [
+              _EmptyView(view: section.view, periodLabel: periodLabel),
+            ],
+          },
         ],
       ],
     );
   }
 }
 
-final class _Cards extends StatelessWidget {
-  const _Cards({
+/// Три плитки ролей в пути и широкая плитка «Через связи, как сейчас» с числом
+/// действий вида за период; открыта ровно одна.
+final class _ViewTiles extends StatelessWidget {
+  const _ViewTiles({
     required this.section,
     required this.periodLabel,
     required this.onViewSelected,
@@ -160,71 +178,115 @@ final class _Cards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final texts = AppLocalizations.of(context);
-    final colors = Theme.of(context).colorScheme;
-    // Wrap переносит карточки, а их высота следует содержимому и масштабу текста:
-    // https://api.flutter.dev/flutter/widgets/Wrap-class.html
-    return LayoutBuilder(
-      builder: (context, constraints) => Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final view in StatisticsView.values)
-            SizedBox(
-              width: constraints.maxWidth >= 600
-                  ? (constraints.maxWidth - 8) / 2
-                  : constraints.maxWidth,
-              child: MergeSemantics(
-                child: Semantics(
-                  selected: section.view == view,
-                  inMutuallyExclusiveGroup: true,
-                  child: OutlinedButton(
-                    onPressed: () => onViewSelected(view),
-                    style: OutlinedButton.styleFrom(
-                      backgroundColor: section.view == view
-                          ? colors.secondaryContainer
-                          : null,
-                      foregroundColor: section.view == view
-                          ? colors.onSecondaryContainer
-                          : null,
-                      padding: const EdgeInsets.all(12),
-                    ),
-                    child: Semantics(
-                      excludeSemantics: true,
-                      label: [
-                        texts.statisticsViewCardSemantics(
-                          _viewLabel(texts, view),
-                          periodLabel,
-                          texts.statisticsContributionCountsSemantics(
-                            section.cards[view].contribution,
-                            section.cards[view].planned,
-                          ),
-                        ),
-                        if (section.view == view) ?_shareLabel(texts, section),
-                      ].join('. '),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (section.view == view)
-                            const Icon(Icons.check, size: 18),
-                          Text(
-                            _viewLabel(texts, view),
-                            textAlign: TextAlign.center,
-                          ),
-                          Text(
-                            texts.statisticsContributionCounts(
-                              section.cards[view].contribution,
-                              section.cards[view].planned,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
+    String semanticLabel(StatisticsView view, String name) =>
+        texts.statisticsTileSemantics(
+          name,
+          texts.statisticsPeriodActions(section.cards[view].planned),
+          periodLabel,
+        );
+    CountTile<StatisticsView> tile(StatisticsView view, String name) =>
+        CountTile(
+          key: ValueKey(view),
+          id: view,
+          count: section.cards[view].planned,
+          name: name,
+          semanticLabel: semanticLabel(view, name),
+        );
+    final throughRelations = texts.statisticsTileThroughRelations;
+    return CountTiles<StatisticsView>(
+      columns: CountTileColumns.three,
+      value: section.view,
+      onPick: onViewSelected,
+      label: texts.statisticsTilesLabel,
+      tiles: [
+        tile(StatisticsView.rootIntentions, texts.statisticsTileRoot),
+        tile(
+          StatisticsView.intermediateIntentions,
+          texts.statisticsTileIntermediate,
+        ),
+        tile(StatisticsView.terminalIntentions, texts.statisticsTileTerminal),
+      ],
+      wide: CountTileWide(
+        key: const ValueKey(StatisticsView.throughRelations),
+        id: StatisticsView.throughRelations,
+        count: section.cards[StatisticsView.throughRelations].planned,
+        name: throughRelations,
+        semanticLabel: semanticLabel(
+          StatisticsView.throughRelations,
+          throughRelations,
+        ),
+        icon: DoableIconData.graph,
       ),
+    );
+  }
+}
+
+/// Пояснение выбранного вида под плитками; для «Через связи» оно же говорит,
+/// что число меняется вместе со связями.
+final class _ViewHint extends StatelessWidget {
+  const _ViewHint({required this.view});
+
+  final StatisticsView view;
+
+  @override
+  Widget build(BuildContext context) {
+    final texts = AppLocalizations.of(context);
+    final colors = Theme.of(context).extension<DoableColors>()!;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        DoableMetrics.space1,
+        10,
+        DoableMetrics.space1,
+        0,
+      ),
+      child: Text(switch (view) {
+        StatisticsView.rootIntentions => texts.statisticsIntentionRootHint,
+        StatisticsView.intermediateIntentions =>
+          texts.statisticsIntentionIntermediateHint,
+        StatisticsView.terminalIntentions =>
+          texts.statisticsIntentionTerminalHint,
+        StatisticsView.throughRelations =>
+          texts.statisticsIntentionThroughRelationsHint,
+      }, style: DoableType.caption.copyWith(color: colors.muted)),
+    );
+  }
+}
+
+/// Сообщение вместо сводки, календаря и разбивок: какие действия здесь будут
+/// посчитаны.
+final class _EmptyView extends StatelessWidget {
+  const _EmptyView({required this.view, required this.periodLabel});
+
+  final StatisticsView view;
+  final String periodLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final texts = AppLocalizations.of(context);
+    return EmptyState(
+      title: switch (view) {
+        StatisticsView.rootIntentions =>
+          texts.statisticsIntentionEmptyRootTitle(periodLabel),
+        StatisticsView.intermediateIntentions =>
+          texts.statisticsIntentionEmptyIntermediateTitle(periodLabel),
+        StatisticsView.terminalIntentions =>
+          texts.statisticsIntentionEmptyTerminalTitle(periodLabel),
+        StatisticsView.throughRelations =>
+          texts.statisticsIntentionEmptyThroughRelationsTitle(periodLabel),
+      },
+      text: switch (view) {
+        StatisticsView.rootIntentions => texts.statisticsIntentionEmptyRootText,
+        StatisticsView.intermediateIntentions =>
+          texts.statisticsIntentionEmptyIntermediateText,
+        StatisticsView.terminalIntentions =>
+          texts.statisticsIntentionEmptyTerminalText,
+        StatisticsView.throughRelations =>
+          texts.statisticsIntentionEmptyThroughRelationsText,
+      },
+      textMaxWidth: 270,
+      spaceAbove: DoableMetrics.space6,
+      spaceBelow: DoableMetrics.space6,
+      pretty: true,
     );
   }
 }
@@ -279,12 +341,3 @@ String? _shareLabel(
     : texts.statisticsPeriodActionsShare(
         section.selectedCounts.planned / section.periodCounts.planned,
       );
-
-String _viewLabel(AppLocalizations texts, StatisticsView view) =>
-    switch (view) {
-      StatisticsView.rootIntentions => texts.statisticsRootIntentions,
-      StatisticsView.intermediateIntentions =>
-        texts.statisticsIntermediateIntentions,
-      StatisticsView.terminalIntentions => texts.statisticsTerminalIntentions,
-      StatisticsView.throughRelations => texts.statisticsThroughRelations,
-    };

@@ -210,8 +210,40 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get statisticsEmpty =>
-      'No daily choices are credited to this view for the selected period.';
+  String statisticsIntentionEmptyRootTitle(String period) {
+    return 'No actions with it as the root in $period';
+  }
+
+  @override
+  String statisticsIntentionEmptyIntermediateTitle(String period) {
+    return 'No actions through it in $period';
+  }
+
+  @override
+  String statisticsIntentionEmptyTerminalTitle(String period) {
+    return 'No actions with it as the final one in $period';
+  }
+
+  @override
+  String statisticsIntentionEmptyThroughRelationsTitle(String period) {
+    return 'No actions through relations in $period';
+  }
+
+  @override
+  String get statisticsIntentionEmptyRootText =>
+      'An action of the selected period whose path starts from this intention will be counted here.';
+
+  @override
+  String get statisticsIntentionEmptyIntermediateText =>
+      'An action of the selected period whose path passes through this intention between the root and the final one will be counted here.';
+
+  @override
+  String get statisticsIntentionEmptyTerminalText =>
+      'An action of the selected period whose path ends at this intention will be counted here.';
+
+  @override
+  String get statisticsIntentionEmptyThroughRelationsText =>
+      'An action of the selected period that this intention serves through its relations will be counted here.';
 
   @override
   String get statisticsRefreshing => 'Updating statistics…';
@@ -258,13 +290,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statisticsSectionTitle => 'Statistics';
 
   @override
-  String get statisticsBreakdownSourceIntentions => 'By source intentions';
-
-  @override
-  String get statisticsBreakdownSelectedActions => 'By selected actions';
-
-  @override
-  String get statisticsBreakdownRelations => 'By relations';
+  String get statisticsBreakdownRelations => 'Comes through';
 
   @override
   String statisticsExplicitPathActions(int count, int planned) {
@@ -298,14 +324,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statisticsCalendarDayAllCompleted =>
-      'All credited daily choices are completed';
+      'All actions of this view are completed';
 
   @override
   String get statisticsCalendarDayHasIncomplete =>
-      'There is an incomplete credited daily choice';
+      'There is an incomplete action of this view';
 
   @override
-  String get statisticsCalendarDayNoChoices => 'No credited daily choices';
+  String get statisticsCalendarDayNoActions => 'No actions of this view';
 
   @override
   String statisticsCalendarDaySemantics(DateTime date, String dayStatus) {
@@ -326,13 +352,42 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String statisticsViewCardSemantics(
-    String view,
-    String period,
-    String counts,
-  ) {
-    return '$view. $period. $counts';
+  String get statisticsTilesLabel =>
+      'How the actions are counted for this intention';
+
+  @override
+  String get statisticsTileRoot => 'Root';
+
+  @override
+  String get statisticsTileIntermediate => 'Intermediate';
+
+  @override
+  String get statisticsTileTerminal => 'Final';
+
+  @override
+  String get statisticsTileThroughRelations =>
+      'Through relations, as they are now';
+
+  @override
+  String statisticsTileSemantics(String view, String actions, String period) {
+    return '$view: $actions in $period';
   }
+
+  @override
+  String get statisticsIntentionRootHint =>
+      'Actions whose path starts from this intention.';
+
+  @override
+  String get statisticsIntentionIntermediateHint =>
+      'Actions whose path passes through this intention between the root and the final one.';
+
+  @override
+  String get statisticsIntentionTerminalHint =>
+      'Actions whose path ends at this intention: it is their final one.';
+
+  @override
+  String get statisticsIntentionThroughRelationsHint =>
+      'Actions that this intention serves through its relations. The count changes when the relations do.';
 
   @override
   String get quickCreationLabel => 'Quick create';

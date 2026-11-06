@@ -128,7 +128,7 @@ final class _Day extends StatelessWidget {
               texts.statisticsCalendarDayAllCompleted,
             ActionDayStatus.hasIncomplete =>
               texts.statisticsCalendarDayHasIncomplete,
-            null => texts.statisticsCalendarDayNoChoices,
+            null => texts.statisticsCalendarDayNoActions,
           },
         ),
         child: Column(

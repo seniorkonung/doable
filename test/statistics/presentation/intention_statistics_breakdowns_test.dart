@@ -92,10 +92,9 @@ void main() {
       final texts = _texts(tester);
       for (final kind in StatisticsBreakdown.values) {
         final title = switch (kind) {
-          StatisticsBreakdown.rootIntentions =>
-            texts.statisticsBreakdownSourceIntentions,
+          StatisticsBreakdown.rootIntentions => texts.statisticsRootIntentions,
           StatisticsBreakdown.terminalIntentions =>
-            texts.statisticsBreakdownSelectedActions,
+            texts.statisticsTerminalIntentions,
           StatisticsBreakdown.relations => texts.statisticsBreakdownRelations,
         };
         expect(
@@ -106,6 +105,32 @@ void main() {
     }
   });
 
+  testWidgets('разбивка без элементов скрыта целиком, а непустая соседняя '
+      'остаётся', (tester) async {
+    final base = _state();
+    final loaded = base.read as IntentionStatisticsLoaded;
+    await _pump(
+      tester,
+      base.withRead(
+        loaded.copyWith(
+          breakdowns: loaded.breakdowns.copyWith(
+            relations:
+                IntentionStatisticsBreakdownState<StatisticsRelationItem>(
+                  items: const [],
+                  totalItems: 0,
+                  nextCursor: null,
+                ),
+          ),
+        ),
+      ),
+    );
+    final texts = _texts(tester);
+    expect(find.text(texts.statisticsBreakdownRelations), findsNothing);
+    expect(find.text(texts.statisticsTotalItems(0)), findsNothing);
+    expect(find.text(texts.statisticsTerminalIntentions), findsOneWidget);
+    expect(find.text(texts.statisticsTotalItems(1)), findsOneWidget);
+  });
+
   testWidgets('загрузка, пустой вид, отсутствие намерения и отказы различимы', (
     tester,
   ) async {
@@ -114,10 +139,11 @@ void main() {
     await _pump(tester, base.withRead(const IntentionStatisticsInitialLoad()));
     final texts = _texts(tester);
     expect(find.text(texts.statisticsLoading), findsOneWidget);
-    expect(find.text(texts.statisticsEmpty), findsNothing);
     await _pump(tester, _state(empty: true));
-    expect(find.text(texts.statisticsEmpty), findsWidgets);
-    expect(find.text(texts.statisticsTotalItems(0)), findsNWidgets(2));
+    // Пустая разбивка скрыта целиком: ни заголовка, ни нуля.
+    expect(find.text(texts.statisticsBreakdownRelations), findsNothing);
+    expect(find.text(texts.statisticsTerminalIntentions), findsNothing);
+    expect(find.text(texts.statisticsTotalItems(0)), findsNothing);
     await _pump(tester, base.withRead(const IntentionStatisticsNotFound()));
     expect(find.text(texts.detailsNotFound), findsOneWidget);
     for (final (failure, message, canRetry) in [
@@ -143,7 +169,6 @@ void main() {
         onRetry: () => retries++,
       );
       expect(find.text(message), findsOneWidget);
-      expect(find.text(texts.statisticsEmpty), findsNothing);
       expect(
         find.text(texts.commonRetry),
         canRetry ? findsOneWidget : findsNothing,
@@ -214,7 +239,7 @@ void main() {
       updates.value = initial.withRead(beforeRefresh);
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
-        find.text(texts.statisticsBreakdownSelectedActions),
+        find.text(texts.statisticsTerminalIntentions),
         300,
       );
       expect(find.text(texts.statisticsTotalItems(200)), findsOneWidget);

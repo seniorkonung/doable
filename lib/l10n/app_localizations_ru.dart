@@ -214,8 +214,40 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get statisticsEmpty =>
-      'За выбранный период нет засчитанных дневных выборов для этого вида.';
+  String statisticsIntentionEmptyRootTitle(String period) {
+    return 'Нет действий с ним корневым за $period';
+  }
+
+  @override
+  String statisticsIntentionEmptyIntermediateTitle(String period) {
+    return 'Нет действий через него за $period';
+  }
+
+  @override
+  String statisticsIntentionEmptyTerminalTitle(String period) {
+    return 'Нет действий с ним конечным за $period';
+  }
+
+  @override
+  String statisticsIntentionEmptyThroughRelationsTitle(String period) {
+    return 'Нет действий через связи за $period';
+  }
+
+  @override
+  String get statisticsIntentionEmptyRootText =>
+      'Здесь будет посчитано действие выбранного периода, путь которого начинается с этого намерения.';
+
+  @override
+  String get statisticsIntentionEmptyIntermediateText =>
+      'Здесь будет посчитано действие выбранного периода, путь которого проходит через это намерение между корневым и конечным.';
+
+  @override
+  String get statisticsIntentionEmptyTerminalText =>
+      'Здесь будет посчитано действие выбранного периода, путь которого заканчивается этим намерением.';
+
+  @override
+  String get statisticsIntentionEmptyThroughRelationsText =>
+      'Здесь будет посчитано действие выбранного периода, которому это намерение служит через связи.';
 
   @override
   String get statisticsRefreshing => 'Обновляем статистику…';
@@ -263,13 +295,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get statisticsSectionTitle => 'Статистика';
 
   @override
-  String get statisticsBreakdownSourceIntentions => 'По исходным намерениям';
-
-  @override
-  String get statisticsBreakdownSelectedActions => 'По выбранным действиям';
-
-  @override
-  String get statisticsBreakdownRelations => 'По связям';
+  String get statisticsBreakdownRelations => 'Через какие связи';
 
   @override
   String statisticsExplicitPathActions(int count, int planned) {
@@ -302,16 +328,14 @@ class AppLocalizationsRu extends AppLocalizations {
   String get statisticsRefreshUnexpectedShort => 'Ошибка обновления.';
 
   @override
-  String get statisticsCalendarDayAllCompleted =>
-      'Все засчитанные дневные выборы выполнены';
+  String get statisticsCalendarDayAllCompleted => 'Все действия вида выполнены';
 
   @override
   String get statisticsCalendarDayHasIncomplete =>
-      'Есть невыполненный засчитанный дневной выбор';
+      'Есть невыполненное действие вида';
 
   @override
-  String get statisticsCalendarDayNoChoices =>
-      'Нет засчитанных дневных выборов';
+  String get statisticsCalendarDayNoActions => 'Нет действий вида';
 
   @override
   String statisticsCalendarDaySemantics(DateTime date, String dayStatus) {
@@ -332,13 +356,40 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String statisticsViewCardSemantics(
-    String view,
-    String period,
-    String counts,
-  ) {
-    return '$view. $period. $counts';
+  String get statisticsTilesLabel => 'Как считаются действия этого намерения';
+
+  @override
+  String get statisticsTileRoot => 'Корневое';
+
+  @override
+  String get statisticsTileIntermediate => 'Промежуточное';
+
+  @override
+  String get statisticsTileTerminal => 'Конечное';
+
+  @override
+  String get statisticsTileThroughRelations => 'Через связи, как сейчас';
+
+  @override
+  String statisticsTileSemantics(String view, String actions, String period) {
+    return '$view: $actions за $period';
   }
+
+  @override
+  String get statisticsIntentionRootHint =>
+      'Действия, путь которых начинается с этого намерения.';
+
+  @override
+  String get statisticsIntentionIntermediateHint =>
+      'Действия, путь которых проходит через это намерение между корневым и конечным.';
+
+  @override
+  String get statisticsIntentionTerminalHint =>
+      'Действия, путь которых заканчивается этим намерением: оно их конечное.';
+
+  @override
+  String get statisticsIntentionThroughRelationsHint =>
+      'Действия, которым это намерение служит через связи. Число меняется вместе со связями.';
 
   @override
   String get quickCreationLabel => 'Быстрое создание';

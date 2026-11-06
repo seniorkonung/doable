@@ -19,6 +19,7 @@ import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:doable/src/statistics/presentation/home_statistics_state.dart';
 import 'package:doable/src/statistics/presentation/home_statistics_view_model.dart';
+import 'package:doable/src/statistics/presentation/intention_statistics_calendar.dart';
 import 'package:doable/src/statistics/presentation/intention_statistics_section.dart';
 import 'package:doable/src/statistics/presentation/intention_statistics_state.dart';
 import 'package:doable/src/statistics/presentation/intention_statistics_view_model.dart';
@@ -157,7 +158,10 @@ void main() {
           await tester.ensureVisible(
             find.text('Статистика', skipOffstage: false).last,
           );
-          await _tap(tester, find.text(app.texts.statisticsThroughRelations));
+          await _tap(
+            tester,
+            find.text(app.texts.statisticsTileThroughRelations),
+          );
           await _wait(
             tester,
             () =>
@@ -256,7 +260,7 @@ void main() {
         StatisticsView.terminalIntentions,
         StatisticsMonth(2025, 9),
       );
-      await _tap(tester, find.text(app.texts.statisticsThroughRelations));
+      await _tap(tester, find.text(app.texts.statisticsTileThroughRelations));
       final relation = find.descendant(
         of: find.byKey(const ValueKey(StatisticsBreakdown.relations)),
         matching: find.text('Намерение 2'),
@@ -273,14 +277,34 @@ void main() {
       );
       final second = app.sectionProvider(tester);
       expect(second, isNot(first));
-      await _tap(tester, find.text(app.texts.statisticsRootIntentions));
+      await _tap(tester, find.text(app.texts.statisticsTileIntermediate));
       await _tap(tester, find.byTooltip(app.texts.statisticsPreviousMonth));
       await _wait(
         tester,
-        () => app.container.read(second).read is IntentionStatisticsLoaded,
+        () => _isLoadedFor(app, second, StatisticsMonth(2025, 8)),
+      );
+      // В августе у «Намерения 2» нет действий: плитки сохранены, а вместо
+      // календаря стоит сообщение.
+      expect(
+        find.text(
+          app.texts.statisticsIntentionEmptyIntermediateTitle(
+            app.texts.statisticsMonthPeriod(DateTime.utc(2025, 8)),
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text(app.texts.statisticsTileThroughRelations),
+        findsOneWidget,
+      );
+      expect(find.byType(IntentionStatisticsCalendarView), findsNothing);
+      await _tap(tester, find.byTooltip(app.texts.statisticsNextMonth));
+      await _wait(
+        tester,
+        () => _isLoadedFor(app, second, StatisticsMonth(2025, 9)),
       );
       final topState = app.container.read(second);
-      expect(topState.selection.period, StatisticsMonth(2025, 8));
+      expect(topState.selection.view, StatisticsView.intermediateIntentions);
       tester.binding.platformDispatcher.localesTestValue = const [Locale('en')];
       await tester.pumpAndSettle();
       expect(find.text('Statistics').first, findsOneWidget);
@@ -290,8 +314,8 @@ void main() {
       final english = lookupAppLocalizations(const Locale('en'));
       final day = find.bySemanticsLabel(
         english.statisticsCalendarDaySemantics(
-          DateTime.utc(2025, 8, 1),
-          english.statisticsCalendarDayNoChoices,
+          DateTime.utc(2025, 9, 12),
+          english.statisticsCalendarDayAllCompleted,
         ),
       );
       await tester.ensureVisible(day);
@@ -305,7 +329,7 @@ void main() {
       expect(app.router.stack, hasLength(depth + 1));
       expect(
         tester.widget<ActionDayDatePage>(find.byType(ActionDayDatePage)).date,
-        CalendarDate.fromParts(2025, 8, 1),
+        CalendarDate.fromParts(2025, 9, 12),
       );
       expect(
         tester
@@ -460,6 +484,15 @@ Future<void> _scrollTo(WidgetTester tester, Finder row, Finder page) async {
   }
   fail('Строка не появилась: $row');
 }
+
+bool _isLoadedFor(
+  _App app,
+  IntentionStatisticsViewModelProvider provider,
+  StatisticsPeriod period,
+) => switch (app.container.read(provider).read) {
+  IntentionStatisticsLoaded(:final section) => section.query.period == period,
+  _ => false,
+};
 
 Future<void> _untilFound(WidgetTester tester, Finder finder) =>
     _wait(tester, () => finder.evaluate().isNotEmpty);

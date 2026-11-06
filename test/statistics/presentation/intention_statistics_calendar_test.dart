@@ -24,7 +24,7 @@ void main() {
       for (final (day, status, icon) in [
         (5, texts.statisticsCalendarDayAllCompleted, Icons.check),
         (7, texts.statisticsCalendarDayHasIncomplete, Icons.circle_outlined),
-        (9, texts.statisticsCalendarDayNoChoices, null),
+        (9, texts.statisticsCalendarDayNoActions, null),
       ]) {
         final label = texts.statisticsCalendarDaySemantics(
           DateTime.utc(2026, 10, day),

@@ -97,16 +97,7 @@ void main() {
             .descendant(of: scrollView, matching: find.byType(Scrollable))
             .first;
         final position = tester.state<ScrollableState>(scrollable).position;
-        final cardLabel = find.text(texts.statisticsThroughRelations);
-        final card = size.height < 400
-            ? find.descendant(
-                of: find.widgetWithText(
-                  OutlinedButton,
-                  texts.statisticsThroughRelations,
-                ),
-                matching: find.text(texts.statisticsContributionCounts(30, 30)),
-              )
-            : cardLabel;
+        final card = find.text(texts.statisticsTileThroughRelations);
         await _placeInFreeArea(tester, card, position);
         final cardOffset = position.pixels;
 
@@ -255,7 +246,10 @@ void main() {
         await tester.pumpAndSettle();
         await _placeInFreeArea(
           tester,
-          find.text(texts.statisticsContributionCounts(29, 29)).first,
+          find.descendant(
+            of: find.byKey(const ValueKey(StatisticsView.throughRelations)),
+            matching: find.text('29'),
+          ),
           position,
         );
 
@@ -323,7 +317,13 @@ void main() {
         expect(query.view, isNull);
         expect(find.byType(TagAssignmentsSection), findsNothing);
         expect(statistics.hitTestable(), findsOneWidget);
-        expect(find.textContaining('октябрь 2026'), findsOneWidget);
+        expect(
+          find.text(
+            lookupAppLocalizations(const Locale('ru'))
+                .statisticsMonthPeriod(DateTime.utc(2026, 10)),
+          ),
+          findsOneWidget,
+        );
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
       }
@@ -673,7 +673,7 @@ void main() {
         find.text('Statistics', skipOffstage: false).first,
       );
       await tester.pumpAndSettle();
-      expect(find.textContaining('October 2026'), findsOneWidget);
+      expect(find.text('October 2026'), findsOneWidget);
       expect(repository.statisticsQueries.last.period, StatisticsYear(2019));
     },
   );

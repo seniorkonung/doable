@@ -145,6 +145,9 @@ final class IntentionStatisticsBreakdownState<T> {
   final StatisticsBreakdownCursor<T>? nextCursor;
   final IntentionStatisticsPageStatus pageStatus;
 
+  /// Разбивка без элементов в разделе не показывается.
+  bool get hasItems => totalItems > 0;
+
   IntentionStatisticsBreakdownState<T> withPageStatus(
     IntentionStatisticsPageStatus pageStatus,
   ) => IntentionStatisticsBreakdownState(
