@@ -281,6 +281,15 @@ final class ActionDayPageReadDiagnosticsEvent extends DiagnosticsEvent {
   final bool isContinuation;
 }
 
+/// Чтение состояний дней окна календаря: исход, длительность и безопасная
+/// категория отказа. Даты, окно, идентификаторы, пользовательский текст и
+/// исходное исключение не входят в контракт события.
+final class ActionDayStatusesReadDiagnosticsEvent extends DiagnosticsEvent {
+  const ActionDayStatusesReadDiagnosticsEvent({
+    required DiagnosticsStatus status,
+  }) : super(status);
+}
+
 final class BootstrapDiagnosticsEvent extends DiagnosticsEvent {
   const BootstrapDiagnosticsEvent({
     required DiagnosticsStatus status,

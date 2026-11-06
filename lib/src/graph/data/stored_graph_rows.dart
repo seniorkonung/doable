@@ -514,6 +514,16 @@ ActionPath _decodeStoredActionPath(Iterable<Map<String, Object?>> rows) {
   return ActionPath(intentions);
 }
 
+/// Дата действия из столбца `date`.
+CalendarDate decodeStoredActionDate(Map<String, Object?> data) {
+  final value = requiredStoredString(data, 'date');
+  try {
+    return CalendarDate.parseCanonical(value);
+  } on CalendarDateValidationException {
+    throw const StoredGraphCorruption();
+  }
+}
+
 /// Дата дневного выбора из столбца `choice_date`.
 CalendarDate decodeStoredChoiceDate(Map<String, Object?> data) {
   final value = requiredStoredString(data, 'choice_date');

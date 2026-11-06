@@ -6,6 +6,7 @@ import 'dart:typed_data';
 
 import '../../action/application/action_command.dart';
 import '../../action/application/action_day.dart';
+import '../../action/application/action_day_statuses.dart';
 import '../../action/application/action_result.dart';
 import '../../action/domain/action.dart';
 import '../../action/domain/action_id.dart';
@@ -110,6 +111,7 @@ part 'drift_personal_graph_repository_daily_choice_day_statuses.dart';
 part 'drift_personal_graph_repository_daily_choice_commands.dart';
 part 'drift_personal_graph_repository_action_commands.dart';
 part 'drift_personal_graph_repository_action_day.dart';
+part 'drift_personal_graph_repository_action_day_statuses.dart';
 part 'drift_personal_graph_repository_relation_commands.dart';
 part 'drift_personal_graph_repository_relation_details.dart';
 part 'drift_personal_graph_repository_relation_groups.dart';
@@ -320,6 +322,11 @@ final class DriftPersonalGraphRepository
   @override
   Future<ActionDayPageResult> getActionDayPage(ActionDayQuery query) =>
       _readActionDayPage(query);
+
+  @override
+  Future<ActionDayStatusesReadResult> getActionDayStatuses(
+    ActionDayStatusQuery query,
+  ) => _readActionDayStatuses(query);
 
   @override
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
