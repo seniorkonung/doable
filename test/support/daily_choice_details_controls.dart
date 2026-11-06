@@ -4,7 +4,7 @@ library;
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_sheet.dart';
-import 'package:doable/src/design_system/components/choice_head.dart';
+import 'package:doable/src/design_system/components/action_head.dart';
 import 'package:doable/src/design_system/components/options_menu.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
@@ -22,11 +22,11 @@ DailyChoiceId shownDailyChoice(WidgetTester tester) =>
 
 /// Подробный просмотр загрузил данные и готов к действиям.
 Finder get dailyChoiceDetailsReady =>
-    find.descendant(of: dailyChoiceDetails, matching: find.byType(ChoiceHead));
+    find.descendant(of: dailyChoiceDetails, matching: find.byType(ActionHead));
 
 /// Шапка подробного просмотра с выполнением и приоритетом выбора.
-ChoiceHead shownDailyChoiceHead(WidgetTester tester) =>
-    tester.widget<ChoiceHead>(dailyChoiceDetailsReady);
+ActionHead shownDailyChoiceHead(WidgetTester tester) =>
+    tester.widget<ActionHead>(dailyChoiceDetailsReady);
 
 /// Значение [value] поля на вкладке «Обзор».
 Finder dailyChoiceDetailsField(String value) =>

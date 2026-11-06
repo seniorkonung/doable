@@ -5,17 +5,17 @@ import '../doable_icon.dart';
 import '../doable_metrics.dart';
 import '../doable_priority.dart';
 
-/// Кольцо флажка дневного выбора: цвет кольца — приоритет, выполненный выбор
+/// Кольцо флажка действия: цвет кольца — приоритет, выполненное действие
 /// заливается серым с галочкой.
 ///
 /// Метка без области нажатия и без собственного имени: нажатие и доступное
 /// название, в том числе приоритета, задаёт охватывающий элемент управления.
 ///
 /// P1–P3 рисуют кольцо цвета приоритета с его тоном 12% внутри, P4 — кольцо
-/// без тона. У выполненного выбора кольцо и заливка `grip`, галочка цвета
+/// без тона. У выполненного действия кольцо и заливка `grip`, галочка цвета
 /// плоскости под кольцом, и приоритет в нём уже не виден.
-final class ChoiceCheck extends StatelessWidget {
-  const ChoiceCheck({
+final class ActionCheck extends StatelessWidget {
+  const ActionCheck({
     required this.priority,
     this.done = false,
     this.markColor,
@@ -24,7 +24,7 @@ final class ChoiceCheck extends StatelessWidget {
 
   final DoablePriority priority;
 
-  /// Выбор выполнен.
+  /// Действие выполнено.
   final bool done;
 
   /// Цвет галочки: цвет плоскости под кольцом. Без него `fill`, плоскость

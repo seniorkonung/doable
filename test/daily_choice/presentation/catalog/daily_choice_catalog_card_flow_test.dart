@@ -1,7 +1,7 @@
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/design_system/components/choice_row.dart';
+import 'package:doable/src/design_system/components/action_row.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
 import 'package:doable/src/design_system/doable_priority.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -147,7 +147,7 @@ void main() {
 
 /// Карточка с приоритетом [priority].
 Finder _rowWith(DoablePriority priority) => find.byWidgetPredicate(
-  (widget) => widget is ChoiceRow && widget.priority == priority,
+  (widget) => widget is ActionRow && widget.priority == priority,
 );
 
 /// Прокрутка к элементу сдвигает его только к следующему кадру.

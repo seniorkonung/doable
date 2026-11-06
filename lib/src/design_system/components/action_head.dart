@@ -5,42 +5,41 @@ import '../doable_icon.dart';
 import '../doable_metrics.dart';
 import '../doable_priority.dart';
 import '../doable_type.dart';
+import 'action_check.dart';
 import 'badge.dart';
-import 'choice_check.dart';
 import 'edge_overhang.dart';
 
-/// Кнопка параметров шапки выбора: её нет, она доступна или временно
-/// недоступна.
+/// Кнопка шапки действия: её нет, она доступна или временно недоступна.
 ///
 /// Временно недоступная кнопка остаётся на месте, поэтому раскладка шапки не
 /// сдвигается. Название есть только у вариантов с кнопкой.
-sealed class ChoiceHeadOptions {
-  const ChoiceHeadOptions._();
+sealed class ActionHeadButton {
+  const ActionHeadButton._();
 
   /// Кнопки нет, например над редактором описания.
-  const factory ChoiceHeadOptions.none() = ChoiceHeadOptionsNone;
+  const factory ActionHeadButton.none() = ActionHeadButtonNone;
 
-  /// Кнопка открывает параметры выбора.
-  const factory ChoiceHeadOptions.available({
+  /// Кнопка принимает нажатие.
+  const factory ActionHeadButton.available({
     required String label,
     required VoidCallback onOpen,
     Key? buttonKey,
-  }) = ChoiceHeadOptionsAvailable;
+  }) = ActionHeadButtonAvailable;
 
   /// Кнопка на месте, но не принимает нажатие: диктор объявляет её
   /// недоступной.
-  const factory ChoiceHeadOptions.unavailable({
+  const factory ActionHeadButton.unavailable({
     required String label,
     Key? buttonKey,
-  }) = ChoiceHeadOptionsUnavailable;
+  }) = ActionHeadButtonUnavailable;
 }
 
-final class ChoiceHeadOptionsNone extends ChoiceHeadOptions {
-  const ChoiceHeadOptionsNone() : super._();
+final class ActionHeadButtonNone extends ActionHeadButton {
+  const ActionHeadButtonNone() : super._();
 }
 
-final class ChoiceHeadOptionsAvailable extends ChoiceHeadOptions {
-  const ChoiceHeadOptionsAvailable({
+final class ActionHeadButtonAvailable extends ActionHeadButton {
+  const ActionHeadButtonAvailable({
     required this.label,
     required this.onOpen,
     this.buttonKey,
@@ -55,8 +54,8 @@ final class ChoiceHeadOptionsAvailable extends ChoiceHeadOptions {
   final Key? buttonKey;
 }
 
-final class ChoiceHeadOptionsUnavailable extends ChoiceHeadOptions {
-  const ChoiceHeadOptionsUnavailable({required this.label, this.buttonKey})
+final class ActionHeadButtonUnavailable extends ActionHeadButton {
+  const ActionHeadButtonUnavailable({required this.label, this.buttonKey})
     : super._();
 
   /// Доступное название кнопки.
@@ -66,21 +65,26 @@ final class ChoiceHeadOptionsUnavailable extends ChoiceHeadOptions {
   final Key? buttonKey;
 }
 
-/// Шапка выбора в листе: флажок, исходное намерение, цепочка шагов пути,
-/// выбранное действие и кнопка параметров.
+/// Шапка действия в листе: флажок, корневое намерение пути, цепочка
+/// намерений, название действия и кнопка параметров.
 ///
-/// Исходное намерение — `caption` цвета `muted`, действие — `headline` цвета
-/// `ink`; оба переносятся и не обрезаются. У выполненного выбора оба
-/// зачёркнуты, а действие `muted`. Тексты, метки архива, цепочку, доступные
-/// названия и ключи кнопок задаёт потребитель.
+/// Корневое намерение — `caption` цвета `muted`, название — `headline` цвета
+/// `ink`; оба переносятся и не обрезаются. У выполненного действия оба
+/// зачёркнуты, а название `muted`. Тексты, метки «В архиве» и «Удалено»,
+/// цепочку, доступные названия и ключи кнопок задаёт потребитель.
+///
+/// Корневое намерение с цепочкой — путь в свёрнутом виде, и [path] делает их
+/// одной кнопкой; название становится кнопкой через [nameEdit]. Область
+/// нажатия каждой из них занимает всю ширину колонки текста, а область пути
+/// ещё и верхнее поле шапки.
 ///
 /// Флажок стоит в области шириной `tap-min` на всю высоту шапки. Кольцо
 /// начинается у левого края шапки, поэтому область выходит за него на 11, а
 /// текст стоит в 34 от края. Область кнопки параметров выходит за правый край
 /// на 14. Обе полосы за краем принимают касания, пока родитель шире шапки на
 /// эти полосы, например поле содержимого листа с отступами.
-final class ChoiceHead extends StatelessWidget {
-  const ChoiceHead({
+final class ActionHead extends StatelessWidget {
+  const ActionHead({
     required this.goal,
     required this.action,
     required this.priority,
@@ -90,25 +94,27 @@ final class ChoiceHead extends StatelessWidget {
     this.onToggle,
     this.goalBadge,
     this.actionBadge,
-    this.options = const ChoiceHeadOptions.none(),
+    this.path = const ActionHeadButton.none(),
+    this.nameEdit = const ActionHeadButton.none(),
+    this.options = const ActionHeadButton.none(),
     this.checkKey,
     super.key,
   });
 
-  /// Исходное намерение пути.
+  /// Корневое намерение пути.
   final String goal;
 
-  /// Выбранное действие.
+  /// Название действия.
   final String action;
 
-  /// Приоритет выбора: цвет кольца флажка.
+  /// Приоритет действия: цвет кольца флажка.
   final DoablePriority priority;
 
-  /// Цепочка шагов пути между исходным намерением и действием; её приоритет и
-  /// признак выполнения потребитель согласует с шапкой.
+  /// Цепочка намерений пути между корневым намерением и названием; её
+  /// приоритет и признак выполнения потребитель согласует с шапкой.
   final Widget chain;
 
-  /// Выбор выполнен.
+  /// Действие выполнено.
   final bool done;
 
   /// Доступное название флажка.
@@ -117,14 +123,24 @@ final class ChoiceHead extends StatelessWidget {
   /// Переключает выполнение; без него флажок выключен.
   final VoidCallback? onToggle;
 
-  /// Метка архива после исходного намерения: [Badge.archivedInline], поэтому
-  /// строка исходного намерения не становится выше своего текста.
+  /// Метка «В архиве» или «Удалено» после корневого намерения:
+  /// [Badge.archivedInline] или [Badge.deletedInline], поэтому строка
+  /// корневого намерения не становится выше своего текста.
   final Widget? goalBadge;
 
-  /// Метка архива после действия, своей высоты.
+  /// Метка после названия, своей высоты.
   final Widget? actionBadge;
 
-  final ChoiceHeadOptions options;
+  /// Кнопка, которая открывает вкладку пути. Когда вкладка уже открыта,
+  /// потребитель передаёт недоступный вариант: кнопка остаётся на месте, но
+  /// ничего не делает, потому что путь виден ниже.
+  final ActionHeadButton path;
+
+  /// Кнопка, которая открывает изменение названия и описания.
+  final ActionHeadButton nameEdit;
+
+  /// Кнопка параметров действия.
+  final ActionHeadButton options;
 
   /// Ключ кнопки флажка.
   final Key? checkKey;
@@ -146,7 +162,7 @@ final class ChoiceHead extends StatelessWidget {
 
     return EdgeOverhang(
       start: _checkOverhang,
-      end: options is ChoiceHeadOptionsNone ? 0 : _optionsOverhang,
+      end: options is ActionHeadButtonNone ? 0 : _optionsOverhang,
       // Отклик нажатия рисуется на плоскости шапки, а не под ней:
       // https://api.flutter.dev/flutter/material/InkWell-class.html
       child: Material(
@@ -161,52 +177,68 @@ final class ChoiceHead extends StatelessWidget {
             Padding(
               padding: EdgeInsetsDirectional.only(
                 start: DoableMetrics.tapMin + 1,
-                end: options is ChoiceHeadOptionsNone
-                    ? 0
-                    : DoableMetrics.tapMin,
-                top: DoableMetrics.space2,
-                bottom: 10,
+                end: options is ActionHeadButtonNone ? 0 : DoableMetrics.tapMin,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
+                // Цепочка отстоит от названия на 5: 2 между элементами и 3
+                // в запас под цепочкой.
                 spacing: 2,
                 children: [
-                  Wrap(
-                    spacing: DoableMetrics.space2,
-                    runSpacing: 2,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(
-                        goal,
-                        style: DoableType.caption.copyWith(
-                          color: colors.muted,
-                          decoration: strike,
-                        ),
+                  _textButton(
+                    path,
+                    // Верхнее поле шапки принадлежит кнопке пути.
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: DoableMetrics.space2),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        spacing: 2,
+                        children: [
+                          Wrap(
+                            spacing: DoableMetrics.space2,
+                            runSpacing: 2,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                goal,
+                                style: DoableType.caption.copyWith(
+                                  color: colors.muted,
+                                  decoration: strike,
+                                ),
+                              ),
+                              ?goalBadge,
+                            ],
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 3),
+                            child: chain,
+                          ),
+                        ],
                       ),
-                      ?goalBadge,
-                    ],
+                    ),
                   ),
-                  // Цепочка отстоит от действия на 5: 2 между элементами и 3
-                  // в запас под цепочкой.
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 3),
-                    child: chain,
-                  ),
-                  Wrap(
-                    spacing: DoableMetrics.space2,
-                    runSpacing: DoableMetrics.space1,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(
-                        action,
-                        style: DoableType.headline.copyWith(
-                          color: done ? colors.muted : colors.ink,
-                          decoration: strike,
-                        ),
+                  _textButton(
+                    nameEdit,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Wrap(
+                        spacing: DoableMetrics.space2,
+                        runSpacing: DoableMetrics.space1,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            action,
+                            style: DoableType.headline.copyWith(
+                              color: done ? colors.muted : colors.ink,
+                              decoration: strike,
+                            ),
+                          ),
+                          ?actionBadge,
+                        ],
                       ),
-                      ?actionBadge,
-                    ],
+                    ),
                   ),
                 ],
               ),
@@ -221,12 +253,13 @@ final class ChoiceHead extends StatelessWidget {
                 label: checkLabel,
                 checked: done,
                 onTap: onToggle,
+                radius: DoableMetrics.tapMin / 2,
                 builder: (showsFocus) => Center(
                   child: _FocusRing(
                     radius: DoableMetrics.checkSize / 2,
                     shown: showsFocus,
                     // Галочка в цвет листа под кольцом.
-                    child: ChoiceCheck(
+                    child: ActionCheck(
                       priority: priority,
                       done: done,
                       markColor: colors.raised,
@@ -236,8 +269,8 @@ final class ChoiceHead extends StatelessWidget {
               ),
             ),
             switch (options) {
-              ChoiceHeadOptionsNone() => const SizedBox.shrink(),
-              ChoiceHeadOptionsAvailable(
+              ActionHeadButtonNone() => const SizedBox.shrink(),
+              ActionHeadButtonAvailable(
                 :final label,
                 :final onOpen,
                 :final buttonKey,
@@ -248,7 +281,7 @@ final class ChoiceHead extends StatelessWidget {
                   label: label,
                   onTap: onOpen,
                 ),
-              ChoiceHeadOptionsUnavailable(:final label, :final buttonKey) =>
+              ActionHeadButtonUnavailable(:final label, :final buttonKey) =>
                 _optionsButton(
                   colors,
                   key: buttonKey,
@@ -262,8 +295,38 @@ final class ChoiceHead extends StatelessWidget {
     );
   }
 
+  /// Текст шапки, который [button] делает кнопкой. Без кнопки это сам [child],
+  /// поэтому раскладка не зависит от того, есть ли кнопка.
+  Widget _textButton(
+    ActionHeadButton button, {
+    required Widget child,
+  }) => switch (button) {
+    ActionHeadButtonNone() => child,
+    ActionHeadButtonAvailable(:final label, :final onOpen, :final buttonKey) =>
+      _textButtonOf(key: buttonKey, label: label, onTap: onOpen, child: child),
+    ActionHeadButtonUnavailable(:final label, :final buttonKey) =>
+      _textButtonOf(key: buttonKey, label: label, onTap: null, child: child),
+  };
+
+  Widget _textButtonOf({
+    required Key? key,
+    required String label,
+    required VoidCallback? onTap,
+    required Widget child,
+  }) => _Button(
+    key: key,
+    label: label,
+    onTap: onTap,
+    radius: DoableMetrics.radiusSm,
+    builder: (showsFocus) => _FocusRing(
+      radius: DoableMetrics.radiusSm,
+      shown: showsFocus,
+      child: child,
+    ),
+  );
+
   /// Три точки в квадрате `tap-min` у верхнего правого угла. Точки стоят
-  /// против первой строки исходного намерения.
+  /// против первой строки корневого намерения.
   Widget _optionsButton(
     DoableColors colors, {
     required Key? key,
@@ -278,6 +341,7 @@ final class ChoiceHead extends StatelessWidget {
       key: key,
       label: label,
       onTap: onTap,
+      radius: DoableMetrics.tapMin / 2,
       builder: (showsFocus) => _FocusRing(
         radius: DoableMetrics.tapMin / 2,
         shown: showsFocus,
@@ -302,6 +366,7 @@ final class _Button extends StatefulWidget {
   const _Button({
     required this.label,
     required this.onTap,
+    required this.radius,
     required this.builder,
     this.checked,
     super.key,
@@ -315,6 +380,9 @@ final class _Button extends StatefulWidget {
   /// Без обработчика кнопка не принимает нажатие, а диктор объявляет её
   /// недоступной.
   final VoidCallback? onTap;
+
+  /// Радиус отклика нажатия и кольца фокуса области.
+  final double radius;
 
   final Widget Function(bool showsFocus) builder;
 
@@ -356,7 +424,7 @@ final class _ButtonState extends State<_Button> {
         enabled: widget.onTap != null,
         child: InkWell(
           onTap: widget.onTap,
-          borderRadius: BorderRadius.circular(DoableMetrics.tapMin / 2),
+          borderRadius: BorderRadius.circular(widget.radius),
           focusColor: Colors.transparent,
           onFocusChange: (focused) => setState(() => _focused = focused),
           child: ExcludeSemantics(child: widget.builder(showsFocus)),

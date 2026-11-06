@@ -176,6 +176,43 @@ void main() {
           expect(paint.strokeWidth, closeTo(1.5 * scale, 1e-6));
         });
 
+        testWidgets('сплошное жирное кольцо — диаметр 10 с обводкой 2 внутрь', (
+          tester,
+        ) async {
+          await tester.pumpWidget(
+            _app(
+              brightness,
+              PathGlyph(
+                shape: PathGlyphShape.finalRing,
+                outline: PathGlyphOutline.solid,
+                size: size,
+                color: colors.accent,
+              ),
+            ),
+          );
+
+          final glyph = find.byType(PathGlyph);
+          expect(tester.getSize(glyph), Size.square(size));
+          late Offset center;
+          late double radius;
+          late Paint paint;
+          expect(
+            tester.renderObject(glyph),
+            paints..something((method, arguments) {
+              if (method != #drawCircle) return false;
+              center = arguments[0] as Offset;
+              radius = arguments[1] as double;
+              paint = arguments[2] as Paint;
+              return true;
+            }),
+          );
+          expect(center, _near(const Offset(7, 7) * scale));
+          expect(radius, closeTo(4 * scale, 1e-6));
+          expect(paint.color, isSameColorAs(colors.accent));
+          expect(paint.style, PaintingStyle.stroke);
+          expect(paint.strokeWidth, closeTo(2 * scale, 1e-6));
+        });
+
         testWidgets('сплошной круг — заполненный круг диаметром 12', (
           tester,
         ) async {

@@ -1,7 +1,7 @@
 import 'dart:typed_data' show ByteData;
 import 'dart:ui' show ImageByteFormat;
 
-import 'package:doable/src/design_system/components/choice_check.dart';
+import 'package:doable/src/design_system/components/action_check.dart';
 import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_priority.dart';
@@ -25,7 +25,7 @@ void main() {
       ]) {
         final boundary = GlobalKey();
         await tester.pumpWidget(
-          _app(brightness, ChoiceCheck(priority: priority), boundary),
+          _app(brightness, ActionCheck(priority: priority), boundary),
         );
 
         final pixels = await _capture(tester, boundary);
@@ -42,36 +42,39 @@ void main() {
       }
     });
 
-    testWidgets('в $themeName теме выполненный выбор — кольцо и заливка grip '
-        'с галочкой 12 цвета fill, приоритет не виден', (tester) async {
-      final boundary = GlobalKey();
-      await tester.pumpWidget(
-        _app(
-          brightness,
-          const ChoiceCheck(priority: DoablePriority.p1, done: true),
-          boundary,
-        ),
-      );
+    testWidgets(
+      'в $themeName теме выполненное действие — кольцо и заливка grip '
+      'с галочкой 12 цвета fill, приоритет не виден',
+      (tester) async {
+        final boundary = GlobalKey();
+        await tester.pumpWidget(
+          _app(
+            brightness,
+            const ActionCheck(priority: DoablePriority.p1, done: true),
+            boundary,
+          ),
+        );
 
-      final pixels = await _capture(tester, boundary);
-      expect(pixels.at(3, 4), isSameColorAs(colors.grip));
-      // Точка внутри кольца левее галочки.
-      expect(pixels.at(4, 11), isSameColorAs(colors.grip));
-      final check = tester.widget<DoableIcon>(find.byType(DoableIcon));
-      expect(check.icon, DoableIconData.check);
-      expect(check.size, 12);
-      expect(check.color, colors.fill);
-    });
+        final pixels = await _capture(tester, boundary);
+        expect(pixels.at(3, 4), isSameColorAs(colors.grip));
+        // Точка внутри кольца левее галочки.
+        expect(pixels.at(4, 11), isSameColorAs(colors.grip));
+        final check = tester.widget<DoableIcon>(find.byType(DoableIcon));
+        expect(check.icon, DoableIconData.check);
+        expect(check.size, 12);
+        expect(check.color, colors.fill);
+      },
+    );
   }
 
-  testWidgets('markColor задаёт цвет галочки выполненного выбора', (
+  testWidgets('markColor задаёт цвет галочки выполненного действия', (
     tester,
   ) async {
     final colors = DoableColors.light;
     await tester.pumpWidget(
       _app(
         Brightness.light,
-        ChoiceCheck(
+        ActionCheck(
           priority: DoablePriority.p1,
           done: true,
           markColor: colors.raised,
@@ -91,12 +94,12 @@ void main() {
       await tester.pumpWidget(
         _app(
           Brightness.light,
-          ChoiceCheck(priority: DoablePriority.p2, done: done),
+          ActionCheck(priority: DoablePriority.p2, done: done),
           GlobalKey(),
         ),
       );
 
-      expect(tester.getSize(find.byType(ChoiceCheck)), const Size.square(22));
+      expect(tester.getSize(find.byType(ActionCheck)), const Size.square(22));
     }
   });
 
@@ -114,19 +117,19 @@ void main() {
             container: true,
             explicitChildNodes: true,
             label: 'Выполнить',
-            child: const ChoiceCheck(priority: DoablePriority.p1, done: true),
+            child: const ActionCheck(priority: DoablePriority.p1, done: true),
           ),
         ),
         GlobalKey(),
       ),
     );
 
-    final node = tester.getSemantics(find.byType(ChoiceCheck));
+    final node = tester.getSemantics(find.byType(ActionCheck));
     expect(node.label, 'Выполнить');
     expect(node.childrenCount, 0);
 
     // Нажатие по метке достаётся охватывающей области, а не самой метке.
-    await tester.tap(find.byType(ChoiceCheck));
+    await tester.tap(find.byType(ActionCheck));
     expect(taps, 1);
     semantics.dispose();
   });

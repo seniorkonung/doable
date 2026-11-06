@@ -9,7 +9,7 @@ import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_sheet.dart';
-import 'package:doable/src/design_system/components/choice_head.dart';
+import 'package:doable/src/design_system/components/action_head.dart';
 import 'package:doable/src/design_system/components/choice_path.dart' as ui;
 import 'package:doable/src/design_system/components/detail_row.dart';
 import 'package:doable/src/design_system/components/half_pinned_sliver.dart';
@@ -306,7 +306,7 @@ final _longDescription = List.filled(300, 'слово').join(' ');
 final _sheet = find.byType(Sheet);
 
 // Прокрученная шапка уходит за край списка, поэтому ищется и за ним.
-final _head = find.byType(ChoiceHead, skipOffstage: false);
+final _head = find.byType(ActionHead, skipOffstage: false);
 final _tabs = find.byWidgetPredicate(
   (widget) => widget is Tabs,
   skipOffstage: false,

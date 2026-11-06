@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../l10n/app_localizations.dart';
-import '../../../design_system/components/choice_row.dart';
+import '../../../design_system/components/action_row.dart';
 import '../../../design_system/components/day_heading.dart';
 import '../../../design_system/components/empty_state.dart';
 import '../../../design_system/components/list_state.dart';
@@ -558,14 +558,14 @@ final class _DailyChoiceCatalogBodyState
                             ),
                           ),
                         ),
-                      ChoiceRow(
+                      ActionRow(
                         openKey: ValueKey('daily-choice-row-$number'),
                         checkKey: ValueKey(
                           'daily-choice-completion-${item.id.toCanonicalString()}',
                         ),
                         goal: item.source.title,
                         action: action,
-                        note: item.description?.value,
+                        description: item.description?.value,
                         priority: switch (item.priority) {
                           DailyChoicePriority.p1 => DoablePriority.p1,
                           DailyChoicePriority.p2 => DoablePriority.p2,

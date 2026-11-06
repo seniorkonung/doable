@@ -1,8 +1,8 @@
 import 'dart:ui' show ImageByteFormat;
 
+import 'package:doable/src/design_system/components/action_check.dart';
+import 'package:doable/src/design_system/components/action_head.dart';
 import 'package:doable/src/design_system/components/badge.dart';
-import 'package:doable/src/design_system/components/choice_check.dart';
-import 'package:doable/src/design_system/components/choice_head.dart';
 import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_priority.dart';
@@ -16,6 +16,8 @@ import 'package:flutter_test/flutter_test.dart';
 const _chainKey = ValueKey('chain');
 const _checkKey = ValueKey('check');
 const _optionsKey = ValueKey('options');
+const _pathKey = ValueKey('path');
+const _nameKey = ValueKey('name');
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -30,8 +32,8 @@ void main() {
     ('светлой', Brightness.light, DoableColors.light),
     ('тёмной', Brightness.dark, DoableColors.dark),
   ]) {
-    testWidgets('в $themeName теме исходное намерение — caption muted, '
-        'действие — headline ink, а у выполненного выбора оба зачёркнуты, '
+    testWidgets('в $themeName теме корневое намерение — caption muted, '
+        'действие — headline ink, а у выполненного действия оба зачёркнуты, '
         'действие muted, а галочка цвета листа', (tester) async {
       await tester.pumpWidget(
         _app(brightness, _head(goal: 'Цель', action: 'Действие')),
@@ -68,14 +70,14 @@ void main() {
       );
       expect(_style(tester, 'Цель').decoration, TextDecoration.lineThrough);
       expect(_style(tester, 'Действие').decoration, TextDecoration.lineThrough);
-      final check = tester.widget<ChoiceCheck>(find.byType(ChoiceCheck));
+      final check = tester.widget<ActionCheck>(find.byType(ActionCheck));
       expect(check.done, isTrue);
       expect(check.markColor, colors.raised);
     });
   }
 
   testWidgets('кольцо стоит у левого края шапки по центру её высоты, текст в '
-      '34 от края, а цепочка отстоит на 2 от исходного намерения и на 5 от '
+      '34 от края, а цепочка отстоит на 2 от корневого намерения и на 5 от '
       'действия', (tester) async {
     await tester.pumpWidget(
       _app(
@@ -84,13 +86,13 @@ void main() {
       ),
     );
 
-    final head = tester.getRect(find.byType(ChoiceHead));
-    final mark = tester.getRect(find.byType(ChoiceCheck));
+    final head = tester.getRect(find.byType(ActionHead));
+    final mark = tester.getRect(find.byType(ActionCheck));
     final goal = tester.getRect(find.text('Цель'));
     final chain = tester.getRect(find.byKey(_chainKey));
     final action = tester.getRect(find.text('Действие'));
     expect(
-      tester.widget<ChoiceCheck>(find.byType(ChoiceCheck)).priority,
+      tester.widget<ActionCheck>(find.byType(ActionCheck)).priority,
       DoablePriority.p2,
     );
     expect(mark.size, const Size.square(22));
@@ -113,7 +115,7 @@ void main() {
         Brightness.light,
         _head(
           onToggle: () => calls.add('toggle'),
-          options: ChoiceHeadOptions.available(
+          options: ActionHeadButton.available(
             label: 'Параметры',
             onOpen: () => calls.add('options'),
             buttonKey: _optionsKey,
@@ -123,7 +125,7 @@ void main() {
       ),
     );
 
-    final head = tester.getRect(find.byType(ChoiceHead));
+    final head = tester.getRect(find.byType(ActionHead));
     final check = tester.getRect(find.byKey(_checkKey));
     final options = tester.getRect(find.byKey(_optionsKey));
     expect(check.width, 44);
@@ -164,7 +166,7 @@ void main() {
     await tester.pumpWidget(_app(Brightness.light, _head()));
     expect(_layout(tester), enabled);
 
-    await tester.tap(find.byType(ChoiceCheck));
+    await tester.tap(find.byType(ActionCheck));
     await tester.pump();
     expect(toggles, 0);
   });
@@ -173,7 +175,7 @@ void main() {
       'доходит до правого края шапки', (tester) async {
     await tester.pumpWidget(_app(Brightness.light, _head()));
 
-    final head = tester.getRect(find.byType(ChoiceHead));
+    final head = tester.getRect(find.byType(ActionHead));
     expect(find.byType(DoableIcon), findsNothing);
     expect(tester.getRect(find.byType(Wrap).first).right, head.right);
   });
@@ -185,7 +187,7 @@ void main() {
       _app(
         Brightness.light,
         _head(
-          options: const ChoiceHeadOptions.available(
+          options: const ActionHeadButton.available(
             label: 'Параметры',
             onOpen: _noop,
             buttonKey: _optionsKey,
@@ -194,7 +196,7 @@ void main() {
       ),
     );
 
-    final head = tester.getRect(find.byType(ChoiceHead));
+    final head = tester.getRect(find.byType(ActionHead));
     final options = tester.getRect(find.byKey(_optionsKey));
     final icon = tester.widget<DoableIcon>(find.byType(DoableIcon));
     expect(icon.size, 24);
@@ -204,7 +206,7 @@ void main() {
       tester.getRect(find.byType(DoableIcon)).center.dx,
       options.center.dx,
     );
-    // Центр точек в 18 от верха шапки, против первой строки исходного
+    // Центр точек в 18 от верха шапки, против первой строки корневого
     // намерения.
     expect(tester.getRect(find.byType(DoableIcon)).center.dy, head.top + 18);
     expect(tester.getRect(find.byType(Wrap).first).right, options.left);
@@ -217,7 +219,7 @@ void main() {
       _app(
         Brightness.light,
         _head(
-          options: ChoiceHeadOptions.available(
+          options: ActionHeadButton.available(
             label: 'Параметры',
             onOpen: () => opened++,
             buttonKey: _optionsKey,
@@ -232,7 +234,7 @@ void main() {
       _app(
         Brightness.light,
         _head(
-          options: const ChoiceHeadOptions.unavailable(
+          options: const ActionHeadButton.unavailable(
             label: 'Параметры',
             buttonKey: _optionsKey,
           ),
@@ -260,7 +262,7 @@ void main() {
           action: action,
           goalBadge: const Badge.archivedInline(word: 'Архив'),
           actionBadge: const Badge.archived(word: 'Архив'),
-          options: const ChoiceHeadOptions.available(
+          options: const ActionHeadButton.available(
             label: 'Параметры',
             onOpen: _noop,
           ),
@@ -286,14 +288,14 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('метка архива исходного намерения высотой 18 не увеличивает его '
+  testWidgets('метка архива корневого намерения высотой 18 не увеличивает его '
       'строку, а метка действия остаётся своей высоты 20 в 8 от текста', (
     tester,
   ) async {
     await tester.pumpWidget(
       _app(Brightness.light, _head(goal: 'Цель', action: 'Действие')),
     );
-    final plain = tester.getRect(find.byType(ChoiceHead));
+    final plain = tester.getRect(find.byType(ActionHead));
 
     await tester.pumpWidget(
       _app(
@@ -307,7 +309,7 @@ void main() {
       ),
     );
 
-    expect(tester.getRect(find.byType(ChoiceHead)).height, plain.height);
+    expect(tester.getRect(find.byType(ActionHead)).height, plain.height);
     final goal = tester.getRect(find.text('Цель'));
     final goalBadge = tester.getRect(find.byType(BadgeArchived).first);
     expect(goalBadge.height, 18);
@@ -328,7 +330,7 @@ void main() {
     Future<void> pump({
       required bool done,
       VoidCallback? onToggle,
-      ChoiceHeadOptions? options,
+      ActionHeadButton? options,
     }) async {
       await tester.pumpWidget(
         _app(
@@ -337,7 +339,7 @@ void main() {
             done: done,
             onToggle: onToggle,
             checkLabel: 'Выполнить: Действие, приоритет P1',
-            options: options ?? const ChoiceHeadOptions.none(),
+            options: options ?? const ActionHeadButton.none(),
           ),
         ),
       );
@@ -358,7 +360,7 @@ void main() {
           hasFocusAction: enabled,
         );
     Matcher options({required bool enabled}) => matchesSemantics(
-      label: 'Параметры выбора',
+      label: 'Параметры действия',
       isButton: true,
       hasEnabledState: true,
       isEnabled: enabled,
@@ -374,7 +376,7 @@ void main() {
       node('Выполнить: Действие, приоритет P1'),
       check(checked: false, enabled: true),
     );
-    expect(find.bySemanticsLabel('Параметры выбора'), findsNothing);
+    expect(find.bySemanticsLabel('Параметры действия'), findsNothing);
 
     await pump(done: true, onToggle: () {});
     expect(
@@ -390,18 +392,18 @@ void main() {
 
     await pump(
       done: false,
-      options: const ChoiceHeadOptions.available(
-        label: 'Параметры выбора',
+      options: const ActionHeadButton.available(
+        label: 'Параметры действия',
         onOpen: _noop,
       ),
     );
-    expect(node('Параметры выбора'), options(enabled: true));
+    expect(node('Параметры действия'), options(enabled: true));
 
     await pump(
       done: false,
-      options: const ChoiceHeadOptions.unavailable(label: 'Параметры выбора'),
+      options: const ActionHeadButton.unavailable(label: 'Параметры действия'),
     );
-    expect(node('Параметры выбора'), options(enabled: false));
+    expect(node('Параметры действия'), options(enabled: false));
     semantics.dispose();
   });
 
@@ -414,7 +416,7 @@ void main() {
         Brightness.light,
         _head(
           onToggle: () => calls.add('toggle'),
-          options: ChoiceHeadOptions.available(
+          options: ActionHeadButton.available(
             label: 'Параметры',
             onOpen: () => calls.add('options'),
             buttonKey: _optionsKey,
@@ -423,7 +425,7 @@ void main() {
         boundary: boundary,
       ),
     );
-    final mark = tester.getRect(find.byType(ChoiceCheck));
+    final mark = tester.getRect(find.byType(ActionCheck));
     final options = tester.getRect(find.byKey(_optionsKey));
     // Полоса `accent` лежит в 2–4 от края; точка в её середине не зависит от
     // сглаживания края круга.
@@ -463,11 +465,201 @@ void main() {
     await tester.pumpAndSettle();
     expect(calls, ['toggle', 'options']);
   });
+
+  testWidgets('кнопка пути охватывает корневое намерение, цепочку и верхнее '
+      'поле шапки, а название и флажок её не вызывают', (tester) async {
+    final calls = <String>[];
+    await tester.pumpWidget(_app(Brightness.light, _head()));
+    final plain = _layout(tester);
+
+    await tester.pumpWidget(
+      _app(
+        Brightness.light,
+        _head(
+          path: ActionHeadButton.available(
+            label: 'Путь от Цель',
+            onOpen: () => calls.add('path'),
+            buttonKey: _pathKey,
+          ),
+          onToggle: () => calls.add('toggle'),
+        ),
+      ),
+    );
+
+    expect(_layout(tester), plain);
+    final head = tester.getRect(find.byType(ActionHead));
+    final goal = tester.getRect(find.text('Цель'));
+    final chain = tester.getRect(find.byKey(_chainKey));
+    final button = tester.getRect(find.byKey(_pathKey));
+    expect(button.top, head.top);
+    expect(button.left, goal.left);
+    expect(button.right, head.right);
+    expect(button.bottom, chain.bottom + 3);
+
+    await tester.tap(find.text('Цель'));
+    await tester.tapAt(tester.getCenter(find.byKey(_chainKey)));
+    await tester.tapAt(Offset(goal.left + 4, head.top + 2));
+    await tester.pump();
+    expect(calls, ['path', 'path', 'path']);
+
+    await tester.tap(find.text('Действие'));
+    await tester.tap(find.byType(ActionCheck));
+    await tester.pump();
+    expect(calls, ['path', 'path', 'path', 'toggle']);
+  });
+
+  testWidgets('когда вкладка пути открыта, кнопка пути остаётся на месте, '
+      'ничего не делает и объявлена диктору недоступной', (tester) async {
+    final semantics = tester.ensureSemantics();
+    var opened = 0;
+    await tester.pumpWidget(
+      _app(
+        Brightness.light,
+        _head(
+          path: ActionHeadButton.available(
+            label: 'Путь от Цель',
+            onOpen: () => opened++,
+            buttonKey: _pathKey,
+          ),
+        ),
+      ),
+    );
+    final available = _layout(tester);
+    final availableButton = tester.getRect(find.byKey(_pathKey));
+    expect(
+      tester.getSemantics(find.byKey(_pathKey)),
+      matchesSemantics(
+        label: 'Путь от Цель',
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: true,
+        isFocusable: true,
+        hasTapAction: true,
+        hasFocusAction: true,
+      ),
+    );
+
+    await tester.pumpWidget(
+      _app(
+        Brightness.light,
+        _head(
+          path: const ActionHeadButton.unavailable(
+            label: 'Путь от Цель, показан ниже',
+            buttonKey: _pathKey,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(_layout(tester), available);
+    expect(tester.getRect(find.byKey(_pathKey)), availableButton);
+    expect(
+      tester.getSemantics(find.byKey(_pathKey)),
+      matchesSemantics(
+        label: 'Путь от Цель, показан ниже',
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: false,
+      ),
+    );
+    await tester.tap(find.text('Цель'));
+    await tester.pump();
+    expect(opened, 0);
+    semantics.dispose();
+  });
+
+  testWidgets('кнопка названия охватывает название с меткой и нижнее поле, а '
+      'корневое намерение её не вызывает', (tester) async {
+    final calls = <String>[];
+    await tester.pumpWidget(_app(Brightness.light, _head()));
+    final plain = _layout(tester);
+
+    await tester.pumpWidget(
+      _app(
+        Brightness.light,
+        _head(
+          nameEdit: ActionHeadButton.available(
+            label: 'Изменить название и описание: Действие',
+            onOpen: () => calls.add('name'),
+            buttonKey: _nameKey,
+          ),
+        ),
+      ),
+    );
+
+    expect(_layout(tester), plain);
+    final head = tester.getRect(find.byType(ActionHead));
+    final action = tester.getRect(find.text('Действие'));
+    final button = tester.getRect(find.byKey(_nameKey));
+    expect(button.top, action.top);
+    expect(button.bottom, head.bottom);
+    expect(button.left, action.left);
+    expect(button.right, head.right);
+
+    await tester.tap(find.text('Действие'));
+    await tester.tapAt(Offset(action.left + 4, head.bottom - 2));
+    await tester.pump();
+    expect(calls, ['name', 'name']);
+
+    await tester.tap(find.text('Цель'));
+    await tester.tapAt(tester.getCenter(find.byKey(_chainKey)));
+    await tester.pump();
+    expect(calls, ['name', 'name']);
+  });
+
+  testWidgets('метка «Удалено» после корневого намерения не увеличивает его '
+      'строку, а кнопки пути и названия идут в обходе клавиатурой по порядку '
+      'на экране', (tester) async {
+    await tester.pumpWidget(
+      _app(Brightness.light, _head(goal: 'Цель', action: 'Действие')),
+    );
+    final plain = tester.getRect(find.byType(ActionHead));
+    final boundary = GlobalKey();
+    final calls = <String>[];
+
+    await tester.pumpWidget(
+      _app(
+        Brightness.light,
+        _head(
+          goalBadge: const Badge.deletedInline(word: 'Удалено'),
+          path: ActionHeadButton.available(
+            label: 'Путь',
+            onOpen: () => calls.add('path'),
+          ),
+          nameEdit: ActionHeadButton.available(
+            label: 'Название',
+            onOpen: () => calls.add('name'),
+          ),
+          onToggle: () => calls.add('toggle'),
+          options: ActionHeadButton.available(
+            label: 'Параметры',
+            onOpen: () => calls.add('options'),
+          ),
+        ),
+        boundary: boundary,
+      ),
+    );
+
+    expect(tester.getRect(find.byType(ActionHead)).height, plain.height);
+    final goal = tester.getRect(find.text('Цель'));
+    final badge = tester.getRect(find.byType(BadgeDeleted));
+    expect(badge.height, 18);
+    expect(badge.left - goal.right, 8);
+
+    for (final expected in ['toggle', 'path', 'options', 'name']) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(calls.last, expected);
+    }
+  });
 }
 
 void _noop() {}
 
-ChoiceHead _head({
+ActionHead _head({
   String goal = 'Цель',
   String action = 'Действие',
   DoablePriority priority = DoablePriority.p1,
@@ -476,9 +668,11 @@ ChoiceHead _head({
   VoidCallback? onToggle,
   Widget? goalBadge,
   Widget? actionBadge,
-  ChoiceHeadOptions options = const ChoiceHeadOptions.none(),
+  ActionHeadButton path = const ActionHeadButton.none(),
+  ActionHeadButton nameEdit = const ActionHeadButton.none(),
+  ActionHeadButton options = const ActionHeadButton.none(),
   Key? checkKey,
-}) => ChoiceHead(
+}) => ActionHead(
   goal: goal,
   action: action,
   priority: priority,
@@ -488,14 +682,16 @@ ChoiceHead _head({
   onToggle: onToggle,
   goalBadge: goalBadge,
   actionBadge: actionBadge,
+  path: path,
+  nameEdit: nameEdit,
   options: options,
   checkKey: checkKey,
 );
 
 /// Прямоугольники, по которым видно любой сдвиг раскладки шапки.
 List<Rect> _layout(WidgetTester tester) => [
-  tester.getRect(find.byType(ChoiceHead)),
-  tester.getRect(find.byType(ChoiceCheck)),
+  tester.getRect(find.byType(ActionHead)),
+  tester.getRect(find.byType(ActionCheck)),
   tester.getRect(find.text('Цель')),
   tester.getRect(find.text('Действие')),
 ];

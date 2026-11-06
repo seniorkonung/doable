@@ -1,7 +1,7 @@
 import 'dart:ui' show ImageByteFormat;
 
-import 'package:doable/src/design_system/components/choice_check.dart';
-import 'package:doable/src/design_system/components/choice_row.dart';
+import 'package:doable/src/design_system/components/action_check.dart';
+import 'package:doable/src/design_system/components/action_row.dart';
 import 'package:doable/src/design_system/components/reason_chain.dart';
 import 'package:doable/src/design_system/doable_colors.dart';
 import 'package:doable/src/design_system/doable_priority.dart';
@@ -25,18 +25,18 @@ void main() {
     ('светлой', Brightness.light, DoableColors.light),
     ('тёмной', Brightness.dark, DoableColors.dark),
   ]) {
-    testWidgets('в $themeName теме строка — плоскость fill, исходное намерение '
+    testWidgets('в $themeName теме строка — плоскость fill, корневое намерение '
         'и описание muted, а действие ink', (tester) async {
       final boundary = GlobalKey();
       await tester.pumpWidget(
         _app(
           brightness,
-          _row(goal: 'Цель', action: 'Действие', note: 'Описание'),
+          _row(goal: 'Цель', action: 'Действие', description: 'Описание'),
           boundary: boundary,
         ),
       );
 
-      final rect = tester.getRect(find.byType(ChoiceRow));
+      final rect = tester.getRect(find.byType(ActionRow));
       // Левое поле строки свободно от содержимого: цвет в нём — цвет плоскости.
       expect(
         await _pixel(tester, boundary, Offset(rect.left + 4, rect.center.dy)),
@@ -60,7 +60,7 @@ void main() {
       );
     });
 
-    testWidgets('в $themeName теме у выполненного выбора действие muted и '
+    testWidgets('в $themeName теме у выполненного действия название muted и '
         'зачёркнуто, а кольцо и цепочка серые', (tester) async {
       await tester.pumpWidget(
         _app(brightness, _row(action: 'Действие', done: true)),
@@ -68,18 +68,18 @@ void main() {
 
       expect(_style(tester, 'Действие').color, colors.muted);
       expect(_style(tester, 'Действие').decoration, TextDecoration.lineThrough);
-      expect(tester.widget<ChoiceCheck>(find.byType(ChoiceCheck)).done, isTrue);
+      expect(tester.widget<ActionCheck>(find.byType(ActionCheck)).done, isTrue);
       expect(tester.widget<ReasonChain>(find.byType(ReasonChain)).off, isTrue);
     });
   }
 
   testWidgets('приоритет и число шагов пути уходят в кольцо и цепочку, а у '
-      'невыполненного выбора они цветные', (tester) async {
+      'невыполненного действия они цветные', (tester) async {
     await tester.pumpWidget(
       _app(Brightness.light, _row(priority: DoablePriority.p2, reasons: 4)),
     );
 
-    final check = tester.widget<ChoiceCheck>(find.byType(ChoiceCheck));
+    final check = tester.widget<ActionCheck>(find.byType(ActionCheck));
     expect(check.priority, DoablePriority.p2);
     expect(check.done, isFalse);
     final chain = tester.widget<ReasonChain>(find.byType(ReasonChain));
@@ -88,7 +88,7 @@ void main() {
     expect(chain.off, isFalse);
   });
 
-  testWidgets('исходное намерение занимает одну строку с многоточием, действие '
+  testWidgets('корневое намерение занимает одну строку с многоточием, действие '
       'переносится целиком, а описание — не больше двух строк', (tester) async {
     const goal =
         'Поддерживать форму тела сильной и выносливой на долгие годы вперёд '
@@ -96,14 +96,14 @@ void main() {
     const action =
         'Подготовить рюкзак, палатку и запас еды для долгого похода через '
         'горы на целую неделю вперёд';
-    const note =
+    const description =
         'Первая строка описания достаточно длинная, чтобы занять место. '
         'Вторая строка описания тоже длинная, чтобы заполнить второе место. '
         'Третьей строки не будет, она обрезается многоточием.';
     await tester.pumpWidget(
       _app(
         Brightness.light,
-        _row(goal: goal, action: action, note: note),
+        _row(goal: goal, action: action, description: description),
         width: 300,
       ),
     );
@@ -121,19 +121,24 @@ void main() {
       greaterThan(actionParagraph.preferredLineHeight * 2),
     );
 
-    final noteParagraph = tester.renderObject<RenderParagraph>(find.text(note));
-    expect(noteParagraph.didExceedMaxLines, isTrue);
-    expect(noteParagraph.size.height, noteParagraph.preferredLineHeight * 2);
+    final descriptionParagraph = tester.renderObject<RenderParagraph>(
+      find.text(description),
+    );
+    expect(descriptionParagraph.didExceedMaxLines, isTrue);
+    expect(
+      descriptionParagraph.size.height,
+      descriptionParagraph.preferredLineHeight * 2,
+    );
   });
 
   testWidgets('текст стоит правее флажка шириной 52 с полями 9 сверху, 10 '
-      'снизу и 16 справа, а цепочка отстоит на 2 от исходного намерения и на 5 '
+      'снизу и 16 справа, а цепочка отстоит на 2 от корневого намерения и на 5 '
       'от действия', (tester) async {
     await tester.pumpWidget(
       _app(Brightness.light, _row(goal: 'Цель', action: 'Действие')),
     );
 
-    final row = tester.getRect(find.byType(ChoiceRow));
+    final row = tester.getRect(find.byType(ActionRow));
     final goal = tester.getRect(find.text('Цель'));
     final chain = tester.getRect(find.byType(ReasonChain));
     final action = tester.getRect(find.text('Действие'));
@@ -150,27 +155,27 @@ void main() {
 
   testWidgets('кольцо флажка стоит по центру высоты строки с описанием в две '
       'строки, а описание отстоит от действия на 2', (tester) async {
-    const note =
+    const description =
         'Первая строка описания достаточно длинная, чтобы занять место. '
         'Вторая строка описания тоже длинная, чтобы заполнить второе место.';
     await tester.pumpWidget(
       _app(
         Brightness.light,
-        _row(goal: 'Цель', action: 'Действие', note: note),
+        _row(goal: 'Цель', action: 'Действие', description: description),
         width: 300,
       ),
     );
 
-    final row = tester.getRect(find.byType(ChoiceRow));
-    final mark = tester.getRect(find.byType(ChoiceCheck));
+    final row = tester.getRect(find.byType(ActionRow));
+    final mark = tester.getRect(find.byType(ActionCheck));
     final action = tester.getRect(find.text('Действие'));
-    final noteRect = tester.getRect(find.text(note));
+    final descriptionRect = tester.getRect(find.text(description));
     expect(mark.size, const Size.square(22));
     expect(mark.center.dy, row.center.dy);
     // Область флажка 52 с полем 4 слева: кольцо по центру остальных 48.
     expect(mark.left - row.left, 17);
-    expect(noteRect.top - action.bottom, 2);
-    expect(row.bottom - noteRect.bottom, 10);
+    expect(descriptionRect.top - action.bottom, 2);
+    expect(row.bottom - descriptionRect.bottom, 10);
   });
 
   testWidgets('флажок и текст вызывают каждый свой обработчик по ключам '
@@ -204,16 +209,16 @@ void main() {
     expect(calls, ['toggle', 'open', 'open']);
 
     // Угол области флажка далеко от кольца, но это тоже флажок.
-    final row = tester.getRect(find.byType(ChoiceRow));
+    final row = tester.getRect(find.byType(ActionRow));
     await tester.tapAt(row.topLeft + const Offset(4, 4));
     await tester.pumpAndSettle();
     expect(calls, ['toggle', 'open', 'open', 'toggle']);
   });
 
   testWidgets('без обработчика флажок выключен: нажатие его не открывает '
-      'выбор, а раскладка не меняется', (tester) async {
+      'действие, а раскладка не меняется', (tester) async {
     final calls = <String>[];
-    ChoiceRow row({VoidCallback? onToggle}) => _row(
+    ActionRow row({VoidCallback? onToggle}) => _row(
       goal: 'Цель',
       action: 'Действие',
       onToggle: onToggle,
@@ -224,20 +229,20 @@ void main() {
       _app(Brightness.light, row(onToggle: () => calls.add('toggle'))),
     );
     final enabled = [
-      tester.getRect(find.byType(ChoiceRow)),
-      tester.getRect(find.byType(ChoiceCheck)),
+      tester.getRect(find.byType(ActionRow)),
+      tester.getRect(find.byType(ActionCheck)),
       tester.getRect(find.text('Действие')),
     ];
 
     await tester.pumpWidget(_app(Brightness.light, row()));
     final disabled = [
-      tester.getRect(find.byType(ChoiceRow)),
-      tester.getRect(find.byType(ChoiceCheck)),
+      tester.getRect(find.byType(ActionRow)),
+      tester.getRect(find.byType(ActionCheck)),
       tester.getRect(find.text('Действие')),
     ];
     expect(disabled, enabled);
 
-    await tester.tap(find.byType(ChoiceCheck));
+    await tester.tap(find.byType(ActionCheck));
     await tester.pumpAndSettle();
     expect(calls, isEmpty);
   });
@@ -325,8 +330,8 @@ void main() {
         boundary: boundary,
       ),
     );
-    final row = tester.getRect(find.byType(ChoiceRow));
-    final mark = tester.getRect(find.byType(ChoiceCheck));
+    final row = tester.getRect(find.byType(ActionRow));
+    final mark = tester.getRect(find.byType(ActionCheck));
     // Полоса `accent` лежит в 2–4 от метки; точка в её середине не зависит от
     // сглаживания края круга.
     final aroundMark = Offset(mark.left - 3, mark.center.dy);
@@ -367,10 +372,10 @@ void main() {
   });
 }
 
-ChoiceRow _row({
+ActionRow _row({
   String goal = 'Цель',
   String action = 'Действие',
-  String? note,
+  String? description,
   DoablePriority priority = DoablePriority.p1,
   int reasons = 3,
   bool done = false,
@@ -380,10 +385,10 @@ ChoiceRow _row({
   Key? openKey,
   VoidCallback? onToggle,
   VoidCallback? onOpen,
-}) => ChoiceRow(
+}) => ActionRow(
   goal: goal,
   action: action,
-  note: note,
+  description: description,
   priority: priority,
   reasons: reasons,
   done: done,

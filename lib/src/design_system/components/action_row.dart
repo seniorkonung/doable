@@ -4,23 +4,23 @@ import '../doable_colors.dart';
 import '../doable_metrics.dart';
 import '../doable_priority.dart';
 import '../doable_type.dart';
-import 'choice_check.dart';
+import 'action_check.dart';
 import 'reason_chain.dart';
 
-/// Один дневной выбор в списке: флажок, исходное намерение, цепочка шагов
-/// пути, выбранное действие и описание.
+/// Одно действие в списке дня: флажок, корневое намерение пути, путь малой
+/// цепочкой, название действия и описание.
 ///
 /// Строка — две кнопки рядом. Флажок шириной 52 на всю высоту строки
 /// вызывает [onToggle], остальная строка — [onOpen]. Нажатие на флажок
-/// выбор не открывает. Без [onToggle] флажок выключен, а раскладка та же.
+/// действие не открывает. Без [onToggle] флажок выключен, а раскладка та же.
 /// Тексты, в том числе готовые доступные названия обеих кнопок, и ключи
 /// кнопок задаёт потребитель; даты и времени строка не показывает.
 ///
-/// Исходное намерение занимает одну строку и обрезается многоточием,
-/// действие переносится, описание не длиннее двух строк. У выполненного
-/// выбора цепочка серая, а действие `muted` и зачёркнуто.
-final class ChoiceRow extends StatelessWidget {
-  const ChoiceRow({
+/// Корневое намерение занимает одну строку и обрезается многоточием,
+/// название переносится, описание не длиннее двух строк. У выполненного
+/// действия цепочка серая, а название `muted` и зачёркнуто.
+final class ActionRow extends StatelessWidget {
+  const ActionRow({
     required this.goal,
     required this.action,
     required this.priority,
@@ -28,37 +28,36 @@ final class ChoiceRow extends StatelessWidget {
     required this.checkLabel,
     required this.label,
     required this.onOpen,
-    this.note,
+    this.description,
     this.done = false,
     this.onToggle,
     this.checkKey,
     this.openKey,
     super.key,
-  }) : assert(note != '');
+  }) : assert(description != '');
 
-  /// Исходное намерение пути.
+  /// Корневое намерение сохранённого пути.
   final String goal;
 
-  /// Выбранное действие.
+  /// Название действия.
   final String action;
 
-  /// Описание выбора; без него последней строки нет.
-  final String? note;
+  /// Описание действия; без него последней строки нет.
+  final String? description;
 
-  /// Приоритет выбора: цвет кольца флажка и концов цепочки.
+  /// Приоритет действия: цвет кольца флажка и концов цепочки.
   final DoablePriority priority;
 
-  /// Число шагов сохранённого пути от исходного намерения до действия, не
-  /// меньше 1.
+  /// Число намерений сохранённого пути от корневого до конечного, не меньше 1.
   final int reasons;
 
-  /// Выбор выполнен.
+  /// Действие выполнено.
   final bool done;
 
   /// Доступное название флажка.
   final String checkLabel;
 
-  /// Доступное название кнопки, открывающей выбор.
+  /// Доступное название кнопки, открывающей действие.
   final String label;
 
   /// Переключает выполнение; без него флажок выключен.
@@ -69,7 +68,7 @@ final class ChoiceRow extends StatelessWidget {
   /// Ключ кнопки флажка.
   final Key? checkKey;
 
-  /// Ключ кнопки, открывающей выбор.
+  /// Ключ кнопки, открывающей действие.
   final Key? openKey;
 
   static const BorderRadius _radius = BorderRadius.all(
@@ -80,7 +79,7 @@ final class ChoiceRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<DoableColors>()!;
-    final note = this.note;
+    final description = this.description;
 
     return DecoratedBox(
       decoration: BoxDecoration(color: colors.fill, borderRadius: _radius),
@@ -108,7 +107,7 @@ final class ChoiceRow extends StatelessWidget {
                       child: _FocusRing(
                         radius: DoableMetrics.checkSize / 2,
                         shown: showsFocus,
-                        child: ChoiceCheck(priority: priority, done: done),
+                        child: ActionCheck(priority: priority, done: done),
                       ),
                     ),
                   ),
@@ -160,9 +159,9 @@ final class ChoiceRow extends StatelessWidget {
                                   : null,
                             ),
                           ),
-                          if (note != null)
+                          if (description != null)
                             Text(
-                              note,
+                              description,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: DoableType.note.copyWith(
@@ -244,7 +243,7 @@ final class _ButtonState extends State<_Button> {
         enabled: widget.onTap != null,
         child: InkWell(
           onTap: widget.onTap,
-          borderRadius: ChoiceRow._radius,
+          borderRadius: ActionRow._radius,
           focusColor: Colors.transparent,
           onFocusChange: (focused) => setState(() => _focused = focused),
           child: ExcludeSemantics(child: widget.builder(showsFocus)),

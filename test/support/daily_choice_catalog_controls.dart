@@ -18,8 +18,8 @@ import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calend
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
-import 'package:doable/src/design_system/components/choice_check.dart';
-import 'package:doable/src/design_system/components/choice_row.dart';
+import 'package:doable/src/design_system/components/action_check.dart';
+import 'package:doable/src/design_system/components/action_row.dart';
 import 'package:doable/src/design_system/components/day_heading.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
 import 'package:doable/src/design_system/components/notice.dart';
@@ -310,7 +310,7 @@ bool _isBefore(CalendarDate a, CalendarDate b) =>
 /// Флажок выполнения на карточке каталога, когда карточка одна.
 ///
 /// Карточку из нескольких шаг находит по её ключу выполнения.
-final dailyChoiceCompletionControl = find.byType(ChoiceCheck);
+final dailyChoiceCompletionControl = find.byType(ActionCheck);
 
 /// Что показывает флажок выполнения [control]: выполнен ли выбор и можно ли
 /// сейчас изменить выполнение.
@@ -321,8 +321,8 @@ final dailyChoiceCompletionControl = find.byType(ChoiceCheck);
   WidgetTester tester,
   Finder control,
 ) {
-  final row = tester.widget<ChoiceRow>(
-    find.ancestor(of: control, matching: find.byType(ChoiceRow)),
+  final row = tester.widget<ActionRow>(
+    find.ancestor(of: control, matching: find.byType(ActionRow)),
   );
   return (completed: row.done, enabled: row.onToggle != null);
 }

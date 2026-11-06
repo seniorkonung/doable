@@ -19,7 +19,7 @@ import 'package:doable/src/daily_choice/presentation/details/daily_choice_detail
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_sheet.dart';
 import 'package:doable/src/design_system/components/badge.dart';
 import 'package:doable/src/design_system/components/button.dart';
-import 'package:doable/src/design_system/components/choice_head.dart';
+import 'package:doable/src/design_system/components/action_head.dart';
 import 'package:doable/src/design_system/components/choice_path.dart' as ui;
 import 'package:doable/src/design_system/components/date_grid.dart';
 import 'package:doable/src/design_system/components/detail_row.dart';
@@ -130,7 +130,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.widgetWithText(TopBar, 'Описание'), findsOneWidget);
-    expect(_head(tester).options, isA<ChoiceHeadOptionsNone>());
+    expect(_head(tester).options, isA<ActionHeadButtonNone>());
     expect(_editedText(tester), 'Пояснение');
     expect(tester.getSemantics(_save), isSemantics(isEnabled: false));
 
@@ -212,7 +212,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(Sheet), findsOneWidget);
       expect(find.text(_notFound), findsOneWidget);
-      expect(find.byType(ChoiceHead), findsNothing);
+      expect(find.byType(ActionHead), findsNothing);
       expect(
         find.textContaining('Дневной выбор удалён.').hitTestable(),
         findsOneWidget,
@@ -234,7 +234,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(Sheet), findsOneWidget);
     expect(find.text(_notFound), findsOneWidget);
-    expect(find.byType(ChoiceHead), findsNothing);
+    expect(find.byType(ActionHead), findsNothing);
   });
 
   testWidgets('отказ удаления остаётся в панели', (tester) async {
@@ -727,7 +727,7 @@ void main() {
     ]);
     expect(_fields(tester).enabled, isFalse);
     expect(_head(tester).onToggle, isNull);
-    expect(_head(tester).options, isA<ChoiceHeadOptionsUnavailable>());
+    expect(_head(tester).options, isA<ActionHeadButtonUnavailable>());
     expect(_picker(tester).value, DoablePriority.p4);
     expect(_head(tester).priority, DoablePriority.p4);
 
@@ -750,7 +750,7 @@ void main() {
     expect(_picker(tester).value, DoablePriority.p4);
     expect(_fields(tester).enabled, isFalse);
     expect(_head(tester).onToggle, isNull);
-    expect(_head(tester).options, isA<ChoiceHeadOptionsUnavailable>());
+    expect(_head(tester).options, isA<ActionHeadButtonUnavailable>());
 
     repository.emit(_details(priority: DailyChoicePriority.p1));
     await tester.pumpAndSettle();
@@ -983,7 +983,7 @@ void main() {
       greaterThan(tester.getRect(find.byType(Sheet)).bottom),
     );
 
-    tester.widget<ChoiceHead>(find.byType(ChoiceHead)).onToggle!();
+    tester.widget<ActionHead>(find.byType(ActionHead)).onToggle!();
     await tester.pump();
     harness.repository.failCommand(const DailyChoiceUnavailableFailure());
     await tester.pumpAndSettle();
@@ -1089,10 +1089,10 @@ void main() {
     expect(find.widgetWithText(TopBar, 'Описание'), findsOneWidget);
     expect(find.bySemanticsLabel(_collapse), findsNothing);
     expect(find.bySemanticsLabel(_expand), findsNothing);
-    expect(_head(tester).options, isA<ChoiceHeadOptionsNone>());
+    expect(_head(tester).options, isA<ActionHeadButtonNone>());
     expect(_tabs, findsNothing);
     expect(
-      tester.getRect(find.byType(ChoiceHead)).bottom,
+      tester.getRect(find.byType(ActionHead)).bottom,
       lessThanOrEqualTo(tester.getRect(find.byType(EditableText)).top),
     );
     expect(tester.getSemantics(_save), isSemantics(isEnabled: false));
@@ -1141,7 +1141,7 @@ void main() {
     expect(find.byType(AlertDialog), findsNothing);
     expect(find.byType(TopBar), findsNothing);
     expect(_sheetRect(tester), _fullScreen(tester));
-    expect(_head(tester).options, isA<ChoiceHeadOptionsAvailable>());
+    expect(_head(tester).options, isA<ActionHeadButtonAvailable>());
 
     await tester.tap(find.bySemanticsLabel(_collapse));
     await tester.pumpAndSettle();
@@ -1285,7 +1285,7 @@ void main() {
     expect(find.text('Новое'), findsOneWidget);
     expect(find.text('Пояснение'), findsNothing);
     expect(_fields(tester).enabled, isTrue);
-    expect(_head(tester).options, isA<ChoiceHeadOptionsAvailable>());
+    expect(_head(tester).options, isA<ActionHeadButtonAvailable>());
     expect(
       tester.getSemantics(_check),
       isSemantics(hasEnabledState: true, isEnabled: true),
@@ -1312,9 +1312,9 @@ Future<void> _startDeletion(WidgetTester tester) async {
 
 /// Флажок и кнопка параметров выключены.
 void _expectHeadLocked(WidgetTester tester) {
-  final head = tester.widget<ChoiceHead>(find.byType(ChoiceHead));
+  final head = tester.widget<ActionHead>(find.byType(ActionHead));
   expect(head.onToggle, isNull);
-  expect(head.options, isA<ChoiceHeadOptionsUnavailable>());
+  expect(head.options, isA<ActionHeadButtonUnavailable>());
 }
 
 /// Проходит закрытие панели по кадрам: пока она в дереве, в ней прежние
@@ -1364,8 +1364,8 @@ void _useLowScreen(WidgetTester tester) {
 DailyChoiceDetailFields _fields(WidgetTester tester) =>
     tester.widget<DailyChoiceDetailFields>(dailyChoiceDetailFields);
 
-ChoiceHead _head(WidgetTester tester) =>
-    tester.widget<ChoiceHead>(find.byType(ChoiceHead));
+ActionHead _head(WidgetTester tester) =>
+    tester.widget<ActionHead>(find.byType(ActionHead));
 
 PriorityPicker _picker(WidgetTester tester) =>
     tester.widget<PriorityPicker>(find.byType(PriorityPicker));

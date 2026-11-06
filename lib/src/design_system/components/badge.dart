@@ -35,6 +35,16 @@ sealed class Badge extends StatelessWidget {
   /// размере шрифта.
   const factory Badge.archivedInline({required String word, Key? key}) =
       BadgeArchived.inline;
+
+  /// Метка «Удалено» после намерения или связи, удалённых после сохранения
+  /// пути: слово [word] цвета `muted` на плоскости `fill` за значком корзины.
+  /// Диктор читает слово.
+  const factory Badge.deleted({required String word, Key? key}) = BadgeDeleted;
+
+  /// Та же метка в строке, которая не должна стать выше своего текста: как
+  /// [Badge.archivedInline].
+  const factory Badge.deletedInline({required String word, Key? key}) =
+      BadgeDeleted.inline;
 }
 
 /// Метка-значок: плитка 22×20 со значком [icon] тона [tone].
@@ -86,6 +96,48 @@ final class BadgeArchived extends Badge {
   final double _verticalPadding;
 
   @override
+  Widget build(BuildContext context) => _WordBadge(
+    icon: DoableIconData.archive,
+    word: word,
+    verticalPadding: _verticalPadding,
+  );
+}
+
+/// Метка удаления: корзина и слово [word].
+final class BadgeDeleted extends Badge {
+  const BadgeDeleted({required this.word, super.key})
+    : _verticalPadding = 1,
+      super._();
+
+  const BadgeDeleted.inline({required this.word, super.key})
+    : _verticalPadding = 0,
+      super._();
+
+  final String word;
+  final double _verticalPadding;
+
+  @override
+  Widget build(BuildContext context) => _WordBadge(
+    icon: DoableIconData.delete,
+    word: word,
+    verticalPadding: _verticalPadding,
+  );
+}
+
+/// Слово `muted` на плоскости `fill` за значком [icon]: общий вид меток
+/// архива и удаления.
+final class _WordBadge extends StatelessWidget {
+  const _WordBadge({
+    required this.icon,
+    required this.word,
+    required this.verticalPadding,
+  });
+
+  final DoableIconData icon;
+  final String word;
+  final double verticalPadding;
+
+  @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<DoableColors>()!;
 
@@ -95,12 +147,12 @@ final class BadgeArchived extends Badge {
         borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
       ),
       child: Padding(
-        padding: EdgeInsets.fromLTRB(5, _verticalPadding, 7, _verticalPadding),
+        padding: EdgeInsets.fromLTRB(5, verticalPadding, 7, verticalPadding),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           spacing: DoableMetrics.space1,
           children: [
-            DoableIcon(DoableIconData.archive, size: 13, color: colors.muted),
+            DoableIcon(icon, size: 13, color: colors.muted),
             Text(
               word,
               maxLines: 1,

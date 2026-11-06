@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../design_system/components/badge.dart';
-import '../../../design_system/components/choice_head.dart';
+import '../../../design_system/components/action_head.dart';
 import '../../../design_system/components/choice_path.dart';
 import '../../../design_system/components/confirm_dialog.dart';
 import '../../../design_system/components/half_pinned_sliver.dart';
@@ -583,7 +583,7 @@ final class _ChoiceHeader extends StatelessWidget {
             padding: const EdgeInsets.symmetric(
               horizontal: DoableMetrics.space5,
             ),
-            child: ChoiceHead(
+            child: ActionHead(
               goal: details.source.title,
               action: details.selected.title,
               priority: priority,
@@ -607,13 +607,13 @@ final class _ChoiceHeader extends StatelessWidget {
                   : null,
               actionBadge: _archiveBadge(localizations, details.selected),
               options: browsing == null
-                  ? const ChoiceHeadOptions.none()
+                  ? const ActionHeadButton.none()
                   : switch (browsing.onOptions) {
-                      final onOpen? => ChoiceHeadOptions.available(
+                      final onOpen? => ActionHeadButton.available(
                         label: localizations.dailyChoiceSheetOptionsLabel,
                         onOpen: onOpen,
                       ),
-                      null => ChoiceHeadOptions.unavailable(
+                      null => ActionHeadButton.unavailable(
                         label: localizations.dailyChoiceSheetOptionsLabel,
                       ),
                     },

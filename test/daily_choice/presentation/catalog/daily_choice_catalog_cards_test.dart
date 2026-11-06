@@ -3,8 +3,8 @@ import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
-import 'package:doable/src/design_system/components/choice_check.dart';
-import 'package:doable/src/design_system/components/choice_row.dart';
+import 'package:doable/src/design_system/components/action_check.dart';
+import 'package:doable/src/design_system/components/action_row.dart';
 import 'package:doable/src/design_system/components/reason_chain.dart';
 import 'package:doable/src/design_system/components/section_header.dart';
 import 'package:doable/src/design_system/doable_colors.dart';
@@ -262,7 +262,7 @@ void main() {
           tester
               .widgetList<Text>(
                 find.descendant(
-                  of: find.byType(ChoiceRow),
+                  of: find.byType(ActionRow),
                   matching: find.byType(Text),
                 ),
               )
@@ -273,7 +273,7 @@ void main() {
         expect(chain.reasons, 3);
         expect(chain.priority, DoablePriority.p2);
         expect(
-          tester.widget<ChoiceCheck>(find.byType(ChoiceCheck)).priority,
+          tester.widget<ActionCheck>(find.byType(ActionCheck)).priority,
           DoablePriority.p2,
         );
         final row = tester
@@ -329,7 +329,7 @@ void main() {
 
     expect(dailyChoiceSectionCount(tester, completed: false), '5');
     expect(dailyChoiceSectionCount(tester, completed: true), '1');
-    expect(find.byType(ChoiceRow), findsNWidgets(3));
+    expect(find.byType(ActionRow), findsNWidgets(3));
 
     await tester.tap(find.byKey(const ValueKey('daily-choice-section-false')));
     await tester.pumpAndSettle();
@@ -342,7 +342,7 @@ void main() {
       isFalse,
     );
     expect(dailyChoiceSectionCount(tester, completed: false), '5');
-    expect(find.byType(ChoiceRow), findsOneWidget);
+    expect(find.byType(ActionRow), findsOneWidget);
   });
 
   testWidgets('секция без выборов сохраняет заголовок с числом 0 и не '
@@ -363,7 +363,7 @@ void main() {
 
     expect(dailyChoiceSectionCount(tester, completed: false), '0');
     expect(dailyChoiceSectionCount(tester, completed: true), '1');
-    expect(find.byType(ChoiceRow), findsOneWidget);
+    expect(find.byType(ActionRow), findsOneWidget);
     expect(
       tester
           .widget<SectionHeader>(
