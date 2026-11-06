@@ -1165,6 +1165,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationDailyChoice => 'дневной выбор';
 
   @override
+  String get graphOperationAction => 'действие';
+
+  @override
   String get graphOperationTag => 'тег';
 
   @override
@@ -1914,6 +1917,34 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get dailyChoiceOperationUnexpected =>
       'Действие с дневным выбором не выполнено из-за непредвиденной ошибки.';
+
+  @override
+  String get actionDeleted => 'Действие удалено.';
+
+  @override
+  String get actionTitleInvalid => 'Проверьте название действия.';
+
+  @override
+  String get actionDescriptionInvalid => 'Проверьте описание действия.';
+
+  @override
+  String get actionOperationNotFound => 'Действие больше не существует.';
+
+  @override
+  String get actionOperationConflict =>
+      'Данные изменились. Обновите их и подтвердите снова.';
+
+  @override
+  String get actionOperationUnavailable =>
+      'Не удалось выполнить операцию с действием. Повторите попытку.';
+
+  @override
+  String get actionOperationCorruption =>
+      'Сохранённые данные повреждены. Действие не изменено.';
+
+  @override
+  String get actionOperationUnexpected =>
+      'Операция с действием не выполнена из-за непредвиденной ошибки.';
 
   @override
   String get graphOperationAddRelations => 'Добавление';

@@ -1,6 +1,14 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/action/application/action_command.dart';
+import 'package:doable/src/action/application/action_result.dart';
+import 'package:doable/src/action/domain/action.dart' as action_domain;
+import 'package:doable/src/action/domain/action_id.dart';
+import 'package:doable/src/action/domain/action_path.dart';
+import 'package:doable/src/action/domain/action_priority.dart';
+import 'package:doable/src/action/domain/action_schedule.dart';
+import 'package:doable/src/action/domain/action_text.dart';
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
@@ -871,6 +879,86 @@ void main() {
     await _closeMessage(tester);
     expect(find.byType(SnackBar), findsNothing);
   });
+
+  testWidgets('действие предъявляет удаление лишь после подтверждения записи', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final deletion = harness.startActionDelete();
+    await tester.pump();
+    expect(find.byType(SnackBar), findsNothing);
+
+    harness.completeActionDeleted(deletion);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Удаление — «действие»: Действие удалено.'),
+      findsOneWidget,
+    );
+    await _closeMessage(tester);
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
+  testWidgets('сообщение об удалении действия локализуется', (tester) async {
+    final harness = await _pumpPresenterApp(tester);
+    final deletion = harness.startActionDelete();
+
+    harness.completeActionDeleted(deletion);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete — “action”: Action deleted.'), findsOneWidget);
+    await _closeMessage(tester);
+  });
+
+  for (final scenario in <({ActionCommandFailure failure, String ru})>[
+    (
+      failure: const ActionValidationFailure(ActionValidationField.title),
+      ru: 'Проверьте название действия.',
+    ),
+    (
+      failure: const ActionValidationFailure(ActionValidationField.description),
+      ru: 'Проверьте описание действия.',
+    ),
+    (
+      failure: const ActionNotFoundFailure(),
+      ru: 'Действие больше не существует.',
+    ),
+    (
+      failure: const ActionConflictFailure(),
+      ru: 'Данные изменились. Обновите их и подтвердите снова.',
+    ),
+    (
+      failure: const ActionUnavailableFailure(),
+      ru: 'Не удалось выполнить операцию с действием. Повторите попытку.',
+    ),
+    (
+      failure: const ActionCorruptionFailure(),
+      ru: 'Сохранённые данные повреждены. Действие не изменено.',
+    ),
+    (
+      failure: const ActionUnexpectedFailure(),
+      ru: 'Операция с действием не выполнена из-за непредвиденной ошибки.',
+    ),
+  ]) {
+    testWidgets('отказ действия ${scenario.failure.runtimeType} объяснён', (
+      tester,
+    ) async {
+      final harness = await _pumpPresenterApp(
+        tester,
+        locale: const Locale('ru'),
+      );
+      final update = harness.startActionUpdate();
+      harness.completeActionFailure(update, scenario.failure);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Изменение — «действие»: ${scenario.ru}'),
+        findsOneWidget,
+      );
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    });
+  }
 
   testWidgets(
     'успех изменения дневного выбора не объявляется сообщением и не занимает '
@@ -1839,6 +1927,13 @@ final _dailyChoiceId = switch (DailyChoiceId.decode(
   ),
 };
 
+final _actionId = switch (ActionId.decode(
+  '018f1400-0000-7000-8000-000000000005',
+)) {
+  ActionIdDecodingSuccess(:final id) => id,
+  InvalidActionIdDecoding() => throw StateError('Некорректный ID действия.'),
+};
+
 final _tagId = switch (TagId.decode('018f1400-0000-7000-8000-000000000003')) {
   TagIdDecodingSuccess(:final id) => id,
   InvalidTagIdDecoding() => throw StateError('Некорректный ID тега.'),
@@ -1934,6 +2029,7 @@ final class _PresenterHarness {
   final _titles = <IntentionCommandAccepted, (int, String)>{};
   final _relationIndexes = <LongTermRelationCommandAccepted, int>{};
   final _dailyChoiceIndexes = <DailyChoiceCommandAccepted, int>{};
+  final _actionIndexes = <ActionCommandAccepted, int>{};
   final _tagIndexes = <TagCommandAccepted, int>{};
   final _exports = <GraphExportAccepted, Completer<GraphExportOutcome>>{};
   final _restores =
@@ -2142,6 +2238,66 @@ final class _PresenterHarness {
     DailyChoiceCommandFailure failure,
   ) => repository.completeDailyChoiceCommand(
     _dailyChoiceIndexes[accepted]!,
+    GraphCommandFailed(failure),
+  );
+
+  ActionCommandAccepted startActionUpdate() {
+    final commandIndex = repository.actionCommands.length;
+    final accepted = _coordinator.acceptActionUpdate(
+      UpdateActionFields(
+        actionId: _actionId,
+        patch: const ActionFieldsPatch(isCompleted: ActionFieldSet(true)),
+      ),
+    ) as ActionCommandAccepted;
+    _coordinator.releaseInitiatorPresentation(accepted.token);
+    _actionIndexes[accepted] = commandIndex;
+    return accepted;
+  }
+
+  ActionCommandAccepted startActionDelete() {
+    final commandIndex = repository.actionCommands.length;
+    final accepted = _coordinator.acceptActionDelete(
+      DeleteAction(_actionId),
+    ) as ActionCommandAccepted;
+    _coordinator.releaseInitiatorPresentation(accepted.token);
+    _actionIndexes[accepted] = commandIndex;
+    return accepted;
+  }
+
+  void completeActionDeleted(ActionCommandAccepted accepted) {
+    const revision = TestDetailsRevision(7);
+    final action = action_domain.Action(
+      id: _actionId,
+      title: ActionTitle('Пробежка'),
+      description: null,
+      path: ActionPath([testDetailsIntentionId(1)]),
+      date: CalendarDate.fromParts(2026, 9, 23),
+      schedule: const ActionAllDay(),
+      priority: ActionPriority.p4,
+      isCompleted: false,
+      creationSequence: action_domain.ActionCreationSequence(1),
+      createdAt: action_domain.ActionTimestamp(DateTime.utc(2026, 9, 23)),
+      updatedAt: action_domain.ActionTimestamp(DateTime.utc(2026, 9, 23)),
+    );
+    repository.completeActionCommand(
+      _actionIndexes[accepted]!,
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: ActionDeleted(
+            action: action,
+            changes: [ActionDeletedChange(revision: revision, action: action)],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void completeActionFailure(
+    ActionCommandAccepted accepted,
+    ActionCommandFailure failure,
+  ) => repository.completeActionCommand(
+    _actionIndexes[accepted]!,
     GraphCommandFailed(failure),
   );
 

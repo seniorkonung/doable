@@ -4,6 +4,11 @@ import 'dart:isolate';
 import 'dart:math' show min;
 import 'dart:typed_data';
 
+import '../../action/application/action_command.dart';
+import '../../action/application/action_result.dart';
+import '../../action/domain/action.dart';
+import '../../action/domain/action_id.dart';
+import '../../action/domain/action_schedule.dart';
 import '../../data/local/app_database.dart' as local;
 import '../../data/local/fts_query.dart';
 import '../../data/local/sqlite_failure_classifier.dart';
@@ -101,6 +106,7 @@ part 'drift_personal_graph_repository_daily_choice_reads.dart';
 part 'drift_personal_graph_repository_daily_choice_catalog.dart';
 part 'drift_personal_graph_repository_daily_choice_day_statuses.dart';
 part 'drift_personal_graph_repository_daily_choice_commands.dart';
+part 'drift_personal_graph_repository_action_commands.dart';
 part 'drift_personal_graph_repository_relation_commands.dart';
 part 'drift_personal_graph_repository_relation_details.dart';
 part 'drift_personal_graph_repository_relation_groups.dart';
@@ -532,6 +538,7 @@ final class DriftPersonalGraphRepository
       final DailyChoiceCommand dailyChoiceCommand => await _executeDailyChoice(
         dailyChoiceCommand,
       ),
+      final ActionCommand actionCommand => await _executeAction(actionCommand),
       final CreateTag createTag => await _executeTag(createTag),
       final UpdateTag updateTag => await _executeTag(updateTag),
       final MoveTag moveTag => await _executeTag(moveTag),

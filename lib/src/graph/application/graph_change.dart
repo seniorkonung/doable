@@ -1,3 +1,4 @@
+import '../../action/domain/action.dart';
 import '../../daily_choice/domain/daily_choice.dart';
 import '../../intention/domain/intention_id.dart';
 import '../../long_term_relation/application/relation_counts.dart';
@@ -115,6 +116,50 @@ final class DailyChoiceChange implements GraphChange {
             ? <IntentionId>{}
             : {choice.sourceIntentionId, choice.selectedIntentionId},
       );
+}
+
+/// Изменение действия одной ревизии графа с состоянием до и после, по
+/// которому потребители находят затронутые даты и намерения пути.
+sealed class ActionChange implements GraphChange {
+  const ActionChange();
+
+  Action? get before;
+  Action? get after;
+}
+
+/// Поля действия подтверждённо записаны. При операции без изменений состояния
+/// до и после совпадают, а ревизия остаётся прежней.
+final class ActionUpdatedChange extends ActionChange {
+  const ActionUpdatedChange({
+    required this.revision,
+    required this.before,
+    required this.after,
+  });
+
+  @override
+  final GraphRevision revision;
+
+  @override
+  final Action before;
+
+  @override
+  final Action after;
+}
+
+final class ActionDeletedChange extends ActionChange {
+  const ActionDeletedChange({required this.revision, required this.action});
+
+  @override
+  final GraphRevision revision;
+
+  /// Состояние действия перед удалением.
+  final Action action;
+
+  @override
+  Action get before => action;
+
+  @override
+  Action? get after => null;
 }
 
 final class IntentionRelationCountsChanged implements GraphChange {

@@ -1158,6 +1158,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationDailyChoice => 'daily choice';
 
   @override
+  String get graphOperationAction => 'action';
+
+  @override
   String get graphOperationTag => 'tag';
 
   @override
@@ -1890,6 +1893,34 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get dailyChoiceOperationUnexpected =>
       'The daily choice operation failed because of an unexpected error.';
+
+  @override
+  String get actionDeleted => 'Action deleted.';
+
+  @override
+  String get actionTitleInvalid => 'Check the action title.';
+
+  @override
+  String get actionDescriptionInvalid => 'Check the action description.';
+
+  @override
+  String get actionOperationNotFound => 'This action no longer exists.';
+
+  @override
+  String get actionOperationConflict =>
+      'The data changed. Refresh it and confirm again.';
+
+  @override
+  String get actionOperationUnavailable =>
+      'Could not complete the action operation. Try again.';
+
+  @override
+  String get actionOperationCorruption =>
+      'Stored data is damaged. The action was not changed.';
+
+  @override
+  String get actionOperationUnexpected =>
+      'The action operation failed because of an unexpected error.';
 
   @override
   String get graphOperationAddRelations => 'Add';

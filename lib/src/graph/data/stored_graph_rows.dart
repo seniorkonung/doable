@@ -1,3 +1,9 @@
+import '../../action/domain/action.dart';
+import '../../action/domain/action_id.dart';
+import '../../action/domain/action_path.dart';
+import '../../action/domain/action_priority.dart';
+import '../../action/domain/action_schedule.dart';
+import '../../action/domain/action_text.dart';
 import '../../daily_choice/domain/choice_path_step_id.dart';
 import '../../daily_choice/domain/daily_choice.dart';
 import '../../daily_choice/domain/daily_choice_description.dart';
@@ -78,6 +84,11 @@ DailyChoiceId decodeStoredDailyChoiceId(String value) =>
       DailyChoiceIdDecodingSuccess(:final id) => id,
       InvalidDailyChoiceIdDecoding() => throw const StoredGraphCorruption(),
     };
+
+ActionId decodeStoredActionId(String value) => switch (ActionId.decode(value)) {
+  ActionIdDecodingSuccess(:final id) => id,
+  InvalidActionIdDecoding() => throw const StoredGraphCorruption(),
+};
 
 ChoicePathStepId _decodeStoredChoicePathStepId(String value) =>
     switch (ChoicePathStepId.decode(value)) {
@@ -396,6 +407,78 @@ DailyChoice decodeStoredDailyChoice(Map<String, Object?> data) {
   } on ArgumentError {
     throw const StoredGraphCorruption();
   }
+}
+
+/// Действие из столбцов таблицы `actions` и строк его пути из
+/// `action_path_items` в порядке позиций. Название и описание хранятся в той
+/// форме, к которой их приводит ввод; путь непуст, позиции идут подряд с
+/// нуля, а `previous_intention_id` повторяет намерение предыдущей позиции.
+Action decodeStoredAction(
+  Map<String, Object?> data,
+  Iterable<Map<String, Object?>> pathRows,
+) {
+  final title = requiredStoredString(data, 'title');
+  final description = _nullableStoredString(data, 'description');
+  try {
+    final action = Action(
+      id: decodeStoredActionId(requiredStoredString(data, 'id')),
+      title: ActionTitle(title),
+      description: description == null
+          ? null
+          : ActionDescription.fromInput(description) ??
+                (throw const StoredGraphCorruption()),
+      path: _decodeStoredActionPath(pathRows),
+      date: CalendarDate.parseCanonical(requiredStoredString(data, 'date')),
+      schedule: switch (data['scheduled_hour']) {
+        null => const ActionAllDay(),
+        final int hour => ActionAtHour(hour),
+        _ => throw const StoredGraphCorruption(),
+      },
+      priority: switch (requiredStoredInteger(data, 'priority')) {
+        1 => ActionPriority.p1,
+        2 => ActionPriority.p2,
+        3 => ActionPriority.p3,
+        4 => ActionPriority.p4,
+        _ => throw const StoredGraphCorruption(),
+      },
+      isCompleted: switch (requiredStoredInteger(data, 'is_completed')) {
+        0 => false,
+        1 => true,
+        _ => throw const StoredGraphCorruption(),
+      },
+      creationSequence: ActionCreationSequence(
+        requiredStoredInteger(data, 'creation_sequence'),
+      ),
+      createdAt: ActionTimestamp(_decodeStoredInstant(data, 'created_at')),
+      updatedAt: ActionTimestamp(_decodeStoredInstant(data, 'updated_at')),
+    );
+    if (action.title.value != title ||
+        action.description?.value != description) {
+      throw const StoredGraphCorruption();
+    }
+    return action;
+  } on IntentionTextValidationException {
+    throw const StoredGraphCorruption();
+  } on CalendarDateValidationException {
+    throw const StoredGraphCorruption();
+  } on ArgumentError {
+    throw const StoredGraphCorruption();
+  }
+}
+
+ActionPath _decodeStoredActionPath(Iterable<Map<String, Object?>> rows) {
+  final intentions = <IntentionId>[];
+  for (final row in rows) {
+    final previous = _nullableStoredString(row, 'previous_intention_id');
+    if (requiredStoredInteger(row, 'position') != intentions.length ||
+        previous != intentions.lastOrNull?.toCanonicalString()) {
+      throw const StoredGraphCorruption();
+    }
+    intentions.add(
+      decodeStoredIntentionId(requiredStoredString(row, 'intention_id')),
+    );
+  }
+  return ActionPath(intentions);
 }
 
 /// Дата дневного выбора из столбца `choice_date`.

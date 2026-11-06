@@ -1,0 +1,189 @@
+part of 'drift_personal_graph_repository.dart';
+
+extension _ActionCommandExecution on DriftPersonalGraphRepository {
+  Future<ActionCommandResult> _executeAction(ActionCommand command) =>
+      switch (command) {
+        final UpdateActionFields update => _runActionCommand(
+          ActionCommandDiagnosticsType.updateFields,
+          (clock, enterStage) => _updateActionFields(update, clock, enterStage),
+        ),
+        final DeleteAction delete => _runActionCommand(
+          ActionCommandDiagnosticsType.delete,
+          (_, enterStage) => _deleteAction(delete, enterStage),
+        ),
+      };
+
+  /// Исполняет [body] единой записью графа и ведёт диагностику по этапам.
+  /// Тело сообщает о переходе к следующему этапу через `enterStage`; отказ
+  /// относится к последнему начатому этапу.
+  Future<ActionCommandResult> _runActionCommand(
+    ActionCommandDiagnosticsType commandType,
+    Future<_GraphWrite<ActionCommandSuccess>> Function(
+      _GraphWriteClock clock,
+      void Function(ActionCommandDiagnosticsStage next) enterStage,
+    )
+    body,
+  ) async {
+    final stopwatch = Stopwatch()..start();
+    var stage = ActionCommandDiagnosticsStage.validation;
+    void record(DiagnosticsStatus status) => _recordDiagnostics(
+      ActionCommandDiagnosticsEvent(
+        commandType: commandType,
+        stage: stage,
+        status: status,
+      ),
+    );
+    void enterStage(ActionCommandDiagnosticsStage next) {
+      record(DiagnosticsSucceeded(stopwatch.elapsed));
+      stage = next;
+      record(const DiagnosticsStarted());
+    }
+
+    record(const DiagnosticsStarted());
+    try {
+      final confirmed = await _writeGraph<ActionCommandSuccess>(
+        (clock) => body(clock, enterStage),
+      );
+      record(DiagnosticsSucceeded(stopwatch.elapsed));
+      return GraphCommandSucceeded(confirmed);
+    } on Object catch (error) {
+      final failure = _classifyActionCommandFailure(error);
+      record(
+        DiagnosticsFailed(
+          duration: stopwatch.elapsed,
+          code: _graphCommandDiagnosticsFailureCode(failure),
+        ),
+      );
+      return GraphCommandFailed(failure);
+    }
+  }
+
+  Future<_GraphWrite<ActionCommandSuccess>> _updateActionFields(
+    UpdateActionFields command,
+    _GraphWriteClock clock,
+    void Function(ActionCommandDiagnosticsStage next) enterStage,
+  ) async {
+    final before = await _readStoredAction(command.actionId);
+    if (before == null) throw const ActionNotFoundFailure();
+    final patch = command.patch;
+    final title = patch.title.resolve(before.title);
+    final description = patch.description.resolve(before.description);
+    final date = patch.date.resolve(before.date);
+    final schedule = patch.schedule.resolve(before.schedule);
+    final priority = patch.priority.resolve(before.priority);
+    final isCompleted = patch.isCompleted.resolve(before.isCompleted);
+    final didMutate =
+        title != before.title ||
+        description != before.description ||
+        date != before.date ||
+        schedule != before.schedule ||
+        priority != before.priority ||
+        isCompleted != before.isCompleted;
+    if (!didMutate) {
+      return _GraphWriteResult<ActionCommandSuccess>(
+        didMutate: false,
+        toSuccess: (revision) => ActionFieldsUpdated(
+          action: before,
+          changes: [
+            ActionUpdatedChange(
+              revision: revision,
+              before: before,
+              after: before,
+            ),
+          ],
+        ),
+      );
+    }
+
+    enterStage(ActionCommandDiagnosticsStage.write);
+    await (_database.update(_database.actions)
+          ..where((row) => row.id.equals(command.actionId.toCanonicalString())))
+        .write(
+          local.ActionsCompanion(
+            title: Value(title.value),
+            description: Value(description?.value),
+            date: Value(date.toCanonicalString()),
+            scheduledHour: Value(switch (schedule) {
+              ActionAllDay() => null,
+              ActionAtHour(:final hour) => hour,
+            }),
+            priority: Value(priority.level),
+            isCompleted: Value(isCompleted),
+            updatedAt: Value(clock.read().microsecondsSinceEpoch),
+          ),
+        );
+
+    enterStage(ActionCommandDiagnosticsStage.resultRead);
+    final after =
+        await _readStoredAction(command.actionId) ??
+        (throw const StoredGraphCorruption());
+    return _GraphWriteResult<ActionCommandSuccess>(
+      didMutate: true,
+      toSuccess: (revision) => ActionFieldsUpdated(
+        action: after,
+        changes: [
+          ActionUpdatedChange(revision: revision, before: before, after: after),
+        ],
+      ),
+    );
+  }
+
+  /// Путь удаляется каскадом схемы, а надгробия, на которые никто больше не
+  /// ссылается, — её триггерами.
+  Future<_GraphWrite<ActionCommandSuccess>> _deleteAction(
+    DeleteAction command,
+    void Function(ActionCommandDiagnosticsStage next) enterStage,
+  ) async {
+    final before = await _readStoredAction(command.actionId);
+    if (before == null) throw const ActionNotFoundFailure();
+
+    enterStage(ActionCommandDiagnosticsStage.write);
+    await (_database.delete(_database.actions)
+          ..where((row) => row.id.equals(command.actionId.toCanonicalString())))
+        .go();
+    return _GraphWriteResult<ActionCommandSuccess>(
+      didMutate: true,
+      toSuccess: (revision) => ActionDeleted(
+        action: before,
+        changes: [ActionDeletedChange(revision: revision, action: before)],
+      ),
+    );
+  }
+
+  /// Действие вместе с путём или `null`, если его нет. Строка вне формы
+  /// хранения даёт [StoredGraphCorruption].
+  Future<Action?> _readStoredAction(ActionId id) async {
+    final row = await _database
+        .customSelect(
+          '''SELECT creation_sequence, id, title, description, date,
+                    scheduled_hour, priority, is_completed, created_at,
+                    updated_at
+             FROM actions WHERE id = ?''',
+          variables: [Variable<String>(id.toCanonicalString())],
+          readsFrom: {_database.actions},
+        )
+        .getSingleOrNull();
+    if (row == null) return null;
+    final pathRows = await _database
+        .customSelect(
+          '''SELECT position, intention_id, previous_intention_id
+             FROM action_path_items WHERE action_id = ? ORDER BY position''',
+          variables: [Variable<String>(id.toCanonicalString())],
+          readsFrom: {_database.actionPathItems},
+        )
+        .get();
+    return decodeStoredAction(row.data, pathRows.map((path) => path.data));
+  }
+}
+
+ActionCommandFailure _classifyActionCommandFailure(Object error) {
+  if (error is ActionCommandFailure) return error;
+  if (error is StoredGraphCorruption) return const ActionCorruptionFailure();
+  return switch (classifySqliteFailure(error)) {
+    SqliteCorruptionFailure() => const ActionCorruptionFailure(),
+    SqliteUnavailableFailure() => const ActionUnavailableFailure(),
+    SqliteConstraintFailure() ||
+    SqliteStorageFullFailure() ||
+    SqliteUnexpectedFailure() => const ActionUnexpectedFailure(),
+  };
+}

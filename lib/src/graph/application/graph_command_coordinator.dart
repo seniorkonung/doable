@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../action/application/action_command.dart';
+import '../../action/application/action_result.dart';
+import '../../action/domain/action_id.dart';
 import '../../daily_choice/application/daily_choice_command.dart';
 import '../../daily_choice/application/daily_choice_result.dart';
 import '../../daily_choice/domain/daily_choice_id.dart';
@@ -89,6 +92,19 @@ final class ExistingDailyChoiceKey extends GraphCommandKey {
   int get hashCode => Object.hash(ExistingDailyChoiceKey, choiceId);
 }
 
+final class ExistingActionKey extends GraphCommandKey {
+  const ExistingActionKey(this.actionId);
+
+  final ActionId actionId;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ExistingActionKey && other.actionId == actionId;
+
+  @override
+  int get hashCode => Object.hash(ExistingActionKey, actionId);
+}
+
 final class TagCreationFormKey extends GraphCommandKey {
   TagCreationFormKey();
 }
@@ -129,6 +145,13 @@ final class DailyChoiceOperationToken extends GraphOperationToken {
 
   @override
   String toString() => 'DailyChoiceOperationToken';
+}
+
+final class ActionOperationToken extends GraphOperationToken {
+  ActionOperationToken._();
+
+  @override
+  String toString() => 'ActionOperationToken';
 }
 
 final class TagOperationToken extends GraphOperationToken {
@@ -379,6 +402,59 @@ final class DailyChoiceUnannouncedSuccessCompletion
       DailyChoiceCommandSuccess,
       DailyChoiceCommandFailure
     >
+    result,
+  }) : super._(confirmedResult: result);
+}
+
+enum ActionCommandKind { update, delete }
+
+sealed class ActionCommandCompletion extends GraphCommandCompletion {
+  const ActionCommandCompletion._({
+    required this.token,
+    required this.kind,
+    required this.confirmedResult,
+  });
+
+  @override
+  final ActionOperationToken token;
+  final ActionCommandKind kind;
+  final ActionCommandResult confirmedResult;
+
+  GraphResult<ActionCommandSuccess, ActionCommandFailure> get result =>
+      switch (confirmedResult) {
+        GraphResultSuccess(:final value) => GraphResultSuccess(value.value),
+        GraphResultFailure(:final failure) => GraphResultFailure(failure),
+      };
+
+  @override
+  ConfirmedGraphChangePackage? get confirmedChange => switch (confirmedResult) {
+    GraphResultSuccess(:final value) => value,
+    GraphResultFailure() => null,
+  };
+
+  @override
+  bool get isFailure => confirmedResult is GraphResultFailure;
+}
+
+final class ActionPresentableCompletion extends ActionCommandCompletion
+    implements GraphPresentableCompletion {
+  const ActionPresentableCompletion._({
+    required super.token,
+    required super.kind,
+    required super.confirmedResult,
+  }) : super._();
+}
+
+/// Успех изменения полей действия публикуется только для согласования данных.
+///
+/// Изменение следует политике «успех без сообщения» по ADR-0046: результат
+/// виден в открытой панели или строке экрана дня, а отказ сохраняет протокол
+/// ADR-0012.
+final class ActionUnannouncedSuccessCompletion extends ActionCommandCompletion {
+  const ActionUnannouncedSuccessCompletion._({
+    required super.token,
+    required super.kind,
+    required GraphCommandSucceeded<ActionCommandSuccess, ActionCommandFailure>
     result,
   }) : super._(confirmedResult: result);
 }
@@ -775,6 +851,21 @@ final class DailyChoiceCommandAlreadyRunning extends DailyChoiceCommandStart {
   const DailyChoiceCommandAlreadyRunning();
 }
 
+sealed class ActionCommandStart {
+  const ActionCommandStart();
+}
+
+final class ActionCommandAccepted extends ActionCommandStart {
+  const ActionCommandAccepted({required this.token, required this.future});
+
+  final ActionOperationToken token;
+  final Future<ActionCommandCompletion> future;
+}
+
+final class ActionCommandAlreadyRunning extends ActionCommandStart {
+  const ActionCommandAlreadyRunning();
+}
+
 sealed class TagCommandStart {
   const TagCommandStart();
 }
@@ -860,6 +951,7 @@ final class GraphCommandCoordinatorDraining extends IntentionCommandStart
     implements
         LongTermRelationCommandStart,
         DailyChoiceCommandStart,
+        ActionCommandStart,
         TagCommandStart,
         GraphExportStart,
         GraphBackupRestoreStart,
@@ -970,6 +1062,9 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
 
   bool isDailyChoiceRunning(DailyChoiceId choiceId) =>
       isKeyRunning(ExistingDailyChoiceKey(choiceId));
+
+  bool isActionRunning(ActionId actionId) =>
+      isKeyRunning(ExistingActionKey(actionId));
 
   bool isTagRunning(TagId tagId) => isKeyRunning(ExistingTagKey(tagId));
 
@@ -1085,6 +1180,17 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
         DailyChoiceCommandKind.delete,
       );
 
+  /// Принимает изменение полей действия с политикой «успех без сообщения» по
+  /// ADR-0046. Пока принятое изменение или удаление этого действия
+  /// выполняется, другое его изменение, удаление и повтор той же команды не
+  /// принимаются.
+  ActionCommandStart acceptActionUpdate(UpdateActionFields command) =>
+      _acceptAction(command.actionId, command, ActionCommandKind.update);
+
+  /// Принимает удаление действия; успех объявляется по ADR-0012.
+  ActionCommandStart acceptActionDelete(DeleteAction command) =>
+      _acceptAction(command.actionId, command, ActionCommandKind.delete);
+
   TagCommandStart acceptTagCreation(
     TagCreationFormKey formKey,
     CreateTag command,
@@ -1194,6 +1300,49 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
         ),
       ),
       _GraphCommandAlreadyRunning() => const DailyChoiceCommandAlreadyRunning(),
+      _GraphCommandDraining() => const GraphCommandCoordinatorDraining(),
+    };
+  }
+
+  ActionCommandStart _acceptAction(
+    ActionId actionId,
+    ActionCommand command,
+    ActionCommandKind kind,
+  ) {
+    final token = ActionOperationToken._();
+    final policy = _actionPresentationPolicyOf(kind);
+    final acceptance = _acceptOperation(
+      keys: {ExistingActionKey(actionId)},
+      entry: _PresentationEntry(token),
+      execute: () async {
+        final result = await _executeAction(command);
+        if (policy != _PresentationPolicy.standard &&
+            result
+                is GraphCommandSucceeded<
+                  ActionCommandSuccess,
+                  ActionCommandFailure
+                >) {
+          return ActionUnannouncedSuccessCompletion._(
+            token: token,
+            kind: kind,
+            result: result,
+          );
+        }
+        return ActionPresentableCompletion._(
+          token: token,
+          kind: kind,
+          confirmedResult: result,
+        );
+      },
+    );
+    return switch (acceptance) {
+      _GraphCommandAccepted(:final future) => ActionCommandAccepted(
+        token: token,
+        future: future.then(
+          (completion) => completion as ActionCommandCompletion,
+        ),
+      ),
+      _GraphCommandAlreadyRunning() => const ActionCommandAlreadyRunning(),
       _GraphCommandDraining() => const GraphCommandCoordinatorDraining(),
     };
   }
@@ -1845,6 +1994,17 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     }
   }
 
+  Future<ActionCommandResult> _executeAction(ActionCommand command) async {
+    try {
+      return await _repository.execute(command);
+    } on Object {
+      return const GraphCommandFailed<
+        ActionCommandSuccess,
+        ActionCommandFailure
+      >(ActionUnexpectedFailure());
+    }
+  }
+
   Future<TagCommandResult> _executeTag(TagCommand command) async {
     try {
       return await _repository.execute(command);
@@ -1941,6 +2101,12 @@ _PresentationPolicy _dailyChoicePresentationPolicyOf(
   DailyChoiceCommandKind.delete => _PresentationPolicy.standard,
   DailyChoiceCommandKind.update => _PresentationPolicy.silentSuccess,
 };
+
+_PresentationPolicy _actionPresentationPolicyOf(ActionCommandKind kind) =>
+    switch (kind) {
+      ActionCommandKind.delete => _PresentationPolicy.standard,
+      ActionCommandKind.update => _PresentationPolicy.silentSuccess,
+    };
 
 IntentionCommandKind _kindOf(IntentionCommand command) => switch (command) {
   CreateIntention() => IntentionCommandKind.create,

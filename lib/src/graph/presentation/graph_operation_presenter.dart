@@ -5,6 +5,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../action/presentation/action_command_failure_message.dart';
 import '../../daily_choice/presentation/daily_choice_command_failure_message.dart';
 import '../../data_transfer/presentation/graph_import_failure_message.dart';
 import '../../intention/application/intention_catalog.dart';
@@ -316,6 +317,9 @@ GraphOperationMessage _messageFor(
   DailyChoicePresentableCompletion() => GraphOperationMessage(
     _dailyChoiceMessage(localizations, completion),
   ),
+  ActionPresentableCompletion() => GraphOperationMessage(
+    _actionMessage(localizations, completion),
+  ),
   TagCommandFailedCompletion() => GraphOperationMessage(
     _tagFailureMessage(localizations, completion),
   ),
@@ -419,6 +423,29 @@ String _dailyChoiceMessage(
       DailyChoiceCommandKind.delete => localizations.dailyChoiceDeleted,
     },
     GraphResultFailure(:final failure) => dailyChoiceCommandFailureMessage(
+      localizations,
+      failure,
+    ),
+  },
+);
+
+String _actionMessage(
+  AppLocalizations localizations,
+  ActionPresentableCompletion completion,
+) => localizations.graphOperationMessage(
+  switch (completion.kind) {
+    ActionCommandKind.update => localizations.graphOperationUpdate,
+    ActionCommandKind.delete => localizations.graphOperationDelete,
+  },
+  localizations.graphOperationAction,
+  switch (completion.result) {
+    GraphResultSuccess() => switch (completion.kind) {
+      ActionCommandKind.update => throw StateError(
+        'Успех изменения действия не образует права предъявления.',
+      ),
+      ActionCommandKind.delete => localizations.actionDeleted,
+    },
+    GraphResultFailure(:final failure) => actionCommandFailureMessage(
       localizations,
       failure,
     ),

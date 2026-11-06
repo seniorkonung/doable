@@ -1,3 +1,5 @@
+import 'package:doable/src/action/application/action_command.dart';
+import 'package:doable/src/action/application/action_result.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 
@@ -118,11 +120,13 @@ final class ControlledDetailsRepository
   final commands = <IntentionCommand>[];
   final relationCommands = <LongTermRelationCommand>[];
   final dailyChoiceCommands = <DailyChoiceCommand>[];
+  final actionCommands = <ActionCommand>[];
   final tagCommands = <TagCommand>[];
   final _commandRequests =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
   final _dailyChoiceCommandRequests = <Completer<DailyChoiceCommandResult>>[];
+  final _actionCommandRequests = <Completer<ActionCommandResult>>[];
   final _tagCommandRequests = <Completer<TagCommandResult>>[];
   var _watchCallCount = 0;
 
@@ -241,6 +245,7 @@ final class ControlledDetailsRepository
         relation,
       ),
       final DailyChoiceCommand choice => await _executeDailyChoice(choice),
+      final ActionCommand action => await _executeAction(action),
       final TagCommand tag => await _executeTag(tag),
       _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
     };
@@ -267,6 +272,16 @@ final class ControlledDetailsRepository
 
   void completeDailyChoiceCommand(int index, DailyChoiceCommandResult result) =>
       _dailyChoiceCommandRequests[index].complete(result);
+
+  Future<ActionCommandResult> _executeAction(ActionCommand command) {
+    actionCommands.add(command);
+    final request = Completer<ActionCommandResult>();
+    _actionCommandRequests.add(request);
+    return request.future;
+  }
+
+  void completeActionCommand(int index, ActionCommandResult result) =>
+      _actionCommandRequests[index].complete(result);
 
   Future<TagCommandResult> _executeTag(TagCommand command) {
     tagCommands.add(command);

@@ -122,6 +122,11 @@ enum DailyChoiceCommandDiagnosticsType { create, updateFields, delete }
 
 enum DailyChoiceCommandDiagnosticsStage { validation, write, resultRead }
 
+enum ActionCommandDiagnosticsType { updateFields, delete }
+
+/// Проверка состояния действия, запись и чтение подтверждённого результата.
+enum ActionCommandDiagnosticsStage { validation, write, resultRead }
+
 enum TagCommandDiagnosticsType {
   create,
   update,
@@ -263,6 +268,19 @@ final class DailyChoiceCommandDiagnosticsEvent extends DiagnosticsEvent {
 
   final DailyChoiceCommandDiagnosticsType commandType;
   final DailyChoiceCommandDiagnosticsStage stage;
+}
+
+/// Команда действия. Событие не несёт ни содержимого действия, ни его
+/// идентификатора, даты и пути.
+final class ActionCommandDiagnosticsEvent extends DiagnosticsEvent {
+  const ActionCommandDiagnosticsEvent({
+    required this.commandType,
+    required this.stage,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final ActionCommandDiagnosticsType commandType;
+  final ActionCommandDiagnosticsStage stage;
 }
 
 final class BootstrapDiagnosticsEvent extends DiagnosticsEvent {

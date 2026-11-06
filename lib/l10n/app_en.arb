@@ -1008,6 +1008,10 @@
   "@graphOperationDailyChoice": {
     "description": "Безопасное обозначение дневного выбора в сообщении операции"
   },
+  "graphOperationAction": "action",
+  "@graphOperationAction": {
+    "description": "Безопасное обозначение действия в сообщении операции"
+  },
   "graphOperationTag": "tag",
   "@graphOperationTag": {
     "description": "Обозначение тега в общем сообщении операции"
@@ -1381,6 +1385,38 @@
   "dailyChoiceOperationUnexpected": "The daily choice operation failed because of an unexpected error.",
   "@dailyChoiceOperationUnexpected": {
     "description": "Неожиданный отказ команды дневного выбора"
+  },
+  "actionDeleted": "Action deleted.",
+  "@actionDeleted": {
+    "description": "Подтверждение удаления действия"
+  },
+  "actionTitleInvalid": "Check the action title.",
+  "@actionTitleInvalid": {
+    "description": "Ошибка названия действия"
+  },
+  "actionDescriptionInvalid": "Check the action description.",
+  "@actionDescriptionInvalid": {
+    "description": "Ошибка описания действия"
+  },
+  "actionOperationNotFound": "This action no longer exists.",
+  "@actionOperationNotFound": {
+    "description": "Действие отсутствует при выполнении команды"
+  },
+  "actionOperationConflict": "The data changed. Refresh it and confirm again.",
+  "@actionOperationConflict": {
+    "description": "Конфликт актуальности действия"
+  },
+  "actionOperationUnavailable": "Could not complete the action operation. Try again.",
+  "@actionOperationUnavailable": {
+    "description": "Временная недоступность команды действия"
+  },
+  "actionOperationCorruption": "Stored data is damaged. The action was not changed.",
+  "@actionOperationCorruption": {
+    "description": "Повреждение данных действия"
+  },
+  "actionOperationUnexpected": "The action operation failed because of an unexpected error.",
+  "@actionOperationUnexpected": {
+    "description": "Неожиданный отказ команды действия"
   },
   "@graphOperationRelation": {
     "description": "Безопасное обозначение существующей связи"

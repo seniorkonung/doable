@@ -1862,6 +1862,12 @@ abstract class AppLocalizations {
   /// **'daily choice'**
   String get graphOperationDailyChoice;
 
+  /// Безопасное обозначение действия в сообщении операции
+  ///
+  /// In en, this message translates to:
+  /// **'action'**
+  String get graphOperationAction;
+
   /// Обозначение тега в общем сообщении операции
   ///
   /// In en, this message translates to:
@@ -2922,6 +2928,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The daily choice operation failed because of an unexpected error.'**
   String get dailyChoiceOperationUnexpected;
+
+  /// Подтверждение удаления действия
+  ///
+  /// In en, this message translates to:
+  /// **'Action deleted.'**
+  String get actionDeleted;
+
+  /// Ошибка названия действия
+  ///
+  /// In en, this message translates to:
+  /// **'Check the action title.'**
+  String get actionTitleInvalid;
+
+  /// Ошибка описания действия
+  ///
+  /// In en, this message translates to:
+  /// **'Check the action description.'**
+  String get actionDescriptionInvalid;
+
+  /// Действие отсутствует при выполнении команды
+  ///
+  /// In en, this message translates to:
+  /// **'This action no longer exists.'**
+  String get actionOperationNotFound;
+
+  /// Конфликт актуальности действия
+  ///
+  /// In en, this message translates to:
+  /// **'The data changed. Refresh it and confirm again.'**
+  String get actionOperationConflict;
+
+  /// Временная недоступность команды действия
+  ///
+  /// In en, this message translates to:
+  /// **'Could not complete the action operation. Try again.'**
+  String get actionOperationUnavailable;
+
+  /// Повреждение данных действия
+  ///
+  /// In en, this message translates to:
+  /// **'Stored data is damaged. The action was not changed.'**
+  String get actionOperationCorruption;
+
+  /// Неожиданный отказ команды действия
+  ///
+  /// In en, this message translates to:
+  /// **'The action operation failed because of an unexpected error.'**
+  String get actionOperationUnexpected;
 
   /// Вид операции добавления связей
   ///
