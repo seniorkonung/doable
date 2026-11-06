@@ -1,28 +1,19 @@
-import 'dart:async';
-
 import 'package:doable/src/action/application/action_command.dart';
 import 'package:doable/src/action/application/action_details.dart';
 import 'package:doable/src/action/application/action_result.dart';
 import 'package:doable/src/action/domain/action_priority.dart';
 import 'package:doable/src/action/domain/action_schedule.dart';
-import 'package:doable/src/action/presentation/panel/action_panel.dart';
 import 'package:doable/src/design_system/components/button.dart';
 import 'package:doable/src/design_system/components/detail_row.dart';
 import 'package:doable/src/design_system/components/priority_picker.dart';
 import 'package:doable/src/design_system/components/reason_chain.dart';
 import 'package:doable/src/design_system/doable_priority.dart';
-import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
-import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
-import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/action_panel_controls.dart';
 import '../../../support/action_panel_fixture.dart';
-import '../../../support/controlled_local_date.dart';
-import '../../../support/ordinary_page_test_app.dart';
 
 void main() {
   setUp(() {
@@ -34,7 +25,7 @@ void main() {
   testWidgets('панель показывает шапку, описание, поля и строку дат', (
     tester,
   ) async {
-    final repository = await _openPanel(tester);
+    final repository = await openActionPanel(tester);
     repository.emit(
       actionDetailsFixture(
         description: 'Пояснение',
@@ -69,7 +60,7 @@ void main() {
   ]) {
     testWidgets('$name меняется сразу отдельной записью одного поля, а панель '
         'остаётся открытой', (tester) async {
-      final repository = await _openPanel(tester);
+      final repository = await openActionPanel(tester);
       repository.emit(actionDetailsFixture());
       await tester.pumpAndSettle();
 
@@ -84,7 +75,7 @@ void main() {
 
   testWidgets('перенос даты показывает новую дату только после подтверждённой '
       'записи и оставляет панель открытой', (tester) async {
-    final repository = await _openPanel(tester);
+    final repository = await openActionPanel(tester);
     repository.emit(actionDetailsFixture());
     await tester.pumpAndSettle();
 
@@ -106,7 +97,7 @@ void main() {
   testWidgets('закрытие листа даты без выбора ничего не записывает', (
     tester,
   ) async {
-    final repository = await _openPanel(tester);
+    final repository = await openActionPanel(tester);
     repository.emit(actionDetailsFixture());
     await tester.pumpAndSettle();
 
@@ -123,7 +114,7 @@ void main() {
       'флажок и поля недоступны, а прежнее значение остаётся на экране', (
     tester,
   ) async {
-    final repository = await _openPanel(tester);
+    final repository = await openActionPanel(tester);
     repository.emit(actionDetailsFixture());
     await tester.pumpAndSettle();
 
@@ -144,7 +135,7 @@ void main() {
 
   testWidgets('доказанно временный отказ записи остаётся в панели с последним '
       'подтверждённым значением, и поле можно изменить снова', (tester) async {
-    final repository = await _openPanel(tester);
+    final repository = await openActionPanel(tester);
     repository.emit(actionDetailsFixture());
     await tester.pumpAndSettle();
 
@@ -166,7 +157,7 @@ void main() {
   testWidgets('после отказа без явного повтора флажок недоступен, пока '
       'действие не обновлено, и отклонённое изменение не отправляется '
       'повторно', (tester) async {
-    final repository = await _openPanel(tester);
+    final repository = await openActionPanel(tester);
     repository.emit(actionDetailsFixture());
     await tester.pumpAndSettle();
 
@@ -218,7 +209,7 @@ void main() {
     testWidgets('$outcome чтения называется в панели вместо шапки', (
       tester,
     ) async {
-      final repository = await _openPanel(tester);
+      final repository = await openActionPanel(tester);
       finish(repository);
       await tester.pumpAndSettle();
 
@@ -229,7 +220,7 @@ void main() {
 
   testWidgets('временная недоступность чтения предлагает повтор, который '
       'показывает действие', (tester) async {
-    final repository = await _openPanel(tester);
+    final repository = await openActionPanel(tester);
     repository.failRead(const ActionReadUnavailableFailure());
     await tester.pumpAndSettle();
     expect(
@@ -247,7 +238,7 @@ void main() {
   });
 
   testWidgets('закрытие панели снимает подписку на действие', (tester) async {
-    final repository = await _openPanel(tester);
+    final repository = await openActionPanel(tester);
     repository.emit(actionDetailsFixture());
     await tester.pumpAndSettle();
     expect(shownActionId(tester), actionIdOf(1));
@@ -321,42 +312,3 @@ void _expectLocked(WidgetTester tester) {
   if (patch.priority case ActionFieldSet(:final value)) ('priority', value),
   if (patch.isCompleted case ActionFieldSet(:final value)) ('completed', value),
 ].single;
-
-/// Открывает панель над страницей; действие приходит из
-/// [ActionPanelRepository.emit].
-Future<ActionPanelRepository> _openPanel(WidgetTester tester) async {
-  tester.view
-    ..physicalSize = const Size(390, 844)
-    ..devicePixelRatio = 1;
-  addTearDown(tester.view.reset);
-  final repository = ActionPanelRepository();
-  addTearDown(repository.dispose);
-  final localDate = ControlledLocalDate(CalendarDate.fromParts(2026, 10, 8));
-  await tester.pumpWidget(
-    ProviderScope(
-      overrides: [
-        personalGraphRepositoryProvider.overrideWith((ref) => repository),
-        localDateSourceProvider.overrideWithValue(localDate.read),
-      ],
-      child: OrdinaryPageTestApp(
-        locale: const Locale('ru'),
-        builder: (context, child) =>
-            GraphOperationPresenter(child: child ?? const SizedBox.shrink()),
-        home: Scaffold(
-          body: Builder(
-            builder: (context) => TextButton(
-              onPressed: () =>
-                  unawaited(showActionPanel(context, actionIdOf(1))),
-              child: const Text('Открыть'),
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-  await tester.pump();
-  await tester.tap(find.text('Открыть'));
-  await tester.pump();
-  await tester.pump(const Duration(seconds: 1));
-  return repository;
-}

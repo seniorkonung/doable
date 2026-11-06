@@ -3085,6 +3085,72 @@ abstract class AppLocalizations {
   /// **'There is an incomplete action'**
   String get actionCalendarDayHasIncomplete;
 
+  /// Доступное название кнопки параметров в шапке панели действия
+  ///
+  /// In en, this message translates to:
+  /// **'Action options'**
+  String get actionPanelOptionsLabel;
+
+  /// Пункт меню «Действие», открывающий изменение названия и описания действия
+  ///
+  /// In en, this message translates to:
+  /// **'Edit the name and description'**
+  String get actionOptionEditText;
+
+  /// Заголовок полосы изменения названия и описания действия
+  ///
+  /// In en, this message translates to:
+  /// **'Edit the action'**
+  String get actionTextEditTitle;
+
+  /// Доступное название стрелки назад из изменения названия и описания действия
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the action'**
+  String get actionTextEditBack;
+
+  /// Кнопка сохранения названия и описания действия
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get actionTextEditSave;
+
+  /// Доступное название и заполнитель поля названия действия при изменении
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get actionTextEditNameLabel;
+
+  /// Доступное название поля описания действия при изменении
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get actionTextEditDescriptionLabel;
+
+  /// Вопрос перед уходом с несохранёнными названием и описанием действия
+  ///
+  /// In en, this message translates to:
+  /// **'Discard changes?'**
+  String get actionTextEditDiscardTitle;
+
+  /// Пояснение вопроса перед уходом с несохранёнными названием и описанием действия
+  ///
+  /// In en, this message translates to:
+  /// **'Your changes to the name and description won’t be saved.'**
+  String get actionTextEditDiscardMessage;
+
+  /// Действие, которое отменяет изменение названия и описания действия
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get actionTextEditDiscardAction;
+
+  /// Действие, которое возвращает к изменению названия и описания действия
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get actionTextEditContinueAction;
+
   /// Вид операции добавления связей
   ///
   /// In en, this message translates to:

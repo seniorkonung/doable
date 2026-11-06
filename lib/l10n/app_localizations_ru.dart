@@ -2003,6 +2003,40 @@ class AppLocalizationsRu extends AppLocalizations {
   String get actionCalendarDayHasIncomplete => 'Есть невыполненное действие';
 
   @override
+  String get actionPanelOptionsLabel => 'Параметры действия';
+
+  @override
+  String get actionOptionEditText => 'Изменить название и описание';
+
+  @override
+  String get actionTextEditTitle => 'Изменить действие';
+
+  @override
+  String get actionTextEditBack => 'Назад к действию';
+
+  @override
+  String get actionTextEditSave => 'Сохранить';
+
+  @override
+  String get actionTextEditNameLabel => 'Название';
+
+  @override
+  String get actionTextEditDescriptionLabel => 'Описание';
+
+  @override
+  String get actionTextEditDiscardTitle => 'Отменить изменения?';
+
+  @override
+  String get actionTextEditDiscardMessage =>
+      'Изменения названия и описания не сохранятся.';
+
+  @override
+  String get actionTextEditDiscardAction => 'Отменить';
+
+  @override
+  String get actionTextEditContinueAction => 'Продолжить правку';
+
+  @override
   String get graphOperationAddRelations => 'Добавление';
 
   @override

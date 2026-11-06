@@ -135,9 +135,64 @@ void main() {
     expect(tester.getTopLeft(_head).dy, fullTop);
     semantics.dispose();
   });
+
+  testWidgets('в изменении при предельном названии, крупном шрифте и '
+      'клавиатуре оба поля достижимы, каретка описания видна над клавиатурой, '
+      'а текст и фокус переживают смену высоты', (tester) async {
+    await _useExtremeScreen(tester);
+    await _openPanel(
+      tester,
+      actionDetailsFixture(
+        rootTitle: _maxTitle('основа'),
+        title: _maxTitle('действие'),
+        description: 'Пояснение',
+      ),
+    );
+    // Под высокой шапкой описание сначала нужно прокрутить в видимую часть.
+    final description = find.text('Пояснение', skipOffstage: false);
+    await tester.ensureVisible(description);
+    await tester.pumpAndSettle();
+    await tester.tap(description);
+    await tester.pumpAndSettle();
+    final titleField = find.byType(EditableText).first;
+    final descriptionField = find.byType(EditableText).last;
+    _openKeyboard(tester);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(descriptionField, _enteredDescription);
+    await tester.pumpAndSettle();
+
+    _expectCaretVisible(tester, descriptionField);
+    _expectTextKept(tester, titleField, descriptionField);
+    for (final open in [false, true]) {
+      if (open) {
+        _openKeyboard(tester);
+      } else {
+        tester.view.resetViewInsets();
+      }
+      await tester.pumpAndSettle();
+      _expectTextKept(tester, titleField, descriptionField);
+    }
+    _body(tester).jumpTo(0);
+    await tester.pump();
+    expect(
+      tester.getTopLeft(titleField).dy,
+      greaterThanOrEqualTo(_list(tester).top),
+    );
+    _body(tester).jumpTo(_body(tester).maxScrollExtent);
+    await tester.pump();
+    expect(
+      tester.getBottomLeft(descriptionField).dy,
+      lessThanOrEqualTo(_list(tester).bottom),
+    );
+  });
 }
 
 const _statusBar = 24.0;
+
+const _keyboard = 300.0;
+
+const _enteredDescription = 'Новое описание';
 
 /// Название наибольшей допустимой длины: 255 графем.
 String _maxTitle(String word) =>
@@ -320,3 +375,35 @@ ActionDetails _extremeDetails() => actionDetailsFixture(
   date: CalendarDate.fromParts(2025, 10, 8),
   priority: ActionPriority.p1,
 );
+
+void _openKeyboard(WidgetTester tester) =>
+    tester.view.viewInsets = const FakeViewPadding(bottom: _keyboard);
+
+/// Каретка видна в списке над клавиатурой.
+void _expectCaretVisible(WidgetTester tester, Finder field) {
+  final editable = tester.state<EditableTextState>(field).renderEditable;
+  final caret = MatrixUtils.transformRect(
+    editable.getTransformTo(null),
+    editable.getLocalRectForCaret(editable.selection!.extent),
+  );
+  final list = _list(tester);
+  final keyboardTop =
+      (tester.view.physicalSize.height - tester.view.viewInsets.bottom) /
+      tester.view.devicePixelRatio;
+  expect(list.bottom, lessThanOrEqualTo(keyboardTop));
+  expect(caret.top, greaterThanOrEqualTo(list.top));
+  expect(caret.bottom, lessThanOrEqualTo(list.bottom));
+}
+
+/// Введённое описание на месте и сохраняет фокус, название не тронуто.
+void _expectTextKept(WidgetTester tester, Finder title, Finder description) {
+  expect(
+    tester.widget<EditableText>(description).controller.text,
+    _enteredDescription,
+  );
+  expect(tester.widget<EditableText>(description).focusNode.hasFocus, isTrue);
+  expect(
+    tester.widget<EditableText>(title).controller.text,
+    _maxTitle('действие'),
+  );
+}

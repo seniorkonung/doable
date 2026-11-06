@@ -1978,6 +1978,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String get actionCalendarDayHasIncomplete => 'There is an incomplete action';
 
   @override
+  String get actionPanelOptionsLabel => 'Action options';
+
+  @override
+  String get actionOptionEditText => 'Edit the name and description';
+
+  @override
+  String get actionTextEditTitle => 'Edit the action';
+
+  @override
+  String get actionTextEditBack => 'Back to the action';
+
+  @override
+  String get actionTextEditSave => 'Save';
+
+  @override
+  String get actionTextEditNameLabel => 'Name';
+
+  @override
+  String get actionTextEditDescriptionLabel => 'Description';
+
+  @override
+  String get actionTextEditDiscardTitle => 'Discard changes?';
+
+  @override
+  String get actionTextEditDiscardMessage =>
+      'Your changes to the name and description won’t be saved.';
+
+  @override
+  String get actionTextEditDiscardAction => 'Discard';
+
+  @override
+  String get actionTextEditContinueAction => 'Keep editing';
+
+  @override
   String get graphOperationAddRelations => 'Add';
 
   @override
