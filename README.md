@@ -7,8 +7,8 @@ an intention: creation, bounded catalog browsing, editing, explicit action
 readiness, archiving, restoration, deletion, Russian and English localization,
 and persistence within one application installation.
 
-The product model is maintained in
-[`docs/discussions/action-centered-goal-system.md`](docs/discussions/action-centered-goal-system.md).
+The domain language is defined in [`CONTEXT.md`](CONTEXT.md), and the product
+behavior in [`openspec/specs/`](openspec/specs/).
 
 ## Local data before launch and rollback
 
