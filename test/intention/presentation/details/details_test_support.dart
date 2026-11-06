@@ -1,5 +1,6 @@
 import 'package:doable/src/action/application/action_command.dart';
 import 'package:doable/src/action/application/action_result.dart';
+import 'package:doable/src/action/application/intention_actions.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 
@@ -135,6 +136,30 @@ final class ControlledDetailsRepository
   /// Запросы порций групп связей в порядке их поступления.
   final relationGroupQueries = <RelationGroupQuery>[];
   final dailyChoiceGroupQueries = <DailyChoiceGroupQuery>[];
+
+  /// Запросы порций действий намерения в порядке их поступления.
+  final intentionActionsQueries = <IntentionActionsQuery>[];
+
+  /// Запросы, читающие строки списка, а не только числа вкладки.
+  Iterable<IntentionActionsQuery> get intentionActionsListQueries =>
+      intentionActionsQueries.where(
+        (query) => query.pageSize > IntentionActionsQuery.minPageSize,
+      );
+
+  /// Ответ на запрос порции действий; по умолчанию чтение действий
+  /// отклоняется, как в графах, не читающих действия.
+  IntentionActionsPageResult Function(IntentionActionsQuery query)?
+  onIntentionActionsPage;
+
+  @override
+  Future<IntentionActionsPageResult> getIntentionActionsPage(
+    IntentionActionsQuery query,
+  ) {
+    intentionActionsQueries.add(query);
+    return onIntentionActionsPage == null
+        ? super.getIntentionActionsPage(query)
+        : Future.value(onIntentionActionsPage!(query));
+  }
 
   final statisticsQueries = <IntentionStatisticsQuery>[];
   FutureOr<IntentionStatisticsSectionResult> Function(

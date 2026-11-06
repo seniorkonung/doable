@@ -58,6 +58,22 @@ final class IntentionActionCounts {
 
   /// Действия, в путях которых есть намерение, — каждое один раз.
   final int total;
+
+  int countOf(IntentionActionRole role) => switch (role) {
+    IntentionActionRole.root => root,
+    IntentionActionRole.intermediate => intermediate,
+    IntentionActionRole.terminal => terminal,
+  };
+
+  /// Роль с наибольшим числом действий; при равенстве — первая по порядку
+  /// «корневое», «промежуточное», «конечное».
+  IntentionActionRole get busiestRole {
+    var busiest = IntentionActionRole.values.first;
+    for (final role in IntentionActionRole.values.skip(1)) {
+      if (countOf(role) > countOf(busiest)) busiest = role;
+    }
+    return busiest;
+  }
 }
 
 /// Действия роли упорядочены по дате, затем по часу («Весь день» после

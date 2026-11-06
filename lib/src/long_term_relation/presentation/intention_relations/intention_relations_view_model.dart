@@ -153,7 +153,7 @@ final class IntentionRelationsViewModel extends _$IntentionRelationsViewModel {
         RelationsTarget(:final group?) => group,
         RelationsTarget() ||
         OverviewTarget() ||
-        ChoicesTarget() ||
+        ActionsTarget() ||
         StatisticsTarget() => switch (intention.readiness) {
           IntentionReadiness.notReady => IntentionRelationGroup.needs,
           IntentionReadiness.ready => IntentionRelationGroup.neededFor,

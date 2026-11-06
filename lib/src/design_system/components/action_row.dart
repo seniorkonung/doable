@@ -7,37 +7,47 @@ import '../doable_type.dart';
 import 'action_check.dart';
 import 'reason_chain.dart';
 
-/// Одно действие в списке дня: флажок, корневое намерение пути, путь малой
+/// Одно действие в списке: флажок, корневое намерение пути, путь малой
 /// цепочкой, название действия и описание.
 ///
 /// Строка — две кнопки рядом. Флажок шириной 52 на всю высоту строки
 /// вызывает [onToggle], остальная строка — [onOpen]. Нажатие на флажок
 /// действие не открывает. Без [onToggle] флажок выключен, а раскладка та же.
 /// Тексты, в том числе готовые доступные названия обеих кнопок, и ключи
-/// кнопок задаёт потребитель; даты и времени строка не показывает.
+/// кнопок задаёт потребитель. Дату и время строка показывает только по
+/// [when]; список дня их не передаёт, потому что дату называет календарь, а
+/// время — группа. Список страницы намерения передаёт [when], а [goal] не
+/// передаёт там, где корень пути — сама страница.
 ///
 /// Корневое намерение занимает одну строку и обрезается многоточием,
 /// название переносится, описание не длиннее двух строк. У выполненного
 /// действия цепочка серая, а название `muted` и зачёркнуто.
 final class ActionRow extends StatelessWidget {
   const ActionRow({
-    required this.goal,
     required this.action,
     required this.priority,
     required this.reasons,
     required this.checkLabel,
     required this.label,
     required this.onOpen,
+    this.goal,
+    this.when,
     this.description,
     this.done = false,
     this.onToggle,
     this.checkKey,
     this.openKey,
     super.key,
-  }) : assert(description != '');
+  }) : assert(description != ''),
+       assert(goal != ''),
+       assert(when != '');
 
-  /// Корневое намерение сохранённого пути.
-  final String goal;
+  /// Корневое намерение сохранённого пути; без него строки корня нет.
+  final String? goal;
+
+  /// Первая линия строки: дата и время действия в готовом виде; без неё
+  /// линии нет.
+  final String? when;
 
   /// Название действия.
   final String action;
@@ -80,6 +90,8 @@ final class ActionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<DoableColors>()!;
     final description = this.description;
+    final goal = this.goal;
+    final when = this.when;
 
     return DecoratedBox(
       decoration: BoxDecoration(color: colors.fill, borderRadius: _radius),
@@ -132,14 +144,25 @@ final class ActionRow extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         spacing: 2,
                         children: [
-                          Text(
-                            goal,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: DoableType.caption.copyWith(
-                              color: colors.muted,
+                          if (when != null)
+                            Text(
+                              when,
+                              style: DoableType.label.copyWith(
+                                color: colors.muted,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                              ),
                             ),
-                          ),
+                          if (goal != null)
+                            Text(
+                              goal,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: DoableType.caption.copyWith(
+                                color: colors.muted,
+                              ),
+                            ),
                           // Цепочка отстоит от действия на 5: 2 между
                           // элементами и 3 в запас под цепочкой.
                           Padding(

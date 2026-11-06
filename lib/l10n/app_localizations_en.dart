@@ -420,17 +420,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Loading relations and summary…';
 
   @override
-  String relationNeighborhoodDailyTotal(int count) {
-    return 'Daily choices: $count';
-  }
-
-  @override
-  String get relationNeighborhoodDailySourceRole => 'Source intention';
-
-  @override
-  String get relationNeighborhoodDailySelectedRole => 'Selected action';
-
-  @override
   String get relationNeighborhoodTypeNeed => 'Need';
 
   @override
@@ -665,15 +654,78 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get detailsChoicesTab => 'Choices';
+  String get detailsActionsTab => 'Actions';
 
   @override
-  String get detailsChoicesSourceHint =>
-      'Daily choices that start from this intention.';
+  String detailsActionsTabSemantic(int count) {
+    return 'Actions: $count';
+  }
 
   @override
-  String get detailsChoicesSelectedHint =>
-      'Daily choices that end in this intention.';
+  String get detailsActionsRolesLabel =>
+      'Part of the intention in action paths';
+
+  @override
+  String get detailsActionsRoleRoot => 'Root';
+
+  @override
+  String get detailsActionsRoleIntermediate => 'Intermediate';
+
+  @override
+  String get detailsActionsRoleFinal => 'Final';
+
+  @override
+  String detailsActionsRoleTileSemantic(String role, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count actions',
+      one: '$count action',
+    );
+    return '$role: $_temp0';
+  }
+
+  @override
+  String get detailsActionsEmptyTitle => 'No actions yet';
+
+  @override
+  String get detailsActionsEmptyRoot =>
+      'An action whose path starts with this intention will appear here.';
+
+  @override
+  String get detailsActionsEmptyIntermediate =>
+      'An action whose path goes through this intention will appear here.';
+
+  @override
+  String get detailsActionsEmptyFinal =>
+      'An action whose path ends with this intention will appear here.';
+
+  @override
+  String get detailsActionsTodayAndLater => 'Today and later';
+
+  @override
+  String get detailsActionsLoading => 'Loading actions…';
+
+  @override
+  String get detailsActionsLoadingMore => 'Loading more actions…';
+
+  @override
+  String get detailsActionsRefreshing => 'Refreshing…';
+
+  @override
+  String get detailsActionsUnavailable => 'Could not load the actions.';
+
+  @override
+  String get detailsActionsCorruption =>
+      'The stored action data is damaged and cannot be shown.';
+
+  @override
+  String get detailsActionsExpired =>
+      'The list has changed. Refresh it to continue.';
+
+  @override
+  String get detailsActionsUnexpected =>
+      'Could not load the actions because of an unexpected error.';
 
   @override
   String get detailsTitle => 'Intention details';
@@ -2240,10 +2292,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'The relation couldn’t be deleted because of an unexpected error.';
 
   @override
-  String get relationNeighborhoodOpenDailyChoice =>
-      'Open the full saved daily path';
-
-  @override
   String get relationDetailsTitle => 'Relation';
 
   @override
@@ -2722,9 +2770,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String dailyChoicePriorityOption(String priority) {
     return 'Priority $priority';
   }
-
-  @override
-  String get dailyChoiceCatalogTitle => 'Daily choices';
 
   @override
   String get dailyChoiceCreateFromAction => 'Create a choice from an action';

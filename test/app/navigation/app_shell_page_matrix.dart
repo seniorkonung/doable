@@ -79,13 +79,13 @@ void _registerPageMatrixTests() {
     await tester.pumpAndSettle();
     expect(find.byType(AppNavigationBar), findsOneWidget);
     expect(find.byType(DockedFooter), findsNothing);
-    await openIntentionChoicesTab(tester, waitFor: _until, tap: _tap);
-    final selectedRole = find.byKey(
-      const ValueKey('intention-choices-role-selected'),
+    await openIntentionActionsTab(tester, waitFor: _until, tap: _tap);
+    final terminalRole = find.byKey(
+      const ValueKey('intention-actions-role-terminal'),
     );
-    expect(selectedRole, findsOneWidget);
-    await _tap(tester, selectedRole);
-    expect(selectedRole, findsOneWidget);
+    await _until(tester, terminalRole);
+    await _tap(tester, terminalRole);
+    expect(terminalRole, findsOneWidget);
     await _tap(tester, find.text('Relations').first);
     await _tap(
       tester,

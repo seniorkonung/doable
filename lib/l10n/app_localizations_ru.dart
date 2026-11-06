@@ -424,17 +424,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationNeighborhoodSummaryLoading => 'Загружаем связи и сводку…';
 
   @override
-  String relationNeighborhoodDailyTotal(int count) {
-    return 'Дневных выборов: $count';
-  }
-
-  @override
-  String get relationNeighborhoodDailySourceRole => 'Исходное намерение';
-
-  @override
-  String get relationNeighborhoodDailySelectedRole => 'Выбранное действие';
-
-  @override
   String get relationNeighborhoodTypeNeed => 'Нужно';
 
   @override
@@ -670,15 +659,79 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get detailsChoicesTab => 'Выборы';
+  String get detailsActionsTab => 'Действия';
 
   @override
-  String get detailsChoicesSourceHint =>
-      'Дневные выборы, которые начинаются с этого намерения.';
+  String detailsActionsTabSemantic(int count) {
+    return 'Действия: $count';
+  }
 
   @override
-  String get detailsChoicesSelectedHint =>
-      'Дневные выборы, которые заканчиваются этим намерением.';
+  String get detailsActionsRolesLabel => 'Роль намерения в путях действий';
+
+  @override
+  String get detailsActionsRoleRoot => 'Корневое';
+
+  @override
+  String get detailsActionsRoleIntermediate => 'Промежуточное';
+
+  @override
+  String get detailsActionsRoleFinal => 'Конечное';
+
+  @override
+  String detailsActionsRoleTileSemantic(String role, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count действия',
+      many: '$count действий',
+      few: '$count действия',
+      one: '$count действие',
+    );
+    return '$role: $_temp0';
+  }
+
+  @override
+  String get detailsActionsEmptyTitle => 'Действий пока нет';
+
+  @override
+  String get detailsActionsEmptyRoot =>
+      'Здесь появится действие, путь которого начинается с этого намерения.';
+
+  @override
+  String get detailsActionsEmptyIntermediate =>
+      'Здесь появится действие, путь которого проходит через это намерение.';
+
+  @override
+  String get detailsActionsEmptyFinal =>
+      'Здесь появится действие, путь которого заканчивается этим намерением.';
+
+  @override
+  String get detailsActionsTodayAndLater => 'Сегодня и позже';
+
+  @override
+  String get detailsActionsLoading => 'Загружаем действия…';
+
+  @override
+  String get detailsActionsLoadingMore => 'Загружаем ещё действия…';
+
+  @override
+  String get detailsActionsRefreshing => 'Обновляем…';
+
+  @override
+  String get detailsActionsUnavailable => 'Не удалось загрузить действия.';
+
+  @override
+  String get detailsActionsCorruption =>
+      'Сохранённые данные действий повреждены и не могут быть показаны.';
+
+  @override
+  String get detailsActionsExpired =>
+      'Список изменился. Обновите его, чтобы продолжить.';
+
+  @override
+  String get detailsActionsUnexpected =>
+      'Не удалось загрузить действия из-за непредвиденной ошибки.';
 
   @override
   String get detailsTitle => 'Подробности намерения';
@@ -2271,10 +2324,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось удалить связь из-за непредвиденной ошибки.';
 
   @override
-  String get relationNeighborhoodOpenDailyChoice =>
-      'Открыть полный путь дневного выбора';
-
-  @override
   String get relationDetailsTitle => 'Связь';
 
   @override
@@ -2753,9 +2802,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String dailyChoicePriorityOption(String priority) {
     return 'Приоритет $priority';
   }
-
-  @override
-  String get dailyChoiceCatalogTitle => 'Дневные выборы';
 
   @override
   String get dailyChoiceCreateFromAction => 'Создать выбор от действия';

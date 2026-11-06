@@ -1,5 +1,5 @@
+import '../../../action/application/intention_actions.dart';
 import '../../../long_term_relation/application/intention_relation_group.dart';
-import '../../../long_term_relation/application/relation_group.dart';
 import '../../../statistics/application/intention_statistics_target.dart';
 
 /// Начальная вкладка страницы намерения.
@@ -18,8 +18,8 @@ final class RelationsTarget extends IntentionPageTarget {
   final IntentionRelationGroup? group;
 }
 
-final class ChoicesTarget extends IntentionPageTarget {
-  const ChoicesTarget();
+final class ActionsTarget extends IntentionPageTarget {
+  const ActionsTarget();
 }
 
 final class StatisticsTarget extends IntentionPageTarget {
@@ -39,8 +39,9 @@ final class IntentionPageInstance {
 
   final IntentionPageTarget target;
 
-  /// Роль вкладки «Выборы»; до первой смены — «исходное».
-  DailyChoiceRelationRole choicesRole = DailyChoiceRelationRole.source;
+  /// Плитка вкладки «Действия». До первого показа вкладки она не выбрана:
+  /// первую модель вкладки настраивает плитка с наибольшим числом.
+  IntentionActionRole? actionsRole;
 
   /// Настройки вкладки «Связи»; их задаёт первая модель вкладки этого
   /// экземпляра.

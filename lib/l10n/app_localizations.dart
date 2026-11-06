@@ -638,24 +638,6 @@ abstract class AppLocalizations {
   /// **'Loading relations and summary…'**
   String get relationNeighborhoodSummaryLoading;
 
-  /// No description provided for @relationNeighborhoodDailyTotal.
-  ///
-  /// In en, this message translates to:
-  /// **'Daily choices: {count}'**
-  String relationNeighborhoodDailyTotal(int count);
-
-  /// Роль намерения как источника дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Source intention'**
-  String get relationNeighborhoodDailySourceRole;
-
-  /// Роль намерения как выбранного действия
-  ///
-  /// In en, this message translates to:
-  /// **'Selected action'**
-  String get relationNeighborhoodDailySelectedRole;
-
   /// Тип долговременной связи нужно
   ///
   /// In en, this message translates to:
@@ -1022,23 +1004,119 @@ abstract class AppLocalizations {
   /// **'Archived in {group}: {count}'**
   String detailsRelationsArchiveFoldSemantic(String group, int count);
 
-  /// Вкладка дневных выборов, прямо использующих намерение
+  /// Вкладка действий, в сохранённых путях которых участвует намерение
   ///
   /// In en, this message translates to:
-  /// **'Choices'**
-  String get detailsChoicesTab;
+  /// **'Actions'**
+  String get detailsActionsTab;
 
-  /// Подсказка над непустым списком роли «исходное» на вкладке «Выборы»
+  /// Доступное название вкладки «Действия» с числом действий, в путях которых есть намерение
   ///
   /// In en, this message translates to:
-  /// **'Daily choices that start from this intention.'**
-  String get detailsChoicesSourceHint;
+  /// **'Actions: {count}'**
+  String detailsActionsTabSemantic(int count);
 
-  /// Подсказка над непустым списком роли «выбранное» на вкладке «Выборы»
+  /// Доступное название плиток ролей на вкладке «Действия»
   ///
   /// In en, this message translates to:
-  /// **'Daily choices that end in this intention.'**
-  String get detailsChoicesSelectedHint;
+  /// **'Part of the intention in action paths'**
+  String get detailsActionsRolesLabel;
+
+  /// Плитка действий, путь которых начинается с намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Root'**
+  String get detailsActionsRoleRoot;
+
+  /// Плитка действий, путь которых проходит через намерение
+  ///
+  /// In en, this message translates to:
+  /// **'Intermediate'**
+  String get detailsActionsRoleIntermediate;
+
+  /// Плитка действий, путь которых заканчивается намерением
+  ///
+  /// In en, this message translates to:
+  /// **'Final'**
+  String get detailsActionsRoleFinal;
+
+  /// Доступное название плитки роли с числом действий
+  ///
+  /// In en, this message translates to:
+  /// **'{role}: {count, plural, one{{count} action} other{{count} actions}}'**
+  String detailsActionsRoleTileSemantic(String role, int count);
+
+  /// Заголовок пустой плитки на вкладке «Действия»
+  ///
+  /// In en, this message translates to:
+  /// **'No actions yet'**
+  String get detailsActionsEmptyTitle;
+
+  /// Объяснение пустой плитки «Корневое»
+  ///
+  /// In en, this message translates to:
+  /// **'An action whose path starts with this intention will appear here.'**
+  String get detailsActionsEmptyRoot;
+
+  /// Объяснение пустой плитки «Промежуточное»
+  ///
+  /// In en, this message translates to:
+  /// **'An action whose path goes through this intention will appear here.'**
+  String get detailsActionsEmptyIntermediate;
+
+  /// Объяснение пустой плитки «Конечное»
+  ///
+  /// In en, this message translates to:
+  /// **'An action whose path ends with this intention will appear here.'**
+  String get detailsActionsEmptyFinal;
+
+  /// Первая группа списка действий: сегодняшний день и более поздние даты
+  ///
+  /// In en, this message translates to:
+  /// **'Today and later'**
+  String get detailsActionsTodayAndLater;
+
+  /// Состояние первого чтения списка на вкладке «Действия»
+  ///
+  /// In en, this message translates to:
+  /// **'Loading actions…'**
+  String get detailsActionsLoading;
+
+  /// Состояние подгрузки следующей порции списка на вкладке «Действия»
+  ///
+  /// In en, this message translates to:
+  /// **'Loading more actions…'**
+  String get detailsActionsLoadingMore;
+
+  /// Состояние замены показанной части списка на вкладке «Действия»
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing…'**
+  String get detailsActionsRefreshing;
+
+  /// Временный отказ чтения списка на вкладке «Действия»
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the actions.'**
+  String get detailsActionsUnavailable;
+
+  /// Отказ чтения списка на вкладке «Действия» из-за повреждённых данных
+  ///
+  /// In en, this message translates to:
+  /// **'The stored action data is damaged and cannot be shown.'**
+  String get detailsActionsCorruption;
+
+  /// Отказ продолжения списка на вкладке «Действия», когда граф изменился
+  ///
+  /// In en, this message translates to:
+  /// **'The list has changed. Refresh it to continue.'**
+  String get detailsActionsExpired;
+
+  /// Неизвестный отказ чтения списка на вкладке «Действия»
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the actions because of an unexpected error.'**
+  String get detailsActionsUnexpected;
 
   /// Доступное имя страницы намерения при загрузке и отказе чтения
   ///
@@ -3486,12 +3564,6 @@ abstract class AppLocalizations {
   /// **'The relation couldn’t be deleted because of an unexpected error.'**
   String get relationDeleteUnexpected;
 
-  /// Назначение перехода к полному пути дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Open the full saved daily path'**
-  String get relationNeighborhoodOpenDailyChoice;
-
   /// Заголовок подробного просмотра связи
   ///
   /// In en, this message translates to:
@@ -4210,12 +4282,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Priority {priority}'**
   String dailyChoicePriorityOption(String priority);
-
-  /// Заголовок раздела дневных выборов в соседстве намерения, пока их количество не получено
-  ///
-  /// In en, this message translates to:
-  /// **'Daily choices'**
-  String get dailyChoiceCatalogTitle;
 
   /// Вход в создание дневного выбора от действия
   ///

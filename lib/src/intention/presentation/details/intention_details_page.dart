@@ -6,12 +6,11 @@ import 'package:flutter/material.dart' hide Badge, TextField;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../action/presentation/intention_actions/intention_actions_sliver.dart';
+import '../../../action/presentation/intention_actions/intention_actions_state.dart';
+import '../../../action/presentation/intention_actions/intention_actions_view_model.dart';
 import '../../../app/navigation/ordinary_page_scaffold.dart';
 import '../../../app/routing/app_router.gr.dart';
-import '../../../daily_choice/presentation/details/daily_choice_sheet.dart';
-import '../../../daily_choice/presentation/intention_choices/intention_choices_sliver.dart';
-import '../../../daily_choice/presentation/intention_choices/intention_choices_state.dart';
-import '../../../daily_choice/presentation/intention_choices/intention_choices_view_model.dart';
 import '../../../design_system/components/badge.dart';
 import '../../../design_system/components/button.dart';
 import '../../../design_system/components/confirm_dialog.dart';
@@ -75,7 +74,7 @@ final class _IntentionDetailsPageState
   var _routeIsCurrent = false;
   late IntentionDetailsTab _selectedTab;
   ProviderSubscription<IntentionRelationsState>? _relationsSubscription;
-  ProviderSubscription<IntentionChoicesState>? _choicesSubscription;
+  ProviderSubscription<IntentionActionsState>? _actionsSubscription;
 
   IntentionStatisticsViewModelProvider get _statisticsProvider =>
       intentionStatisticsViewModelProvider(
@@ -83,9 +82,12 @@ final class _IntentionDetailsPageState
         _pageInstance,
         target: switch (_pageInstance.target) {
           StatisticsTarget(:final statistics) => statistics,
-          OverviewTarget() || RelationsTarget() || ChoicesTarget() => null,
+          OverviewTarget() || RelationsTarget() || ActionsTarget() => null,
         },
       );
+
+  IntentionActionsViewModelProvider get _actionsProvider =>
+      intentionActionsViewModelProvider(widget.intentionId, _pageInstance);
 
   IntentionRelationsViewModelProvider get _relationsProvider =>
       intentionRelationsViewModelProvider(widget.intentionId, _pageInstance);
@@ -110,11 +112,11 @@ final class _IntentionDetailsPageState
     _selectedTab = switch (_pageInstance.target) {
       OverviewTarget() => IntentionDetailsTab.overview,
       RelationsTarget() => IntentionDetailsTab.relations,
-      ChoicesTarget() => IntentionDetailsTab.choices,
+      ActionsTarget() => IntentionDetailsTab.actions,
       StatisticsTarget() => IntentionDetailsTab.statistics,
     };
     _syncRelationsRetention();
-    _syncChoicesRetention();
+    _syncActions();
   }
 
   /// Модель «Связей» живёт, только пока вкладка выбрана, в том числе под
@@ -136,18 +138,25 @@ final class _IntentionDetailsPageState
     _relationsSubscription = ref.listenManual(_relationsProvider, (_, _) {});
   }
 
-  /// Модель «Выборов» живёт, только пока вкладка выбрана, в том числе под
-  /// открытыми над страницей страницами. Роль остаётся в экземпляре страницы.
-  void _syncChoicesRetention() {
-    if (_selectedTab == IntentionDetailsTab.choices) {
-      _choicesSubscription ??= ref.listenManual(
-        intentionChoicesViewModelProvider(widget.intentionId, _pageInstance),
-        (_, _) {},
-      );
-    } else {
-      _choicesSubscription?.close();
-      _choicesSubscription = null;
+  /// Модель «Действий» живёт, пока получены подробные данные, в том числе под
+  /// другими вкладками и открытыми над страницей страницами: число вкладки
+  /// следует за графом. Список она держит, только пока вкладка выбрана, а
+  /// плитка остаётся в экземпляре страницы. Показ меняется в микрозадаче: он
+  /// меняет состояние модели, а страница может быть ещё в построении.
+  void _syncActions() {
+    if (ref.read(intentionDetailsViewModelProvider(widget.intentionId))
+        is! IntentionDetailsLoaded) {
+      _actionsSubscription?.close();
+      _actionsSubscription = null;
+      return;
     }
+    _actionsSubscription ??= ref.listenManual(_actionsProvider, (_, _) {});
+    scheduleMicrotask(() {
+      if (!mounted || _actionsSubscription == null) return;
+      ref
+          .read(_actionsProvider.notifier)
+          .setVisible(_selectedTab == IntentionDetailsTab.actions);
+    });
   }
 
   void _selectTab(IntentionDetailsTab tab) {
@@ -160,7 +169,7 @@ final class _IntentionDetailsPageState
       _selectedTab = tab;
     });
     _syncRelationsRetention();
-    _syncChoicesRetention();
+    _syncActions();
     _syncStatisticsVisibility();
   }
 
@@ -306,8 +315,8 @@ final class _IntentionDetailsPageState
     if (oldWidget.intentionId != widget.intentionId) {
       _relationsSubscription?.close();
       _relationsSubscription = null;
-      _choicesSubscription?.close();
-      _choicesSubscription = null;
+      _actionsSubscription?.close();
+      _actionsSubscription = null;
       _startPageInstance();
       _headExtent = null;
       _headHidden.value = false;
@@ -389,7 +398,10 @@ final class _IntentionDetailsPageState
     final localizations = AppLocalizations.of(context);
     final provider = intentionDetailsViewModelProvider(intentionId);
     final details = ref.watch(provider);
-    ref.listen(provider, (_, _) => _syncRelationsRetention());
+    ref.listen(provider, (_, _) {
+      _syncRelationsRetention();
+      _syncActions();
+    });
     // Подписка принадлежит странице, в том числе пока её данные загружаются.
     ref.watch(_statisticsProvider);
     // Пока модель «Связей» существует, число вкладки берётся из её
@@ -406,6 +418,10 @@ final class _IntentionDetailsPageState
               },
             ),
           );
+    // Число вкладки берётся из тех же чисел, что плитки и список.
+    final actionCount = details is IntentionDetailsLoaded
+        ? ref.watch(_actionsProvider.select((state) => state.counts?.total))
+        : null;
     return OrdinaryPageScaffold(
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(DoableMetrics.tapMin),
@@ -472,6 +488,7 @@ final class _IntentionDetailsPageState
                 onSelectTab: _selectTab,
                 pageInstance: _pageInstance,
                 relationCounts: relationCounts,
+                actionCount: actionCount,
                 statisticsSection: IntentionStatisticsSectionSliver(
                   provider: _statisticsProvider,
                 ),
@@ -554,6 +571,7 @@ final class _DetailsContent extends ConsumerWidget {
     required this.onSelectTab,
     required this.pageInstance,
     required this.relationCounts,
+    required this.actionCount,
     required this.statisticsSection,
   });
 
@@ -568,6 +586,7 @@ final class _DetailsContent extends ConsumerWidget {
   final ValueChanged<IntentionDetailsTab> onSelectTab;
   final IntentionPageInstance pageInstance;
   final RelationCounts? relationCounts;
+  final int? actionCount;
   final Widget statisticsSection;
 
   @override
@@ -589,6 +608,7 @@ final class _DetailsContent extends ConsumerWidget {
         onSelectTab: onSelectTab,
         pageInstance: pageInstance,
         relationCounts: relationCounts ?? loaded.details.relationCounts,
+        actionCount: actionCount,
         statisticsSection: statisticsSection,
         onEnableReadiness: ref
             .read(intentionDetailsViewModelProvider(intentionId).notifier)
@@ -634,6 +654,7 @@ final class _LoadedDetails extends StatelessWidget {
     required this.onSelectTab,
     required this.pageInstance,
     required this.relationCounts,
+    required this.actionCount,
     required this.statisticsSection,
     required this.onEnableReadiness,
     required this.onDisableReadiness,
@@ -649,6 +670,7 @@ final class _LoadedDetails extends StatelessWidget {
   final ValueChanged<IntentionDetailsTab> onSelectTab;
   final IntentionPageInstance pageInstance;
   final RelationCounts relationCounts;
+  final int? actionCount;
   final Widget statisticsSection;
   final VoidCallback onEnableReadiness;
   final VoidCallback onDisableReadiness;
@@ -666,6 +688,7 @@ final class _LoadedDetails extends StatelessWidget {
           value: selectedTab,
           onChange: onSelectTab,
           counts: relationCounts,
+          actionCount: actionCount,
         ),
         IntentionDetailsTabBody(
           slivers: [
@@ -763,12 +786,11 @@ final class _LoadedDetails extends StatelessWidget {
                 ),
               ),
             ],
-            if (selectedTab == IntentionDetailsTab.choices)
-              IntentionChoicesSliver(
+            if (selectedTab == IntentionDetailsTab.actions)
+              IntentionActionsSliver(
                 intentionId: intention.id,
                 pageInstance: pageInstance,
-                onOpenDailyChoice: (choiceId) =>
-                    unawaited(showDailyChoiceSheet(context, choiceId)),
+                today: today,
               ),
             if (selectedTab == IntentionDetailsTab.statistics)
               statisticsSection,

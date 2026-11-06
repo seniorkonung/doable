@@ -8,14 +8,15 @@ import '../../../design_system/components/tabs.dart';
 import '../../../design_system/doable_icon.dart';
 import '../../../long_term_relation/application/relation_counts.dart';
 
-enum IntentionDetailsTab { overview, relations, choices, statistics }
+enum IntentionDetailsTab { overview, relations, actions, statistics }
 
-/// Разделы страницы намерения; число связей передаёт страница.
+/// Разделы страницы намерения; числа связей и действий передаёт страница.
 final class IntentionDetailsTabs extends StatelessWidget {
   const IntentionDetailsTabs({
     required this.value,
     required this.onChange,
     required this.counts,
+    required this.actionCount,
     required this.headHidden,
     super.key,
   });
@@ -23,6 +24,10 @@ final class IntentionDetailsTabs extends StatelessWidget {
   final IntentionDetailsTab value;
   final ValueChanged<IntentionDetailsTab> onChange;
   final RelationCounts counts;
+
+  /// Число действий, в путях которых есть намерение; `null`, пока оно не
+  /// получено, и тогда вкладка числа не показывает.
+  final int? actionCount;
   final ValueListenable<bool> headHidden;
 
   @override
@@ -58,9 +63,13 @@ final class IntentionDetailsTabs extends StatelessWidget {
                 icon: counts.archived > 0 ? DoableIconData.archive : null,
               ),
               TabItem(
-                id: IntentionDetailsTab.choices,
-                label: texts.detailsChoicesTab,
-                semanticLabel: texts.detailsChoicesTab,
+                id: IntentionDetailsTab.actions,
+                label: texts.detailsActionsTab,
+                semanticLabel: switch (actionCount) {
+                  final count? => texts.detailsActionsTabSemantic(count),
+                  null => texts.detailsActionsTab,
+                },
+                count: actionCount,
               ),
               TabItem(
                 id: IntentionDetailsTab.statistics,

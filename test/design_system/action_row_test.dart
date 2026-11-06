@@ -370,10 +370,44 @@ void main() {
     await tester.pumpAndSettle();
     expect(calls, ['toggle', 'open']);
   });
+  testWidgets('первая линия «when» стоит над корнем и цепочкой, а без неё '
+      'строка прежняя', (tester) async {
+    await tester.pumpWidget(
+      _app(Brightness.light, _row(goal: 'Цель', when: 'Сегодня · 18:00')),
+    );
+
+    final when = tester.getRect(find.text('Сегодня · 18:00'));
+    final goal = tester.getRect(find.text('Цель'));
+    final chain = tester.getRect(find.byType(ReasonChain));
+    expect(when.bottom, lessThanOrEqualTo(goal.top));
+    expect(goal.bottom, lessThanOrEqualTo(chain.top));
+    _expectStyle(
+      _style(tester, 'Сегодня · 18:00'),
+      DoableType.label.copyWith(color: DoableColors.light.muted),
+    );
+
+    await tester.pumpWidget(_app(Brightness.light, _row(goal: 'Цель')));
+    expect(find.text('Сегодня · 18:00'), findsNothing);
+    expect(find.text('Цель'), findsOneWidget);
+  });
+
+  testWidgets('без корневого намерения строки корня нет, а цепочка остаётся', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(Brightness.light, _row(goal: null, when: 'Завтра')),
+    );
+
+    expect(find.text('Цель'), findsNothing);
+    expect(find.text('Завтра'), findsOneWidget);
+    expect(find.byType(ReasonChain), findsOneWidget);
+    expect(find.text('Действие'), findsOneWidget);
+  });
 }
 
 ActionRow _row({
-  String goal = 'Цель',
+  String? goal = 'Цель',
+  String? when,
   String action = 'Действие',
   String? description,
   DoablePriority priority = DoablePriority.p1,
@@ -387,6 +421,7 @@ ActionRow _row({
   VoidCallback? onOpen,
 }) => ActionRow(
   goal: goal,
+  when: when,
   action: action,
   description: description,
   priority: priority,
