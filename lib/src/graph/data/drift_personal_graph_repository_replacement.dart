@@ -46,6 +46,7 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
         progress,
         cancellation,
       );
+      await _verifyInsertedActionPaths();
       if (!_sameRecordCounts(await _selectRecordCounts(), snapshot.counts)) {
         throw const GraphReplacementRecordsRejected();
       }
@@ -164,10 +165,13 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
 
   /// Удаляет прежний граф операторами не больше чем по
   /// [_replacementBatchRowLimit] строк в порядке, обратном ссылкам: дневные
-  /// выборы вместе с шагами путей, которые каскадом удаляются с ними, затем
-  /// связи, назначения тегов, теги и намерения. Назначения удаляются
-  /// отдельно, а не каскадом тегов, поэтому [progress] получает число
-  /// удалённых записей каждого вида.
+  /// выборы вместе с шагами путей, которые каскадом удаляются с ними,
+  /// надгробия, действия вместе со строками путей, затем связи, назначения
+  /// тегов, теги и намерения. Назначения удаляются отдельно, а не каскадом
+  /// тегов, а надгробия — отдельно, а не триггером освобождения после
+  /// удаления строк пути, поэтому [progress] получает число удалённых
+  /// записей каждого вида. Когда удаляются связи и намерения, строк путей
+  /// уже нет, поэтому триггеры не создают новых надгробий.
   Future<void> _deletePreviousGraph(
     _ReplacementProgress progress,
     GraphReplacementCancellation cancellation,
@@ -178,6 +182,9 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
             _database.dailyChoices,
             {_database.dailyChoices, _database.dailyChoicePathSteps},
           ),
+          (_database.deletedRelationPairs, {_database.deletedRelationPairs}),
+          (_database.deletedIntentions, {_database.deletedIntentions}),
+          (_database.actions, {_database.actions, _database.actionPathItems}),
           (_database.longTermRelations, {_database.longTermRelations}),
           (_database.tagAssignments, {_database.tagAssignments}),
           (_database.tags, {_database.tags}),
@@ -200,9 +207,10 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
   }
 
   /// Вставляет записи снимка [records] в порядке файла пакетами не больше
-  /// чем по [_replacementBatchRowLimit] строк: дневной выбор занимает строку
-  /// и по строке на каждый шаг пути. Пакет из одной записи может быть
-  /// больше: длина записи ограничена пределом записи формата.
+  /// чем по [_replacementBatchRowLimit] строк: действие занимает строку и по
+  /// строке на каждое намерение пути, а дневной выбор — строку и по строке
+  /// на каждый шаг пути. Пакет из одной записи может быть больше: длина
+  /// записи ограничена пределом записи формата.
   Future<void> _insertSnapshotRecords(
     Stream<GraphEntityRecord> records,
     _ReplacementProgress progress,
@@ -221,6 +229,7 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
 
     await for (final record in records) {
       final rows = switch (record) {
+        ActionRecord(:final path) => 1 + path.intentions.length,
         DailyChoiceRecord(:final path) => 1 + path.steps.length,
         _ => 1,
       };
@@ -293,12 +302,59 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
                 updatedAt: record.updatedAt.value.microsecondsSinceEpoch,
               ),
             );
-          case DeletedIntentionRecord() ||
-              DeletedRelationPairRecord() ||
-              ActionRecord():
-            throw UnimplementedError(
-              'Замена графа ещё не вставляет действия и надгробия.',
+          case DeletedIntentionRecord(:final id, :final title):
+            batch.insert(
+              _database.deletedIntentions,
+              local.DeletedIntentionsCompanion.insert(
+                intentionId: id.toCanonicalString(),
+                title: title,
+              ),
             );
+          case DeletedRelationPairRecord():
+            batch.insert(
+              _database.deletedRelationPairs,
+              local.DeletedRelationPairsCompanion.insert(
+                sourceIntentionId: record.sourceIntentionId.toCanonicalString(),
+                relatedIntentionId: record.relatedIntentionId
+                    .toCanonicalString(),
+                type: _storedRelationType(record.type),
+              ),
+            );
+          case ActionRecord():
+            final actionId = record.id.toCanonicalString();
+            batch.insert(
+              _database.actions,
+              local.ActionsCompanion.insert(
+                id: actionId,
+                title: record.title.value,
+                description: Value(record.description?.value),
+                date: record.date.toCanonicalString(),
+                scheduledHour: Value(switch (record.schedule) {
+                  ActionAllDay() => null,
+                  ActionAtHour(:final hour) => hour,
+                }),
+                priority: record.priority.level,
+                isCompleted: record.isCompleted,
+                createdAt: record.createdAt.value.microsecondsSinceEpoch,
+                updatedAt: record.updatedAt.value.microsecondsSinceEpoch,
+              ),
+            );
+            // Строки пути вставляются по порядку позиций: так их проверяет
+            // триггер продолжения предыдущей позиции.
+            final intentions = record.path.intentions;
+            batch.insertAll(_database.actionPathItems, [
+              for (final (position, intention) in intentions.indexed)
+                local.ActionPathItemsCompanion.insert(
+                  actionId: actionId,
+                  position: position,
+                  intentionId: intention.toCanonicalString(),
+                  previousIntentionId: Value(
+                    position == 0
+                        ? null
+                        : intentions[position - 1].toCanonicalString(),
+                  ),
+                ),
+            ]);
           case DailyChoiceRecord(:final choice, :final path):
             batch.insert(
               _database.dailyChoices,
@@ -360,6 +416,61 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
         const GraphReplacementRecordsRejected(),
         stackTrace,
       );
+    }
+  }
+
+  /// Проверяет правила целостности сохранённых путей действий, которых не
+  /// выражают триггеры вставки: у каждого звена пути есть связь его пары
+  /// или надгробие пары, а каждое надгробие нужно хоть одному пути. Чтение
+  /// одно на весь вставленный граф: прежний граф к этому моменту удалён.
+  Future<void> _verifyInsertedActionPaths() async {
+    final row = await _database
+        .customSelect(
+          '''SELECT
+            EXISTS (
+              SELECT 1 FROM action_path_items AS item
+              WHERE
+                item.previous_intention_id IS NOT NULL AND
+                NOT EXISTS (
+                  SELECT 1 FROM long_term_relations AS relation
+                  WHERE
+                    relation.source_intention_id =
+                      item.previous_intention_id AND
+                    relation.related_intention_id = item.intention_id
+                ) AND
+                NOT EXISTS (
+                  SELECT 1 FROM deleted_relation_pairs AS pair
+                  WHERE
+                    pair.source_intention_id = item.previous_intention_id AND
+                    pair.related_intention_id = item.intention_id
+                )
+            ) OR
+            EXISTS (
+              SELECT 1 FROM deleted_intentions AS tombstone
+              WHERE NOT EXISTS (
+                SELECT 1 FROM action_path_items AS item
+                WHERE item.intention_id = tombstone.intention_id
+              )
+            ) OR
+            EXISTS (
+              SELECT 1 FROM deleted_relation_pairs AS pair
+              WHERE NOT EXISTS (
+                SELECT 1 FROM action_path_items AS item
+                WHERE
+                  item.previous_intention_id = pair.source_intention_id AND
+                  item.intention_id = pair.related_intention_id
+              )
+            ) AS is_violated''',
+          readsFrom: {
+            _database.actionPathItems,
+            _database.longTermRelations,
+            _database.deletedIntentions,
+            _database.deletedRelationPairs,
+          },
+        )
+        .getSingle();
+    if (row.read<bool>('is_violated')) {
+      throw const GraphReplacementRecordsRejected();
     }
   }
 

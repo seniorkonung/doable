@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:doable/src/action/application/action_command.dart';
+import 'package:doable/src/action/domain/action_id.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show AppDatabase, LocalDatabaseSqlOperation, LocalDatabaseSqlStatement;
 import 'package:doable/src/data_transfer/application/graph_replacement.dart';
@@ -36,9 +38,11 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/encoded_diagnostics_log.dart';
 import '../support/failing_snapshot_temporary_files.dart';
 import '../support/forwarding_graph_fact_log.dart';
+import '../support/graph_import_files.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
+import '../support/reference_graph_replacement.dart';
 import '../support/transaction_storage_exhaustion.dart';
 
 /// Порог сжатия проверок: несколько пакетов вместо производственного
@@ -259,6 +263,25 @@ void main() {
 
     expect(await restore(beforeReplacement), isA<GraphBackupRestored>());
     expect(await graphState(), beforeRestore);
+  });
+
+  test('восстановление копии воспроизводит действия с теми же '
+      'идентификаторами, полями, порядком создания и путями, включая '
+      'удалённое намерение с названием и удалённую связь с типом', () async {
+    await replaceWithReferenceGraph(repository, snapshots);
+    final backup = await makeManualBackup();
+    await confirm(
+      DeleteAction(
+        (ActionId.decode(
+          referenceTombstonedActionId,
+        ) as ActionIdDecodingSuccess).id,
+      ),
+    );
+    await createTag('Сад');
+
+    expect(await restore(backup), isA<GraphBackupRestored>());
+
+    expect(await graphState(), referenceGraphFileLines().skip(1));
   });
 
   test('восстановление собирает состояние копии, хотя во время него сжатие '

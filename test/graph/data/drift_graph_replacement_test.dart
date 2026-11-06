@@ -36,15 +36,19 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:drift/drift.dart' show CouldNotRollBackException;
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/action_seed.dart';
 import '../../support/encoded_diagnostics_log.dart';
+import '../../support/graph_seed.dart';
 import '../../support/graph_log_completeness_reference.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/transaction_storage_exhaustion.dart';
 
 /// Эталонный файл формата версии 1: все виды записей, синий и бесцветный
-/// теги, архивированные намерение и связь и путь через архивированную связь
-/// к намерению без готовности к действию.
+/// теги, архивированные намерение и связь, путь дневного выбора через
+/// архивированную связь к намерению без готовности к действию и пути
+/// действий через архивированную связь, удалённое намерение и удалённую
+/// связь.
 const _goldenPath = 'test/graph_format/golden/graph_format_v1.jsonl';
 
 /// Идентификаторы сущностей эталонного файла.
@@ -54,6 +58,24 @@ const _goldenFiveKilometersId = '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f13';
 const _goldenSportTagId = '7b0e2f4c-1d3a-4c5e-8f60-0a1b2c3d4e12';
 const _goldenHealthRunningRelationId = '2a3b4c5d-6e7f-4a80-b91c-0d1e2f3a4b11';
 const _goldenDailyChoiceId = '3c4d5e6f-7a8b-4c9d-a0e1-1f2a3b4c5d12';
+
+/// Количества записей эталонного файла.
+final _goldenCounts = _goldenCountsWith();
+
+/// Количества записей эталонного файла с другим числом надгробий.
+GraphRecordCounts _goldenCountsWith({
+  int deletedIntentions = 1,
+  int deletedRelationPairs = 1,
+}) => GraphRecordCounts(
+  tags: 2,
+  intentions: 4,
+  deletedIntentions: deletedIntentions,
+  tagAssignments: 3,
+  longTermRelations: 3,
+  deletedRelationPairs: deletedRelationPairs,
+  actions: 3,
+  dailyChoices: 2,
+);
 
 void main() {
   late LocalDatabaseHarness harness;
@@ -134,10 +156,11 @@ void main() {
   }
 
   /// Записывает в каталог снимков снимок замены с записями эталонного
-  /// файла, строки которого изменяет [edit], как его запишет хранилище
-  /// снимков, и возвращает его.
+  /// файла, строки которого изменяет [edit], а количества записей —
+  /// [counts], как его запишет хранилище снимков, и возвращает его.
   Future<UnregisteredGraphSnapshot> goldenSnapshot({
     String Function(String jsonl) edit = _unchanged,
+    GraphRecordCounts? counts,
   }) async {
     final bytes = gzip.encode(utf8.encode(edit(golden)));
     final fileName = 'замена-${++snapshotNumber}.jsonl.gz';
@@ -148,16 +171,7 @@ void main() {
       fileName: fileName,
       byteSize: bytes.length,
       checksum: Uint8List.fromList(sha256.convert(bytes).bytes),
-      counts: GraphRecordCounts(
-        tags: 2,
-        intentions: 4,
-        deletedIntentions: 0,
-        tagAssignments: 3,
-        longTermRelations: 3,
-        deletedRelationPairs: 0,
-        actions: 0,
-        dailyChoices: 2,
-      ),
+      counts: counts ?? _goldenCounts,
     );
   }
 
@@ -233,6 +247,42 @@ void main() {
       await repository.readCurrentPosition(),
     );
     expect(_lines(await state.records.toList()), await graphLines());
+  });
+
+  test('замена графа с действиями и надгробиями удаляет их вместе с путями, '
+      'не создавая надгробий удалённых связей и намерений прежнего графа, '
+      'считает их в ходе замены и даёт граф снимка', () async {
+    final raw = probe.storage;
+    seedRawGraph(raw, () {
+      for (final (number, title) in [(1, 'Здоровье'), (2, 'Бегать')]) {
+        seedIntention(raw, seedUuid(number), title);
+      }
+      seedIntention(raw, seedUuid(3), 'Плавать');
+      seedRelation(raw, seedUuid(101), seedUuid(1), seedUuid(2));
+      seedRelation(raw, seedUuid(102), seedUuid(1), seedUuid(3));
+      seedAction(raw, id: seedUuid(11), path: [seedUuid(1), seedUuid(2)]);
+      seedAction(raw, id: seedUuid(12), path: [seedUuid(1), seedUuid(3)]);
+      raw
+        ..execute('DELETE FROM long_term_relations WHERE id = ?', [
+          seedUuid(102),
+        ])
+        ..execute('DELETE FROM intentions WHERE id = ?', [seedUuid(3)]);
+    });
+    expect(
+      await rows(
+        'SELECT (SELECT count(*) FROM deleted_intentions), '
+        '(SELECT count(*) FROM deleted_relation_pairs)',
+      ),
+      [
+        [1, 1],
+      ],
+    );
+    final progress = <double>[];
+
+    await replace(await goldenSnapshot(), onProgress: progress.add);
+
+    expect(await graphLines(), _recordLines(golden));
+    expect(progress.last, 1);
   });
 
   test('копия перед заменой получает позицию до сброса и сводку с '
@@ -403,7 +453,7 @@ void main() {
         const GraphComposition(
           intentionCount: 4,
           relationCount: 3,
-          dailyChoiceCount: 2,
+          actionCount: 3,
           tagCount: 2,
         ),
       );
@@ -748,6 +798,66 @@ void main() {
 
       expect(await storedState(), before);
     });
+
+    final brokenActionPaths =
+        <String, (String Function(String jsonl), GraphRecordCounts)>{
+          'звено пути действия без связи и без надгробия пары': (
+            (jsonl) => jsonl
+                .replaceFirst(
+                  '"deletedRelationPairs":1',
+                  '"deletedRelationPairs":0',
+                )
+                .replaceFirst(
+                  RegExp(r'\{"kind":"deletedRelationPair"[^\n]*\n'),
+                  '',
+                ),
+            _goldenCountsWith(deletedRelationPairs: 0),
+          ),
+          'надгробие намерения, которого нет ни в одном пути': (
+            (jsonl) => jsonl
+                .replaceFirst('"deletedIntentions":1', '"deletedIntentions":2')
+                .replaceFirst(
+                  '"title":"Заниматься йогой"}\n',
+                  '"title":"Заниматься йогой"}\n'
+                      '{"kind":"deletedIntention",'
+                      '"id":"1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f16",'
+                      '"title":"Медитировать"}\n',
+                ),
+            _goldenCountsWith(deletedIntentions: 2),
+          ),
+          'надгробие пары, которой нет ни в одном пути': (
+            (jsonl) => jsonl
+                .replaceFirst(
+                  '"deletedRelationPairs":1',
+                  '"deletedRelationPairs":2',
+                )
+                .replaceFirst(
+                  '{"kind":"deletedRelationPair"',
+                  '{"kind":"deletedRelationPair",'
+                      '"sourceIntentionId":"$_goldenHealthId",'
+                      '"relatedIntentionId":"1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f14",'
+                      '"type":"can"}\n'
+                      '{"kind":"deletedRelationPair"',
+                ),
+            _goldenCountsWith(deletedRelationPairs: 2),
+          ),
+        };
+    for (final MapEntry(key: violation, value: (edit, counts))
+        in brokenActionPaths.entries) {
+      test('$violation отклоняет записи снимка и оставляет граф, копии, лог '
+          'и реестр снимков прежними', () async {
+        await createPreviousGraph();
+        final before = await storedState();
+        final snapshot = await goldenSnapshot(edit: edit, counts: counts);
+
+        await expectLater(
+          replace(snapshot),
+          throwsA(isA<GraphReplacementRecordsRejected>()),
+        );
+
+        expect(await storedState(), before);
+      });
+    }
 
     test('нехватка места при вставке записей снимка относится к нехватке '
         'места и оставляет граф, копии, лог и реестр снимков '

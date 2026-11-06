@@ -1253,7 +1253,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String dataExportComposition(
     int intentions,
     int relations,
-    int dailyChoices,
+    int actions,
     int tags,
   ) {
     final intl.NumberFormat intentionsNumberFormat =
@@ -1262,11 +1262,9 @@ class AppLocalizationsEn extends AppLocalizations {
     final intl.NumberFormat relationsNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
     final String relationsString = relationsNumberFormat.format(relations);
-    final intl.NumberFormat dailyChoicesNumberFormat =
+    final intl.NumberFormat actionsNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
-    final String dailyChoicesString = dailyChoicesNumberFormat.format(
-      dailyChoices,
-    );
+    final String actionsString = actionsNumberFormat.format(actions);
     final intl.NumberFormat tagsNumberFormat = intl.NumberFormat.decimalPattern(
       localeName,
     );
@@ -1285,10 +1283,10 @@ class AppLocalizationsEn extends AppLocalizations {
       one: '$relationsString relation',
     );
     String _temp2 = intl.Intl.pluralLogic(
-      dailyChoices,
+      actions,
       locale: localeName,
-      other: '$dailyChoicesString daily choices',
-      one: '$dailyChoicesString daily choice',
+      other: '$actionsString actions',
+      one: '$actionsString action',
     );
     String _temp3 = intl.Intl.pluralLogic(
       tags,
@@ -1493,7 +1491,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String date,
     int intentions,
     int relations,
-    int dailyChoices,
+    int actions,
     int tags,
   ) {
     final intl.NumberFormat intentionsNumberFormat =
@@ -1502,11 +1500,9 @@ class AppLocalizationsEn extends AppLocalizations {
     final intl.NumberFormat relationsNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
     final String relationsString = relationsNumberFormat.format(relations);
-    final intl.NumberFormat dailyChoicesNumberFormat =
+    final intl.NumberFormat actionsNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
-    final String dailyChoicesString = dailyChoicesNumberFormat.format(
-      dailyChoices,
-    );
+    final String actionsString = actionsNumberFormat.format(actions);
     final intl.NumberFormat tagsNumberFormat = intl.NumberFormat.decimalPattern(
       localeName,
     );
@@ -1525,10 +1521,10 @@ class AppLocalizationsEn extends AppLocalizations {
       one: '$relationsString relation',
     );
     String _temp2 = intl.Intl.pluralLogic(
-      dailyChoices,
+      actions,
       locale: localeName,
-      other: '$dailyChoicesString daily choices',
-      one: '$dailyChoicesString daily choice',
+      other: '$actionsString actions',
+      one: '$actionsString action',
     );
     String _temp3 = intl.Intl.pluralLogic(
       tags,

@@ -38,7 +38,7 @@ final class _ExportDataSheet extends ConsumerWidget {
         localizations.dataExportComposition(
           composition.intentionCount,
           composition.relationCount,
-          composition.dailyChoiceCount,
+          composition.actionCount,
           composition.tagCount,
         ),
       GraphCompositionReadFailed() || null => null,

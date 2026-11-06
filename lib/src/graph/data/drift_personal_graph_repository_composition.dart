@@ -91,12 +91,12 @@ extension _GraphCompositionReading on DriftPersonalGraphRepository {
           '''SELECT
             (SELECT count(*) FROM intentions) AS intention_count,
             (SELECT count(*) FROM long_term_relations) AS relation_count,
-            (SELECT count(*) FROM daily_choices) AS daily_choice_count,
+            (SELECT count(*) FROM actions) AS action_count,
             (SELECT count(*) FROM tags) AS tag_count''',
           readsFrom: {
             _database.intentions,
             _database.longTermRelations,
-            _database.dailyChoices,
+            _database.actions,
             _database.tags,
           },
         )
@@ -104,7 +104,7 @@ extension _GraphCompositionReading on DriftPersonalGraphRepository {
     return GraphComposition(
       intentionCount: row.read<int>('intention_count'),
       relationCount: row.read<int>('relation_count'),
-      dailyChoiceCount: row.read<int>('daily_choice_count'),
+      actionCount: row.read<int>('action_count'),
       tagCount: row.read<int>('tag_count'),
     );
   }

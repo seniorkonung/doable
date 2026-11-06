@@ -1,10 +1,11 @@
 /// Состав графа намерений: число сущностей каждого вида вместе с
 /// архивированными — столько записей каждого вида попадёт в файл экспорта.
+/// Надгробия удалённых звеньев путей сущностями не считаются.
 final class GraphComposition {
   const GraphComposition({
     required this.intentionCount,
     required this.relationCount,
-    required this.dailyChoiceCount,
+    required this.actionCount,
     required this.tagCount,
   });
 
@@ -13,23 +14,24 @@ final class GraphComposition {
   /// Число долговременных связей.
   final int relationCount;
 
-  final int dailyChoiceCount;
+  final int actionCount;
   final int tagCount;
 
-  /// В графе нет ни одного намерения и ни одного тега.
-  bool get isEmpty => intentionCount == 0 && tagCount == 0;
+  /// В графе нет ни одного намерения, ни одного тега и ни одного действия.
+  /// Действия остаются и без намерений: их пути хранят удалённые намерения.
+  bool get isEmpty => intentionCount == 0 && tagCount == 0 && actionCount == 0;
 
   @override
   bool operator ==(Object other) =>
       other is GraphComposition &&
       other.intentionCount == intentionCount &&
       other.relationCount == relationCount &&
-      other.dailyChoiceCount == dailyChoiceCount &&
+      other.actionCount == actionCount &&
       other.tagCount == tagCount;
 
   @override
   int get hashCode =>
-      Object.hash(intentionCount, relationCount, dailyChoiceCount, tagCount);
+      Object.hash(intentionCount, relationCount, actionCount, tagCount);
 }
 
 /// Исход чтения состава графа.

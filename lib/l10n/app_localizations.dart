@@ -2018,14 +2018,14 @@ abstract class AppLocalizations {
   /// **'{share}'**
   String dataExportProgress(double share);
 
-  /// Состав будущего файла экспорта: числа всех намерений, долговременных связей, дневных выборов и тегов вместе с архивированными
+  /// Состав будущего файла экспорта: числа всех намерений, долговременных связей, действий и тегов вместе с архивированными
   ///
   /// In en, this message translates to:
-  /// **'{intentions, plural, one{{intentions} intention} other{{intentions} intentions}}, {relations, plural, one{{relations} relation} other{{relations} relations}}, {dailyChoices, plural, one{{dailyChoices} daily choice} other{{dailyChoices} daily choices}} and {tags, plural, one{{tags} tag} other{{tags} tags}} in one file'**
+  /// **'{intentions, plural, one{{intentions} intention} other{{intentions} intentions}}, {relations, plural, one{{relations} relation} other{{relations} relations}}, {actions, plural, one{{actions} action} other{{actions} actions}} and {tags, plural, one{{tags} tag} other{{tags} tags}} in one file'**
   String dataExportComposition(
     int intentions,
     int relations,
-    int dailyChoices,
+    int actions,
     int tags,
   );
 
@@ -2299,15 +2299,15 @@ abstract class AppLocalizations {
   /// **'Import this copy?'**
   String get dataImportConfirmationTitle;
 
-  /// Дата сохранения файла импорта по местному времени и числа его намерений, долговременных связей, дневных выборов и тегов из заголовка файла
+  /// Дата сохранения файла импорта по местному времени и числа его намерений, долговременных связей, действий и тегов из заголовка файла
   ///
   /// In en, this message translates to:
-  /// **'It was saved on {date} and holds {intentions, plural, one{{intentions} intention} other{{intentions} intentions}}, {relations, plural, one{{relations} relation} other{{relations} relations}}, {dailyChoices, plural, one{{dailyChoices} daily choice} other{{dailyChoices} daily choices}} and {tags, plural, one{{tags} tag} other{{tags} tags}}.'**
+  /// **'It was saved on {date} and holds {intentions, plural, one{{intentions} intention} other{{intentions} intentions}}, {relations, plural, one{{relations} relation} other{{relations} relations}}, {actions, plural, one{{actions} action} other{{actions} actions}} and {tags, plural, one{{tags} tag} other{{tags} tags}}.'**
   String dataImportConfirmationFacts(
     String date,
     int intentions,
     int relations,
-    int dailyChoices,
+    int actions,
     int tags,
   );
 
