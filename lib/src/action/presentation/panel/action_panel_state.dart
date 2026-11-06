@@ -18,6 +18,14 @@ final class ActionPanelLoaded extends ActionPanelState {
   final GraphRevision revision;
 }
 
+/// Удаление подтверждено: панель закрывается и до закрытия держит прежнее
+/// содержимое вместо «действия нет».
+final class ActionPanelDeleted extends ActionPanelState {
+  const ActionPanelDeleted(this.details);
+
+  final ActionDetails details;
+}
+
 final class ActionPanelNotFound extends ActionPanelState {
   const ActionPanelNotFound();
 }

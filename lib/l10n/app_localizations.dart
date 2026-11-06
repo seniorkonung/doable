@@ -3097,6 +3097,48 @@ abstract class AppLocalizations {
   /// **'Edit the name and description'**
   String get actionOptionEditText;
 
+  /// Опасный пункт меню «Действие», открывающий подтверждение удаления
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the action'**
+  String get actionOptionDelete;
+
+  /// Пояснение пункта удаления действия
+  ///
+  /// In en, this message translates to:
+  /// **'Its intentions and relations stay'**
+  String get actionOptionDeleteHint;
+
+  /// Вопрос перед удалением действия
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the action?'**
+  String get actionDeleteDialogTitle;
+
+  /// Текст перед названием действия
+  ///
+  /// In en, this message translates to:
+  /// **'The action '**
+  String get actionDeleteDialogBefore;
+
+  /// Дата, необратимость удаления и то, что намерения и связи пути остаются
+  ///
+  /// In en, this message translates to:
+  /// **' for {date} will be deleted. This cannot be undone. The intentions and relations of its path stay.'**
+  String actionDeleteDialogAfter(String date);
+
+  /// Дата удаляемого действия, совпадающая с текущим локальным днём устройства
+  ///
+  /// In en, this message translates to:
+  /// **'today'**
+  String get actionDeleteDialogToday;
+
+  /// Подтвердить удаление действия
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get actionDeleteDialogAction;
+
   /// Заголовок полосы изменения названия и описания действия
   ///
   /// In en, this message translates to:

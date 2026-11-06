@@ -32,6 +32,11 @@ final class ActionPanelViewModel extends ChangeNotifier {
   ActionCommandFailure? _completionLock;
   var _awaitsRefresh = false;
 
+  /// Идёт удаление: снимок без действия до его исхода не показывается, а
+  /// запоминается в [_missingWhileDeleting].
+  var _isDeleting = false;
+  var _missingWhileDeleting = false;
+
   /// Завершается, когда кончается [ActionPanelOperationAwaitingSnapshot].
   Completer<void>? _snapshotShown;
 
@@ -74,6 +79,37 @@ final class ActionPanelViewModel extends ChangeNotifier {
         action.id == _id,
       _ => false,
     };
+  }
+
+  /// Возвращает успех только собственной подтверждённой команды удаления.
+  ///
+  /// Подтверждённое удаление сохраняет прежнее содержимое как
+  /// [ActionPanelDeleted]: снимок без действия не должен показать «действия
+  /// нет» в закрывающейся панели. После отказа отсутствие действия показано,
+  /// только если снимок без него уже пришёл.
+  Future<bool> delete() async {
+    final state = _state;
+    if (!_canStartOperation || state is! ActionPanelLoaded) return false;
+    _isDeleting = true;
+    final completion = await _run(
+      _coordinator.acceptActionDelete(DeleteAction(_id)),
+      locksCompletionOnFailure: false,
+    );
+    _isDeleting = false;
+    final missing = _missingWhileDeleting;
+    _missingWhileDeleting = false;
+    final deleted = switch (completion?.result) {
+      GraphResultSuccess(value: ActionDeleted(:final action)) =>
+        action.id == _id,
+      _ => false,
+    };
+    if (deleted) {
+      _stopObserving();
+      _setState(ActionPanelDeleted(state.details));
+    } else if (missing) {
+      _setState(const ActionPanelNotFound());
+    }
+    return deleted;
   }
 
   bool get _canStartOperation =>
@@ -137,6 +173,8 @@ final class ActionPanelViewModel extends ChangeNotifier {
             _awaitsSnapshot(value.revision) && !_showsWritten(action)
                 ? ActionPanelOperationAwaitingSnapshot(value.revision)
                 : const ActionPanelOperationIdle(),
+          ActionDeleted(:final action) when action.id == _id =>
+            const ActionPanelOperationIdle(),
           _ => const ActionPanelOperationFailed(ActionUnexpectedFailure()),
         },
       };
@@ -209,6 +247,8 @@ final class ActionPanelViewModel extends ChangeNotifier {
                       _completionLock = null;
                     }
                     _setState(ActionPanelLoaded(details, revision));
+                  } else if (_isDeleting) {
+                    _missingWhileDeleting = true;
                   } else {
                     _setState(const ActionPanelNotFound());
                   }

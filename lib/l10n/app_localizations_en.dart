@@ -1984,6 +1984,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get actionOptionEditText => 'Edit the name and description';
 
   @override
+  String get actionOptionDelete => 'Delete the action';
+
+  @override
+  String get actionOptionDeleteHint => 'Its intentions and relations stay';
+
+  @override
+  String get actionDeleteDialogTitle => 'Delete the action?';
+
+  @override
+  String get actionDeleteDialogBefore => 'The action ';
+
+  @override
+  String actionDeleteDialogAfter(String date) {
+    return ' for $date will be deleted. This cannot be undone. The intentions and relations of its path stay.';
+  }
+
+  @override
+  String get actionDeleteDialogToday => 'today';
+
+  @override
+  String get actionDeleteDialogAction => 'Delete';
+
+  @override
   String get actionTextEditTitle => 'Edit the action';
 
   @override

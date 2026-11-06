@@ -133,6 +133,7 @@ final class ActionPanelRepository
     implements PersonalGraphRepository {
   final controller = StreamController<ActionReadResult>.broadcast(sync: true);
   final commands = <UpdateActionFields>[];
+  final deletions = <DeleteAction>[];
   final _requests = <Completer<ActionCommandResult>>[];
   var _revision = 0;
   ActionId? observedId;
@@ -158,7 +159,11 @@ final class ActionPanelRepository
     TSuccess extends GraphCommandOutcome,
     TFailure extends GraphCommandFailure
   >(GraphCommand<TSuccess, TFailure> command) async {
-    commands.add(command as UpdateActionFields);
+    if (command is UpdateActionFields) {
+      commands.add(command as UpdateActionFields);
+    } else {
+      deletions.add(command as DeleteAction);
+    }
     final request = Completer<ActionCommandResult>();
     _requests.add(request);
     return await request.future as GraphCommandResult<TSuccess, TFailure>;
@@ -237,6 +242,20 @@ final class ActionPanelRepository
       ),
     );
   }
+
+  /// Подтверждает удаление показанного действия; снимок без действия приходит
+  /// отдельно через [emitMissing].
+  void succeedDelete() => _requests.last.complete(
+    GraphCommandSucceeded(
+      ConfirmedGraphResult(
+        revision: FixtureRevision(++_revision),
+        value: ActionDeleted(
+          action: _shown!,
+          changes: [_Change(FixtureRevision(_revision))],
+        ),
+      ),
+    ),
+  );
 
   Future<void> dispose() => controller.close();
 

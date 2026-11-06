@@ -2009,6 +2009,29 @@ class AppLocalizationsRu extends AppLocalizations {
   String get actionOptionEditText => 'Изменить название и описание';
 
   @override
+  String get actionOptionDelete => 'Удалить действие';
+
+  @override
+  String get actionOptionDeleteHint => 'Намерения и связи останутся';
+
+  @override
+  String get actionDeleteDialogTitle => 'Удалить действие?';
+
+  @override
+  String get actionDeleteDialogBefore => 'Действие ';
+
+  @override
+  String actionDeleteDialogAfter(String date) {
+    return ' на $date будет удалено. Удаление нельзя отменить. Намерения и связи его пути останутся.';
+  }
+
+  @override
+  String get actionDeleteDialogToday => 'сегодня';
+
+  @override
+  String get actionDeleteDialogAction => 'Удалить';
+
+  @override
   String get actionTextEditTitle => 'Изменить действие';
 
   @override

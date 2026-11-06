@@ -9,6 +9,7 @@ import '../../../design_system/components/confirm_dialog.dart';
 import '../../../design_system/components/half_pinned_sliver.dart';
 import '../../../design_system/components/list_state.dart';
 import '../../../design_system/components/notice.dart';
+import '../../../design_system/components/option_row.dart';
 import '../../../design_system/components/options_menu.dart';
 import '../../../design_system/components/reason_chain.dart';
 import '../../../design_system/components/sheet.dart';
@@ -30,6 +31,7 @@ import '../../application/action_result.dart';
 import '../../domain/action.dart';
 import '../../domain/action_id.dart';
 import '../action_command_failure_message.dart';
+import 'action_delete_confirmation.dart';
 import 'action_field_labels.dart';
 import 'action_panel_fields.dart';
 import 'action_panel_state.dart';
@@ -56,6 +58,9 @@ import 'action_text_editor.dart';
 /// одна запись обоих полей, а панель закрывает изменение, только когда
 /// подписка показала записанные значения. Уход с правками спрашивает
 /// подтверждение.
+///
+/// Удаление спрашивает подтверждение. Подтверждённое закрывает панель с
+/// прежним содержимым, а отказ остаётся в открытой панели.
 Future<void> showActionPanel(BuildContext context, ActionId actionId) =>
     showDoableSheet<void>(
       context: context,
@@ -63,7 +68,7 @@ Future<void> showActionPanel(BuildContext context, ActionId actionId) =>
       builder: (_, sheet) => ActionPanel(sheet, actionId: actionId),
     );
 
-enum _ActionOption { editText }
+enum _ActionOption { editText, delete }
 
 /// Содержимое панели действия; показывает его [showActionPanel].
 final class ActionPanel extends ConsumerStatefulWidget {
@@ -165,6 +170,13 @@ final class _ActionPanelState extends ConsumerState<ActionPanel> {
             icon: DoableIconData.edit,
             name: localizations.actionOptionEditText,
           ),
+          OptionsMenuItem(
+            value: _ActionOption.delete,
+            icon: DoableIconData.delete,
+            name: localizations.actionOptionDelete,
+            hint: localizations.actionOptionDeleteHint,
+            tone: OptionRowTone.danger,
+          ),
         ],
       ),
     );
@@ -174,6 +186,18 @@ final class _ActionPanelState extends ConsumerState<ActionPanel> {
     switch (option) {
       case _ActionOption.editText:
         _openEdit(state.details.action, ActionTextField.title);
+      case _ActionOption.delete:
+        final confirmed = await confirmActionDeletion(
+          context,
+          state.details.action,
+          today: _localDay.today,
+        );
+        if (!confirmed ||
+            !mounted ||
+            !(ModalRoute.isCurrentOf(context) ?? false)) {
+          return;
+        }
+        if (await _model.delete() && mounted) Navigator.of(context).pop();
       case null:
         break;
     }
@@ -255,6 +279,10 @@ final class _ActionPanelState extends ConsumerState<ActionPanel> {
                   ListState.error(message: localizations.actionPanelUnexpected),
                 ),
               ],
+              ActionPanelDeleted(:final details) => _action(
+                details,
+                isWriting: true,
+              ),
               ActionPanelLoaded() when edit != null => _textEdit(
                 edit,
                 isWriting: isWriting,
