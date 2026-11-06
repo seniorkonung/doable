@@ -4,8 +4,10 @@ import 'dart:math' as math;
 import 'package:doable/src/action/application/action_details.dart';
 import 'package:doable/src/action/domain/action_priority.dart';
 import 'package:doable/src/action/presentation/panel/action_panel.dart';
+import 'package:doable/src/action/presentation/panel/action_panel_state.dart';
 import 'package:doable/src/design_system/components/action_head.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
+import 'package:doable/src/design_system/components/tabs.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
@@ -39,6 +41,8 @@ void main() {
       await _expectWholeTextReachable(tester, [
         _maxTitle('основа'),
         _maxTitle('действие'),
+        'Обзор',
+        'Путь',
         _maxDescription,
         'Дата',
         '8 окт. 2025',
@@ -108,7 +112,7 @@ void main() {
   });
 
   testWidgets('раскрытие панели через порог закрепляет шапку', (tester) async {
-    _useScreen(tester, const Size(390, 1000));
+    _useScreen(tester, const Size(390, 1100));
     final semantics = tester.ensureSemantics();
     await _openPanel(
       tester,
@@ -206,6 +210,7 @@ final _sheet = find.byType(Sheet);
 
 // Прокрученная шапка уходит за край списка, поэтому ищется и за ним.
 final _head = find.byType(ActionHead, skipOffstage: false);
+final _tabs = find.byType(Tabs<ActionPanelTab>, skipOffstage: false);
 final _expand = find.bySemanticsLabel('Раскрыть панель действия');
 final _collapse = find.bySemanticsLabel('Свернуть панель действия');
 
@@ -222,8 +227,9 @@ ScrollPosition _body(WidgetTester tester) => tester
     )
     .position;
 
+/// Шапка вместе с вкладками: её высоту сравнивает с половиной тела панель.
 double _headerHeight(WidgetTester tester) =>
-    tester.getBottomLeft(_head).dy - tester.getTopLeft(_head).dy;
+    tester.getBottomLeft(_tabs).dy - tester.getTopLeft(_head).dy;
 
 /// Экран ниже границы поддержки 360×720, но выше компактного предела, поэтому
 /// у панели остаются оба размера. Шрифт — наибольший системный на Android.
@@ -284,14 +290,17 @@ Future<void> _expectWholeTextReachable(
     paragraphs.map((paragraph) => paragraph.text.toPlainText()),
     containsAll(texts),
   );
-  final inHeader = _paragraphs(tester, _head).toSet();
+  final inHeader = {
+    ..._paragraphs(tester, _head),
+    ..._paragraphs(tester, _tabs),
+  };
   final reached = {for (final paragraph in paragraphs) paragraph: 0.0};
   final step = _list(tester).height / 2;
   for (var pixels = 0.0; ; pixels += step) {
     body.jumpTo(math.min(pixels, body.maxScrollExtent));
     await tester.pump();
     final list = _list(tester);
-    final headerBottom = tester.getBottomLeft(_head).dy;
+    final headerBottom = tester.getBottomLeft(_tabs).dy;
     for (final paragraph in paragraphs) {
       final rect = _rectOf(paragraph);
       final text = paragraph.text.toPlainText();

@@ -3,6 +3,9 @@ import '../../../graph/application/graph_revision.dart';
 import '../../application/action_details.dart';
 import '../../application/action_result.dart';
 
+/// Вкладка панели; панель открывается на «Обзоре».
+enum ActionPanelTab { overview, path }
+
 sealed class ActionPanelState {
   const ActionPanelState();
 }

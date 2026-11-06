@@ -3193,6 +3193,89 @@ abstract class AppLocalizations {
   /// **'Keep editing'**
   String get actionTextEditContinueAction;
 
+  /// Доступное название полосы вкладок панели действия
+  ///
+  /// In en, this message translates to:
+  /// **'Action sections'**
+  String get actionPanelTabsLabel;
+
+  /// Вкладка сохранённого пути действия
+  ///
+  /// In en, this message translates to:
+  /// **'Path'**
+  String get actionPanelPathTab;
+
+  /// Доступное название вкладки пути с числом намерений
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Path, {count} intention} other{Path, {count} intentions}}'**
+  String actionPanelPathTabLabel(int count);
+
+  /// Доступное название вкладки пути, в котором есть архивное намерение или связь
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Path, {count} intention, the path has archived items} other{Path, {count} intentions, the path has archived items}}'**
+  String actionPanelPathTabArchivedLabel(int count);
+
+  /// Доступное название кнопки корневого намерения с цепочкой в шапке панели, которая открывает вкладку пути
+  ///
+  /// In en, this message translates to:
+  /// **'Open the action path'**
+  String get actionPanelPathButtonLabel;
+
+  /// Метка после удалённого намерения или связи сохранённого пути и после удалённого корневого намерения в шапке
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted'**
+  String get actionPathDeletedBadge;
+
+  /// Строка под путём, в котором есть только архивные намерения или связи
+  ///
+  /// In en, this message translates to:
+  /// **'Archived intentions and relations stay in the saved path.'**
+  String get actionPathNoteArchived;
+
+  /// Строка под путём, в котором есть только удалённые намерения или связи
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted intentions and relations stay in the saved path as they were.'**
+  String get actionPathNoteDeleted;
+
+  /// Строка под путём, в котором есть и архивные, и удалённые намерения или связи
+  ///
+  /// In en, this message translates to:
+  /// **'Archived and deleted intentions and relations stay in the saved path.'**
+  String get actionPathNoteArchivedAndDeleted;
+
+  /// Роль первого намерения сохранённого пути в доступном названии его кнопки
+  ///
+  /// In en, this message translates to:
+  /// **'Root intention'**
+  String get actionPathRoleRoot;
+
+  /// Роль промежуточного намерения сохранённого пути в доступном названии его кнопки
+  ///
+  /// In en, this message translates to:
+  /// **'Intermediate intention'**
+  String get actionPathRoleIntermediate;
+
+  /// Роль последнего намерения сохранённого пути из двух и более в доступном названии его кнопки
+  ///
+  /// In en, this message translates to:
+  /// **'Final intention'**
+  String get actionPathRoleFinal;
+
+  /// Доступное название кнопки существующей связи сохранённого пути: тип, намерения звена и приоритет
+  ///
+  /// In en, this message translates to:
+  /// **'Relation {kind}. {source}, {related}. {priority}'**
+  String actionPathRelationLabel(
+    String kind,
+    String source,
+    String related,
+    String priority,
+  );
+
   /// Вид операции добавления связей
   ///
   /// In en, this message translates to:

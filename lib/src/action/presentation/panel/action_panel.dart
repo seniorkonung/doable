@@ -13,6 +13,7 @@ import '../../../design_system/components/option_row.dart';
 import '../../../design_system/components/options_menu.dart';
 import '../../../design_system/components/reason_chain.dart';
 import '../../../design_system/components/sheet.dart';
+import '../../../design_system/components/tabs.dart';
 import '../../../design_system/components/text_field.dart';
 import '../../../design_system/components/top_bar.dart';
 import '../../../design_system/doable_colors.dart';
@@ -36,13 +37,17 @@ import 'action_field_labels.dart';
 import 'action_panel_fields.dart';
 import 'action_panel_state.dart';
 import 'action_panel_view_model.dart';
+import 'action_path_tab.dart';
 import 'action_text_editor.dart';
 
 /// Показывает действие раскрываемой панелью над текущей страницей.
 ///
 /// Панель владеет моделью действия, поэтому её закрытие снимает подписку. Шапка
-/// — первый срез тела: она закреплена, пока занимает не больше половины высоты
-/// тела, а выше прокручивается вместе с ним.
+/// с вкладками — первый срез тела: она закреплена, пока занимает не больше
+/// половины высоты тела, а выше прокручивается вместе с ним. Панель открывается
+/// на «Обзоре»; корень с цепочкой в шапке открывает «Путь», где сохранённый
+/// путь показан только для чтения. Страница намерения и просмотр связи из пути
+/// ложатся поверх панели, а возврат оставляет её на прежней вкладке.
 ///
 /// Без загруженного действия вместо шапки стоит одно состояние. Закрывает лист
 /// пользователь, в том числе когда действия больше нет.
@@ -56,8 +61,8 @@ import 'action_text_editor.dart';
 /// Название и описание меняются вместе в изменении под полосой: его открывают
 /// название в шапке, описание в «Обзоре» и пункт меню параметров. Сохранение —
 /// одна запись обоих полей, а панель закрывает изменение, только когда
-/// подписка показала записанные значения. Уход с правками спрашивает
-/// подтверждение.
+/// подписка показала записанные значения. Закрытое изменение возвращает
+/// вкладку, с которой оно начато. Уход с правками спрашивает подтверждение.
 ///
 /// Удаление спрашивает подтверждение. Подтверждённое закрывает панель с
 /// прежним содержимым, а отказ остаётся в открытой панели.
@@ -90,6 +95,9 @@ final class _ActionPanelState extends ConsumerState<ActionPanel> {
 
   /// Открытое изменение названия и описания.
   ActionTextEdit? _edit;
+
+  /// Выбранная вкладка не меняется изменением текста: оно её только скрывает.
+  var _tab = ActionPanelTab.overview;
 
   @override
   void initState() {
@@ -326,14 +334,16 @@ final class _ActionPanelState extends ConsumerState<ActionPanel> {
     ];
   }
 
-  /// Шапка и «Обзор». Пока идёт запись, флажок, название, описание, параметры
-  /// и поля недоступны.
+  /// Шапка с вкладками и выбранная вкладка. Пока идёт запись, флажок, название,
+  /// описание, параметры и поля недоступны; вкладки переключаются всегда.
   List<Widget> _action(ActionDetails details, {required bool isWriting}) {
     final completionLock = _model.completionLock;
     return [
       HalfPinnedSliver(
         child: _ActionHeader(
           details: details,
+          tab: _tab,
+          onTabChange: (tab) => setState(() => _tab = tab),
           onToggle: isWriting || completionLock != null
               ? null
               : () => unawaited(
@@ -350,15 +360,18 @@ final class _ActionPanelState extends ConsumerState<ActionPanel> {
         ),
       ),
       ..._notice(),
-      _Overview(
-        details: details,
-        today: _localDay.today,
-        enabled: !isWriting,
-        onChange: (patch) => unawaited(_model.change(patch)),
-        onOpenDescription: isWriting
-            ? null
-            : () => _openEdit(details.action, ActionTextField.description),
-      ),
+      switch (_tab) {
+        ActionPanelTab.overview => _Overview(
+          details: details,
+          today: _localDay.today,
+          enabled: !isWriting,
+          onChange: (patch) => unawaited(_model.change(patch)),
+          onOpenDescription: isWriting
+              ? null
+              : () => _openEdit(details.action, ActionTextField.description),
+        ),
+        ActionPanelTab.path => ActionPathTab(details: details),
+      },
     ];
   }
 }
@@ -381,7 +394,7 @@ final class _StateSliver extends StatelessWidget {
   );
 }
 
-/// Отказ операции под шапкой. Новый отказ панель показывает сама: тело могло
+/// Отказ операции под вкладками. Новый отказ панель показывает сама: тело могло
 /// уйти дальше него, а высокая шапка могла вытеснить его вниз. Видимый отказ
 /// остаётся на месте.
 ///
@@ -447,17 +460,21 @@ final class _OperationNoticeState extends State<_OperationNotice> {
   }
 }
 
-/// Шапка действия. Тело проходит под закреплённым срезом, поэтому фон
-/// непрозрачный.
+/// Шапка действия и вкладки. Тело проходит под закреплённым срезом, поэтому
+/// фон непрозрачный.
 final class _ActionHeader extends StatelessWidget {
   const _ActionHeader({
     required this.details,
+    required this.tab,
+    required this.onTabChange,
     required this.onToggle,
     required this.onEditName,
     required this.onOpenOptions,
   });
 
   final ActionDetails details;
+  final ActionPanelTab tab;
+  final ValueChanged<ActionPanelTab> onTabChange;
 
   /// Переключает выполнение; без него флажок выключен.
   final VoidCallback? onToggle;
@@ -474,34 +491,82 @@ final class _ActionHeader extends StatelessWidget {
     final colors = Theme.of(context).extension<DoableColors>()!;
     final action = details.action;
     final priority = actionDesignPriority(action.priority);
+    final intentionCount = details.path.intentionCount;
+    final hasArchive = actionPathHasArchive(details.path);
     return ColoredBox(
       color: colors.raised,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: DoableMetrics.space5),
-        child: ActionHead(
-          goal: details.path.root.title,
-          action: action.title.value,
-          priority: priority,
-          done: action.isCompleted,
-          chain: ReasonChain(
-            reasons: details.path.intentionCount,
-            priority: priority,
-            off: action.isCompleted,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: DoableMetrics.space5,
+            ),
+            child: ActionHead(
+              goal: details.path.root.title,
+              action: action.title.value,
+              priority: priority,
+              done: action.isCompleted,
+              chain: ReasonChain(
+                reasons: intentionCount,
+                priority: priority,
+                off: action.isCompleted,
+              ),
+              checkLabel: localizations.actionPanelCompletionLabel(
+                action.title.value,
+                localizations.actionPriorityOption(
+                  actionPriorityName(priority),
+                ),
+              ),
+              onToggle: onToggle,
+              goalBadge: actionPathRootBadge(localizations, details.path.root),
+              // На самой вкладке путь уже виден, и корень с цепочкой не
+              // действует.
+              path: switch (tab) {
+                ActionPanelTab.overview => ActionHeadButton.available(
+                  label: localizations.actionPanelPathButtonLabel,
+                  onOpen: () => onTabChange(ActionPanelTab.path),
+                ),
+                ActionPanelTab.path => ActionHeadButton.unavailable(
+                  label: localizations.actionPanelPathButtonLabel,
+                ),
+              },
+              nameEdit: _button(
+                localizations.detailsEditTitleLabel(action.title.value),
+                onEditName,
+              ),
+              options: _button(
+                localizations.actionPanelOptionsLabel,
+                onOpenOptions,
+              ),
+            ),
           ),
-          checkLabel: localizations.actionPanelCompletionLabel(
-            action.title.value,
-            localizations.actionPriorityOption(actionPriorityName(priority)),
+          Tabs(
+            plane: TabsPlane.sheet,
+            label: localizations.actionPanelTabsLabel,
+            value: tab,
+            onChange: onTabChange,
+            items: [
+              TabItem(
+                id: ActionPanelTab.overview,
+                label: localizations.detailsOverviewTab,
+                semanticLabel: localizations.detailsOverviewTab,
+              ),
+              TabItem(
+                id: ActionPanelTab.path,
+                label: localizations.actionPanelPathTab,
+                semanticLabel: hasArchive
+                    ? localizations.actionPanelPathTabArchivedLabel(
+                        intentionCount,
+                      )
+                    : localizations.actionPanelPathTabLabel(intentionCount),
+                count: intentionCount,
+                icon: hasArchive ? DoableIconData.archive : null,
+              ),
+            ],
           ),
-          onToggle: onToggle,
-          nameEdit: _button(
-            localizations.detailsEditTitleLabel(action.title.value),
-            onEditName,
-          ),
-          options: _button(
-            localizations.actionPanelOptionsLabel,
-            onOpenOptions,
-          ),
-        ),
+        ],
       ),
     );
   }
@@ -540,8 +605,7 @@ final class _Overview extends StatelessWidget {
   /// нажимаются.
   final VoidCallback? onOpenDescription;
 
-  /// Под шапкой без вкладок содержимое начинается так же, как под полосой
-  /// вкладок.
+  /// Вместе с нижним полем полосы вкладок даёт 6 под областью их нажатия.
   static const double _top = 2;
 
   @override

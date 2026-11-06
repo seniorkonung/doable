@@ -2060,6 +2060,75 @@ class AppLocalizationsRu extends AppLocalizations {
   String get actionTextEditContinueAction => 'Продолжить правку';
 
   @override
+  String get actionPanelTabsLabel => 'Разделы действия';
+
+  @override
+  String get actionPanelPathTab => 'Путь';
+
+  @override
+  String actionPanelPathTabLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Путь, $count намерения',
+      many: 'Путь, $count намерений',
+      few: 'Путь, $count намерения',
+      one: 'Путь, $count намерение',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String actionPanelPathTabArchivedLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Путь, $count намерения, в пути есть архив',
+      many: 'Путь, $count намерений, в пути есть архив',
+      few: 'Путь, $count намерения, в пути есть архив',
+      one: 'Путь, $count намерение, в пути есть архив',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get actionPanelPathButtonLabel => 'Открыть путь действия';
+
+  @override
+  String get actionPathDeletedBadge => 'Удалено';
+
+  @override
+  String get actionPathNoteArchived =>
+      'Архивные намерения и связи остаются в сохранённом пути.';
+
+  @override
+  String get actionPathNoteDeleted =>
+      'Удалённые намерения и связи остаются в сохранённом пути такими, какими были.';
+
+  @override
+  String get actionPathNoteArchivedAndDeleted =>
+      'Архивные и удалённые намерения и связи остаются в сохранённом пути.';
+
+  @override
+  String get actionPathRoleRoot => 'Корневое намерение';
+
+  @override
+  String get actionPathRoleIntermediate => 'Промежуточное намерение';
+
+  @override
+  String get actionPathRoleFinal => 'Конечное намерение';
+
+  @override
+  String actionPathRelationLabel(
+    String kind,
+    String source,
+    String related,
+    String priority,
+  ) {
+    return 'Связь $kind. $source, $related. $priority';
+  }
+
+  @override
   String get graphOperationAddRelations => 'Добавление';
 
   @override

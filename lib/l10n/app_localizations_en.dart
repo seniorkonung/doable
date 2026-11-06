@@ -2035,6 +2035,71 @@ class AppLocalizationsEn extends AppLocalizations {
   String get actionTextEditContinueAction => 'Keep editing';
 
   @override
+  String get actionPanelTabsLabel => 'Action sections';
+
+  @override
+  String get actionPanelPathTab => 'Path';
+
+  @override
+  String actionPanelPathTabLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Path, $count intentions',
+      one: 'Path, $count intention',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String actionPanelPathTabArchivedLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Path, $count intentions, the path has archived items',
+      one: 'Path, $count intention, the path has archived items',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get actionPanelPathButtonLabel => 'Open the action path';
+
+  @override
+  String get actionPathDeletedBadge => 'Deleted';
+
+  @override
+  String get actionPathNoteArchived =>
+      'Archived intentions and relations stay in the saved path.';
+
+  @override
+  String get actionPathNoteDeleted =>
+      'Deleted intentions and relations stay in the saved path as they were.';
+
+  @override
+  String get actionPathNoteArchivedAndDeleted =>
+      'Archived and deleted intentions and relations stay in the saved path.';
+
+  @override
+  String get actionPathRoleRoot => 'Root intention';
+
+  @override
+  String get actionPathRoleIntermediate => 'Intermediate intention';
+
+  @override
+  String get actionPathRoleFinal => 'Final intention';
+
+  @override
+  String actionPathRelationLabel(
+    String kind,
+    String source,
+    String related,
+    String priority,
+  ) {
+    return 'Relation $kind. $source, $related. $priority';
+  }
+
+  @override
   String get graphOperationAddRelations => 'Add';
 
   @override

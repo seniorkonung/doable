@@ -3,6 +3,7 @@ library;
 
 import 'dart:async';
 
+import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/action/domain/action_id.dart';
 import 'package:doable/src/action/presentation/panel/action_panel.dart';
 import 'package:doable/src/design_system/components/action_head.dart';
@@ -45,8 +46,12 @@ Future<void> closeActionPanel(WidgetTester tester) async {
 }
 
 /// Открывает панель над страницей; действие приходит из
-/// [ActionPanelRepository.emit]. Сегодня — 2026-10-08.
-Future<ActionPanelRepository> openActionPanel(WidgetTester tester) async {
+/// [ActionPanelRepository.emit]. Сегодня — 2026-10-08. [routes] — страницы,
+/// которые панель открывает поверх себя.
+Future<ActionPanelRepository> openActionPanel(
+  WidgetTester tester, {
+  List<AutoRoute> routes = const [],
+}) async {
   tester.view
     ..physicalSize = const Size(390, 844)
     ..devicePixelRatio = 1;
@@ -62,6 +67,7 @@ Future<ActionPanelRepository> openActionPanel(WidgetTester tester) async {
       ],
       child: OrdinaryPageTestApp(
         locale: const Locale('ru'),
+        routes: routes,
         builder: (context, child) =>
             GraphOperationPresenter(child: child ?? const SizedBox.shrink()),
         home: Scaffold(

@@ -19,6 +19,7 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
@@ -32,8 +33,12 @@ String _uuid(int n) =>
 ActionId actionIdOf(int number) =>
     (ActionId.decode(_uuid(number)) as ActionIdDecodingSuccess).id;
 
-IntentionId _intentionId(int number) =>
+IntentionId intentionIdOf(int number) =>
     (IntentionId.decode(_uuid(number)) as IntentionIdDecodingSuccess).id;
+
+LongTermRelationId relationIdOf(int number) => (LongTermRelationId.decode(
+  _uuid(number),
+) as LongTermRelationIdDecodingSuccess).id;
 
 /// Действие [actionIdOf] 1 с путём из [pathLength] существующих активных
 /// намерений; корневое называется [rootTitle].
@@ -51,7 +56,7 @@ ActionDetails actionDetailsFixture({
 }) {
   final created = createdAt ?? DateTime.utc(2026, 10, 6, 9);
   Intention intention(int position) => Intention(
-    id: _intentionId(10 + position),
+    id: intentionIdOf(10 + position),
     title: position == 0 ? rootTitle : 'Намерение ${position + 1}',
     description: null,
     readiness: IntentionReadiness.ready,
@@ -83,9 +88,7 @@ ActionDetails actionDetailsFixture({
           ActionPathStep(
             link: ExistingActionPathLink(
               LongTermRelation(
-                id: (LongTermRelationId.decode(
-                  _uuid(100 + i),
-                ) as LongTermRelationIdDecodingSuccess).id,
+                id: relationIdOf(100 + i),
                 sourceIntentionId: intentions[i - 1].id,
                 relatedIntentionId: intentions[i].id,
                 type: LongTermRelationType.need,
@@ -134,6 +137,9 @@ final class ActionPanelRepository
   final controller = StreamController<ActionReadResult>.broadcast(sync: true);
   final commands = <UpdateActionFields>[];
   final deletions = <DeleteAction>[];
+
+  /// Связи, подробный просмотр которых открыла панель.
+  final watchedRelations = <LongTermRelationId>[];
   final _requests = <Completer<ActionCommandResult>>[];
   var _revision = 0;
   ActionId? observedId;
@@ -152,6 +158,12 @@ final class ActionPanelRepository
     observedId = id;
     watchCount++;
     return controller.stream;
+  }
+
+  @override
+  Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) {
+    watchedRelations.add(id);
+    return const Stream.empty();
   }
 
   @override
