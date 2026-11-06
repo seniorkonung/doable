@@ -109,7 +109,7 @@ void main() {
         today: _replacementDay,
         tab: HomeStatisticsTab.month,
         period: StatisticsMonth(2026, 10),
-        view: StatisticsView.sourceIntentions,
+        view: StatisticsView.rootIntentions,
         expanded: false,
       ),
     );
@@ -281,7 +281,7 @@ Future<void> _prepareHome(WidgetTester tester, _App app) async {
   await _select(tester, AppDestination.home);
   await _tap(tester, find.text(_l10n.statisticsYearTab));
   await _tap(tester, find.byTooltip(_l10n.statisticsPreviousYear));
-  await _tap(tester, find.text(_l10n.statisticsSelectedActions));
+  await _tap(tester, find.text(_l10n.statisticsTerminalIntentions));
   await _settle(tester);
 
   final home = app.container.read(homeStatisticsViewModelProvider).selection;
@@ -290,7 +290,7 @@ Future<void> _prepareHome(WidgetTester tester, _App app) async {
     (
       tab: HomeStatisticsTab.year,
       period: StatisticsYear(2025),
-      view: StatisticsView.selectedActions,
+      view: StatisticsView.terminalIntentions,
     ),
   );
 }

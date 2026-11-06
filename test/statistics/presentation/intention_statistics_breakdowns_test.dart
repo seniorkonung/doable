@@ -426,13 +426,13 @@ IntentionStatisticsState _state({
     ),
     revision: const StatisticsTestRevision(0),
     cards: IntentionStatisticsCards(
-      sourceIntentions: view == StatisticsView.sourceIntentions
+      sourceIntentions: view == StatisticsView.rootIntentions
           ? counts
           : ContributionCounts(planned: 0, contribution: 0),
       intermediateIntentions: view == StatisticsView.intermediateIntentions
           ? counts
           : ContributionCounts(planned: 0, contribution: 0),
-      selectedActions: view == StatisticsView.selectedActions
+      selectedActions: view == StatisticsView.terminalIntentions
           ? counts
           : ContributionCounts(planned: 0, contribution: 0),
       throughRelations: counts,
@@ -442,7 +442,7 @@ IntentionStatisticsState _state({
       contribution: planned + 10,
     ),
     details: switch (view) {
-      StatisticsView.sourceIntentions => IntentionStatisticsSourceDetails(
+      StatisticsView.rootIntentions => IntentionStatisticsSourceDetails(
         uncompleted: split,
         selectedActions: intentions(),
       ),
@@ -452,7 +452,7 @@ IntentionStatisticsState _state({
           sourceIntentions: intentions(),
           selectedActions: intentions(),
         ),
-      StatisticsView.selectedActions => IntentionStatisticsSelectedDetails(
+      StatisticsView.terminalIntentions => IntentionStatisticsSelectedDetails(
         uncompleted: split,
         sourceIntentions: intentions(),
       ),

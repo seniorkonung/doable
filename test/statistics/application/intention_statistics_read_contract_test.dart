@@ -14,14 +14,14 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('каждый вид предоставляет только свои разбивки в порядке показа', () {
-    expect(StatisticsView.sourceIntentions.breakdowns, [
+    expect(StatisticsView.rootIntentions.breakdowns, [
       StatisticsBreakdown.selectedActions,
     ]);
     expect(StatisticsView.intermediateIntentions.breakdowns, [
       StatisticsBreakdown.sourceIntentions,
       StatisticsBreakdown.selectedActions,
     ]);
-    expect(StatisticsView.selectedActions.breakdowns, [
+    expect(StatisticsView.terminalIntentions.breakdowns, [
       StatisticsBreakdown.sourceIntentions,
     ]);
     expect(StatisticsView.throughRelations.breakdowns, [
@@ -33,8 +33,8 @@ void main() {
   test('цель разбивки сохраняет период и открывает соответствующий вид', () {
     final period = StatisticsYear(2025);
     for (final (breakdown, view) in [
-      (StatisticsBreakdown.sourceIntentions, StatisticsView.sourceIntentions),
-      (StatisticsBreakdown.selectedActions, StatisticsView.selectedActions),
+      (StatisticsBreakdown.sourceIntentions, StatisticsView.rootIntentions),
+      (StatisticsBreakdown.selectedActions, StatisticsView.terminalIntentions),
       (StatisticsBreakdown.relations, StatisticsView.throughRelations),
     ]) {
       final target = IntentionStatisticsTarget.forBreakdown(

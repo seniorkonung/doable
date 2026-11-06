@@ -7,7 +7,7 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/action/application/action_command.dart';
 import 'package:doable/src/data/local/app_database.dart' hide LongTermRelation;
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -27,6 +27,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/action_seed.dart';
 import '../support/app_root_pages.dart';
 import '../support/controlled_local_date.dart';
 import '../support/daily_choice_durability_fixture.dart';
@@ -42,12 +43,16 @@ void main() {
     tester,
   ) async {
     final gate = _StatisticsRefreshGate();
-    final app = await _start(tester, reachabilityRunner: gate.compute);
+    final app = await _start(
+      tester,
+      reachabilityRunner: gate.compute,
+      seedMore: (database) =>
+          _seedAction(database, 201, [1, 2, 3], '2026-09-23', completed: true),
+    );
     addTearDown(gate.releaseComputation);
     await _until(tester, find.text(app.texts.statisticsEmpty));
-    await app.choice(tester, durabilityCreate());
     await _tap(tester, find.byTooltip(app.texts.statisticsPreviousMonth));
-    await _until(tester, find.text(app.texts.statisticsContribution(1)));
+    await _until(tester, find.text(app.texts.statisticsPeriodCompleted(1, 1)));
     await _tap(tester, find.text(app.texts.statisticsThroughRelations));
     await _until(tester, find.text(app.texts.statisticsTotalItems(3)));
 
@@ -120,20 +125,21 @@ void main() {
         description: null,
       ),
     );
-    await app.choice(
+    await app.action(
       tester,
-      UpdateDailyChoiceFields(
-        choiceId: durabilityChoice(201),
-        patch: const DailyChoiceFieldsPatch(
-          isCompleted: DailyChoiceFieldSet(false),
-        ),
+      UpdateActionFields(
+        actionId: seedActionId(201),
+        patch: const ActionFieldsPatch(isCompleted: ActionFieldSet(false)),
       ),
     );
     expect(app.reads, reads);
     await app.back(tester);
     await _until(tester, find.text('Сохранённое основание'));
     expect(app.reads, reads + 1);
-    expect(find.text(app.texts.statisticsContribution(0)), findsOneWidget);
+    expect(
+      find.text(app.texts.statisticsPeriodCompleted(0, 1)),
+      findsOneWidget,
+    );
     expect(
       find.text(app.texts.statisticsContributionCounts(0, 1)),
       findsNWidgets(3),
@@ -150,7 +156,7 @@ void main() {
       () => gate.computationStarted.isCompleted,
       'Подсчёт года не начался',
     );
-    await _tap(tester, find.text(app.texts.statisticsSourceIntentions));
+    await _tap(tester, find.text(app.texts.statisticsRootIntentions));
     await _until(tester, find.text(app.texts.statisticsTotalItems(1)));
     final readsAfterViewChange = app.reads;
     final pagesBeforeOldResponse = app.completedPages;
@@ -179,10 +185,7 @@ void main() {
       await _until(tester, find.text(app.texts.statisticsEmpty));
       await _tap(tester, find.text(app.texts.statisticsYearTab));
       await _tap(tester, find.byTooltip(app.texts.statisticsPreviousYear));
-      await _until(
-        tester,
-        find.text(app.texts.statisticsPlannedContribution(220)),
-      );
+      await _until(tester, find.text(app.texts.statisticsPeriodActions(220)));
       await _tap(tester, find.text(app.texts.statisticsIntermediateIntentions));
       await _until(tester, find.text(app.texts.statisticsTotalItems(220)));
       await _tap(
@@ -298,7 +301,10 @@ void main() {
       await _until(tester, find.text(app.texts.statisticsEmpty));
       await _tap(tester, find.text(app.texts.statisticsYearTab));
       await _tap(tester, find.byTooltip(app.texts.statisticsPreviousYear));
-      await _until(tester, find.text(app.texts.statisticsContribution(220)));
+      await _until(
+        tester,
+        find.text(app.texts.statisticsPeriodCompleted(220, 220)),
+      );
       await _tap(tester, find.text(app.texts.statisticsThroughRelations));
       await _until(tester, find.text(app.texts.statisticsTotalItems(222)));
       final row = find.text('Промежуточное 071');
@@ -310,13 +316,11 @@ void main() {
       final offset = _homeScroll(tester).position.pixels;
       expect(row.hitTestable(), findsOneWidget);
       gate.holdNextComputation();
-      await app.choice(
+      await app.action(
         tester,
-        UpdateDailyChoiceFields(
-          choiceId: durabilityChoice(3071),
-          patch: const DailyChoiceFieldsPatch(
-            isCompleted: DailyChoiceFieldSet(false),
-          ),
+        UpdateActionFields(
+          actionId: seedActionId(3071),
+          patch: const ActionFieldsPatch(isCompleted: ActionFieldSet(false)),
         ),
       );
       await _untilCondition(
@@ -417,7 +421,10 @@ void main() {
       _homeScroll(tester).position.jumpTo(0);
       await tester.pumpAndSettle();
       expect(find.text('2025'), findsOneWidget);
-      expect(find.text(app.texts.statisticsContribution(219)), findsOneWidget);
+      expect(
+        find.text(app.texts.statisticsPeriodCompleted(219, 220)),
+        findsOneWidget,
+      );
       expect(find.text(app.texts.statisticsTotalItems(222)), findsOneWidget);
       await _scrollTo(tester, row);
       final card = find.ancestor(of: row, matching: find.byType(Card));
@@ -433,41 +440,41 @@ void main() {
   );
 
   testWidgets(
-    'полночь и возврат приложения обновляют границу невыполненного только при показе',
+    'полночь и возврат приложения меняют только отметку текущего периода',
     (tester) async {
       final clock = ControlledLocalDate(
-        _today,
+        CalendarDate.fromParts(2026, 10, 31),
         untilNextDate: const Duration(seconds: 2),
       );
-      final app = await _start(tester, clock: clock);
-      await _until(tester, find.text(app.texts.statisticsEmpty));
-      await app.choice(
+      final app = await _start(
         tester,
-        durabilityCreate(date: _today, completed: false),
+        clock: clock,
+        seedMore: (database) =>
+            _seedAction(database, 201, [1, 2, 3], '2026-10-31'),
       );
-      await _until(tester, find.text(app.texts.statisticsUpcoming(1)));
-      clock.today = CalendarDate.fromParts(2026, 10, 13);
+      await _until(tester, find.text(app.texts.statisticsPeriodActions(1)));
+      expect(find.text(app.texts.statisticsCurrentPeriod), findsOneWidget);
+      final reads = app.reads;
+      clock.today = CalendarDate.fromParts(2026, 11, 1);
       clock.untilNextDate = const Duration(hours: 12);
       await tester.pump(const Duration(seconds: 2));
-      await _until(tester, find.text(app.texts.statisticsMissed(1)));
-      expect(find.text(app.texts.statisticsUpcoming(0)), findsOneWidget);
+      await _until(
+        tester,
+        find.text(app.texts.statisticsCurrentPeriod),
+        absent: true,
+      );
       expect(
         find.text(app.texts.statisticsMonthPeriod(DateTime.utc(2026, 10))),
         findsOneWidget,
       );
-      await app.choice(
-        tester,
-        UpdateDailyChoiceFields(
-          choiceId: durabilityChoice(201),
-          patch: DailyChoiceFieldsPatch(
-            date: DailyChoiceFieldSet(CalendarDate.fromParts(2026, 10, 14)),
-          ),
-        ),
+      expect(
+        find.text(app.texts.statisticsPeriodCompleted(0, 1)),
+        findsOneWidget,
       );
-      await _until(tester, find.text(app.texts.statisticsUpcoming(1)));
+      expect(app.reads, reads);
+
       await openIntentionGraph(tester);
       await tester.pumpAndSettle();
-      final reads = app.reads;
       for (final state in [
         AppLifecycleState.inactive,
         AppLifecycleState.hidden,
@@ -475,7 +482,7 @@ void main() {
       ]) {
         tester.binding.handleAppLifecycleStateChanged(state);
       }
-      clock.today = CalendarDate.fromParts(2026, 10, 15);
+      clock.today = CalendarDate.fromParts(2026, 10, 31);
       for (final state in [
         AppLifecycleState.hidden,
         AppLifecycleState.inactive,
@@ -484,11 +491,9 @@ void main() {
         tester.binding.handleAppLifecycleStateChanged(state);
       }
       await tester.pumpAndSettle();
-      expect(app.reads, reads);
       await openHome(tester);
-      await _until(tester, find.text(app.texts.statisticsMissed(1)));
-      expect(find.text(app.texts.statisticsUpcoming(0)), findsOneWidget);
-      expect(app.reads, reads + 1);
+      await _until(tester, find.text(app.texts.statisticsCurrentPeriod));
+      expect(app.reads, reads);
       expect(tester.takeException(), isNull);
     },
   );
@@ -503,10 +508,18 @@ void main() {
         tester,
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
+        seedMore: (database) => _seedAction(
+          database,
+          201,
+          [1, 2, 3],
+          '2026-10-12',
+          completed: true,
+        ),
       );
-      await _until(tester, find.text(first.texts.statisticsEmpty));
-      await first.choice(tester, durabilityCreate(date: _today));
-      await _until(tester, find.text(first.texts.statisticsContribution(1)));
+      await _until(
+        tester,
+        find.text(first.texts.statisticsPeriodCompleted(1, 1)),
+      );
       await _tap(tester, find.text(first.texts.statisticsYearTab));
       await _tap(tester, find.byTooltip(first.texts.statisticsPreviousYear));
       await _tap(tester, find.text(first.texts.statisticsThroughRelations));
@@ -524,7 +537,10 @@ void main() {
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
       );
-      await _until(tester, find.text(second.texts.statisticsContribution(1)));
+      await _until(
+        tester,
+        find.text(second.texts.statisticsPeriodCompleted(1, 1)),
+      );
       expect(find.text('Намерение 1'), findsOneWidget);
       expect(find.text('Намерение 3'), findsNothing);
       expect(
@@ -543,7 +559,10 @@ void main() {
         findsOneWidget,
       );
       await _tap(tester, find.text(second.texts.statisticsYearTab));
-      await _until(tester, find.text(second.texts.statisticsContribution(1)));
+      await _until(
+        tester,
+        find.text(second.texts.statisticsPeriodCompleted(1, 1)),
+      );
       expect(find.text('2026'), findsOneWidget);
       expect(tester.takeException(), isNull);
       semantics.dispose();
@@ -553,23 +572,24 @@ void main() {
   testWidgets(
     'команды SQLite отражаются после показа Главной без скрытых чтений',
     (tester) async {
-      final app = await _start(tester);
-      await _until(tester, find.text(app.texts.statisticsEmpty));
+      final app = await _start(
+        tester,
+        seedMore: (database) =>
+            _seedAction(database, 201, [1, 2, 3], '2026-10-12'),
+      );
+      await _until(
+        tester,
+        find.text(app.texts.statisticsPeriodCompleted(0, 1)),
+      );
       final initialReads = app.reads;
 
       await openIntentionGraph(tester);
       await tester.pumpAndSettle();
-      await app.choice(
+      await app.action(
         tester,
-        durabilityCreate(date: _today, completed: false),
-      );
-      await app.choice(
-        tester,
-        UpdateDailyChoiceFields(
-          choiceId: durabilityChoice(201),
-          patch: const DailyChoiceFieldsPatch(
-            isCompleted: DailyChoiceFieldSet(true),
-          ),
+        UpdateActionFields(
+          actionId: seedActionId(201),
+          patch: const ActionFieldsPatch(isCompleted: ActionFieldSet(true)),
         ),
       );
       await app.intention(
@@ -583,49 +603,51 @@ void main() {
       expect(app.reads, initialReads);
       await openHome(tester);
       await _until(tester, find.text('Быть здоровым'));
-      expect(find.text(app.texts.statisticsContribution(1)), findsOneWidget);
       expect(
-        find.text(app.texts.statisticsPlannedContribution(1)),
+        find.text(app.texts.statisticsPeriodCompleted(1, 1)),
         findsOneWidget,
       );
+      expect(find.text(app.texts.statisticsPeriodActions(1)), findsOneWidget);
       expect(app.reads, initialReads + 1);
 
       await _tap(tester, find.text(app.texts.statisticsIntermediateIntentions));
       await _until(tester, find.text('Намерение 2'));
       await app.coverHome(tester);
       final coveredReads = app.reads;
-      await app.choice(
+      await app.action(
         tester,
-        UpdateDailyChoiceFields(
-          choiceId: durabilityChoice(201),
-          patch: DailyChoiceFieldsPatch(
-            date: DailyChoiceFieldSet(CalendarDate.fromParts(2026, 11, 1)),
+        UpdateActionFields(
+          actionId: seedActionId(201),
+          patch: ActionFieldsPatch(
+            date: ActionFieldSet(CalendarDate.fromParts(2026, 11, 1)),
           ),
         ),
       );
       expect(app.reads, coveredReads);
       await app.back(tester);
-      await _until(
-        tester,
-        find.text(app.texts.statisticsPlannedContribution(0)),
-      );
+      await _until(tester, find.text(app.texts.statisticsPeriodActions(0)));
       expect(app.reads, coveredReads + 1);
 
       await app.coverHome(tester);
       final recreatingReads = app.reads;
-      await app.choice(tester, DeleteDailyChoice(durabilityChoice(201)));
-      await app.choice(tester, durabilityCreate(path: [103], date: _today));
+      await app.action(tester, DeleteAction(seedActionId(201)));
+      await tester.runAsync(
+        () => _seedAction(
+          app.database,
+          202,
+          [1, 4],
+          '2026-10-12',
+          completed: true,
+        ),
+      );
       await app.intention(tester, ArchiveIntention(durabilityIntention(4)));
       expect(app.reads, recreatingReads);
       await openHome(tester);
-      await _until(
-        tester,
-        find.text(app.texts.statisticsPlannedContribution(1)),
-      );
+      await _until(tester, find.text(app.texts.statisticsPeriodActions(1)));
       expect(find.text(app.texts.statisticsEmpty), findsOneWidget);
       expect(find.text('Намерение 2'), findsNothing);
       expect(app.reads, recreatingReads + 1);
-      await _tap(tester, find.text(app.texts.statisticsSelectedActions));
+      await _tap(tester, find.text(app.texts.statisticsTerminalIntentions));
       await _until(tester, find.text('Намерение 4'));
       expect(find.text(app.texts.detailsArchived), findsOneWidget);
       expect(
@@ -635,13 +657,10 @@ void main() {
 
       await app.coverHome(tester);
       final deletingReads = app.reads;
-      await app.choice(tester, DeleteDailyChoice(durabilityChoice(201)));
+      await app.action(tester, DeleteAction(seedActionId(202)));
       expect(app.reads, deletingReads);
       await app.back(tester);
-      await _until(
-        tester,
-        find.text(app.texts.statisticsPlannedContribution(0)),
-      );
+      await _until(tester, find.text(app.texts.statisticsPeriodActions(0)));
       expect(find.text(app.texts.statisticsEmpty), findsOneWidget);
       expect(app.reads, deletingReads + 1);
       expect(tester.takeException(), isNull);
@@ -714,9 +733,10 @@ final class _StatisticsRefreshGate extends LocalDatabaseConnectionObserver {
 }
 
 final class _App {
-  _App(this.runtime, this.container, this.diagnostics);
+  _App(this.runtime, this.container, this.diagnostics, this.database);
 
   final AppRuntime runtime;
+  final AppDatabase database;
   final ProviderContainer container;
   final InMemoryDiagnosticsSink diagnostics;
   final texts = lookupAppLocalizations(const Locale('ru'));
@@ -741,21 +761,15 @@ final class _App {
       )
       .length;
 
-  Future<void> choice(WidgetTester tester, DailyChoiceCommand command) async {
+  Future<void> action(WidgetTester tester, ActionCommand command) async {
     await tester.runAsync(() async {
       final coordinator = runtime.commandCoordinator;
       final start = switch (command) {
-        CreateDailyChoice() => coordinator.acceptDailyChoiceCreation(
-          DailyChoiceCreationFormKey(),
-          command,
-        ),
-        UpdateDailyChoiceFields() => coordinator.acceptDailyChoiceUpdate(
-          command,
-        ),
-        DeleteDailyChoice() => coordinator.acceptDailyChoiceDelete(command),
+        UpdateActionFields() => coordinator.acceptActionUpdate(command),
+        DeleteAction() => coordinator.acceptActionDelete(command),
       };
-      expect(start, isA<DailyChoiceCommandAccepted>());
-      final completion = await (start as DailyChoiceCommandAccepted).future;
+      expect(start, isA<ActionCommandAccepted>());
+      final completion = await (start as ActionCommandAccepted).future;
       expect(completion.isFailure, isFalse);
     });
     await tester.pump();
@@ -855,8 +869,6 @@ Future<_App> _start(
         UuidV7IntentionIdGenerator(),
         () => DateTime.utc(2026, 10, 12),
         diagnostics,
-        dailyChoiceIdGenerator: FixedChoiceIds(durabilityChoice(201)),
-        choicePathStepIdGenerator: SequentialStepIds(301),
         statisticsReachabilityRunner: reachabilityRunner,
       );
     },
@@ -870,7 +882,7 @@ Future<_App> _start(
   if (seedMore != null) await tester.runAsync(() => seedMore(database));
   await tester.pumpWidget(MainApp(runtime: runtime));
   await _until(tester, find.byType(HomePage));
-  return _App(runtime, ready.container, diagnostics);
+  return _App(runtime, ready.container, diagnostics, database);
 }
 
 ScrollableState _homeScroll(WidgetTester tester) =>
@@ -907,8 +919,6 @@ Future<void> _seedCatalog(AppDatabase database) =>
       for (var index = 1; index <= 220; index++) {
         final middle = 1000 + index;
         final firstRelation = 2000 + index * 2;
-        final choice = 3000 + index;
-        final firstStep = 4000 + index * 2;
         await database.customStatement(
           'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, 1, 1)',
           [
@@ -929,23 +939,55 @@ Future<void> _seedCatalog(AppDatabase database) =>
             ],
           );
         }
-        await database.customStatement(
-          "INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, '2025-09-12', 1)",
-          [durabilityUuid(choice), durabilityUuid(1), durabilityUuid(4)],
+        await _insertAction(
+          database,
+          3000 + index,
+          [1, middle, 4],
+          '2025-09-12',
+          completed: true,
         );
-        for (var step = 0; step < 2; step++) {
-          await database.customStatement(
-            'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id, previous_step_id) VALUES (?, ?, ?, ?)',
-            [
-              durabilityUuid(firstStep + step),
-              durabilityUuid(choice),
-              durabilityUuid(firstRelation + step),
-              step == 0 ? null : durabilityUuid(firstStep),
-            ],
-          );
-        }
       }
     });
+
+/// Действие с путём из намерений [path] по их номерам.
+Future<void> _seedAction(
+  AppDatabase database,
+  int number,
+  List<int> path,
+  String date, {
+  bool completed = false,
+}) => seedGraph(
+  database,
+  () => _insertAction(database, number, path, date, completed: completed),
+);
+
+Future<void> _insertAction(
+  AppDatabase database,
+  int number,
+  List<int> path,
+  String date, {
+  required bool completed,
+}) async {
+  await database.customStatement(
+    '''INSERT INTO actions
+       (id, title, date, priority, is_completed, created_at, updated_at)
+       VALUES (?, 'Действие', ?, 4, ?, 1, 1)''',
+    [seedUuid(number), date, if (completed) 1 else 0],
+  );
+  for (final (position, intention) in path.indexed) {
+    await database.customStatement(
+      '''INSERT INTO action_path_items
+         (action_id, position, intention_id, previous_intention_id)
+         VALUES (?, ?, ?, ?)''',
+      [
+        seedUuid(number),
+        position,
+        seedUuid(intention),
+        position == 0 ? null : seedUuid(path[position - 1]),
+      ],
+    );
+  }
+}
 
 Future<void> _until(
   WidgetTester tester,

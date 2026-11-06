@@ -201,8 +201,8 @@ final class ContributionStatisticsFixture {
           'view',
           'Для вида через связи используется отдельный эталон обхода графа',
         ),
-        StatisticsView.sourceIntentions => [source],
-        StatisticsView.selectedActions => [source + length],
+        StatisticsView.rootIntentions => [source],
+        StatisticsView.terminalIntentions => [source + length],
         StatisticsView.intermediateIntentions => [
           for (var node = source + 1; node < source + length; node++) node,
         ],

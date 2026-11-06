@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/action/application/action_command.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -14,6 +14,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/action_seed.dart';
 import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/graph_seed.dart';
 import '../../support/local_database_harness.dart';
@@ -117,18 +118,36 @@ void main() {
     expect(probe.reads, greaterThan(reads));
   });
 
-  test('изменения выборов и данных намерений не перечитывают связи', () async {
+  test('изменения действий и данных намерений не перечитывают связи', () async {
+    await seedGraph(database, () async {
+      await database.customStatement(
+        '''INSERT INTO actions
+         (id, title, date, priority, is_completed, created_at, updated_at)
+         VALUES (?, 'Пробежка', '2026-09-23', 4, 1, 1, 1)''',
+        [seedUuid(201)],
+      );
+      for (final (position, number) in [1, 2, 3].indexed) {
+        await database.customStatement(
+          '''INSERT INTO action_path_items
+           (action_id, position, intention_id, previous_intention_id)
+           VALUES (?, ?, ?, ?)''',
+          [
+            seedUuid(201),
+            position,
+            seedUuid(number),
+            position == 0 ? null : seedUuid(number - 1),
+          ],
+        );
+      }
+    });
     await repository.loadStatisticsRelationSnapshot();
     final reads = probe.reads;
-    for (final command in <DailyChoiceCommand>[
-      durabilityCreate(),
-      UpdateDailyChoiceFields(
-        choiceId: durabilityChoice(201),
-        patch: const DailyChoiceFieldsPatch(
-          isCompleted: DailyChoiceFieldSet(false),
-        ),
+    for (final command in <ActionCommand>[
+      UpdateActionFields(
+        actionId: seedActionId(201),
+        patch: const ActionFieldsPatch(isCompleted: ActionFieldSet(false)),
       ),
-      DeleteDailyChoice(durabilityChoice(201)),
+      DeleteAction(seedActionId(201)),
     ]) {
       expect(await repository.execute(command), isA<GraphCommandSucceeded>());
       await repository.loadStatisticsRelationSnapshot();

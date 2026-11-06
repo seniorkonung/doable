@@ -1,7 +1,6 @@
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/statistics/application/contribution_counts.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
@@ -11,8 +10,7 @@ void main() {
   test('запрос допускает порции от 1 до 100 и отклоняет выход за границы', () {
     StatisticsQuery query(int pageSize) => StatisticsQuery(
       period: StatisticsMonth(2026, 10),
-      view: StatisticsView.sourceIntentions,
-      localDate: CalendarDate.fromParts(2026, 10, 12),
+      view: StatisticsView.rootIntentions,
       pageSize: pageSize,
     );
 
@@ -82,10 +80,7 @@ void main() {
     expect(
       () => StatisticsFirstPage(
         items: const [],
-        summary: StatisticsPeriodSummary(
-          counts: ContributionCounts(planned: 0, contribution: 0),
-          uncompleted: UncompletedSplit(missed: 0, upcoming: 0),
-        ),
+        summary: ContributionCounts(planned: 0, contribution: 0),
         totalItems: -1,
         revision: const _TestRevision(),
         nextCursor: null,
@@ -106,10 +101,7 @@ void main() {
       final source = [item];
       final StatisticsPage page = StatisticsFirstPage(
         items: source,
-        summary: StatisticsPeriodSummary(
-          counts: ContributionCounts(planned: 21, contribution: 4),
-          uncompleted: UncompletedSplit(missed: 10, upcoming: 7),
-        ),
+        summary: ContributionCounts(planned: 21, contribution: 4),
         totalItems: 1,
         revision: const _TestRevision(),
         nextCursor: null,

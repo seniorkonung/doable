@@ -11,6 +11,51 @@ typedef ContributionReferenceChoice = ({
   bool completed,
 });
 
+typedef ContributionReferenceAction = ({
+  List<IntentionId> path,
+  bool completed,
+});
+
+/// Независимый эталон Главной: каждое самостоятельное действие начинает обход
+/// со всех существующих намерений сохранённого пути, включая архивированные,
+/// и идёт по активным связям. Удалённые намерения [deleted] не засчитываются
+/// и обход не начинают. Опорные группы, сокращение опорных намерений,
+/// компоненты сильной связности и битовые маски не используются.
+Map<IntentionId, ({int planned, int contribution})>
+referenceActionContributionCounts({
+  required List<ContributionReferenceRelation> relations,
+  required List<ContributionReferenceAction> actions,
+  Set<IntentionId> deleted = const {},
+}) {
+  final parents = <IntentionId, List<IntentionId>>{};
+  for (final relation in relations) {
+    if (!relation.archived) {
+      (parents[relation.target] ??= []).add(relation.source);
+    }
+  }
+  final counts = <IntentionId, ({int planned, int contribution})>{};
+  for (final action in actions) {
+    final visited = <IntentionId>{};
+    final pending = [
+      for (final intention in action.path)
+        if (!deleted.contains(intention)) intention,
+    ];
+    while (pending.isNotEmpty) {
+      final intention = pending.removeLast();
+      if (!visited.add(intention)) continue;
+      pending.addAll(parents[intention] ?? const []);
+    }
+    for (final intention in visited) {
+      final previous = counts[intention] ?? (planned: 0, contribution: 0);
+      counts[intention] = (
+        planned: previous.planned + 1,
+        contribution: previous.contribution + (action.completed ? 1 : 0),
+      );
+    }
+  }
+  return counts;
+}
+
 /// Независимый эталон: каждый самостоятельный выбор начинает обход
 /// со всех намерений полного сохранённого пути, включая архивированные шаги.
 /// Опорные группы, компоненты сильной связности и битовые маски не используются.

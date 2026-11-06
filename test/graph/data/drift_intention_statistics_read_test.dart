@@ -159,13 +159,13 @@ void main() {
             entry.key.day: entry.value,
         },
         switch (view) {
-          StatisticsView.sourceIntentions => {
+          StatisticsView.rootIntentions => {
             1: DailyChoiceDayStatus.allCompleted,
           },
           StatisticsView.intermediateIntentions => {
             11: DailyChoiceDayStatus.hasIncomplete,
           },
-          StatisticsView.selectedActions => {
+          StatisticsView.terminalIntentions => {
             12: DailyChoiceDayStatus.hasIncomplete,
           },
           StatisticsView.throughRelations => {
@@ -185,7 +185,7 @@ void main() {
       );
       expect(
         section.details.uncompleted.upcoming,
-        view == StatisticsView.selectedActions ||
+        view == StatisticsView.terminalIntentions ||
                 view == StatisticsView.throughRelations
             ? 1
             : 0,
@@ -370,7 +370,7 @@ void main() {
       repository = createRepository();
       final emptyView = _value(
         await repository.getIntentionStatisticsSection(
-          query(view: StatisticsView.selectedActions),
+          query(view: StatisticsView.terminalIntentions),
         ),
       );
       expect(_counts(emptyView.periodCounts), (1, 1));
@@ -556,18 +556,18 @@ void main() {
       await addChoice(201, [102], completed: false);
       final source = _value(
         await repository.getIntentionStatisticsSection(
-          query(view: StatisticsView.sourceIntentions),
+          query(view: StatisticsView.rootIntentions),
         ),
       );
       final other = _value(
         await repository.getIntentionStatisticsSection(
-          query(view: StatisticsView.sourceIntentions, intention: 3),
+          query(view: StatisticsView.rootIntentions, intention: 3),
         ),
       );
       final tomorrow = _value(
         await repository.getIntentionStatisticsSection(
           query(
-            view: StatisticsView.sourceIntentions,
+            view: StatisticsView.rootIntentions,
             localDate: CalendarDate.fromParts(2026, 10, 13),
           ),
         ),

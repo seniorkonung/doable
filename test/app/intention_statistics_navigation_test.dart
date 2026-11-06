@@ -38,9 +38,9 @@ void main() {
     final app = await _start(tester);
     app.homeModel.selectPeriod(StatisticsYear(2025));
     for (final (view, id) in [
-      (StatisticsView.sourceIntentions, 1120),
+      (StatisticsView.rootIntentions, 1120),
       (StatisticsView.intermediateIntentions, 2),
-      (StatisticsView.selectedActions, 2120),
+      (StatisticsView.terminalIntentions, 2120),
       (StatisticsView.throughRelations, 2120),
     ]) {
       _scroll(tester, find.byType(HomePage)).position.jumpTo(0);
@@ -90,7 +90,7 @@ void main() {
         tester,
         app,
         1010,
-        StatisticsView.sourceIntentions,
+        StatisticsView.rootIntentions,
         StatisticsMonth(2025, 9),
       );
       app.router.pop();
@@ -104,7 +104,7 @@ void main() {
         tester,
         app,
         1010,
-        StatisticsView.sourceIntentions,
+        StatisticsView.rootIntentions,
         StatisticsMonth(2025, 9),
       );
       await openHome(tester, waitFor: _untilFound);
@@ -136,12 +136,12 @@ void main() {
         (
           StatisticsBreakdown.sourceIntentions,
           1010,
-          StatisticsView.sourceIntentions,
+          StatisticsView.rootIntentions,
         ),
         (
           StatisticsBreakdown.selectedActions,
           2010,
-          StatisticsView.selectedActions,
+          StatisticsView.terminalIntentions,
         ),
         (StatisticsBreakdown.relations, 2010, StatisticsView.throughRelations),
       ]) {
@@ -245,7 +245,7 @@ void main() {
         tester,
         app,
         2120,
-        StatisticsView.selectedActions,
+        StatisticsView.terminalIntentions,
         StatisticsMonth(2025, 9),
       );
       await _tap(tester, find.text(app.texts.statisticsThroughRelations));
@@ -265,7 +265,7 @@ void main() {
       );
       final second = app.sectionProvider(tester);
       expect(second, isNot(first));
-      await _tap(tester, find.text(app.texts.statisticsSourceIntentions));
+      await _tap(tester, find.text(app.texts.statisticsRootIntentions));
       await _tap(tester, find.byTooltip(app.texts.statisticsPreviousMonth));
       await _wait(
         tester,
@@ -339,10 +339,10 @@ void main() {
 
 String _viewLabel(AppLocalizations texts, StatisticsView view) =>
     switch (view) {
-      StatisticsView.sourceIntentions => texts.statisticsSourceIntentions,
+      StatisticsView.rootIntentions => texts.statisticsRootIntentions,
       StatisticsView.intermediateIntentions =>
         texts.statisticsIntermediateIntentions,
-      StatisticsView.selectedActions => texts.statisticsSelectedActions,
+      StatisticsView.terminalIntentions => texts.statisticsTerminalIntentions,
       StatisticsView.throughRelations => texts.statisticsThroughRelations,
     };
 
@@ -519,6 +519,23 @@ Future<void> _seed(AppDatabase database) => seedGraph(database, () async {
           durabilityUuid(4000 + i),
           durabilityUuid(firstRelation + step),
           step == 0 ? null : durabilityUuid(5000 + i * 2),
+        ],
+      );
+    }
+    // Главная считает действия: путь действия повторяет путь выбора.
+    await database.customStatement(
+      "INSERT INTO actions (id, title, date, priority, is_completed, created_at, updated_at) VALUES (?, 'Действие', '2025-09-12', 4, 1, 1, 1)",
+      [durabilityUuid(7000 + i)],
+    );
+    final path = [1000 + i, 2, 2000 + i];
+    for (final (position, intention) in path.indexed) {
+      await database.customStatement(
+        'INSERT INTO action_path_items (action_id, position, intention_id, previous_intention_id) VALUES (?, ?, ?, ?)',
+        [
+          durabilityUuid(7000 + i),
+          position,
+          durabilityUuid(intention),
+          position == 0 ? null : durabilityUuid(path[position - 1]),
         ],
       );
     }

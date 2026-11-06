@@ -14,7 +14,6 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
-import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -171,7 +170,6 @@ void main() {
                 StatisticsQuery(
                   period: period,
                   view: StatisticsView.throughRelations,
-                  localDate: CalendarDate.fromParts(2026, 6, 15),
                   pageSize: 100,
                   cursor: cursor,
                 );
@@ -415,10 +413,8 @@ void _expectPage(
   if (offset == 0) {
     final first = page as StatisticsFirstPage;
     expect(first.totalItems, expected.length);
-    expect(first.summary.counts.planned, volume.choices);
-    expect(first.summary.counts.contribution, volume.completed);
-    expect(first.summary.uncompleted.missed, volume.missed);
-    expect(first.summary.uncompleted.upcoming, volume.upcoming);
+    expect(first.summary.planned, volume.choices);
+    expect(first.summary.contribution, volume.completed);
   }
 }
 

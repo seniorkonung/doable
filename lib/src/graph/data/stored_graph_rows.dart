@@ -450,11 +450,7 @@ StoredActionFields decodeStoredActionFields(Map<String, Object?> data) {
         4 => ActionPriority.p4,
         _ => throw const StoredGraphCorruption(),
       },
-      isCompleted: switch (requiredStoredInteger(data, 'is_completed')) {
-        0 => false,
-        1 => true,
-        _ => throw const StoredGraphCorruption(),
-      },
+      isCompleted: decodeStoredActionCompletion(data),
     );
     if (fields.title.value != title ||
         fields.description?.value != description) {
@@ -523,6 +519,14 @@ CalendarDate decodeStoredActionDate(Map<String, Object?> data) {
     throw const StoredGraphCorruption();
   }
 }
+
+/// Выполнение действия из столбца `is_completed`.
+bool decodeStoredActionCompletion(Map<String, Object?> data) =>
+    switch (requiredStoredInteger(data, 'is_completed')) {
+      0 => false,
+      1 => true,
+      _ => throw const StoredGraphCorruption(),
+    };
 
 /// Дата дневного выбора из столбца `choice_date`.
 CalendarDate decodeStoredChoiceDate(Map<String, Object?> data) {

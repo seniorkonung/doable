@@ -28,16 +28,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get appDestinationIntentionGraph => 'Граф намерений';
 
   @override
-  String get statisticsSourceIntentions => 'Исходные намерения';
+  String get statisticsRootIntentions => 'Корневые намерения';
 
   @override
   String get statisticsIntermediateIntentions => 'Промежуточные намерения';
 
   @override
-  String get statisticsSelectedActions => 'Выбранные действия';
+  String get statisticsTerminalIntentions => 'Конечные намерения';
 
   @override
-  String get statisticsThroughRelations => 'Весь вклад';
+  String get statisticsThroughRelations => 'Через связи';
 
   @override
   String get statisticsMonthTab => 'Месяц';
@@ -114,21 +114,32 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String statisticsPlannedContribution(int count) {
+  String statisticsPeriodActions(int count) {
     final intl.NumberFormat countNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
     final String countString = countNumberFormat.format(count);
 
-    return 'Запланированный вклад: $countString';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString действия',
+      many: '$countString действий',
+      few: '$countString действия',
+      one: '$countString действие',
+    );
+    return '$_temp0';
   }
 
   @override
-  String statisticsContribution(int count) {
-    final intl.NumberFormat countNumberFormat =
+  String statisticsPeriodCompleted(int completed, int planned) {
+    final intl.NumberFormat completedNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
+    final String completedString = completedNumberFormat.format(completed);
+    final intl.NumberFormat plannedNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String plannedString = plannedNumberFormat.format(planned);
 
-    return 'Вклад: $countString';
+    return '$completedString из $plannedString выполнено';
   }
 
   @override
@@ -189,6 +200,15 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get statisticsNoContributionShare =>
       'Доля отсутствует: вклад периода равен нулю';
+
+  @override
+  String statisticsPeriodActionsShare(num share) {
+    final intl.NumberFormat shareNumberFormat =
+        intl.NumberFormat.percentPattern(localeName);
+    final String shareString = shareNumberFormat.format(share);
+
+    return 'Доля действий периода: $shareString';
+  }
 
   @override
   String get statisticsLoading => 'Загружаем статистику…';

@@ -134,28 +134,28 @@ abstract class AppLocalizations {
   /// **'Intention graph'**
   String get appDestinationIntentionGraph;
 
-  /// Вид статистики по исходным намерениям дневных выборов
+  /// Вид статистики по корневым намерениям сохранённых путей действий
   ///
   /// In en, this message translates to:
-  /// **'Source intentions'**
-  String get statisticsSourceIntentions;
+  /// **'Root intentions'**
+  String get statisticsRootIntentions;
 
-  /// Вид статистики по промежуточным намерениям сохранённого пути
+  /// Вид статистики по намерениям строго между корневым и конечным в сохранённых путях действий
   ///
   /// In en, this message translates to:
   /// **'Intermediate intentions'**
   String get statisticsIntermediateIntentions;
 
-  /// Вид статистики по выбранным действиям
+  /// Вид статистики по конечным намерениям сохранённых путей действий
   ///
   /// In en, this message translates to:
-  /// **'Selected actions'**
-  String get statisticsSelectedActions;
+  /// **'Final intentions'**
+  String get statisticsTerminalIntentions;
 
-  /// Вид статистики по сохранённому пути и текущим активным связям
+  /// Вид статистики по существующим намерениям сохранённых путей и текущим активным связям
   ///
   /// In en, this message translates to:
-  /// **'Total contribution'**
+  /// **'Through relations'**
   String get statisticsThroughRelations;
 
   /// Вкладка статистики календарного месяца
@@ -230,7 +230,7 @@ abstract class AppLocalizations {
   /// **'Current period'**
   String get statisticsCurrentPeriod;
 
-  /// Заголовок сводки дневных выборов всего периода
+  /// Заголовок сводки действий всего периода
   ///
   /// In en, this message translates to:
   /// **'Period summary'**
@@ -248,17 +248,17 @@ abstract class AppLocalizations {
   /// **'{count, plural, one{{count} item} other{{count} items}}'**
   String statisticsTotalItems(int count);
 
-  /// Запланированный вклад сводки периода
+  /// Число всех действий периода — его запланированный вклад — с числовой формой локали
   ///
   /// In en, this message translates to:
-  /// **'Planned contribution: {count}'**
-  String statisticsPlannedContribution(int count);
+  /// **'{count, plural, one{{count} action} other{{count} actions}}'**
+  String statisticsPeriodActions(int count);
 
-  /// Вклад сводки периода
+  /// Сколько из действий периода выполнено — вклад периода
   ///
   /// In en, this message translates to:
-  /// **'Contribution: {count}'**
-  String statisticsContribution(int count);
+  /// **'{completed} of {planned} completed'**
+  String statisticsPeriodCompleted(int completed, int planned);
 
   /// Число невыполненных выборов раньше текущей местной даты
   ///
@@ -295,6 +295,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No share: the period’s contribution is zero'**
   String get statisticsNoContributionShare;
+
+  /// Видимая и доступная доля элемента Главной: его запланированный вклад, делённый на число действий периода, без умножения на 100
+  ///
+  /// In en, this message translates to:
+  /// **'Share of the period’s actions: {share}'**
+  String statisticsPeriodActionsShare(num share);
 
   /// Начальное получение статистики выбранных условий
   ///

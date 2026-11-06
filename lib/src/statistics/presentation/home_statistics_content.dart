@@ -131,8 +131,7 @@ final class _HomeStatisticsContentState extends State<HomeStatisticsContent> {
                           _scheduleLoadMore(index, read);
                           return _StatisticsRow(
                             item: read.items[index],
-                            periodContribution:
-                                read.summary.counts.contribution,
+                            periodActions: read.summary.planned,
                             onPressed: () =>
                                 widget.onOpenIntention(read.items[index].id),
                           );
@@ -233,7 +232,7 @@ final class _HomeStatisticsContentState extends State<HomeStatisticsContent> {
 final class _PeriodSummary extends StatelessWidget {
   const _PeriodSummary({required this.summary});
 
-  final StatisticsPeriodSummary summary;
+  final ContributionCounts summary;
 
   @override
   Widget build(BuildContext context) {
@@ -250,10 +249,13 @@ final class _PeriodSummary extends StatelessWidget {
               style: Theme.of(context).textTheme.titleLarge,
             ),
           ),
-          Text(texts.statisticsPlannedContribution(summary.counts.planned)),
-          Text(texts.statisticsContribution(summary.counts.contribution)),
-          Text(texts.statisticsMissed(summary.uncompleted.missed)),
-          Text(texts.statisticsUpcoming(summary.uncompleted.upcoming)),
+          Text(texts.statisticsPeriodActions(summary.planned)),
+          Text(
+            texts.statisticsPeriodCompleted(
+              summary.contribution,
+              summary.planned,
+            ),
+          ),
         ],
       ),
     );
@@ -275,10 +277,10 @@ final class _ViewButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final texts = AppLocalizations.of(context);
     final label = switch (view) {
-      StatisticsView.sourceIntentions => texts.statisticsSourceIntentions,
+      StatisticsView.rootIntentions => texts.statisticsRootIntentions,
       StatisticsView.intermediateIntentions =>
         texts.statisticsIntermediateIntentions,
-      StatisticsView.selectedActions => texts.statisticsSelectedActions,
+      StatisticsView.terminalIntentions => texts.statisticsTerminalIntentions,
       StatisticsView.throughRelations => texts.statisticsThroughRelations,
     };
     final colors = Theme.of(context).colorScheme;
@@ -309,23 +311,24 @@ final class _ViewButton extends StatelessWidget {
 final class _StatisticsRow extends StatelessWidget {
   const _StatisticsRow({
     required this.item,
-    required this.periodContribution,
+    required this.periodActions,
     required this.onPressed,
   });
 
   final StatisticsItem item;
-  final int periodContribution;
+
+  /// Элемент существует только при засчитанном действии периода, поэтому
+  /// число действий периода положительно.
+  final int periodActions;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     final texts = AppLocalizations.of(context);
     final archived = item.archiveState == IntentionArchiveState.archived;
-    final share = periodContribution == 0
-        ? null
-        : texts.statisticsContributionShare(
-            item.counts.contribution / periodContribution,
-          );
+    final share = texts.statisticsPeriodActionsShare(
+      item.counts.planned / periodActions,
+    );
     // Стандартная кнопка обеспечивает фокус, клавиатуру и действие диктора.
     // https://api.flutter.dev/flutter/material/TextButton-class.html
     return Card(
@@ -344,7 +347,7 @@ final class _StatisticsRow extends StatelessWidget {
               item.counts.contribution,
               item.counts.planned,
             ),
-            share ?? texts.statisticsNoContributionShare,
+            share,
           ].join('\n'),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -357,7 +360,7 @@ final class _StatisticsRow extends StatelessWidget {
                   item.counts.planned,
                 ),
               ),
-              if (share != null) Text(share),
+              Text(share),
             ],
           ),
         ),

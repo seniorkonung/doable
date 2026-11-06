@@ -73,20 +73,20 @@ void main() {
       page.model.selectPeriod(StatisticsMonth(2025, 3));
       page.model.selectMode(IntentionStatisticsMode.year);
       page.model.selectPeriod(StatisticsYear(2024));
-      page.model.selectView(StatisticsView.sourceIntentions);
+      page.model.selectView(StatisticsView.rootIntentions);
       page.model.selectMode(IntentionStatisticsMode.month);
       expect(page.state.selection.period, StatisticsMonth(2025, 3));
       page.model.selectMode(IntentionStatisticsMode.year);
       expect(page.state.selection.period, StatisticsYear(2024));
       page.model.selectMonth(7);
       expect(page.state.selection.period, StatisticsMonth(2024, 7));
-      expect(page.state.selection.view, StatisticsView.sourceIntentions);
+      expect(page.state.selection.view, StatisticsView.rootIntentions);
       page.model.selectMode(IntentionStatisticsMode.year);
       expect(page.state.selection.period, StatisticsYear(2024));
       final count = harness.reader.queries.length;
       page.model.selectMode(IntentionStatisticsMode.year);
       page.model.selectPeriod(StatisticsYear(2024));
-      page.model.selectView(StatisticsView.sourceIntentions);
+      page.model.selectView(StatisticsView.rootIntentions);
       expect(harness.reader.queries, hasLength(count));
     },
   );
@@ -277,7 +277,7 @@ void main() {
       );
       await pumpEventQueue();
       final oldLoad = page.model.loadMore(StatisticsBreakdown.selectedActions);
-      page.model.selectView(StatisticsView.selectedActions);
+      page.model.selectView(StatisticsView.terminalIntentions);
       expect(page.state.read, isA<IntentionStatisticsInitialLoad>());
       harness.reader.section(1, marker: 9);
       await pumpEventQueue();
@@ -298,7 +298,7 @@ void main() {
       addTearDown(harness.dispose);
       final page = harness.open(
         target: IntentionStatisticsTarget(
-          view: StatisticsView.selectedActions,
+          view: StatisticsView.terminalIntentions,
           period: StatisticsMonth(2026, 10),
         ),
       );

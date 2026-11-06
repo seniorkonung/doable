@@ -337,7 +337,7 @@ void main() {
           case 'скрытие':
             page.model.setVisible(false);
           case 'смена условий':
-            page.model.selectView(StatisticsView.selectedActions);
+            page.model.selectView(StatisticsView.terminalIntentions);
           case 'освобождение':
             page.close();
             await h.container.pump();

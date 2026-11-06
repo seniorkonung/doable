@@ -28,16 +28,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appDestinationIntentionGraph => 'Intention graph';
 
   @override
-  String get statisticsSourceIntentions => 'Source intentions';
+  String get statisticsRootIntentions => 'Root intentions';
 
   @override
   String get statisticsIntermediateIntentions => 'Intermediate intentions';
 
   @override
-  String get statisticsSelectedActions => 'Selected actions';
+  String get statisticsTerminalIntentions => 'Final intentions';
 
   @override
-  String get statisticsThroughRelations => 'Total contribution';
+  String get statisticsThroughRelations => 'Through relations';
 
   @override
   String get statisticsMonthTab => 'Month';
@@ -112,21 +112,30 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String statisticsPlannedContribution(int count) {
+  String statisticsPeriodActions(int count) {
     final intl.NumberFormat countNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
     final String countString = countNumberFormat.format(count);
 
-    return 'Planned contribution: $countString';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString actions',
+      one: '$countString action',
+    );
+    return '$_temp0';
   }
 
   @override
-  String statisticsContribution(int count) {
-    final intl.NumberFormat countNumberFormat =
+  String statisticsPeriodCompleted(int completed, int planned) {
+    final intl.NumberFormat completedNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
+    final String completedString = completedNumberFormat.format(completed);
+    final intl.NumberFormat plannedNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String plannedString = plannedNumberFormat.format(planned);
 
-    return 'Contribution: $countString';
+    return '$completedString of $plannedString completed';
   }
 
   @override
@@ -187,6 +196,15 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get statisticsNoContributionShare =>
       'No share: the period’s contribution is zero';
+
+  @override
+  String statisticsPeriodActionsShare(num share) {
+    final intl.NumberFormat shareNumberFormat =
+        intl.NumberFormat.percentPattern(localeName);
+    final String shareString = shareNumberFormat.format(share);
+
+    return 'Share of the period’s actions: $shareString';
+  }
 
   @override
   String get statisticsLoading => 'Loading statistics…';

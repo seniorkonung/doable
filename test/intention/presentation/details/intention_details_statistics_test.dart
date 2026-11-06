@@ -475,7 +475,7 @@ void main() {
 
       final nextTarget = StatisticsTarget(
         IntentionStatisticsTarget(
-          view: StatisticsView.sourceIntentions,
+          view: StatisticsView.rootIntentions,
           period: StatisticsYear(2030),
         ),
       );
@@ -517,7 +517,7 @@ void main() {
       expect(repository.statisticsQueries.last.intentionId, second.id);
       expect(
         repository.statisticsQueries.last.view,
-        StatisticsView.sourceIntentions,
+        StatisticsView.rootIntentions,
       );
       expect(
         tester
@@ -630,7 +630,7 @@ void main() {
             intentionId: intention.id,
             target: StatisticsTarget(
               IntentionStatisticsTarget(
-                view: StatisticsView.sourceIntentions,
+                view: StatisticsView.rootIntentions,
                 period: StatisticsYear(2020),
               ),
             ),
@@ -804,7 +804,7 @@ IntentionStatisticsSectionResult _emptySection(
       ),
       periodCounts: zero,
       details: switch (query.view) {
-        StatisticsView.sourceIntentions => IntentionStatisticsSourceDetails(
+        StatisticsView.rootIntentions => IntentionStatisticsSourceDetails(
           uncompleted: split,
           selectedActions: intentions,
         ),
@@ -814,7 +814,7 @@ IntentionStatisticsSectionResult _emptySection(
             sourceIntentions: intentions,
             selectedActions: intentions,
           ),
-        StatisticsView.selectedActions => IntentionStatisticsSelectedDetails(
+        StatisticsView.terminalIntentions => IntentionStatisticsSelectedDetails(
           uncompleted: split,
           sourceIntentions: intentions,
         ),

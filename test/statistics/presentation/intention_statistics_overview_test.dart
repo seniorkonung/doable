@@ -32,18 +32,18 @@ void main() {
           .map((node) => node.getSemanticsData())
           .where(
             (node) => [
-              texts.statisticsSourceIntentions,
+              texts.statisticsRootIntentions,
               texts.statisticsIntermediateIntentions,
-              texts.statisticsSelectedActions,
+              texts.statisticsTerminalIntentions,
               texts.statisticsThroughRelations,
             ].any((view) => node.label.startsWith('$view.')),
           )
           .where((node) => node.flagsCollection.isButton)
           .toList();
       expect(nodes.map((node) => node.label.split('.').first), [
-        texts.statisticsSourceIntentions,
+        texts.statisticsRootIntentions,
         texts.statisticsIntermediateIntentions,
-        texts.statisticsSelectedActions,
+        texts.statisticsTerminalIntentions,
         texts.statisticsThroughRelations,
       ]);
       expect(find.text('3 из 7'), findsOneWidget);
@@ -124,13 +124,13 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pump();
-      expect(harness.reader.queries.last.view, StatisticsView.sourceIntentions);
+      expect(harness.reader.queries.last.view, StatisticsView.rootIntentions);
       harness.reader.section(3, count: 1);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Месяц'));
       await tester.pump();
       expect(harness.reader.queries.last.period, StatisticsMonth(2026, 10));
-      expect(harness.reader.queries.last.view, StatisticsView.sourceIntentions);
+      expect(harness.reader.queries.last.view, StatisticsView.rootIntentions);
       harness.reader.section(4, count: 1);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Год'));
@@ -146,7 +146,7 @@ void main() {
       await tester.tap(march);
       await tester.pump();
       expect(harness.reader.queries.last.period, StatisticsMonth(2025, 3));
-      expect(harness.reader.queries.last.view, StatisticsView.sourceIntentions);
+      expect(harness.reader.queries.last.view, StatisticsView.rootIntentions);
       harness.reader.section(6, count: 1);
       await tester.pumpAndSettle();
       await _pump(tester, content, locale: 'en');
@@ -162,7 +162,7 @@ void main() {
           .map((node) => node.getSemanticsData())
           .singleWhere(
             (node) =>
-                node.label.startsWith('${english.statisticsSourceIntentions}.'),
+                node.label.startsWith('${english.statisticsRootIntentions}.'),
           );
       expect(sourceCard.flagsCollection.isSelected, Tristate.isTrue);
     },

@@ -312,12 +312,12 @@ final class IntentionFixtureReference {
       periodPlanned++;
       if (choice.completed) periodContribution++;
       final credited = {
-        StatisticsView.sourceIntentions: choice.source == _target,
+        StatisticsView.rootIntentions: choice.source == _target,
         StatisticsView.intermediateIntentions: path.path
             .skip(1)
             .take(path.path.length - 2)
             .contains(_target),
-        StatisticsView.selectedActions: choice.selected == _target,
+        StatisticsView.terminalIntentions: choice.selected == _target,
         StatisticsView.throughRelations: path.through,
       };
       for (final kind in StatisticsView.values) {

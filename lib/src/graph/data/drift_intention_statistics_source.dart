@@ -76,7 +76,7 @@ extension DriftIntentionStatisticsSourceReading
 
           // Общая сводка также проверяет исходные даты и выполнение до того,
           // как SQL свернёт их до календарных частей и суммарных весов.
-          final periodSummary = await _readStatisticsSummary(
+          final periodSummary = await _readDailyChoiceStatisticsSummary(
             query.period,
             query.localDate,
           );
@@ -156,11 +156,11 @@ extension DriftIntentionStatisticsSourceReading
             final (role, total) = switch (position) {
               ContributionOutsidePath() => (null, null),
               ContributionSelectedOnPath() => (
-                StatisticsView.selectedActions,
+                StatisticsView.terminalIntentions,
                 selected,
               ),
               ContributionBeforeSelectedAction(predecessorId: null) => (
-                StatisticsView.sourceIntentions,
+                StatisticsView.rootIntentions,
                 source,
               ),
               ContributionBeforeSelectedAction() => (
@@ -246,9 +246,9 @@ extension DriftIntentionStatisticsSourceReading
     // группы не разделяются по неиспользуемому исходному участнику.
     final breakdownSource = switch (query.view) {
       StatisticsView.intermediateIntentions => 'CASE WHEN following_relation_id IS NOT NULL AND predecessor_id IS NOT NULL THEN source_intention_id END',
-      StatisticsView.selectedActions =>
+      StatisticsView.terminalIntentions =>
         'CASE WHEN selected_intention_id = ?1 THEN source_intention_id END',
-      StatisticsView.sourceIntentions ||
+      StatisticsView.rootIntentions ||
       StatisticsView.throughRelations => 'NULL',
     };
     // Простой сохранённый путь гарантирует единственных соседей X. Сначала
@@ -293,6 +293,57 @@ extension DriftIntentionStatisticsSourceReading
           },
         )
         .get();
+  }
+
+  Future<StatisticsPeriodSummary> _readDailyChoiceStatisticsSummary(
+    StatisticsPeriod period,
+    CalendarDate localDate,
+  ) async {
+    // Группы дат и выполнения ограничены календарным периодом. Декодирование
+    // проверяет необходимые значения, не материализуя выборы и их пути.
+    final rows = await _database
+        .customSelect(
+          '''SELECT choice_date, is_completed, COUNT(*) AS planned,
+           SUM(CASE WHEN is_completed = 0 AND choice_date < ? THEN 1 ELSE 0 END) AS missed,
+           SUM(CASE WHEN is_completed = 0 AND choice_date >= ? THEN 1 ELSE 0 END) AS upcoming
+         FROM daily_choices INDEXED BY daily_choices_date_creation_order
+         WHERE choice_date BETWEEN ? AND ?
+         GROUP BY choice_date, is_completed''',
+          variables: [
+            Variable<String>(localDate.toCanonicalString()),
+            Variable<String>(localDate.toCanonicalString()),
+            ..._statisticsPeriodVariables(period),
+          ],
+          readsFrom: {_database.dailyChoices},
+        )
+        .get();
+    var planned = 0;
+    var contribution = 0;
+    var missed = 0;
+    var upcoming = 0;
+    for (final row in rows) {
+      decodeStoredChoiceDate(row.data);
+      final completed = decodeStoredChoiceCompletion(row.data);
+      final count = requiredStoredInteger(row.data, 'planned');
+      final group = StatisticsPeriodSummary(
+        counts: ContributionCounts(
+          planned: count,
+          contribution: completed ? count : 0,
+        ),
+        uncompleted: UncompletedSplit(
+          missed: requiredStoredInteger(row.data, 'missed'),
+          upcoming: requiredStoredInteger(row.data, 'upcoming'),
+        ),
+      );
+      planned += group.counts.planned;
+      contribution += group.counts.contribution;
+      missed += group.uncompleted.missed;
+      upcoming += group.uncompleted.upcoming;
+    }
+    return StatisticsPeriodSummary(
+      counts: ContributionCounts(planned: planned, contribution: contribution),
+      uncompleted: UncompletedSplit(missed: missed, upcoming: upcoming),
+    );
   }
 }
 

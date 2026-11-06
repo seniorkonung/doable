@@ -9,14 +9,14 @@ enum StatisticsBreakdown { sourceIntentions, selectedActions, relations }
 extension StatisticsViewBreakdowns on StatisticsView {
   /// Только допустимые разбивки, в порядке показа в разделе намерения.
   List<StatisticsBreakdown> get breakdowns => switch (this) {
-    StatisticsView.sourceIntentions => const [
+    StatisticsView.rootIntentions => const [
       StatisticsBreakdown.selectedActions,
     ],
     StatisticsView.intermediateIntentions => const [
       StatisticsBreakdown.sourceIntentions,
       StatisticsBreakdown.selectedActions,
     ],
-    StatisticsView.selectedActions => const [
+    StatisticsView.terminalIntentions => const [
       StatisticsBreakdown.sourceIntentions,
     ],
     StatisticsView.throughRelations => const [

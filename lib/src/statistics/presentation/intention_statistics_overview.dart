@@ -287,9 +287,9 @@ String _shareLabel(
 
 String _viewLabel(AppLocalizations texts, StatisticsView view) =>
     switch (view) {
-      StatisticsView.sourceIntentions => texts.statisticsSourceIntentions,
+      StatisticsView.rootIntentions => texts.statisticsRootIntentions,
       StatisticsView.intermediateIntentions =>
         texts.statisticsIntermediateIntentions,
-      StatisticsView.selectedActions => texts.statisticsSelectedActions,
+      StatisticsView.terminalIntentions => texts.statisticsTerminalIntentions,
       StatisticsView.throughRelations => texts.statisticsThroughRelations,
     };

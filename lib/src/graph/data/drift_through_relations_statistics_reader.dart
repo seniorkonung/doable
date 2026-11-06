@@ -2,7 +2,7 @@ part of 'drift_personal_graph_repository.dart';
 
 /// Подсчёт получает только типизированные данные; очередь и SQLite ему
 /// недоступны. Подмена позволяет управлять завершением изолята в проверках.
-/// Возвращает неизменяемые количества в порядке вклада, запланированного
+/// Возвращает неизменяемые количества в порядке запланированного вклада,
 /// вклада и идентификатора по убыванию либо передаёт отказ подсчёта.
 typedef ContributionReachabilityRunner =
     Future<List<ContributionReachabilityEntry>> Function(
@@ -18,7 +18,7 @@ runContributionReachabilityInIsolate(
   List<ContributionSeedGroup> groups,
 ) => Isolate.run(() => computeContributionReachability(graph, groups));
 
-/// Внутренняя сборка чтения вида «Весь вклад» за общей границей репозитория.
+/// Внутренняя сборка чтения вида «Через связи» за общей границей репозитория.
 extension _ThroughRelationsStatisticsReading on DriftPersonalGraphRepository {
   /// Одна попытка: подготовка и названия идут через общую очередь, подсчёт —
   /// вне неё. Устаревание, включая вытеснение кэша, требует новой первой порции.
@@ -50,10 +50,7 @@ extension _ThroughRelationsStatisticsReading on DriftPersonalGraphRepository {
       if (result == null) {
         final source = await _statisticsStage(
           StatisticsReadDiagnosticsStage.sourceData,
-          () => readStatisticsSeedGroups(
-            period: query.period,
-            localDate: query.localDate,
-          ),
+          () => readStatisticsSeedGroups(period: query.period),
         );
         final graph = await _statisticsStage(
           StatisticsReadDiagnosticsStage.relationSnapshot,
@@ -128,20 +125,17 @@ final class _ThroughRelationsStatisticsResult {
     StatisticsSeedGroupsSnapshot source,
     this.entries,
   ) : period = query.period,
-      localDate = query.localDate,
       revision = source.revision,
       summary = source.summary;
 
   final Object key = Object();
   final StatisticsPeriod period;
-  final CalendarDate localDate;
   final GraphRevision revision;
-  final StatisticsPeriodSummary summary;
+  final ContributionCounts summary;
   final List<ContributionReachabilityEntry> entries;
 
   bool matches(StatisticsQuery query, GraphRevision currentRevision) =>
       period == query.period &&
-      localDate == query.localDate &&
       revision.compareTo(currentRevision) == GraphRevisionOrder.same;
 }
 
@@ -152,19 +146,16 @@ final class _ThroughRelationsStatisticsCursor implements StatisticsCursor {
     this.offset,
   ) : period = query.period,
       view = query.view,
-      localDate = query.localDate,
       pageSize = query.pageSize;
 
   final Object resultKey;
   final int offset;
   final StatisticsPeriod period;
   final StatisticsView view;
-  final CalendarDate localDate;
   final int pageSize;
 
   bool matches(StatisticsQuery query) =>
       period == query.period &&
       view == query.view &&
-      localDate == query.localDate &&
       pageSize == query.pageSize;
 }

@@ -189,7 +189,7 @@ final class IntentionStatisticsReader implements PersonalGraphRepository {
     );
     final uncompleted = split ?? UncompletedSplit(missed: 0, upcoming: 0);
     final details = switch (query.view) {
-      StatisticsView.sourceIntentions => IntentionStatisticsSourceDetails(
+      StatisticsView.rootIntentions => IntentionStatisticsSourceDetails(
         uncompleted: uncompleted,
         selectedActions: intentions(actionsCursor),
       ),
@@ -199,7 +199,7 @@ final class IntentionStatisticsReader implements PersonalGraphRepository {
           sourceIntentions: intentions(sourcesCursor),
           selectedActions: intentions(actionsCursor),
         ),
-      StatisticsView.selectedActions => IntentionStatisticsSelectedDetails(
+      StatisticsView.terminalIntentions => IntentionStatisticsSelectedDetails(
         uncompleted: uncompleted,
         sourceIntentions: intentions(sourcesCursor),
       ),
@@ -230,16 +230,16 @@ final class IntentionStatisticsReader implements PersonalGraphRepository {
           revision: StatisticsTestRevision(revision, epoch),
           cards: IntentionStatisticsCards(
             sourceIntentions:
-                empty && query.view != StatisticsView.sourceIntentions
+                empty && query.view != StatisticsView.rootIntentions
                 ? ContributionCounts(planned: 1, contribution: 1)
-                : query.view == StatisticsView.sourceIntentions
+                : query.view == StatisticsView.rootIntentions
                 ? counts
                 : ContributionCounts(planned: 0, contribution: 0),
             intermediateIntentions:
                 query.view == StatisticsView.intermediateIntentions
                 ? counts
                 : ContributionCounts(planned: 0, contribution: 0),
-            selectedActions: query.view == StatisticsView.selectedActions
+            selectedActions: query.view == StatisticsView.terminalIntentions
                 ? counts
                 : ContributionCounts(planned: 0, contribution: 0),
             throughRelations:

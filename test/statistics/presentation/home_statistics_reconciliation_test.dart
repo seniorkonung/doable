@@ -30,7 +30,7 @@ void main() {
     final h = _Harness(visible: false);
     addTearDown(h.dispose);
     h.model.selectPeriod(StatisticsMonth(2025, 3));
-    h.model.selectView(StatisticsView.selectedActions);
+    h.model.selectView(StatisticsView.terminalIntentions);
     await h.change(1);
     await h.model.retryFirstPage();
     await h.model.loadMore();
@@ -111,7 +111,7 @@ void main() {
       h.reader.first(3, revision: 1, count: 100, total: 350, cursor: _Cursor());
       await pumpEventQueue();
       expect(h.loaded.items, hasLength(300));
-      expect(h.loaded.summary.counts.planned, 300);
+      expect(h.loaded.summary.planned, 300);
       expect(h.loaded.items.first.title, 'Версия 0');
       h.reader.more(4, revision: 1, start: 100, cursor: _Cursor());
       await pumpEventQueue();
@@ -126,7 +126,7 @@ void main() {
         h.loaded.items.map((item) => item.title),
         everyElement('Версия 1'),
       );
-      expect(h.loaded.summary.counts.planned, 350);
+      expect(h.loaded.summary.planned, 350);
       expect(h.loaded.totalItems, 350);
       expect(h.loaded.refreshStatus, isA<HomeStatisticsRefreshIdle>());
       expect(h.reader.queries.map((q) => q.pageSize), everyElement(100));
@@ -221,8 +221,7 @@ void main() {
       final query = h.reader.queries.last;
       expect(query.cursor, isNull);
       expect(query.period, StatisticsMonth(2026, 10));
-      expect(query.view, StatisticsView.sourceIntentions);
-      expect(query.localDate, _today);
+      expect(query.view, StatisticsView.rootIntentions);
       expect(h.state.read, isA<HomeStatisticsInitialLoad>());
       expect(updates.whereType<HomeStatisticsInitialFailure>(), isEmpty);
 
@@ -254,7 +253,7 @@ void main() {
       expect(h.reader.queries, hasLength(3));
       expect(h.reader.queries.last.cursor, isNull);
       expect(h.loaded.items.single.title, 'Версия 0');
-      expect(h.loaded.summary.counts.contribution, 1);
+      expect(h.loaded.summary.contribution, 1);
       expect(h.loaded.refreshStatus, isA<HomeStatisticsRefreshing>());
       expect(
         updates,
@@ -273,7 +272,7 @@ void main() {
         h.loaded.items.map((item) => item.title),
         everyElement('Версия 1'),
       );
-      expect(h.loaded.summary.counts.contribution, 2);
+      expect(h.loaded.summary.contribution, 2);
       expect(h.loaded.refreshStatus, isA<HomeStatisticsRefreshIdle>());
     },
   );
@@ -284,7 +283,7 @@ void main() {
       final h = _Harness(visible: false);
       addTearDown(h.dispose);
       h.model.selectPeriod(StatisticsMonth(2025, 3));
-      h.model.selectView(StatisticsView.selectedActions);
+      h.model.selectView(StatisticsView.terminalIntentions);
       h.model.setVisible(true);
       h.reader.first(0);
       await pumpEventQueue();
@@ -312,7 +311,7 @@ void main() {
       final query = h.reader.queries.last;
       expect(query.cursor, isNull);
       expect(query.period, StatisticsMonth(2025, 3));
-      expect(query.view, StatisticsView.selectedActions);
+      expect(query.view, StatisticsView.terminalIntentions);
       expect(h.loaded.items.single.title, 'Версия 0');
       expect(h.loaded.refreshStatus, isA<HomeStatisticsRefreshing>());
       h.reader.first(2, revision: 3);
@@ -328,7 +327,7 @@ void main() {
       final h = _Harness();
       addTearDown(h.dispose);
       h.model.selectPeriod(StatisticsMonth(2025, 3));
-      h.model.selectView(StatisticsView.selectedActions);
+      h.model.selectView(StatisticsView.terminalIntentions);
       h.reader.first(2, revision: 1);
       await pumpEventQueue();
       final updates = <HomeStatisticsState>[];
@@ -347,7 +346,7 @@ void main() {
       expect(h.loaded.items.single.title, 'Версия 1');
       expect(h.loaded.refreshStatus, isA<HomeStatisticsRefreshIdle>());
       expect(h.state.selection.period, StatisticsMonth(2025, 3));
-      expect(h.state.selection.view, StatisticsView.selectedActions);
+      expect(h.state.selection.view, StatisticsView.terminalIntentions);
     },
   );
 
@@ -394,7 +393,7 @@ void main() {
         await pumpEventQueue();
         expect(h.loaded.items, hasLength(300));
         expect(h.loaded.items.first.title, 'Версия 0');
-        expect(h.loaded.summary.counts.planned, 300);
+        expect(h.loaded.summary.planned, 300);
         final status = h.loaded.refreshStatus as HomeStatisticsRefreshFailure;
         expect(status.failure, failure);
         expect(status.canRetry, canRetry);
@@ -418,30 +417,26 @@ void main() {
   }
 
   test(
-    'смена местного дня обновляет деление, сохраняя периоды и вид',
+    'смена местного дня меняет только отметку текущего периода без чтения',
     () async {
       final h = _Harness();
       addTearDown(h.dispose);
-      h.reader.first(0, split: UncompletedSplit(missed: 0, upcoming: 1));
+      h.reader.first(0);
       await pumpEventQueue();
+      final loaded = h.loaded;
       final tomorrow = CalendarDate.fromParts(2026, 11, 1);
       h.model.setLocalDate(tomorrow);
-      h.model.setLocalDate(tomorrow);
-      expect(h.reader.queries, hasLength(2));
-      expect(h.reader.queries.last.localDate, tomorrow);
+      expect(h.reader.queries, hasLength(1));
       expect(h.state.selection.month, StatisticsMonth(2026, 10));
       expect(h.state.selection.year, StatisticsYear(2026));
       expect(h.state.selection.isCurrentPeriod, isFalse);
-      expect(h.loaded.summary.uncompleted.upcoming, 1);
-      h.reader.first(1, split: UncompletedSplit(missed: 1, upcoming: 0));
-      await pumpEventQueue();
-      expect(h.loaded.summary.uncompleted.missed, 1);
+      expect(h.loaded, same(loaded));
       h.model.setVisible(false);
       h.model.setLocalDate(_today);
-      expect(h.reader.queries, hasLength(2));
       h.model.setVisible(true);
-      expect(h.reader.queries.last.localDate, _today);
-      expect(h.reader.queries, hasLength(3));
+      await pumpEventQueue();
+      expect(h.reader.queries, hasLength(1));
+      expect(h.state.selection.isCurrentPeriod, isTrue);
     },
   );
 
@@ -619,21 +614,18 @@ final class _Reader implements PersonalGraphRepository {
     int count = 1,
     int? total,
     StatisticsCursor? cursor,
-    UncompletedSplit? split,
+    bool completed = true,
   }) {
     final totalItems = total ?? count + (cursor == null ? 0 : 100);
     responses[index].complete(
       StatisticsPageSuccess(
         StatisticsFirstPage(
-          summary: StatisticsPeriodSummary(
-            counts: ContributionCounts(
-              planned: totalItems,
-              contribution: split == null ? totalItems : 0,
-            ),
-            uncompleted: split ?? UncompletedSplit(missed: 0, upcoming: 0),
+          summary: ContributionCounts(
+            planned: totalItems,
+            contribution: completed ? totalItems : 0,
           ),
           totalItems: totalItems,
-          items: _items(revision, 0, count, completed: split == null),
+          items: _items(revision, 0, count, completed: completed),
           revision: _Revision(revision, epoch),
           nextCursor: cursor,
         ),

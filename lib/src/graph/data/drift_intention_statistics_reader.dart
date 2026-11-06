@@ -89,7 +89,7 @@ extension _IntentionStatisticsReading on DriftPersonalGraphRepository {
           ).read(this, ready);
           final uncompleted = ready.summary.uncompleted;
           final details = switch (query.view) {
-            StatisticsView.sourceIntentions => IntentionStatisticsSourceDetails(
+            StatisticsView.rootIntentions => IntentionStatisticsSourceDetails(
               uncompleted: uncompleted,
               selectedActions: await intentions(
                 _IntentionItemsBreakdown.selectedActions,
@@ -105,7 +105,7 @@ extension _IntentionStatisticsReading on DriftPersonalGraphRepository {
                   _IntentionItemsBreakdown.selectedActions,
                 ),
               ),
-            StatisticsView.selectedActions =>
+            StatisticsView.terminalIntentions =>
               IntentionStatisticsSelectedDetails(
                 uncompleted: uncompleted,
                 sourceIntentions: await intentions(

@@ -135,9 +135,9 @@ void main() {
         final details = source.savedPathDetails!;
         expect(details.breakdowns.keys, view.breakdowns);
         final expected = switch (view) {
-          StatisticsView.sourceIntentions => (1, 1, 0, 0, 1),
+          StatisticsView.rootIntentions => (1, 1, 0, 0, 1),
           StatisticsView.intermediateIntentions => (2, 1, 1, 0, 11),
-          StatisticsView.selectedActions => (1, 0, 0, 1, 12),
+          StatisticsView.terminalIntentions => (1, 0, 0, 1, 12),
           StatisticsView.throughRelations => throw StateError('Недостижимо'),
         };
         expect(_counts(details.summary.counts), (expected.$1, expected.$2));
@@ -273,7 +273,7 @@ void main() {
     }
     final today = CalendarDate.fromParts(2024, 2, 29);
     final month = (await read(
-      view: StatisticsView.sourceIntentions,
+      view: StatisticsView.rootIntentions,
       period: StatisticsMonth(2024, 2),
       localDate: today,
     ))!;
@@ -283,7 +283,7 @@ void main() {
       {1, 28, 29},
     );
     final year = (await read(
-      view: StatisticsView.sourceIntentions,
+      view: StatisticsView.rootIntentions,
       period: StatisticsYear(2024),
       localDate: today,
     ))!;
@@ -313,7 +313,7 @@ void main() {
     'отсутствующее намерение отличается от пустого вида и периода',
     () async {
       expect(await read(intention: 999), isNull);
-      final empty = (await read(view: StatisticsView.selectedActions))!;
+      final empty = (await read(view: StatisticsView.terminalIntentions))!;
       expect(empty.groups, isEmpty);
       expect(_counts(empty.periodSummary.counts), (0, 0));
       expect(empty.savedPathDetails!.calendarCounts, isEmpty);
@@ -323,7 +323,7 @@ void main() {
         isEmpty,
       );
       await addChoice(201, [102]);
-      final emptyView = (await read(view: StatisticsView.selectedActions))!;
+      final emptyView = (await read(view: StatisticsView.terminalIntentions))!;
       expect(_counts(emptyView.periodSummary.counts), (1, 1));
       expect(_counts(emptyView.selectedActions), (0, 0));
       expect(emptyView.savedPathDetails!.calendarCounts, isEmpty);

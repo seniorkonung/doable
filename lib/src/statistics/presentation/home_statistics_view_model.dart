@@ -85,11 +85,11 @@ final class HomeStatisticsViewModel extends _$HomeStatisticsViewModel {
     }
   }
 
-  /// Сигнал часов меняет только границу невыполненного и отметку текущего периода.
+  /// Сигнал часов меняет только отметку текущего периода: числа статистики
+  /// от местной даты не зависят.
   void setLocalDate(CalendarDate localDate) {
     if (localDate == _selection.localDate) return;
     _publishSelection(_selection.copyWith(localDate: localDate));
-    unawaited(_markStale());
   }
 
   void selectTab(HomeStatisticsTab tab) {
@@ -389,7 +389,6 @@ final class HomeStatisticsViewModel extends _$HomeStatisticsViewModel {
         StatisticsQuery(
           period: selection.period,
           view: selection.view,
-          localDate: selection.localDate,
           pageSize: 100,
           cursor: cursor,
         ),

@@ -35,21 +35,20 @@ final class IntentionStatisticsQuery {
     required this.intentionId,
     required StatisticsPeriod period,
     required StatisticsView view,
-    required CalendarDate localDate,
+    required this.localDate,
     required int pageSize,
   }) : _statistics = StatisticsQuery(
          period: period,
          view: view,
-         localDate: localDate,
          pageSize: pageSize,
        );
 
   final IntentionId intentionId;
+  final CalendarDate localDate;
   final StatisticsQuery _statistics;
 
   StatisticsPeriod get period => _statistics.period;
   StatisticsView get view => _statistics.view;
-  CalendarDate get localDate => _statistics.localDate;
   int get pageSize => _statistics.pageSize;
 }
 
@@ -68,9 +67,9 @@ final class IntentionStatisticsCards {
   final ContributionCounts throughRelations;
 
   ContributionCounts operator [](StatisticsView view) => switch (view) {
-    StatisticsView.sourceIntentions => sourceIntentions,
+    StatisticsView.rootIntentions => sourceIntentions,
     StatisticsView.intermediateIntentions => intermediateIntentions,
-    StatisticsView.selectedActions => selectedActions,
+    StatisticsView.terminalIntentions => selectedActions,
     StatisticsView.throughRelations => throughRelations,
   };
 }
@@ -97,7 +96,7 @@ final class IntentionStatisticsSourceDetails
   final StatisticsBreakdownFirstPage<StatisticsItem> selectedActions;
 
   @override
-  StatisticsView get view => StatisticsView.sourceIntentions;
+  StatisticsView get view => StatisticsView.rootIntentions;
 
   @override
   List<StatisticsBreakdownFirstPage<Object>> get _pages => [selectedActions];
@@ -134,7 +133,7 @@ final class IntentionStatisticsSelectedDetails
   final StatisticsBreakdownFirstPage<StatisticsItem> sourceIntentions;
 
   @override
-  StatisticsView get view => StatisticsView.selectedActions;
+  StatisticsView get view => StatisticsView.terminalIntentions;
 
   @override
   List<StatisticsBreakdownFirstPage<Object>> get _pages => [sourceIntentions];

@@ -14,7 +14,7 @@ final class HomeStatisticsSelection {
     required this.year,
     required this.browsedYear,
     this.tab = HomeStatisticsTab.month,
-    this.view = StatisticsView.sourceIntentions,
+    this.view = StatisticsView.rootIntentions,
     this.isPeriodSelectorExpanded = false,
   });
 
@@ -141,7 +141,7 @@ sealed class HomeStatisticsLoaded extends HomeStatisticsReadState {
     this.refreshStatus = const HomeStatisticsRefreshIdle(),
   }) : items = List.unmodifiable(items);
 
-  final StatisticsPeriodSummary summary;
+  final ContributionCounts summary;
   final int totalItems;
   final List<StatisticsItem> items;
   final GraphRevision revision;

@@ -1,8 +1,18 @@
+import 'package:doable/src/action/domain/action_id.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 /// Идентификатор сущности теста по номеру в той же форме, что у настоящих.
 String seedUuid(int number) =>
     '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}';
+
+/// Идентификатор намерения, заполненного с номером [number].
+IntentionId seedIntentionId(int number) =>
+    (IntentionId.decode(seedUuid(number)) as IntentionIdDecodingSuccess).id;
+
+/// Идентификатор действия, заполненного с номером [number].
+ActionId seedActionId(int number) =>
+    (ActionId.decode(seedUuid(number)) as ActionIdDecodingSuccess).id;
 
 /// Намерение без связей. Вызывать внутри `seedRawGraph`.
 void seedIntention(sqlite.Database db, String id, String title) {

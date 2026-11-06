@@ -6,19 +6,19 @@ import 'package:doable/src/graph/data/contribution_reachability.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
-import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
-import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/action_seed.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
 void main() {
   late LocalDatabaseHarness harness;
+  late sqlite.Database raw;
   late AppDatabase database;
   late DriftPersonalGraphRepository repository;
   late InMemoryDiagnosticsSink diagnostics;
@@ -26,18 +26,20 @@ void main() {
 
   StatisticsQuery query({
     StatisticsPeriod? period,
-    StatisticsView view = StatisticsView.sourceIntentions,
+    StatisticsView view = StatisticsView.rootIntentions,
   }) => StatisticsQuery(
     period: period ?? StatisticsMonth(2026, 2),
     view: view,
-    localDate: CalendarDate.fromParts(2026, 2, 12),
     pageSize: 100,
   );
 
   setUp(() async {
     harness = LocalDatabaseHarness.inMemory();
     probe = _FailureProbe();
-    database = await harness.openReadyDatabase(observer: probe);
+    database = await harness.openReadyDatabase(
+      setup: (db) => raw = db,
+      observer: probe,
+    );
     diagnostics = InMemoryDiagnosticsSink();
     repository = DriftPersonalGraphRepository(
       database,
@@ -45,13 +47,20 @@ void main() {
       () => DateTime.utc(2026, 2, 12),
       diagnostics,
     );
-    await seedDurabilityGraph(database);
-    expect(
-      await repository.execute(
-        durabilityCreate(date: CalendarDate.fromParts(2026, 2, 12)),
-      ),
-      isA<GraphCommandSucceeded>(),
-    );
+    seedRawGraph(raw, () {
+      for (var number = 1; number <= 3; number++) {
+        seedIntention(raw, seedUuid(number), 'Намерение $number');
+      }
+      seedAction(
+        raw,
+        id: seedUuid(201),
+        path: [
+          for (final number in [1, 2, 3]) seedUuid(number),
+        ],
+        date: '2026-02-12',
+        isCompleted: true,
+      );
+    });
   });
   tearDown(() => harness.dispose());
 
@@ -189,21 +198,15 @@ void main() {
 
   test('некорректная календарная дата отклоняет весь период', () async {
     // Формат этой даты допускается схемой, но календарный день не существует.
-    await seedGraph(
-      database,
-      () => database.customStatement(
-        'UPDATE daily_choices SET choice_date = ?',
-        ['2026-02-30'],
-      ),
-    );
-    for (final month in [1, 12]) {
-      expect(
-        await repository.execute(
-          durabilityCreate(date: CalendarDate.fromParts(2026, month, 1)),
-        ),
-        isA<GraphCommandSucceeded>(),
-      );
-    }
+    seedRawGraph(raw, () {
+      for (final (number, date) in [
+        (202, '2026-01-01'),
+        (203, '2026-02-30'),
+        (204, '2026-12-01'),
+      ]) {
+        seedAction(raw, id: seedUuid(number), path: [seedUuid(1)], date: date);
+      }
+    });
     expectFailure(
       await repository.getStatisticsPage(query(period: StatisticsYear(2026))),
       GraphFailureCategory.corruption,
@@ -216,7 +219,7 @@ void main() {
     ('planned', -1),
     ('contribution', 2),
     ('total_items', -1),
-    ('missed', 'не число'),
+    ('date', 'не дата'),
   ]) {
     test('декодирование отклоняет повреждённое значение: $field', () async {
       probe.replaceField = field;

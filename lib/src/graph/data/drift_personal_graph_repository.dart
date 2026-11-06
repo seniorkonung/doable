@@ -195,17 +195,17 @@ final class DriftPersonalGraphRepository
   @override
   Future<StatisticsPageResult> getStatisticsPage(StatisticsQuery query) =>
       switch (query.view) {
-        StatisticsView.sourceIntentions => _readStatisticsPage(
+        StatisticsView.rootIntentions => _readStatisticsPage(
           query,
-          _SavedPathStatisticsView.source,
+          _PathRoleStatisticsView.root,
         ),
         StatisticsView.intermediateIntentions => _readStatisticsPage(
           query,
-          _SavedPathStatisticsView.intermediate,
+          _PathRoleStatisticsView.intermediate,
         ),
-        StatisticsView.selectedActions => _readStatisticsPage(
+        StatisticsView.terminalIntentions => _readStatisticsPage(
           query,
-          _SavedPathStatisticsView.selected,
+          _PathRoleStatisticsView.terminal,
         ),
         StatisticsView.throughRelations => _readThroughRelationsStatisticsPage(
           query,
