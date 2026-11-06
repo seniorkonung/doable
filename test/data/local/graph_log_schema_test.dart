@@ -13,11 +13,13 @@ const _created = '018f0b5d-6b2e-7c80-8000-000000000004';
 const _relation = '018f0b5d-6b2e-7c80-8000-000000000011';
 const _secondRelation = '018f0b5d-6b2e-7c80-8000-000000000012';
 const _createdRelation = '018f0b5d-6b2e-7c80-8000-000000000013';
+const _recreatedRelation = '018f0b5d-6b2e-7c80-8000-000000000014';
 const _tag = '018f0b5d-6b2e-7c80-8000-000000000021';
 const _secondTag = '018f0b5d-6b2e-7c80-8000-000000000022';
 const _choice = '018f0b5d-6b2e-7c80-8000-000000000031';
 const _firstStep = '018f0b5d-6b2e-7c80-8000-000000000041';
 const _secondStep = '018f0b5d-6b2e-7c80-8000-000000000042';
+const _action = '018f0b5d-6b2e-7c80-8000-000000000051';
 
 typedef _Mark = (String kind, String entity, String firstOperation);
 
@@ -135,11 +137,39 @@ void main() {
       {('longTermRelation', _createdRelation, 'update')},
     ),
     (
-      'удаление связи',
+      'создание действия',
+      () => _addAction(raw, _action),
+      {('action', _action, 'insert')},
+    ),
+    (
+      'добавление строк пути',
+      () => _addPath(raw, _action, [_source, _other, _created]),
+      {('action', _action, 'update')},
+    ),
+    (
+      'изменение действия',
+      () => raw.execute('UPDATE actions SET is_completed = 1 WHERE id = ?', [
+        _action,
+      ]),
+      {('action', _action, 'update')},
+    ),
+    (
+      'удаление связи звена пути',
       () => raw.execute('DELETE FROM long_term_relations WHERE id = ?', [
         _createdRelation,
       ]),
-      {('longTermRelation', _createdRelation, 'delete')},
+      {
+        ('longTermRelation', _createdRelation, 'delete'),
+        ('deletedRelationPair', '$_source/$_other', 'insert'),
+      },
+    ),
+    (
+      'повторное создание связи пары',
+      () => _addRelation(raw, _recreatedRelation, _source, _other),
+      {
+        ('longTermRelation', _recreatedRelation, 'insert'),
+        ('deletedRelationPair', '$_source/$_other', 'delete'),
+      },
     ),
     (
       'создание дневного выбора',
@@ -181,9 +211,19 @@ void main() {
       {('dailyChoice', _choice, 'delete')},
     ),
     (
-      'удаление намерения',
+      'удаление намерения пути',
       () => raw.execute('DELETE FROM intentions WHERE id = ?', [_created]),
-      {('intention', _created, 'delete')},
+      {
+        ('intention', _created, 'delete'),
+        ('deletedIntention', _created, 'insert'),
+      },
+    ),
+    (
+      'удаление действия',
+      () => raw.execute('DELETE FROM actions WHERE id = ?', [_action]),
+      // Каскад удаляет строки пути раньше, чем срабатывает AFTER DELETE
+      // самого действия, поэтому первая операция — изменение его пути.
+      {('action', _action, 'update'), ('deletedIntention', _created, 'delete')},
     ),
     (
       'удаление тега',
@@ -319,6 +359,9 @@ void main() {
     raw.execute('UPDATE long_term_relations SET priority = 2 WHERE id = ?', [
       _createdRelation,
     ]);
+    _addAction(raw, _action);
+    _addPath(raw, _action, [_source, _other, _created]);
+    raw.execute('UPDATE actions SET is_completed = 1 WHERE id = ?', [_action]);
     raw.execute('DELETE FROM long_term_relations WHERE id = ?', [
       _createdRelation,
     ]);
@@ -333,6 +376,7 @@ void main() {
     raw.execute('DELETE FROM daily_choices WHERE id = ?', [_choice]);
     raw.execute('DELETE FROM tags WHERE id = ?', [_tag]);
     raw.execute('DELETE FROM intentions WHERE id = ?', [_created]);
+    raw.execute('DELETE FROM actions WHERE id = ?', [_action]);
     expect(_marks(raw), isEmpty);
 
     raw.execute('UPDATE graph_log_control SET capture = 1');
@@ -497,6 +541,18 @@ Set<_Mark> _marks(sqlite.Database db) => {
     UNION ALL
     SELECT 'dailyChoice', daily_choice_id, first_operation
     FROM graph_log_daily_choice_marks
+    UNION ALL
+    SELECT 'action', action_id, first_operation
+    FROM graph_log_action_marks
+    UNION ALL
+    SELECT 'deletedIntention', intention_id, first_operation
+    FROM graph_log_deleted_intention_marks
+    UNION ALL
+    SELECT
+      'deletedRelationPair',
+      source_intention_id || '/' || related_intention_id,
+      first_operation
+    FROM graph_log_deleted_relation_pair_marks
   '''))
     (
       row['kind'] as String,
@@ -505,7 +561,7 @@ Set<_Mark> _marks(sqlite.Database db) => {
     ),
 };
 
-/// Строки таблиц графа и шагов пути.
+/// Строки таблиц графа, шагов и строк пути и надгробий.
 List<Map<String, Object?>> _graphRows(sqlite.Database db) => [
   for (final table in [
     'tags',
@@ -514,6 +570,10 @@ List<Map<String, Object?>> _graphRows(sqlite.Database db) => [
     'long_term_relations',
     'daily_choices',
     'daily_choice_path_steps',
+    'actions',
+    'action_path_items',
+    'deleted_intentions',
+    'deleted_relation_pairs',
   ])
     for (final row in db.select('SELECT * FROM $table ORDER BY rowid'))
       {'table': table, ...row},
@@ -538,6 +598,9 @@ void _clearMarks(sqlite.Database db) {
     'graph_log_tag_assignment_marks',
     'graph_log_long_term_relation_marks',
     'graph_log_daily_choice_marks',
+    'graph_log_action_marks',
+    'graph_log_deleted_intention_marks',
+    'graph_log_deleted_relation_pair_marks',
   ]) {
     db.execute('DELETE FROM $table');
   }
@@ -603,6 +666,31 @@ void _addStep(
        VALUES (?, ?, ?, ?)''',
     [id, owner, relation, previous],
   );
+}
+
+void _addAction(sqlite.Database db, String id) {
+  db.execute(
+    '''INSERT INTO actions
+       (id, title, date, priority, is_completed, created_at, updated_at)
+       VALUES (?, 'Пробежка', '2026-09-23', 4, 0, 1, 1)''',
+    [id],
+  );
+}
+
+void _addPath(sqlite.Database db, String actionId, List<String> intentions) {
+  for (final (position, intention) in intentions.indexed) {
+    db.execute(
+      '''INSERT INTO action_path_items
+         (action_id, position, intention_id, previous_intention_id)
+         VALUES (?, ?, ?, ?)''',
+      [
+        actionId,
+        position,
+        intention,
+        position == 0 ? null : intentions[position - 1],
+      ],
+    );
+  }
 }
 
 void _addChangePackage(sqlite.Database db) {

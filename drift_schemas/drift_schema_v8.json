@@ -263,6 +263,128 @@
       "references": [],
       "type": "table",
       "data": {
+        "name": "graph_log_action_marks",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "action_id",
+            "getter_name": "actionId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL PRIMARY KEY",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "primary-key"
+            ]
+          },
+          {
+            "name": "first_operation",
+            "getter_name": "firstOperation",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (first_operation IN ('insert', 'update', 'delete'))",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 8,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "graph_log_deleted_intention_marks",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "intention_id",
+            "getter_name": "intentionId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL PRIMARY KEY",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "primary-key"
+            ]
+          },
+          {
+            "name": "first_operation",
+            "getter_name": "firstOperation",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (first_operation IN ('insert', 'delete'))",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 9,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "graph_log_deleted_relation_pair_marks",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "source_intention_id",
+            "getter_name": "sourceIntentionId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "related_intention_id",
+            "getter_name": "relatedIntentionId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "first_operation",
+            "getter_name": "firstOperation",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (first_operation IN ('insert', 'delete'))",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [
+          "PRIMARY KEY(source_intention_id, related_intention_id)"
+        ],
+        "explicit_pk": [
+          "source_intention_id",
+          "related_intention_id"
+        ]
+      }
+    },
+    {
+      "id": 10,
+      "references": [],
+      "type": "table",
+      "data": {
         "name": "graph_snapshots",
         "was_declared_in_moor": true,
         "columns": [
@@ -327,9 +449,9 @@
       }
     },
     {
-      "id": 8,
+      "id": 11,
       "references": [
-        7
+        10
       ],
       "type": "table",
       "data": {
@@ -419,7 +541,7 @@
       }
     },
     {
-      "id": 9,
+      "id": 12,
       "references": [],
       "type": "table",
       "data": {
@@ -517,7 +639,7 @@
       }
     },
     {
-      "id": 10,
+      "id": 13,
       "references": [],
       "type": "table",
       "data": {
@@ -614,17 +736,17 @@
       }
     },
     {
-      "id": 11,
+      "id": 14,
       "references": [
-        10,
+        13,
         0,
         2
       ],
       "type": "trigger",
       "data": {
-        "on": 10,
+        "on": 13,
         "references_in_body": [
-          10,
+          13,
           0,
           2
         ],
@@ -633,17 +755,17 @@
       }
     },
     {
-      "id": 12,
+      "id": 15,
       "references": [
-        10,
+        13,
         0,
         2
       ],
       "type": "trigger",
       "data": {
-        "on": 10,
+        "on": 13,
         "references_in_body": [
-          10,
+          13,
           0,
           2
         ],
@@ -652,17 +774,17 @@
       }
     },
     {
-      "id": 13,
+      "id": 16,
       "references": [
-        10,
+        13,
         0,
         2
       ],
       "type": "trigger",
       "data": {
-        "on": 10,
+        "on": 13,
         "references_in_body": [
-          10,
+          13,
           0,
           2
         ],
@@ -671,7 +793,7 @@
       }
     },
     {
-      "id": 14,
+      "id": 17,
       "references": [],
       "type": "table",
       "data": {
@@ -783,17 +905,17 @@
       }
     },
     {
-      "id": 15,
+      "id": 18,
       "references": [
-        14,
+        17,
         0,
         3
       ],
       "type": "trigger",
       "data": {
-        "on": 14,
+        "on": 17,
         "references_in_body": [
-          14,
+          17,
           0,
           3
         ],
@@ -802,17 +924,17 @@
       }
     },
     {
-      "id": 16,
+      "id": 19,
       "references": [
-        14,
+        17,
         0,
         3
       ],
       "type": "trigger",
       "data": {
-        "on": 14,
+        "on": 17,
         "references_in_body": [
-          14,
+          17,
           0,
           3
         ],
@@ -821,17 +943,17 @@
       }
     },
     {
-      "id": 17,
+      "id": 20,
       "references": [
-        14,
+        17,
         0,
         3
       ],
       "type": "trigger",
       "data": {
-        "on": 14,
+        "on": 17,
         "references_in_body": [
-          14,
+          17,
           0,
           3
         ],
@@ -840,10 +962,10 @@
       }
     },
     {
-      "id": 18,
+      "id": 21,
       "references": [
-        10,
-        14
+        13,
+        17
       ],
       "type": "table",
       "data": {
@@ -921,17 +1043,17 @@
       }
     },
     {
-      "id": 19,
+      "id": 22,
       "references": [
-        18,
+        21,
         0,
         4
       ],
       "type": "trigger",
       "data": {
-        "on": 18,
+        "on": 21,
         "references_in_body": [
-          18,
+          21,
           0,
           4
         ],
@@ -940,17 +1062,17 @@
       }
     },
     {
-      "id": 20,
+      "id": 23,
       "references": [
-        18,
+        21,
         0,
         4
       ],
       "type": "trigger",
       "data": {
-        "on": 18,
+        "on": 21,
         "references_in_body": [
-          18,
+          21,
           0,
           4
         ],
@@ -959,17 +1081,17 @@
       }
     },
     {
-      "id": 21,
+      "id": 24,
       "references": [
-        18,
+        21,
         0,
         4
       ],
       "type": "trigger",
       "data": {
-        "on": 18,
+        "on": 21,
         "references_in_body": [
-          18,
+          21,
           0,
           4
         ],
@@ -978,9 +1100,9 @@
       }
     },
     {
-      "id": 22,
+      "id": 25,
       "references": [
-        14
+        17
       ],
       "type": "table",
       "data": {
@@ -1131,17 +1253,17 @@
       }
     },
     {
-      "id": 23,
+      "id": 26,
       "references": [
-        22,
+        25,
         0,
         5
       ],
       "type": "trigger",
       "data": {
-        "on": 22,
+        "on": 25,
         "references_in_body": [
-          22,
+          25,
           0,
           5
         ],
@@ -1150,17 +1272,17 @@
       }
     },
     {
-      "id": 24,
+      "id": 27,
       "references": [
-        22,
+        25,
         0,
         5
       ],
       "type": "trigger",
       "data": {
-        "on": 22,
+        "on": 25,
         "references_in_body": [
-          22,
+          25,
           0,
           5
         ],
@@ -1169,17 +1291,17 @@
       }
     },
     {
-      "id": 25,
+      "id": 28,
       "references": [
-        22,
+        25,
         0,
         5
       ],
       "type": "trigger",
       "data": {
-        "on": 22,
+        "on": 25,
         "references_in_body": [
-          22,
+          25,
           0,
           5
         ],
@@ -1188,9 +1310,9 @@
       }
     },
     {
-      "id": 26,
+      "id": 29,
       "references": [
-        14
+        17
       ],
       "type": "table",
       "data": {
@@ -1324,17 +1446,17 @@
       }
     },
     {
-      "id": 27,
+      "id": 30,
       "references": [
-        26,
+        29,
         0,
         6
       ],
       "type": "trigger",
       "data": {
-        "on": 26,
+        "on": 29,
         "references_in_body": [
-          26,
+          29,
           0,
           6
         ],
@@ -1343,17 +1465,17 @@
       }
     },
     {
-      "id": 28,
+      "id": 31,
       "references": [
-        26,
+        29,
         0,
         6
       ],
       "type": "trigger",
       "data": {
-        "on": 26,
+        "on": 29,
         "references_in_body": [
-          26,
+          29,
           0,
           6
         ],
@@ -1362,17 +1484,17 @@
       }
     },
     {
-      "id": 29,
+      "id": 32,
       "references": [
-        26,
+        29,
         0,
         6
       ],
       "type": "trigger",
       "data": {
-        "on": 26,
+        "on": 29,
         "references_in_body": [
-          26,
+          29,
           0,
           6
         ],
@@ -1381,10 +1503,10 @@
       }
     },
     {
-      "id": 30,
+      "id": 33,
       "references": [
-        26,
-        22
+        29,
+        25
       ],
       "type": "table",
       "data": {
@@ -1474,17 +1596,17 @@
       }
     },
     {
-      "id": 31,
+      "id": 34,
       "references": [
-        30,
+        33,
         0,
         6
       ],
       "type": "trigger",
       "data": {
-        "on": 30,
+        "on": 33,
         "references_in_body": [
-          30,
+          33,
           0,
           6
         ],
@@ -1493,17 +1615,17 @@
       }
     },
     {
-      "id": 32,
+      "id": 35,
       "references": [
-        30,
+        33,
         0,
         6
       ],
       "type": "trigger",
       "data": {
-        "on": 30,
+        "on": 33,
         "references_in_body": [
-          30,
+          33,
           0,
           6
         ],
@@ -1512,17 +1634,17 @@
       }
     },
     {
-      "id": 33,
+      "id": 36,
       "references": [
-        30,
+        33,
         0,
         6
       ],
       "type": "trigger",
       "data": {
-        "on": 30,
+        "on": 33,
         "references_in_body": [
-          30,
+          33,
           0,
           6
         ],
@@ -1531,170 +1653,731 @@
       }
     },
     {
-      "id": 34,
-      "references": [
-        10
-      ],
-      "type": "trigger",
-      "data": {
-        "on": 10,
-        "references_in_body": [
-          10
-        ],
-        "name": "tags_immutable_identity",
-        "sql": "CREATE TRIGGER tags_immutable_identity\nAFTER UPDATE OF creation_sequence, id ON tags\nWHEN\n  new.creation_sequence <> old.creation_sequence OR\n  new.id <> old.id\nBEGIN\n  SELECT RAISE(ABORT, 'tag identity is immutable');\nEND;"
-      }
-    },
-    {
-      "id": 35,
-      "references": [
-        18
-      ],
-      "type": "index",
-      "data": {
-        "on": 18,
-        "name": "tag_assignments_intention",
-        "sql": "CREATE INDEX tag_assignments_intention\n  ON tag_assignments (intention_id, tag_id);",
-        "unique": false,
-        "columns": []
-      }
-    },
-    {
-      "id": 36,
-      "references": [
-        18
-      ],
-      "type": "trigger",
-      "data": {
-        "on": 18,
-        "references_in_body": [
-          18
-        ],
-        "name": "tag_assignments_immutable_identity",
-        "sql": "CREATE TRIGGER tag_assignments_immutable_identity\nAFTER UPDATE OF creation_sequence, tag_id, intention_id ON tag_assignments\nWHEN\n  new.creation_sequence <> old.creation_sequence OR\n  new.tag_id <> old.tag_id OR\n  new.intention_id <> old.intention_id\nBEGIN\n  SELECT RAISE(ABORT, 'tag assignment identity is immutable');\nEND;"
-      }
-    },
-    {
       "id": 37,
-      "references": [
-        26
-      ],
-      "type": "index",
+      "references": [],
+      "type": "table",
       "data": {
-        "on": 26,
-        "name": "daily_choices_date_completion_schedule_order",
-        "sql": "CREATE INDEX daily_choices_date_completion_schedule_order\n  ON daily_choices (\n    choice_date, is_completed, COALESCE(scheduled_minute, -1),\n    priority, creation_sequence\n  );",
-        "unique": false,
-        "columns": []
+        "name": "actions",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "creation_sequence",
+            "getter_name": "creationSequence",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (creation_sequence > 0)",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "auto-increment"
+            ]
+          },
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL UNIQUE",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "unique"
+            ]
+          },
+          {
+            "name": "title",
+            "getter_name": "title",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (typeof(title) = 'text' AND title <> '' AND instr(CAST(title AS BLOB), X'00') = 0)",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "description",
+            "getter_name": "description",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "CHECK (description IS NULL OR(typeof(description) = 'text' AND instr(CAST(description AS BLOB), X'00') = 0 AND length(trim(description, char(9) || char(10) || char(11) || char(12) || char(13) || char(32))) > 0))",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "date",
+            "getter_name": "date",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (typeof(date) = 'text' AND length(date) = 10 AND date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "scheduled_hour",
+            "getter_name": "scheduledHour",
+            "moor_type": "int",
+            "nullable": true,
+            "customConstraints": "CHECK (scheduled_hour IS NULL OR(typeof(scheduled_hour) = 'integer' AND scheduled_hour BETWEEN 0 AND 23))",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "priority",
+            "getter_name": "priority",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (typeof(priority) = 'integer' AND priority BETWEEN 1 AND 4)",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "is_completed",
+            "getter_name": "isCompleted",
+            "moor_type": "bool",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (typeof(is_completed) = 'integer' AND is_completed IN (0, 1))",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "created_at",
+            "getter_name": "createdAt",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (typeof(created_at) = 'integer')",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "updated_at",
+            "getter_name": "updatedAt",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (typeof(updated_at) = 'integer')",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
       }
     },
     {
       "id": 38,
       "references": [
-        26
+        37,
+        0,
+        7
       ],
-      "type": "index",
+      "type": "trigger",
       "data": {
-        "on": 26,
-        "name": "daily_choices_date_creation_order",
-        "sql": "CREATE INDEX daily_choices_date_creation_order\n  ON daily_choices (choice_date, creation_sequence);",
-        "unique": false,
-        "columns": []
+        "on": 37,
+        "references_in_body": [
+          37,
+          0,
+          7
+        ],
+        "name": "graph_log_mark_action_insert",
+        "sql": "CREATE TRIGGER graph_log_mark_action_insert\nAFTER INSERT ON actions\nWHEN (SELECT capture FROM graph_log_control) = 1\nBEGIN\n  SELECT RAISE(ABORT, 'graph write outside the graph write path')\n  FROM graph_log_control\n  WHERE writing = 0;\n  INSERT OR IGNORE INTO graph_log_action_marks (\n    action_id, first_operation\n  ) VALUES (new.id, 'insert');\nEND;"
       }
     },
     {
       "id": 39,
       "references": [
-        26
+        37,
+        0,
+        7
       ],
-      "type": "index",
+      "type": "trigger",
       "data": {
-        "on": 26,
-        "name": "daily_choices_source_date_creation_order",
-        "sql": "CREATE INDEX daily_choices_source_date_creation_order\n  ON daily_choices (source_intention_id, choice_date, creation_sequence);",
-        "unique": false,
-        "columns": []
+        "on": 37,
+        "references_in_body": [
+          37,
+          0,
+          7
+        ],
+        "name": "graph_log_mark_action_update",
+        "sql": "CREATE TRIGGER graph_log_mark_action_update\nAFTER UPDATE ON actions\nWHEN (SELECT capture FROM graph_log_control) = 1\nBEGIN\n  SELECT RAISE(ABORT, 'graph write outside the graph write path')\n  FROM graph_log_control\n  WHERE writing = 0;\n  INSERT OR IGNORE INTO graph_log_action_marks (\n    action_id, first_operation\n  ) VALUES (new.id, 'update');\nEND;"
       }
     },
     {
       "id": 40,
       "references": [
-        26
+        37,
+        0,
+        7
       ],
-      "type": "index",
+      "type": "trigger",
       "data": {
-        "on": 26,
-        "name": "daily_choices_selected_date_creation_order",
-        "sql": "CREATE INDEX daily_choices_selected_date_creation_order\n  ON daily_choices (selected_intention_id, choice_date, creation_sequence);",
-        "unique": false,
-        "columns": []
+        "on": 37,
+        "references_in_body": [
+          37,
+          0,
+          7
+        ],
+        "name": "graph_log_mark_action_delete",
+        "sql": "CREATE TRIGGER graph_log_mark_action_delete\nAFTER DELETE ON actions\nWHEN (SELECT capture FROM graph_log_control) = 1\nBEGIN\n  SELECT RAISE(ABORT, 'graph write outside the graph write path')\n  FROM graph_log_control\n  WHERE writing = 0;\n  INSERT OR IGNORE INTO graph_log_action_marks (\n    action_id, first_operation\n  ) VALUES (old.id, 'delete');\nEND;"
       }
     },
     {
       "id": 41,
       "references": [
-        26
+        37
       ],
-      "type": "trigger",
+      "type": "table",
       "data": {
-        "on": 26,
-        "references_in_body": [
-          26
+        "name": "action_path_items",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "action_id",
+            "getter_name": "actionId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL REFERENCES actions(id)ON UPDATE RESTRICT ON DELETE CASCADE",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              {
+                "foreign_key": {
+                  "to": {
+                    "table": "actions",
+                    "column": "id"
+                  },
+                  "initially_deferred": false,
+                  "on_update": "restrict",
+                  "on_delete": "cascade"
+                }
+              }
+            ]
+          },
+          {
+            "name": "position",
+            "getter_name": "position",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (typeof(position) = 'integer' AND position >= 0)",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "intention_id",
+            "getter_name": "intentionId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (typeof(intention_id) = 'text')",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "previous_intention_id",
+            "getter_name": "previousIntentionId",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
         ],
-        "name": "daily_choices_immutable_identity",
-        "sql": "CREATE TRIGGER daily_choices_immutable_identity\nAFTER UPDATE OF creation_sequence, id ON daily_choices\nWHEN\n  new.creation_sequence <> old.creation_sequence OR\n  new.id <> old.id\nBEGIN\n  SELECT RAISE(ABORT, 'daily choice identity is immutable');\nEND;"
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [
+          "PRIMARY KEY(action_id, position)",
+          "UNIQUE(action_id, intention_id)"
+        ],
+        "explicit_pk": [
+          "action_id",
+          "position"
+        ],
+        "unique_keys": [
+          [
+            "action_id",
+            "intention_id"
+          ]
+        ]
       }
     },
     {
       "id": 42,
       "references": [
-        30
+        41,
+        0,
+        7
       ],
-      "type": "index",
+      "type": "trigger",
       "data": {
-        "on": 30,
-        "name": "daily_choice_path_steps_one_root",
-        "sql": "CREATE UNIQUE INDEX daily_choice_path_steps_one_root\n  ON daily_choice_path_steps (daily_choice_id)\n  WHERE previous_step_id IS NULL;",
-        "unique": true,
-        "columns": []
+        "on": 41,
+        "references_in_body": [
+          41,
+          0,
+          7
+        ],
+        "name": "graph_log_mark_action_path_item_insert",
+        "sql": "CREATE TRIGGER graph_log_mark_action_path_item_insert\nAFTER INSERT ON action_path_items\nWHEN (SELECT capture FROM graph_log_control) = 1\nBEGIN\n  SELECT RAISE(ABORT, 'graph write outside the graph write path')\n  FROM graph_log_control\n  WHERE writing = 0;\n  INSERT OR IGNORE INTO graph_log_action_marks (\n    action_id, first_operation\n  ) VALUES (new.action_id, 'update');\nEND;"
       }
     },
     {
       "id": 43,
       "references": [
-        30
+        41,
+        0,
+        7
       ],
-      "type": "index",
+      "type": "trigger",
       "data": {
-        "on": 30,
-        "name": "daily_choice_path_steps_one_successor",
-        "sql": "CREATE UNIQUE INDEX daily_choice_path_steps_one_successor\n  ON daily_choice_path_steps (daily_choice_id, previous_step_id)\n  WHERE previous_step_id IS NOT NULL;",
-        "unique": true,
-        "columns": []
+        "on": 41,
+        "references_in_body": [
+          41,
+          0,
+          7
+        ],
+        "name": "graph_log_mark_action_path_item_delete",
+        "sql": "CREATE TRIGGER graph_log_mark_action_path_item_delete\nAFTER DELETE ON action_path_items\nWHEN (SELECT capture FROM graph_log_control) = 1\nBEGIN\n  SELECT RAISE(ABORT, 'graph write outside the graph write path')\n  FROM graph_log_control\n  WHERE writing = 0;\n  INSERT OR IGNORE INTO graph_log_action_marks (\n    action_id, first_operation\n  ) VALUES (old.action_id, 'update');\nEND;"
       }
     },
     {
       "id": 44,
-      "references": [
-        30
-      ],
-      "type": "index",
+      "references": [],
+      "type": "table",
       "data": {
-        "on": 30,
-        "name": "daily_choice_path_steps_relation",
-        "sql": "CREATE INDEX daily_choice_path_steps_relation\n  ON daily_choice_path_steps (long_term_relation_id);",
-        "unique": false,
-        "columns": []
+        "name": "deleted_intentions",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "intention_id",
+            "getter_name": "intentionId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL PRIMARY KEY CHECK (typeof(intention_id) = 'text')",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "primary-key"
+            ]
+          },
+          {
+            "name": "title",
+            "getter_name": "title",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (typeof(title) = 'text' AND title <> '' AND instr(CAST(title AS BLOB), X'00') = 0)",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
       }
     },
     {
       "id": 45,
       "references": [
-        22
+        44,
+        0,
+        8
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 44,
+        "references_in_body": [
+          44,
+          0,
+          8
+        ],
+        "name": "graph_log_mark_deleted_intention_insert",
+        "sql": "CREATE TRIGGER graph_log_mark_deleted_intention_insert\nAFTER INSERT ON deleted_intentions\nWHEN (SELECT capture FROM graph_log_control) = 1\nBEGIN\n  SELECT RAISE(ABORT, 'graph write outside the graph write path')\n  FROM graph_log_control\n  WHERE writing = 0;\n  INSERT OR IGNORE INTO graph_log_deleted_intention_marks (\n    intention_id, first_operation\n  ) VALUES (new.intention_id, 'insert');\nEND;"
+      }
+    },
+    {
+      "id": 46,
+      "references": [
+        44,
+        0,
+        8
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 44,
+        "references_in_body": [
+          44,
+          0,
+          8
+        ],
+        "name": "graph_log_mark_deleted_intention_delete",
+        "sql": "CREATE TRIGGER graph_log_mark_deleted_intention_delete\nAFTER DELETE ON deleted_intentions\nWHEN (SELECT capture FROM graph_log_control) = 1\nBEGIN\n  SELECT RAISE(ABORT, 'graph write outside the graph write path')\n  FROM graph_log_control\n  WHERE writing = 0;\n  INSERT OR IGNORE INTO graph_log_deleted_intention_marks (\n    intention_id, first_operation\n  ) VALUES (old.intention_id, 'delete');\nEND;"
+      }
+    },
+    {
+      "id": 47,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "deleted_relation_pairs",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "source_intention_id",
+            "getter_name": "sourceIntentionId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (typeof(source_intention_id) = 'text')",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "related_intention_id",
+            "getter_name": "relatedIntentionId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (typeof(related_intention_id) = 'text')",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "type",
+            "getter_name": "type",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (typeof(type) = 'text' AND type IN ('need', 'can'))",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [
+          "PRIMARY KEY(source_intention_id, related_intention_id)",
+          "CHECK(source_intention_id <> related_intention_id)"
+        ],
+        "explicit_pk": [
+          "source_intention_id",
+          "related_intention_id"
+        ]
+      }
+    },
+    {
+      "id": 48,
+      "references": [
+        47,
+        0,
+        9
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 47,
+        "references_in_body": [
+          47,
+          0,
+          9
+        ],
+        "name": "graph_log_mark_deleted_relation_pair_insert",
+        "sql": "CREATE TRIGGER graph_log_mark_deleted_relation_pair_insert\nAFTER INSERT ON deleted_relation_pairs\nWHEN (SELECT capture FROM graph_log_control) = 1\nBEGIN\n  SELECT RAISE(ABORT, 'graph write outside the graph write path')\n  FROM graph_log_control\n  WHERE writing = 0;\n  INSERT OR IGNORE INTO graph_log_deleted_relation_pair_marks (\n    source_intention_id, related_intention_id, first_operation\n  ) VALUES (new.source_intention_id, new.related_intention_id, 'insert');\nEND;"
+      }
+    },
+    {
+      "id": 49,
+      "references": [
+        47,
+        0,
+        9
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 47,
+        "references_in_body": [
+          47,
+          0,
+          9
+        ],
+        "name": "graph_log_mark_deleted_relation_pair_delete",
+        "sql": "CREATE TRIGGER graph_log_mark_deleted_relation_pair_delete\nAFTER DELETE ON deleted_relation_pairs\nWHEN (SELECT capture FROM graph_log_control) = 1\nBEGIN\n  SELECT RAISE(ABORT, 'graph write outside the graph write path')\n  FROM graph_log_control\n  WHERE writing = 0;\n  INSERT OR IGNORE INTO graph_log_deleted_relation_pair_marks (\n    source_intention_id, related_intention_id, first_operation\n  ) VALUES (old.source_intention_id, old.related_intention_id, 'delete');\nEND;"
+      }
+    },
+    {
+      "id": 50,
+      "references": [
+        37
       ],
       "type": "index",
       "data": {
-        "on": 22,
+        "on": 37,
+        "name": "actions_date_completion_schedule_order",
+        "sql": "CREATE INDEX actions_date_completion_schedule_order\n  ON actions (\n    date, is_completed, COALESCE(scheduled_hour, -1),\n    priority, creation_sequence\n  );",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 51,
+      "references": [
+        37
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 37,
+        "references_in_body": [
+          37
+        ],
+        "name": "actions_immutable_identity",
+        "sql": "CREATE TRIGGER actions_immutable_identity\nAFTER UPDATE OF creation_sequence, id ON actions\nWHEN\n  new.creation_sequence <> old.creation_sequence OR\n  new.id <> old.id\nBEGIN\n  SELECT RAISE(ABORT, 'action identity is immutable');\nEND;"
+      }
+    },
+    {
+      "id": 52,
+      "references": [
+        41
+      ],
+      "type": "index",
+      "data": {
+        "on": 41,
+        "name": "action_path_items_intention_action",
+        "sql": "CREATE INDEX action_path_items_intention_action\n  ON action_path_items (intention_id, action_id);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 53,
+      "references": [
+        41
+      ],
+      "type": "index",
+      "data": {
+        "on": 41,
+        "name": "action_path_items_link",
+        "sql": "CREATE INDEX action_path_items_link\n  ON action_path_items (previous_intention_id, intention_id);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 54,
+      "references": [
+        41
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 41,
+        "references_in_body": [
+          41
+        ],
+        "name": "action_path_items_continue_previous_position",
+        "sql": "CREATE TRIGGER action_path_items_continue_previous_position\nAFTER INSERT ON action_path_items\nWHEN new.previous_intention_id IS NOT (\n  SELECT intention_id\n  FROM action_path_items\n  WHERE action_id = new.action_id AND position = new.position - 1\n)\nBEGIN\n  SELECT RAISE(ABORT, 'action path item must continue the previous position');\nEND;"
+      }
+    },
+    {
+      "id": 55,
+      "references": [
+        41,
+        17,
+        44
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 41,
+        "references_in_body": [
+          41,
+          17,
+          44
+        ],
+        "name": "action_path_items_known_intention",
+        "sql": "CREATE TRIGGER action_path_items_known_intention\nAFTER INSERT ON action_path_items\nWHEN\n  NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.intention_id) AND\n  NOT EXISTS (\n    SELECT 1 FROM deleted_intentions WHERE intention_id = new.intention_id\n  )\nBEGIN\n  SELECT RAISE(ABORT, 'action path item requires a known intention');\nEND;"
+      }
+    },
+    {
+      "id": 56,
+      "references": [
+        41
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 41,
+        "references_in_body": [
+          41
+        ],
+        "name": "action_path_items_immutable",
+        "sql": "CREATE TRIGGER action_path_items_immutable\nBEFORE UPDATE ON action_path_items\nBEGIN\n  SELECT RAISE(ABORT, 'action path items are immutable');\nEND;"
+      }
+    },
+    {
+      "id": 57,
+      "references": [
+        44,
+        17
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 44,
+        "references_in_body": [
+          44,
+          17
+        ],
+        "name": "deleted_intentions_reject_existing",
+        "sql": "CREATE TRIGGER deleted_intentions_reject_existing\nBEFORE INSERT ON deleted_intentions\nWHEN EXISTS (SELECT 1 FROM intentions WHERE id = new.intention_id)\nBEGIN\n  SELECT RAISE(ABORT, 'tombstone of an existing intention');\nEND;"
+      }
+    },
+    {
+      "id": 58,
+      "references": [
+        17,
+        44
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 17,
+        "references_in_body": [
+          17,
+          44
+        ],
+        "name": "intentions_reject_tombstoned",
+        "sql": "CREATE TRIGGER intentions_reject_tombstoned\nAFTER INSERT ON intentions\nWHEN EXISTS (\n  SELECT 1 FROM deleted_intentions WHERE intention_id = new.id\n)\nBEGIN\n  SELECT RAISE(ABORT, 'tombstone of an existing intention');\nEND;"
+      }
+    },
+    {
+      "id": 59,
+      "references": [
+        47,
+        25
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 47,
+        "references_in_body": [
+          47,
+          25
+        ],
+        "name": "deleted_relation_pairs_reject_existing",
+        "sql": "CREATE TRIGGER deleted_relation_pairs_reject_existing\nBEFORE INSERT ON deleted_relation_pairs\nWHEN EXISTS (\n  SELECT 1\n  FROM long_term_relations\n  WHERE\n    source_intention_id = new.source_intention_id AND\n    related_intention_id = new.related_intention_id\n)\nBEGIN\n  SELECT RAISE(ABORT, 'tombstone of an existing relation pair');\nEND;"
+      }
+    },
+    {
+      "id": 60,
+      "references": [
+        44
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 44,
+        "references_in_body": [
+          44
+        ],
+        "name": "deleted_intentions_immutable",
+        "sql": "CREATE TRIGGER deleted_intentions_immutable\nBEFORE UPDATE ON deleted_intentions\nBEGIN\n  SELECT RAISE(ABORT, 'tombstones are immutable');\nEND;"
+      }
+    },
+    {
+      "id": 61,
+      "references": [
+        47
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 47,
+        "references_in_body": [
+          47
+        ],
+        "name": "deleted_relation_pairs_immutable",
+        "sql": "CREATE TRIGGER deleted_relation_pairs_immutable\nBEFORE UPDATE ON deleted_relation_pairs\nBEGIN\n  SELECT RAISE(ABORT, 'tombstones are immutable');\nEND;"
+      }
+    },
+    {
+      "id": 62,
+      "references": [
+        17,
+        41,
+        44
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 17,
+        "references_in_body": [
+          17,
+          41,
+          44
+        ],
+        "name": "intentions_tombstone_after_delete",
+        "sql": "CREATE TRIGGER intentions_tombstone_after_delete\nAFTER DELETE ON intentions\nWHEN EXISTS (\n  SELECT 1 FROM action_path_items WHERE intention_id = old.id\n)\nBEGIN\n  INSERT INTO deleted_intentions (intention_id, title)\n  VALUES (old.id, old.title);\nEND;"
+      }
+    },
+    {
+      "id": 63,
+      "references": [
+        25,
+        41,
+        47
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 25,
+        "references_in_body": [
+          25,
+          41,
+          47
+        ],
+        "name": "long_term_relations_tombstone_after_delete",
+        "sql": "CREATE TRIGGER long_term_relations_tombstone_after_delete\nAFTER DELETE ON long_term_relations\nWHEN EXISTS (\n  SELECT 1\n  FROM action_path_items\n  WHERE\n    previous_intention_id = old.source_intention_id AND\n    intention_id = old.related_intention_id\n)\nBEGIN\n  INSERT INTO deleted_relation_pairs (\n    source_intention_id, related_intention_id, type\n  ) VALUES (old.source_intention_id, old.related_intention_id, old.type);\nEND;"
+      }
+    },
+    {
+      "id": 64,
+      "references": [
+        25,
+        47
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 25,
+        "references_in_body": [
+          25,
+          47
+        ],
+        "name": "long_term_relations_untombstone_after_insert",
+        "sql": "CREATE TRIGGER long_term_relations_untombstone_after_insert\nAFTER INSERT ON long_term_relations\nBEGIN\n  DELETE FROM deleted_relation_pairs\n  WHERE\n    source_intention_id = new.source_intention_id AND\n    related_intention_id = new.related_intention_id;\nEND;"
+      }
+    },
+    {
+      "id": 65,
+      "references": [
+        41,
+        44,
+        47
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 41,
+        "references_in_body": [
+          41,
+          44,
+          47
+        ],
+        "name": "action_path_items_release_tombstones_after_delete",
+        "sql": "CREATE TRIGGER action_path_items_release_tombstones_after_delete\nAFTER DELETE ON action_path_items\nBEGIN\n  DELETE FROM deleted_intentions\n  WHERE\n    intention_id = old.intention_id AND\n    NOT EXISTS (\n      SELECT 1 FROM action_path_items WHERE intention_id = old.intention_id\n    );\n  DELETE FROM deleted_relation_pairs\n  WHERE\n    source_intention_id = old.previous_intention_id AND\n    related_intention_id = old.intention_id AND\n    NOT EXISTS (\n      SELECT 1\n      FROM action_path_items\n      WHERE\n        previous_intention_id = old.previous_intention_id AND\n        intention_id = old.intention_id\n    );\nEND;"
+      }
+    },
+    {
+      "id": 66,
+      "references": [
+        25
+      ],
+      "type": "index",
+      "data": {
+        "on": 25,
         "name": "long_term_relations_source_group_order",
         "sql": "CREATE INDEX long_term_relations_source_group_order\n  ON long_term_relations (\n    source_intention_id,\n    type,\n    is_archived,\n    priority,\n    creation_sequence\n  );",
         "unique": false,
@@ -1702,13 +2385,13 @@
       }
     },
     {
-      "id": 46,
+      "id": 67,
       "references": [
-        22
+        25
       ],
       "type": "index",
       "data": {
-        "on": 22,
+        "on": 25,
         "name": "long_term_relations_related_group_order",
         "sql": "CREATE INDEX long_term_relations_related_group_order\n  ON long_term_relations (\n    related_intention_id,\n    type,\n    is_archived,\n    priority,\n    creation_sequence\n  );",
         "unique": false,
@@ -1716,73 +2399,73 @@
       }
     },
     {
-      "id": 47,
+      "id": 68,
       "references": [
-        22
+        25
       ],
       "type": "trigger",
       "data": {
-        "on": 22,
+        "on": 25,
         "references_in_body": [
-          22
+          25
         ],
         "name": "long_term_relations_immutable_identity",
         "sql": "CREATE TRIGGER long_term_relations_immutable_identity\nAFTER UPDATE OF\n  creation_sequence,\n  id,\n  source_intention_id,\n  related_intention_id\nON long_term_relations\nWHEN\n  new.creation_sequence <> old.creation_sequence OR\n  new.id <> old.id OR\n  new.source_intention_id <> old.source_intention_id OR\n  new.related_intention_id <> old.related_intention_id\nBEGIN\n  SELECT RAISE(ABORT, 'long-term relation identity is immutable');\nEND;"
       }
     },
     {
-      "id": 48,
+      "id": 69,
       "references": [
-        22,
-        14
+        25,
+        17
       ],
       "type": "trigger",
       "data": {
-        "on": 22,
+        "on": 25,
         "references_in_body": [
-          22,
-          14
+          25,
+          17
         ],
         "name": "long_term_relations_active_participants_after_insert",
         "sql": "CREATE TRIGGER long_term_relations_active_participants_after_insert\nAFTER INSERT ON long_term_relations\nWHEN\n  new.is_archived = 0 AND\n  (\n    NOT EXISTS (\n      SELECT 1\n      FROM intentions\n      WHERE id = new.source_intention_id AND is_archived = 0\n    ) OR\n    NOT EXISTS (\n      SELECT 1\n      FROM intentions\n      WHERE id = new.related_intention_id AND is_archived = 0\n    )\n  )\nBEGIN\n  SELECT RAISE(ABORT, 'active relation requires active intentions');\nEND;"
       }
     },
     {
-      "id": 49,
+      "id": 70,
       "references": [
-        22,
-        14
+        25,
+        17
       ],
       "type": "trigger",
       "data": {
-        "on": 22,
+        "on": 25,
         "references_in_body": [
-          22,
-          14
+          25,
+          17
         ],
         "name": "long_term_relations_active_participants_after_update",
         "sql": "CREATE TRIGGER long_term_relations_active_participants_after_update\nAFTER UPDATE OF is_archived ON long_term_relations\nWHEN\n  new.is_archived = 0 AND\n  (\n    NOT EXISTS (\n      SELECT 1\n      FROM intentions\n      WHERE id = new.source_intention_id AND is_archived = 0\n    ) OR\n    NOT EXISTS (\n      SELECT 1\n      FROM intentions\n      WHERE id = new.related_intention_id AND is_archived = 0\n    )\n  )\nBEGIN\n  SELECT RAISE(ABORT, 'active relation requires active intentions');\nEND;"
       }
     },
     {
-      "id": 50,
+      "id": 71,
       "references": [
-        14,
-        22
+        17,
+        25
       ],
       "type": "trigger",
       "data": {
-        "on": 14,
+        "on": 17,
         "references_in_body": [
-          14,
-          22
+          17,
+          25
         ],
         "name": "intentions_archive_requires_no_active_relations",
         "sql": "CREATE TRIGGER intentions_archive_requires_no_active_relations\nAFTER UPDATE OF is_archived ON intentions\nWHEN\n  old.is_archived = 0 AND\n  new.is_archived = 1 AND\n  EXISTS (\n    SELECT 1\n    FROM long_term_relations\n    WHERE\n      is_archived = 0 AND\n      (\n        source_intention_id = new.id OR\n        related_intention_id = new.id\n      )\n  )\nBEGIN\n  SELECT RAISE(ABORT, 'active relations must be archived first');\nEND;"
       }
     },
     {
-      "id": 51,
+      "id": 72,
       "references": [],
       "type": "table",
       "data": {
@@ -1807,64 +2490,64 @@
       }
     },
     {
-      "id": 52,
+      "id": 73,
       "references": [
-        14,
-        51
+        17,
+        72
       ],
       "type": "trigger",
       "data": {
-        "on": 14,
+        "on": 17,
         "references_in_body": [
-          14,
-          51
+          17,
+          72
         ],
         "name": "intentions_fts_after_insert",
         "sql": "CREATE TRIGGER intentions_fts_after_insert\nAFTER INSERT ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(rowid, title_search_key)\n  VALUES (new.rowid, new.title_search_key);\nEND;"
       }
     },
     {
-      "id": 53,
+      "id": 74,
       "references": [
-        14,
-        51
+        17,
+        72
       ],
       "type": "trigger",
       "data": {
-        "on": 14,
+        "on": 17,
         "references_in_body": [
-          14,
-          51
+          17,
+          72
         ],
         "name": "intentions_fts_after_update_search_content",
         "sql": "CREATE TRIGGER intentions_fts_after_update_search_content\nAFTER UPDATE ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(\n    intention_titles_fts, rowid, title_search_key\n  ) VALUES ('delete', old.rowid, old.title_search_key);\n  INSERT INTO intention_titles_fts(rowid, title_search_key)\n  VALUES (new.rowid, new.title_search_key);\nEND;"
       }
     },
     {
-      "id": 54,
+      "id": 75,
       "references": [
-        14,
-        51
+        17,
+        72
       ],
       "type": "trigger",
       "data": {
-        "on": 14,
+        "on": 17,
         "references_in_body": [
-          14,
-          51
+          17,
+          72
         ],
         "name": "intentions_fts_after_delete",
         "sql": "CREATE TRIGGER intentions_fts_after_delete\nAFTER DELETE ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(\n    intention_titles_fts, rowid, title_search_key\n  ) VALUES ('delete', old.rowid, old.title_search_key);\nEND;"
       }
     },
     {
-      "id": 55,
+      "id": 76,
       "references": [
-        14
+        17
       ],
       "type": "index",
       "data": {
-        "on": 14,
+        "on": 17,
         "name": "intentions_active_created_at_asc_id_asc",
         "sql": "CREATE INDEX intentions_active_created_at_asc_id_asc\n  ON intentions (created_at ASC, id ASC)\n  WHERE is_archived = 0;",
         "unique": false,
@@ -1872,13 +2555,13 @@
       }
     },
     {
-      "id": 56,
+      "id": 77,
       "references": [
-        14
+        17
       ],
       "type": "index",
       "data": {
-        "on": 14,
+        "on": 17,
         "name": "intentions_active_created_at_desc_id_asc",
         "sql": "CREATE INDEX intentions_active_created_at_desc_id_asc\n  ON intentions (created_at DESC, id ASC)\n  WHERE is_archived = 0;",
         "unique": false,
@@ -1886,13 +2569,13 @@
       }
     },
     {
-      "id": 57,
+      "id": 78,
       "references": [
-        14
+        17
       ],
       "type": "index",
       "data": {
-        "on": 14,
+        "on": 17,
         "name": "intentions_active_updated_at_asc_id_asc",
         "sql": "CREATE INDEX intentions_active_updated_at_asc_id_asc\n  ON intentions (updated_at ASC, id ASC)\n  WHERE is_archived = 0;",
         "unique": false,
@@ -1900,13 +2583,13 @@
       }
     },
     {
-      "id": 58,
+      "id": 79,
       "references": [
-        14
+        17
       ],
       "type": "index",
       "data": {
-        "on": 14,
+        "on": 17,
         "name": "intentions_active_updated_at_desc_id_asc",
         "sql": "CREATE INDEX intentions_active_updated_at_desc_id_asc\n  ON intentions (updated_at DESC, id ASC)\n  WHERE is_archived = 0;",
         "unique": false,
@@ -1914,13 +2597,13 @@
       }
     },
     {
-      "id": 59,
+      "id": 80,
       "references": [
-        14
+        17
       ],
       "type": "index",
       "data": {
-        "on": 14,
+        "on": 17,
         "name": "intentions_archived_created_at_asc_id_asc",
         "sql": "CREATE INDEX intentions_archived_created_at_asc_id_asc\n  ON intentions (created_at ASC, id ASC)\n  WHERE is_archived = 1;",
         "unique": false,
@@ -1928,13 +2611,13 @@
       }
     },
     {
-      "id": 60,
+      "id": 81,
       "references": [
-        14
+        17
       ],
       "type": "index",
       "data": {
-        "on": 14,
+        "on": 17,
         "name": "intentions_archived_created_at_desc_id_asc",
         "sql": "CREATE INDEX intentions_archived_created_at_desc_id_asc\n  ON intentions (created_at DESC, id ASC)\n  WHERE is_archived = 1;",
         "unique": false,
@@ -1942,13 +2625,13 @@
       }
     },
     {
-      "id": 61,
+      "id": 82,
       "references": [
-        14
+        17
       ],
       "type": "index",
       "data": {
-        "on": 14,
+        "on": 17,
         "name": "intentions_archived_updated_at_asc_id_asc",
         "sql": "CREATE INDEX intentions_archived_updated_at_asc_id_asc\n  ON intentions (updated_at ASC, id ASC)\n  WHERE is_archived = 1;",
         "unique": false,
@@ -1956,13 +2639,13 @@
       }
     },
     {
-      "id": 62,
+      "id": 83,
       "references": [
-        14
+        17
       ],
       "type": "index",
       "data": {
-        "on": 14,
+        "on": 17,
         "name": "intentions_archived_updated_at_desc_id_asc",
         "sql": "CREATE INDEX intentions_archived_updated_at_desc_id_asc\n  ON intentions (updated_at DESC, id ASC)\n  WHERE is_archived = 1;",
         "unique": false,
@@ -1970,13 +2653,13 @@
       }
     },
     {
-      "id": 63,
+      "id": 84,
       "references": [
-        14
+        17
       ],
       "type": "index",
       "data": {
-        "on": 14,
+        "on": 17,
         "name": "intentions_all_created_at_asc_id_asc",
         "sql": "CREATE INDEX intentions_all_created_at_asc_id_asc\n  ON intentions (created_at ASC, id ASC);",
         "unique": false,
@@ -1984,13 +2667,13 @@
       }
     },
     {
-      "id": 64,
+      "id": 85,
       "references": [
-        14
+        17
       ],
       "type": "index",
       "data": {
-        "on": 14,
+        "on": 17,
         "name": "intentions_all_created_at_desc_id_asc",
         "sql": "CREATE INDEX intentions_all_created_at_desc_id_asc\n  ON intentions (created_at DESC, id ASC);",
         "unique": false,
@@ -1998,13 +2681,13 @@
       }
     },
     {
-      "id": 65,
+      "id": 86,
       "references": [
-        14
+        17
       ],
       "type": "index",
       "data": {
-        "on": 14,
+        "on": 17,
         "name": "intentions_all_updated_at_asc_id_asc",
         "sql": "CREATE INDEX intentions_all_updated_at_asc_id_asc\n  ON intentions (updated_at ASC, id ASC);",
         "unique": false,
@@ -2012,13 +2695,13 @@
       }
     },
     {
-      "id": 66,
+      "id": 87,
       "references": [
-        14
+        17
       ],
       "type": "index",
       "data": {
-        "on": 14,
+        "on": 17,
         "name": "intentions_all_updated_at_desc_id_asc",
         "sql": "CREATE INDEX intentions_all_updated_at_desc_id_asc\n  ON intentions (updated_at DESC, id ASC);",
         "unique": false,
@@ -2026,13 +2709,13 @@
       }
     },
     {
-      "id": 67,
+      "id": 88,
       "references": [
-        14
+        17
       ],
       "type": "index",
       "data": {
-        "on": 14,
+        "on": 17,
         "name": "intentions_active_title_search_key_asc_id_asc",
         "sql": "CREATE INDEX intentions_active_title_search_key_asc_id_asc\n  ON intentions (title_search_key ASC, id ASC)\n  WHERE is_archived = 0;",
         "unique": false,
@@ -2040,13 +2723,13 @@
       }
     },
     {
-      "id": 68,
+      "id": 89,
       "references": [
-        14
+        17
       ],
       "type": "index",
       "data": {
-        "on": 14,
+        "on": 17,
         "name": "intentions_active_title_search_key_desc_id_asc",
         "sql": "CREATE INDEX intentions_active_title_search_key_desc_id_asc\n  ON intentions (title_search_key DESC, id ASC)\n  WHERE is_archived = 0;",
         "unique": false,
@@ -2054,13 +2737,13 @@
       }
     },
     {
-      "id": 69,
+      "id": 90,
       "references": [
-        14
+        17
       ],
       "type": "index",
       "data": {
-        "on": 14,
+        "on": 17,
         "name": "intentions_archived_title_search_key_asc_id_asc",
         "sql": "CREATE INDEX intentions_archived_title_search_key_asc_id_asc\n  ON intentions (title_search_key ASC, id ASC)\n  WHERE is_archived = 1;",
         "unique": false,
@@ -2068,13 +2751,13 @@
       }
     },
     {
-      "id": 70,
+      "id": 91,
       "references": [
-        14
+        17
       ],
       "type": "index",
       "data": {
-        "on": 14,
+        "on": 17,
         "name": "intentions_archived_title_search_key_desc_id_asc",
         "sql": "CREATE INDEX intentions_archived_title_search_key_desc_id_asc\n  ON intentions (title_search_key DESC, id ASC)\n  WHERE is_archived = 1;",
         "unique": false,
@@ -2082,13 +2765,13 @@
       }
     },
     {
-      "id": 71,
+      "id": 92,
       "references": [
-        14
+        17
       ],
       "type": "index",
       "data": {
-        "on": 14,
+        "on": 17,
         "name": "intentions_all_title_search_key_asc_id_asc",
         "sql": "CREATE INDEX intentions_all_title_search_key_asc_id_asc\n  ON intentions (title_search_key ASC, id ASC);",
         "unique": false,
@@ -2096,15 +2779,172 @@
       }
     },
     {
-      "id": 72,
+      "id": 93,
       "references": [
-        14
+        17
       ],
       "type": "index",
       "data": {
-        "on": 14,
+        "on": 17,
         "name": "intentions_all_title_search_key_desc_id_asc",
         "sql": "CREATE INDEX intentions_all_title_search_key_desc_id_asc\n  ON intentions (title_search_key DESC, id ASC);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 94,
+      "references": [
+        13
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 13,
+        "references_in_body": [
+          13
+        ],
+        "name": "tags_immutable_identity",
+        "sql": "CREATE TRIGGER tags_immutable_identity\nAFTER UPDATE OF creation_sequence, id ON tags\nWHEN\n  new.creation_sequence <> old.creation_sequence OR\n  new.id <> old.id\nBEGIN\n  SELECT RAISE(ABORT, 'tag identity is immutable');\nEND;"
+      }
+    },
+    {
+      "id": 95,
+      "references": [
+        21
+      ],
+      "type": "index",
+      "data": {
+        "on": 21,
+        "name": "tag_assignments_intention",
+        "sql": "CREATE INDEX tag_assignments_intention\n  ON tag_assignments (intention_id, tag_id);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 96,
+      "references": [
+        21
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 21,
+        "references_in_body": [
+          21
+        ],
+        "name": "tag_assignments_immutable_identity",
+        "sql": "CREATE TRIGGER tag_assignments_immutable_identity\nAFTER UPDATE OF creation_sequence, tag_id, intention_id ON tag_assignments\nWHEN\n  new.creation_sequence <> old.creation_sequence OR\n  new.tag_id <> old.tag_id OR\n  new.intention_id <> old.intention_id\nBEGIN\n  SELECT RAISE(ABORT, 'tag assignment identity is immutable');\nEND;"
+      }
+    },
+    {
+      "id": 97,
+      "references": [
+        29
+      ],
+      "type": "index",
+      "data": {
+        "on": 29,
+        "name": "daily_choices_date_completion_schedule_order",
+        "sql": "CREATE INDEX daily_choices_date_completion_schedule_order\n  ON daily_choices (\n    choice_date, is_completed, COALESCE(scheduled_minute, -1),\n    priority, creation_sequence\n  );",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 98,
+      "references": [
+        29
+      ],
+      "type": "index",
+      "data": {
+        "on": 29,
+        "name": "daily_choices_date_creation_order",
+        "sql": "CREATE INDEX daily_choices_date_creation_order\n  ON daily_choices (choice_date, creation_sequence);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 99,
+      "references": [
+        29
+      ],
+      "type": "index",
+      "data": {
+        "on": 29,
+        "name": "daily_choices_source_date_creation_order",
+        "sql": "CREATE INDEX daily_choices_source_date_creation_order\n  ON daily_choices (source_intention_id, choice_date, creation_sequence);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 100,
+      "references": [
+        29
+      ],
+      "type": "index",
+      "data": {
+        "on": 29,
+        "name": "daily_choices_selected_date_creation_order",
+        "sql": "CREATE INDEX daily_choices_selected_date_creation_order\n  ON daily_choices (selected_intention_id, choice_date, creation_sequence);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 101,
+      "references": [
+        29
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 29,
+        "references_in_body": [
+          29
+        ],
+        "name": "daily_choices_immutable_identity",
+        "sql": "CREATE TRIGGER daily_choices_immutable_identity\nAFTER UPDATE OF creation_sequence, id ON daily_choices\nWHEN\n  new.creation_sequence <> old.creation_sequence OR\n  new.id <> old.id\nBEGIN\n  SELECT RAISE(ABORT, 'daily choice identity is immutable');\nEND;"
+      }
+    },
+    {
+      "id": 102,
+      "references": [
+        33
+      ],
+      "type": "index",
+      "data": {
+        "on": 33,
+        "name": "daily_choice_path_steps_one_root",
+        "sql": "CREATE UNIQUE INDEX daily_choice_path_steps_one_root\n  ON daily_choice_path_steps (daily_choice_id)\n  WHERE previous_step_id IS NULL;",
+        "unique": true,
+        "columns": []
+      }
+    },
+    {
+      "id": 103,
+      "references": [
+        33
+      ],
+      "type": "index",
+      "data": {
+        "on": 33,
+        "name": "daily_choice_path_steps_one_successor",
+        "sql": "CREATE UNIQUE INDEX daily_choice_path_steps_one_successor\n  ON daily_choice_path_steps (daily_choice_id, previous_step_id)\n  WHERE previous_step_id IS NOT NULL;",
+        "unique": true,
+        "columns": []
+      }
+    },
+    {
+      "id": 104,
+      "references": [
+        33
+      ],
+      "type": "index",
+      "data": {
+        "on": 33,
+        "name": "daily_choice_path_steps_relation",
+        "sql": "CREATE INDEX daily_choice_path_steps_relation\n  ON daily_choice_path_steps (long_term_relation_id);",
         "unique": false,
         "columns": []
       }
@@ -2171,6 +3011,33 @@
         {
           "dialect": "sqlite",
           "sql": "CREATE TABLE IF NOT EXISTS \"graph_log_daily_choice_marks\" (\"daily_choice_id\" TEXT NOT NULL PRIMARY KEY, \"first_operation\" TEXT NOT NULL CHECK (first_operation IN ('insert', 'update', 'delete')));"
+        }
+      ]
+    },
+    {
+      "name": "graph_log_action_marks",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"graph_log_action_marks\" (\"action_id\" TEXT NOT NULL PRIMARY KEY, \"first_operation\" TEXT NOT NULL CHECK (first_operation IN ('insert', 'update', 'delete')));"
+        }
+      ]
+    },
+    {
+      "name": "graph_log_deleted_intention_marks",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"graph_log_deleted_intention_marks\" (\"intention_id\" TEXT NOT NULL PRIMARY KEY, \"first_operation\" TEXT NOT NULL CHECK (first_operation IN ('insert', 'delete')));"
+        }
+      ]
+    },
+    {
+      "name": "graph_log_deleted_relation_pair_marks",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"graph_log_deleted_relation_pair_marks\" (\"source_intention_id\" TEXT NOT NULL, \"related_intention_id\" TEXT NOT NULL, \"first_operation\" TEXT NOT NULL CHECK (first_operation IN ('insert', 'delete')), PRIMARY KEY(source_intention_id, related_intention_id));"
         }
       ]
     },
@@ -2418,101 +3285,263 @@
       ]
     },
     {
-      "name": "tags_immutable_identity",
+      "name": "actions",
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TRIGGER tags_immutable_identity AFTER UPDATE OF creation_sequence, id ON tags WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, 'tag identity is immutable');END"
+          "sql": "CREATE TABLE IF NOT EXISTS \"actions\" (\"creation_sequence\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT CHECK (creation_sequence > 0), \"id\" TEXT NOT NULL UNIQUE, \"title\" TEXT NOT NULL CHECK (typeof(title) = 'text' AND title <> '' AND instr(CAST(title AS BLOB), X'00') = 0), \"description\" TEXT CHECK (description IS NULL OR(typeof(description) = 'text' AND instr(CAST(description AS BLOB), X'00') = 0 AND length(trim(description, char(9) || char(10) || char(11) || char(12) || char(13) || char(32))) > 0)), \"date\" TEXT NOT NULL CHECK (typeof(date) = 'text' AND length(date) = 10 AND date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'), \"scheduled_hour\" INTEGER CHECK (scheduled_hour IS NULL OR(typeof(scheduled_hour) = 'integer' AND scheduled_hour BETWEEN 0 AND 23)), \"priority\" INTEGER NOT NULL CHECK (typeof(priority) = 'integer' AND priority BETWEEN 1 AND 4), \"is_completed\" INTEGER NOT NULL CHECK (typeof(is_completed) = 'integer' AND is_completed IN (0, 1)), \"created_at\" INTEGER NOT NULL CHECK (typeof(created_at) = 'integer'), \"updated_at\" INTEGER NOT NULL CHECK (typeof(updated_at) = 'integer'));"
         }
       ]
     },
     {
-      "name": "tag_assignments_intention",
+      "name": "graph_log_mark_action_insert",
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE INDEX tag_assignments_intention ON tag_assignments (intention_id, tag_id)"
+          "sql": "CREATE TRIGGER graph_log_mark_action_insert AFTER INSERT ON actions WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, 'graph write outside the graph write path') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_action_marks (action_id, first_operation) VALUES (new.id, 'insert');END"
         }
       ]
     },
     {
-      "name": "tag_assignments_immutable_identity",
+      "name": "graph_log_mark_action_update",
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TRIGGER tag_assignments_immutable_identity AFTER UPDATE OF creation_sequence, tag_id, intention_id ON tag_assignments WHEN new.creation_sequence <> old.creation_sequence OR new.tag_id <> old.tag_id OR new.intention_id <> old.intention_id BEGIN SELECT RAISE (ABORT, 'tag assignment identity is immutable');END"
+          "sql": "CREATE TRIGGER graph_log_mark_action_update AFTER UPDATE ON actions WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, 'graph write outside the graph write path') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_action_marks (action_id, first_operation) VALUES (new.id, 'update');END"
         }
       ]
     },
     {
-      "name": "daily_choices_date_completion_schedule_order",
+      "name": "graph_log_mark_action_delete",
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE INDEX daily_choices_date_completion_schedule_order ON daily_choices (choice_date, is_completed, COALESCE(scheduled_minute, -1), priority, creation_sequence)"
+          "sql": "CREATE TRIGGER graph_log_mark_action_delete AFTER DELETE ON actions WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, 'graph write outside the graph write path') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_action_marks (action_id, first_operation) VALUES (old.id, 'delete');END"
         }
       ]
     },
     {
-      "name": "daily_choices_date_creation_order",
+      "name": "action_path_items",
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE INDEX daily_choices_date_creation_order ON daily_choices (choice_date, creation_sequence)"
+          "sql": "CREATE TABLE IF NOT EXISTS \"action_path_items\" (\"action_id\" TEXT NOT NULL REFERENCES actions(id)ON UPDATE RESTRICT ON DELETE CASCADE, \"position\" INTEGER NOT NULL CHECK (typeof(position) = 'integer' AND position >= 0), \"intention_id\" TEXT NOT NULL CHECK (typeof(intention_id) = 'text'), \"previous_intention_id\" TEXT, PRIMARY KEY(action_id, position), UNIQUE(action_id, intention_id));"
         }
       ]
     },
     {
-      "name": "daily_choices_source_date_creation_order",
+      "name": "graph_log_mark_action_path_item_insert",
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE INDEX daily_choices_source_date_creation_order ON daily_choices (source_intention_id, choice_date, creation_sequence)"
+          "sql": "CREATE TRIGGER graph_log_mark_action_path_item_insert AFTER INSERT ON action_path_items WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, 'graph write outside the graph write path') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_action_marks (action_id, first_operation) VALUES (new.action_id, 'update');END"
         }
       ]
     },
     {
-      "name": "daily_choices_selected_date_creation_order",
+      "name": "graph_log_mark_action_path_item_delete",
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE INDEX daily_choices_selected_date_creation_order ON daily_choices (selected_intention_id, choice_date, creation_sequence)"
+          "sql": "CREATE TRIGGER graph_log_mark_action_path_item_delete AFTER DELETE ON action_path_items WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, 'graph write outside the graph write path') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_action_marks (action_id, first_operation) VALUES (old.action_id, 'update');END"
         }
       ]
     },
     {
-      "name": "daily_choices_immutable_identity",
+      "name": "deleted_intentions",
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TRIGGER daily_choices_immutable_identity AFTER UPDATE OF creation_sequence, id ON daily_choices WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, 'daily choice identity is immutable');END"
+          "sql": "CREATE TABLE IF NOT EXISTS \"deleted_intentions\" (\"intention_id\" TEXT NOT NULL PRIMARY KEY CHECK (typeof(intention_id) = 'text'), \"title\" TEXT NOT NULL CHECK (typeof(title) = 'text' AND title <> '' AND instr(CAST(title AS BLOB), X'00') = 0));"
         }
       ]
     },
     {
-      "name": "daily_choice_path_steps_one_root",
+      "name": "graph_log_mark_deleted_intention_insert",
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE UNIQUE INDEX daily_choice_path_steps_one_root ON daily_choice_path_steps (daily_choice_id) WHERE previous_step_id IS NULL"
+          "sql": "CREATE TRIGGER graph_log_mark_deleted_intention_insert AFTER INSERT ON deleted_intentions WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, 'graph write outside the graph write path') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_deleted_intention_marks (intention_id, first_operation) VALUES (new.intention_id, 'insert');END"
         }
       ]
     },
     {
-      "name": "daily_choice_path_steps_one_successor",
+      "name": "graph_log_mark_deleted_intention_delete",
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE UNIQUE INDEX daily_choice_path_steps_one_successor ON daily_choice_path_steps (daily_choice_id, previous_step_id) WHERE previous_step_id IS NOT NULL"
+          "sql": "CREATE TRIGGER graph_log_mark_deleted_intention_delete AFTER DELETE ON deleted_intentions WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, 'graph write outside the graph write path') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_deleted_intention_marks (intention_id, first_operation) VALUES (old.intention_id, 'delete');END"
         }
       ]
     },
     {
-      "name": "daily_choice_path_steps_relation",
+      "name": "deleted_relation_pairs",
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE INDEX daily_choice_path_steps_relation ON daily_choice_path_steps (long_term_relation_id)"
+          "sql": "CREATE TABLE IF NOT EXISTS \"deleted_relation_pairs\" (\"source_intention_id\" TEXT NOT NULL CHECK (typeof(source_intention_id) = 'text'), \"related_intention_id\" TEXT NOT NULL CHECK (typeof(related_intention_id) = 'text'), \"type\" TEXT NOT NULL CHECK (typeof(type) = 'text' AND type IN ('need', 'can')), PRIMARY KEY(source_intention_id, related_intention_id), CHECK(source_intention_id <> related_intention_id));"
+        }
+      ]
+    },
+    {
+      "name": "graph_log_mark_deleted_relation_pair_insert",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER graph_log_mark_deleted_relation_pair_insert AFTER INSERT ON deleted_relation_pairs WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, 'graph write outside the graph write path') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_deleted_relation_pair_marks (source_intention_id, related_intention_id, first_operation) VALUES (new.source_intention_id, new.related_intention_id, 'insert');END"
+        }
+      ]
+    },
+    {
+      "name": "graph_log_mark_deleted_relation_pair_delete",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER graph_log_mark_deleted_relation_pair_delete AFTER DELETE ON deleted_relation_pairs WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, 'graph write outside the graph write path') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_deleted_relation_pair_marks (source_intention_id, related_intention_id, first_operation) VALUES (old.source_intention_id, old.related_intention_id, 'delete');END"
+        }
+      ]
+    },
+    {
+      "name": "actions_date_completion_schedule_order",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX actions_date_completion_schedule_order ON actions (date, is_completed, COALESCE(scheduled_hour, -1), priority, creation_sequence)"
+        }
+      ]
+    },
+    {
+      "name": "actions_immutable_identity",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER actions_immutable_identity AFTER UPDATE OF creation_sequence, id ON actions WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, 'action identity is immutable');END"
+        }
+      ]
+    },
+    {
+      "name": "action_path_items_intention_action",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX action_path_items_intention_action ON action_path_items (intention_id, action_id)"
+        }
+      ]
+    },
+    {
+      "name": "action_path_items_link",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX action_path_items_link ON action_path_items (previous_intention_id, intention_id)"
+        }
+      ]
+    },
+    {
+      "name": "action_path_items_continue_previous_position",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER action_path_items_continue_previous_position AFTER INSERT ON action_path_items WHEN new.previous_intention_id IS NOT (SELECT intention_id FROM action_path_items WHERE action_id = new.action_id AND position = new.position - 1) BEGIN SELECT RAISE (ABORT, 'action path item must continue the previous position');END"
+        }
+      ]
+    },
+    {
+      "name": "action_path_items_known_intention",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER action_path_items_known_intention AFTER INSERT ON action_path_items WHEN NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.intention_id) AND NOT EXISTS (SELECT 1 FROM deleted_intentions WHERE intention_id = new.intention_id) BEGIN SELECT RAISE (ABORT, 'action path item requires a known intention');END"
+        }
+      ]
+    },
+    {
+      "name": "action_path_items_immutable",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER action_path_items_immutable BEFORE UPDATE ON action_path_items BEGIN SELECT RAISE (ABORT, 'action path items are immutable');END"
+        }
+      ]
+    },
+    {
+      "name": "deleted_intentions_reject_existing",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER deleted_intentions_reject_existing BEFORE INSERT ON deleted_intentions WHEN EXISTS (SELECT 1 FROM intentions WHERE id = new.intention_id) BEGIN SELECT RAISE (ABORT, 'tombstone of an existing intention');END"
+        }
+      ]
+    },
+    {
+      "name": "intentions_reject_tombstoned",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER intentions_reject_tombstoned AFTER INSERT ON intentions WHEN EXISTS (SELECT 1 FROM deleted_intentions WHERE intention_id = new.id) BEGIN SELECT RAISE (ABORT, 'tombstone of an existing intention');END"
+        }
+      ]
+    },
+    {
+      "name": "deleted_relation_pairs_reject_existing",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER deleted_relation_pairs_reject_existing BEFORE INSERT ON deleted_relation_pairs WHEN EXISTS (SELECT 1 FROM long_term_relations WHERE source_intention_id = new.source_intention_id AND related_intention_id = new.related_intention_id) BEGIN SELECT RAISE (ABORT, 'tombstone of an existing relation pair');END"
+        }
+      ]
+    },
+    {
+      "name": "deleted_intentions_immutable",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER deleted_intentions_immutable BEFORE UPDATE ON deleted_intentions BEGIN SELECT RAISE (ABORT, 'tombstones are immutable');END"
+        }
+      ]
+    },
+    {
+      "name": "deleted_relation_pairs_immutable",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER deleted_relation_pairs_immutable BEFORE UPDATE ON deleted_relation_pairs BEGIN SELECT RAISE (ABORT, 'tombstones are immutable');END"
+        }
+      ]
+    },
+    {
+      "name": "intentions_tombstone_after_delete",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER intentions_tombstone_after_delete AFTER DELETE ON intentions WHEN EXISTS (SELECT 1 FROM action_path_items WHERE intention_id = old.id) BEGIN INSERT INTO deleted_intentions (intention_id, title) VALUES (old.id, old.title);END"
+        }
+      ]
+    },
+    {
+      "name": "long_term_relations_tombstone_after_delete",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER long_term_relations_tombstone_after_delete AFTER DELETE ON long_term_relations WHEN EXISTS (SELECT 1 FROM action_path_items WHERE previous_intention_id = old.source_intention_id AND intention_id = old.related_intention_id) BEGIN INSERT INTO deleted_relation_pairs (source_intention_id, related_intention_id, type) VALUES (old.source_intention_id, old.related_intention_id, old.type);END"
+        }
+      ]
+    },
+    {
+      "name": "long_term_relations_untombstone_after_insert",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER long_term_relations_untombstone_after_insert AFTER INSERT ON long_term_relations BEGIN DELETE FROM deleted_relation_pairs WHERE source_intention_id = new.source_intention_id AND related_intention_id = new.related_intention_id;END"
+        }
+      ]
+    },
+    {
+      "name": "action_path_items_release_tombstones_after_delete",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER action_path_items_release_tombstones_after_delete AFTER DELETE ON action_path_items BEGIN DELETE FROM deleted_intentions WHERE intention_id = old.intention_id AND NOT EXISTS (SELECT 1 FROM action_path_items WHERE intention_id = old.intention_id);DELETE FROM deleted_relation_pairs WHERE source_intention_id = old.previous_intention_id AND related_intention_id = old.intention_id AND NOT EXISTS (SELECT 1 FROM action_path_items WHERE previous_intention_id = old.previous_intention_id AND intention_id = old.intention_id);END"
         }
       ]
     },
@@ -2765,6 +3794,105 @@
         {
           "dialect": "sqlite",
           "sql": "CREATE INDEX intentions_all_title_search_key_desc_id_asc ON intentions (title_search_key DESC, id ASC)"
+        }
+      ]
+    },
+    {
+      "name": "tags_immutable_identity",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER tags_immutable_identity AFTER UPDATE OF creation_sequence, id ON tags WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, 'tag identity is immutable');END"
+        }
+      ]
+    },
+    {
+      "name": "tag_assignments_intention",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX tag_assignments_intention ON tag_assignments (intention_id, tag_id)"
+        }
+      ]
+    },
+    {
+      "name": "tag_assignments_immutable_identity",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER tag_assignments_immutable_identity AFTER UPDATE OF creation_sequence, tag_id, intention_id ON tag_assignments WHEN new.creation_sequence <> old.creation_sequence OR new.tag_id <> old.tag_id OR new.intention_id <> old.intention_id BEGIN SELECT RAISE (ABORT, 'tag assignment identity is immutable');END"
+        }
+      ]
+    },
+    {
+      "name": "daily_choices_date_completion_schedule_order",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX daily_choices_date_completion_schedule_order ON daily_choices (choice_date, is_completed, COALESCE(scheduled_minute, -1), priority, creation_sequence)"
+        }
+      ]
+    },
+    {
+      "name": "daily_choices_date_creation_order",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX daily_choices_date_creation_order ON daily_choices (choice_date, creation_sequence)"
+        }
+      ]
+    },
+    {
+      "name": "daily_choices_source_date_creation_order",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX daily_choices_source_date_creation_order ON daily_choices (source_intention_id, choice_date, creation_sequence)"
+        }
+      ]
+    },
+    {
+      "name": "daily_choices_selected_date_creation_order",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX daily_choices_selected_date_creation_order ON daily_choices (selected_intention_id, choice_date, creation_sequence)"
+        }
+      ]
+    },
+    {
+      "name": "daily_choices_immutable_identity",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER daily_choices_immutable_identity AFTER UPDATE OF creation_sequence, id ON daily_choices WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, 'daily choice identity is immutable');END"
+        }
+      ]
+    },
+    {
+      "name": "daily_choice_path_steps_one_root",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE UNIQUE INDEX daily_choice_path_steps_one_root ON daily_choice_path_steps (daily_choice_id) WHERE previous_step_id IS NULL"
+        }
+      ]
+    },
+    {
+      "name": "daily_choice_path_steps_one_successor",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE UNIQUE INDEX daily_choice_path_steps_one_successor ON daily_choice_path_steps (daily_choice_id, previous_step_id) WHERE previous_step_id IS NOT NULL"
+        }
+      ]
+    },
+    {
+      "name": "daily_choice_path_steps_relation",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX daily_choice_path_steps_relation ON daily_choice_path_steps (long_term_relation_id)"
         }
       ]
     }
