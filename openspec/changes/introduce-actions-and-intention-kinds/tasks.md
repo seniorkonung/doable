@@ -3,7 +3,7 @@
 - [ ] 1.1 Календарная дата и наблюдатель местного дня принадлежат общему модулю
   - **Критерии приёмки:**
     - `CalendarDate` живёт в `lib/src/shared/domain/`, а наблюдатель и поставщик местного дня — в `lib/src/shared/presentation/local_day/` под именами без «дневного выбора» (D1 `design.md`).
-    - Статистика, формат данных, перенос данных, граф, страница намерения и модуль дневных выборов импортируют их оттуда; `lib/src/daily_choice/` общих типов больше не определяет.
+    - Статистика, формат данных, перенос данных, граф, страница намерения, модуль дневных выборов и бенчмарки импортируют их оттуда; `lib/src/daily_choice/` общих типов больше не определяет.
     - Поведение не меняется: перенесённые тесты проходят с прежними ожиданиями.
   - **Проверка:**
     - `mise run codegen`, затем `mise exec --no-deps -- flutter analyze`.
@@ -12,6 +12,7 @@
   - **Предполагаемые файлы:**
     - переносятся `lib/src/daily_choice/domain/calendar_date.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_local_day_observer.dart`, `daily_choice_local_date_provider.dart` вместе с `.g.dart`;
     - меняются импорты в `lib/src/statistics`, `lib/src/graph_format`, `lib/src/graph/data`, `lib/src/data_transfer/presentation`, `lib/src/intention/presentation/details/intention_details_page.dart` и `lib/src/daily_choice`;
+    - меняются импорты `CalendarDate` в `benchmark/support/graph_log_fixture.dart`, `contribution_statistics_fixture.dart`, `intention_statistics_fixture.dart`, `benchmark/statistics/drift_statistics_benchmark.dart`, `drift_intention_statistics_benchmark.dart`, `drift_through_relations_statistics_benchmark.dart`;
     - переносятся `test/daily_choice/domain/calendar_date_test.dart` и `test/support/daily_choice_local_date.dart`.
   - **Размер:** M по логике: переносятся три файла, а импорты меняются механически.
 
@@ -125,7 +126,7 @@
 - [ ] 1.10 Дневной выбор больше нельзя создать
   - **Критерии приёмки:**
     - Удалены режим быстрого создания «Новый дневной выбор» и стартовый лист «От намерения / От действия», страница и поток создания, поиски действия и исходного намерения с их назначениями и закреплённым типом, пошаговое построение пути с чтением продолжений, их маршруты, кнопка создания пустого дня и «Добавить» вкладки «Выборы» вместе со строками и тестами.
-    - Быстрое создание предлагает только «Новое намерение», а сохранённый ключ прежнего режима приводит к нему по существующему правилу неизвестного ключа. Сохранённые дневные выборы по-прежнему показываются и меняются, пока их не заменят; команда их создания остаётся до задачи 1.27 только для подготовки тестовых данных.
+    - Быстрое создание предлагает только «Новое намерение», а сохранённый ключ прежнего режима приводит к нему по существующему правилу неизвестного ключа. Сохранённые дневные выборы по-прежнему показываются и меняются, пока их не заменят; команда их создания остаётся до задачи 1.28 только для подготовки тестовых данных.
   - **Проверка:**
     - `mise run codegen`, затем `mise exec --no-deps -- flutter analyze`.
     - `mise exec --no-deps -- flutter test test/app test/daily_choice test/intention test/long_term_relation`.
@@ -333,7 +334,17 @@
     - меняются `lib/src/long_term_relation/presentation/details/relation_details_state.dart`, `relation_details_view_model.dart`, `relation_details_sheet.dart`, `relation_command_failure_message.dart`, `relation_list_reconciliation.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и их тесты.
   - **Размер:** M по логике: одно разрешение удаляется через все слои связи.
 
-- [ ] 1.27 Граф больше не читает и не меняет дневные выборы
+- [ ] 1.27 Бенчмарки статистики, журнала фактов, экспорта, импорта и восстановления работают на действиях
+  - **Критерии приёмки:**
+    - Фикстуры бенчмарков наполняют прежний профиль графа — 50 000 намерений и 150 000 связей с циклами — действиями с путями до 60 в день на несколько лет и надгробиями вместо дневных выборов.
+    - Бюджеты бенчмарков статистики Главной, статистики намерения, «Через связи», журнала фактов, экспорта, импорта и восстановления не ослаблены и соблюдаются.
+  - **Проверка:**
+    - `mise run benchmark`.
+  - **Зависимости:** 1.6, 1.7, 1.21, 1.23.
+  - **Предполагаемые файлы:** `benchmark/support/contribution_statistics_fixture.dart`, `intention_statistics_fixture.dart`, `graph_log_fixture.dart`, `graph_log_database.dart`, `graph_log_memory_worker.dart`, `graph_replacement_timing.dart`, `benchmark/statistics/drift_statistics_benchmark.dart`, `drift_intention_statistics_benchmark.dart`, `drift_through_relations_statistics_benchmark.dart`, `benchmark/graph_log/graph_log_benchmark.dart`.
+  - **Размер:** M.
+
+- [ ] 1.28 Граф больше не читает и не меняет дневные выборы
   - **Критерии приёмки:**
     - Чтения, каталог, состояния дней, наблюдение, команды и проверка пути дневных выборов, их контракты в `PersonalGraphRepository` и координаторе, `DailyChoiceChange`, завершения и сообщения представителя, события диагностики и строки удалены.
     - В `lib/src/daily_choice/` остаются только типы, которые нужны хранилищу, формату и журналу фактов до задачи 1.29; тесты, готовившие данные командой создания дневного выбора, готовят действия.
@@ -346,16 +357,6 @@
     - меняются `lib/src/graph/application/graph_command_coordinator.dart`, `graph_change.dart`, `personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, `developer_diagnostics_sink.dart`, `lib/src/app/app_runtime.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`;
     - удаляются `test/daily_choice/`, `test/graph/data/drift_daily_choice_*_test.dart`, `test/support/daily_choice_*.dart`; меняются тесты, готовившие данные дневными выборами.
   - **Размер:** M по логике: файлов больше нормы, но почти всё — удаление.
-
-- [ ] 1.28 Бенчмарки статистики, журнала фактов, экспорта, импорта и восстановления работают на действиях
-  - **Критерии приёмки:**
-    - Фикстуры бенчмарков наполняют прежний профиль графа — 50 000 намерений и 150 000 связей с циклами — действиями с путями до 60 в день на несколько лет и надгробиями вместо дневных выборов.
-    - Бюджеты бенчмарков статистики Главной, статистики намерения, «Через связи», журнала фактов, экспорта, импорта и восстановления не ослаблены и соблюдаются.
-  - **Проверка:**
-    - `mise run benchmark`.
-  - **Зависимости:** 1.6, 1.7, 1.21, 1.23.
-  - **Предполагаемые файлы:** `benchmark/support/contribution_statistics_fixture.dart`, `intention_statistics_fixture.dart`, `graph_log_fixture.dart`, `graph_log_database.dart`, `graph_log_memory_worker.dart`, `graph_replacement_timing.dart`, `benchmark/statistics/drift_statistics_benchmark.dart`, `drift_intention_statistics_benchmark.dart`, `drift_through_relations_statistics_benchmark.dart`, `benchmark/graph_log/graph_log_benchmark.dart`.
-  - **Размер:** M.
 
 - [ ] 1.29 Хранилище, формат и журнал фактов больше не содержат дневных выборов
   - **Критерии приёмки:**
