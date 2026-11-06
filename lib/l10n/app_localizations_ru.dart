@@ -1908,6 +1908,101 @@ class AppLocalizationsRu extends AppLocalizations {
       'Операция с действием не выполнена из-за непредвиденной ошибки.';
 
   @override
+  String get actionPanelTitle => 'Действие';
+
+  @override
+  String get actionPanelExpand => 'Раскрыть панель действия';
+
+  @override
+  String get actionPanelCollapse => 'Свернуть панель действия';
+
+  @override
+  String get actionPanelLoading => 'Загружаем действие…';
+
+  @override
+  String get actionPanelUnavailable =>
+      'Не удалось загрузить действие. Повторите попытку.';
+
+  @override
+  String get actionPanelCorruption =>
+      'Сохранённое действие повреждено и не может быть показано.';
+
+  @override
+  String get actionPanelUnexpected =>
+      'Не удалось загрузить действие из-за непредвиденной ошибки.';
+
+  @override
+  String actionPanelCompletionLabel(String action, String priority) {
+    return 'Выполнение действия. $action. $priority';
+  }
+
+  @override
+  String get actionRefresh => 'Обновить действие';
+
+  @override
+  String get actionFieldDate => 'Дата';
+
+  @override
+  String get actionFieldTime => 'Время';
+
+  @override
+  String get actionFieldPriority => 'Приоритет';
+
+  @override
+  String actionFieldDateLabel(String date) {
+    return 'Дата: $date. Изменить дату';
+  }
+
+  @override
+  String actionFieldTimeLabel(String time) {
+    return 'Время: $time. Изменить время';
+  }
+
+  @override
+  String get actionAllDay => 'Весь день';
+
+  @override
+  String actionPriorityOption(String priority) {
+    return 'Приоритет $priority';
+  }
+
+  @override
+  String get actionDateToday => 'Сегодня';
+
+  @override
+  String get actionDateTomorrow => 'Завтра';
+
+  @override
+  String get actionDateYesterday => 'Вчера';
+
+  @override
+  String get actionDateSheetLabel => 'Дата действия';
+
+  @override
+  String get actionTimeSheetLabel => 'Время действия';
+
+  @override
+  String get actionTimeHalfSwitchLabel => 'Половина суток';
+
+  @override
+  String get actionTimeAmLabel => 'До полудня';
+
+  @override
+  String get actionTimePmLabel => 'После полудня';
+
+  @override
+  String get actionCalendarPreviousMonth => 'Предыдущий месяц';
+
+  @override
+  String get actionCalendarNextMonth => 'Следующий месяц';
+
+  @override
+  String get actionCalendarDayAllCompleted => 'Все действия выполнены';
+
+  @override
+  String get actionCalendarDayHasIncomplete => 'Есть невыполненное действие';
+
+  @override
   String get graphOperationAddRelations => 'Добавление';
 
   @override

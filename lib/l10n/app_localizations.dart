@@ -2917,6 +2917,174 @@ abstract class AppLocalizations {
   /// **'The action operation failed because of an unexpected error.'**
   String get actionOperationUnexpected;
 
+  /// Заголовок и доступное название панели действия
+  ///
+  /// In en, this message translates to:
+  /// **'Action'**
+  String get actionPanelTitle;
+
+  /// Доступное название ручки компактной панели действия
+  ///
+  /// In en, this message translates to:
+  /// **'Expand action sheet'**
+  String get actionPanelExpand;
+
+  /// Доступное название ручки раскрытой панели действия
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse action sheet'**
+  String get actionPanelCollapse;
+
+  /// Начальная загрузка панели действия
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the action…'**
+  String get actionPanelLoading;
+
+  /// Доказанно временный отказ чтения действия в панели
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the action. Try again.'**
+  String get actionPanelUnavailable;
+
+  /// Повреждённые данные действия в панели
+  ///
+  /// In en, this message translates to:
+  /// **'The saved action is corrupted and cannot be shown.'**
+  String get actionPanelCorruption;
+
+  /// Неизвестный отказ чтения действия в панели
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the action because of an unexpected error.'**
+  String get actionPanelUnexpected;
+
+  /// Доступное название флажка в шапке панели; состояние сообщает сам флажок
+  ///
+  /// In en, this message translates to:
+  /// **'Completion of the action. {action}. {priority}'**
+  String actionPanelCompletionLabel(String action, String priority);
+
+  /// Действие уведомления об отказе изменения выполнения без явного повтора: перечитывает действие и возвращает флажок
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh the action'**
+  String get actionRefresh;
+
+  /// Название поля даты действия
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get actionFieldDate;
+
+  /// Название поля времени действия
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get actionFieldTime;
+
+  /// Название поля приоритета действия
+  ///
+  /// In en, this message translates to:
+  /// **'Priority'**
+  String get actionFieldPriority;
+
+  /// Доступное название поля даты: название поля, полное значение и действие
+  ///
+  /// In en, this message translates to:
+  /// **'Date: {date}. Change date'**
+  String actionFieldDateLabel(String date);
+
+  /// Доступное название поля времени: название поля, значение и действие
+  ///
+  /// In en, this message translates to:
+  /// **'Time: {time}. Change time'**
+  String actionFieldTimeLabel(String time);
+
+  /// Планирование на весь день без конкретного времени
+  ///
+  /// In en, this message translates to:
+  /// **'All day'**
+  String get actionAllDay;
+
+  /// Вариант приоритета действия
+  ///
+  /// In en, this message translates to:
+  /// **'Priority {priority}'**
+  String actionPriorityOption(String priority);
+
+  /// Дата действия, совпадающая с текущим локальным днём устройства
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get actionDateToday;
+
+  /// Дата действия, которая наступит завтра
+  ///
+  /// In en, this message translates to:
+  /// **'Tomorrow'**
+  String get actionDateTomorrow;
+
+  /// Дата действия, которая была вчера
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get actionDateYesterday;
+
+  /// Доступное название листа даты действия
+  ///
+  /// In en, this message translates to:
+  /// **'Action date'**
+  String get actionDateSheetLabel;
+
+  /// Доступное название листа времени действия
+  ///
+  /// In en, this message translates to:
+  /// **'Action time'**
+  String get actionTimeSheetLabel;
+
+  /// Доступное название переключателя половины суток на 12-часовом циферблате
+  ///
+  /// In en, this message translates to:
+  /// **'Half of the day'**
+  String get actionTimeHalfSwitchLabel;
+
+  /// Доступное название половины суток до полудня
+  ///
+  /// In en, this message translates to:
+  /// **'Before noon'**
+  String get actionTimeAmLabel;
+
+  /// Доступное название половины суток после полудня
+  ///
+  /// In en, this message translates to:
+  /// **'After noon'**
+  String get actionTimePmLabel;
+
+  /// Команда просмотра предыдущего месяца в листе даты действия
+  ///
+  /// In en, this message translates to:
+  /// **'Previous month'**
+  String get actionCalendarPreviousMonth;
+
+  /// Команда просмотра следующего месяца в листе даты действия
+  ///
+  /// In en, this message translates to:
+  /// **'Next month'**
+  String get actionCalendarNextMonth;
+
+  /// Доступное состояние дня с отметкой: все действия этой даты выполнены
+  ///
+  /// In en, this message translates to:
+  /// **'All actions are completed'**
+  String get actionCalendarDayAllCompleted;
+
+  /// Доступное состояние дня с отметкой: на эту дату есть хотя бы одно невыполненное действие
+  ///
+  /// In en, this message translates to:
+  /// **'There is an incomplete action'**
+  String get actionCalendarDayHasIncomplete;
+
   /// Вид операции добавления связей
   ///
   /// In en, this message translates to:

@@ -1884,6 +1884,100 @@ class AppLocalizationsEn extends AppLocalizations {
       'The action operation failed because of an unexpected error.';
 
   @override
+  String get actionPanelTitle => 'Action';
+
+  @override
+  String get actionPanelExpand => 'Expand action sheet';
+
+  @override
+  String get actionPanelCollapse => 'Collapse action sheet';
+
+  @override
+  String get actionPanelLoading => 'Loading the action…';
+
+  @override
+  String get actionPanelUnavailable => 'Could not load the action. Try again.';
+
+  @override
+  String get actionPanelCorruption =>
+      'The saved action is corrupted and cannot be shown.';
+
+  @override
+  String get actionPanelUnexpected =>
+      'Could not load the action because of an unexpected error.';
+
+  @override
+  String actionPanelCompletionLabel(String action, String priority) {
+    return 'Completion of the action. $action. $priority';
+  }
+
+  @override
+  String get actionRefresh => 'Refresh the action';
+
+  @override
+  String get actionFieldDate => 'Date';
+
+  @override
+  String get actionFieldTime => 'Time';
+
+  @override
+  String get actionFieldPriority => 'Priority';
+
+  @override
+  String actionFieldDateLabel(String date) {
+    return 'Date: $date. Change date';
+  }
+
+  @override
+  String actionFieldTimeLabel(String time) {
+    return 'Time: $time. Change time';
+  }
+
+  @override
+  String get actionAllDay => 'All day';
+
+  @override
+  String actionPriorityOption(String priority) {
+    return 'Priority $priority';
+  }
+
+  @override
+  String get actionDateToday => 'Today';
+
+  @override
+  String get actionDateTomorrow => 'Tomorrow';
+
+  @override
+  String get actionDateYesterday => 'Yesterday';
+
+  @override
+  String get actionDateSheetLabel => 'Action date';
+
+  @override
+  String get actionTimeSheetLabel => 'Action time';
+
+  @override
+  String get actionTimeHalfSwitchLabel => 'Half of the day';
+
+  @override
+  String get actionTimeAmLabel => 'Before noon';
+
+  @override
+  String get actionTimePmLabel => 'After noon';
+
+  @override
+  String get actionCalendarPreviousMonth => 'Previous month';
+
+  @override
+  String get actionCalendarNextMonth => 'Next month';
+
+  @override
+  String get actionCalendarDayAllCompleted => 'All actions are completed';
+
+  @override
+  String get actionCalendarDayHasIncomplete => 'There is an incomplete action';
+
+  @override
   String get graphOperationAddRelations => 'Add';
 
   @override
