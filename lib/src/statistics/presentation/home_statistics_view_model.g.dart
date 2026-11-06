@@ -42,7 +42,7 @@ final class HomeStatisticsViewModelProvider
 }
 
 String _$homeStatisticsViewModelHash() =>
-    r'904e2385d826ba218e3d7735fc77199689a3f03e';
+    r'69a38e1845747086d33f3a410e741cb4b28933fe';
 
 abstract class _$HomeStatisticsViewModel
     extends $Notifier<HomeStatisticsState> {

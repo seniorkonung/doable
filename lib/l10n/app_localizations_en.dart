@@ -40,6 +40,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statisticsThroughRelations => 'Through relations';
 
   @override
+  String get statisticsViewSheetTitle => 'Count actions by';
+
+  @override
+  String get statisticsRootIntentionsHint => 'Where each path starts';
+
+  @override
+  String get statisticsIntermediateIntentionsHint =>
+      'Links between the root and the final intention';
+
+  @override
+  String get statisticsTerminalIntentionsHint =>
+      'The last reason right above the action';
+
+  @override
+  String get statisticsThroughRelationsHint =>
+      'Every intention the action serves';
+
+  @override
+  String get statisticsThroughRelationsNote =>
+      'This view counts by the relations as they are now and changes with them.';
+
+  @override
   String get statisticsMonthTab => 'Month';
 
   @override
@@ -208,6 +230,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statisticsLoading => 'Loading statistics…';
+
+  @override
+  String get statisticsPeriodEmpty =>
+      'There are no actions in this period. Actions dated within it will be counted here.';
+
+  @override
+  String statisticsViewEmpty(String view) {
+    return 'There are no items in the “$view” view for this period.';
+  }
 
   @override
   String get statisticsEmpty =>

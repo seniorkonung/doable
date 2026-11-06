@@ -9,6 +9,7 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/action/application/action_command.dart';
 import 'package:doable/src/data/local/app_database.dart' hide LongTermRelation;
+import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -22,6 +23,8 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_com
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/statistics/application/statistics_read_contract.dart';
+import 'package:doable/src/statistics/presentation/statistics_view_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -50,10 +53,15 @@ void main() {
           _seedAction(database, 201, [1, 2, 3], '2026-09-23', completed: true),
     );
     addTearDown(gate.releaseComputation);
-    await _until(tester, find.text(app.texts.statisticsEmpty));
+    await _until(tester, find.text(app.texts.statisticsPeriodEmpty));
     await _tap(tester, find.byTooltip(app.texts.statisticsPreviousMonth));
     await _until(tester, find.text(app.texts.statisticsPeriodCompleted(1, 1)));
-    await _tap(tester, find.text(app.texts.statisticsThroughRelations));
+    await _selectView(
+      tester,
+      app.texts,
+      from: StatisticsView.rootIntentions,
+      to: StatisticsView.throughRelations,
+    );
     await _until(tester, find.text(app.texts.statisticsTotalItems(3)));
 
     final relation = await app.relation(
@@ -156,7 +164,12 @@ void main() {
       () => gate.computationStarted.isCompleted,
       'Подсчёт года не начался',
     );
-    await _tap(tester, find.text(app.texts.statisticsRootIntentions));
+    await _selectView(
+      tester,
+      app.texts,
+      from: StatisticsView.throughRelations,
+      to: StatisticsView.rootIntentions,
+    );
     await _until(tester, find.text(app.texts.statisticsTotalItems(1)));
     final readsAfterViewChange = app.reads;
     final pagesBeforeOldResponse = app.completedPages;
@@ -180,13 +193,18 @@ void main() {
     (tester) async {
       final semantics = tester.ensureSemantics();
       final app = await _start(tester, seedMore: _seedCatalog);
-      await _until(tester, find.text(app.texts.statisticsEmpty));
+      await _until(tester, find.text(app.texts.statisticsPeriodEmpty));
       await _tap(tester, find.byTooltip(app.texts.statisticsPreviousMonth));
-      await _until(tester, find.text(app.texts.statisticsEmpty));
+      await _until(tester, find.text(app.texts.statisticsPeriodEmpty));
       await _tap(tester, find.text(app.texts.statisticsYearTab));
       await _tap(tester, find.byTooltip(app.texts.statisticsPreviousYear));
       await _until(tester, find.text(app.texts.statisticsPeriodActions(220)));
-      await _tap(tester, find.text(app.texts.statisticsIntermediateIntentions));
+      await _selectView(
+        tester,
+        app.texts,
+        from: StatisticsView.rootIntentions,
+        to: StatisticsView.intermediateIntentions,
+      );
       await _until(tester, find.text(app.texts.statisticsTotalItems(220)));
       await _tap(
         tester,
@@ -261,14 +279,11 @@ void main() {
         Tristate.isTrue,
       );
       expect(
-        tester
-            .getSemantics(find.text(english.statisticsIntermediateIntentions))
-            .flagsCollection
-            .isSelected,
-        Tristate.isTrue,
+        find.text(english.statisticsIntermediateIntentions),
+        findsOneWidget,
       );
       await _tap(tester, find.text(english.statisticsMonthTab));
-      await _until(tester, find.text(english.statisticsEmpty));
+      await _until(tester, find.text(english.statisticsPeriodEmpty));
       expect(
         find.text(english.statisticsMonthPeriod(DateTime.utc(2026, 9))),
         findsOneWidget,
@@ -298,14 +313,19 @@ void main() {
         gate.release();
         gate.releaseComputation();
       });
-      await _until(tester, find.text(app.texts.statisticsEmpty));
+      await _until(tester, find.text(app.texts.statisticsPeriodEmpty));
       await _tap(tester, find.text(app.texts.statisticsYearTab));
       await _tap(tester, find.byTooltip(app.texts.statisticsPreviousYear));
       await _until(
         tester,
         find.text(app.texts.statisticsPeriodCompleted(220, 220)),
       );
-      await _tap(tester, find.text(app.texts.statisticsThroughRelations));
+      await _selectView(
+        tester,
+        app.texts,
+        from: StatisticsView.rootIntentions,
+        to: StatisticsView.throughRelations,
+      );
       await _until(tester, find.text(app.texts.statisticsTotalItems(222)));
       final row = find.text('Промежуточное 071');
       final oldCounts = find.descendant(
@@ -520,10 +540,16 @@ void main() {
         tester,
         find.text(first.texts.statisticsPeriodCompleted(1, 1)),
       );
+      await _selectView(
+        tester,
+        first.texts,
+        from: StatisticsView.rootIntentions,
+        to: StatisticsView.throughRelations,
+      );
+      await _until(tester, find.text(first.texts.statisticsTotalItems(3)));
       await _tap(tester, find.text(first.texts.statisticsYearTab));
       await _tap(tester, find.byTooltip(first.texts.statisticsPreviousYear));
-      await _tap(tester, find.text(first.texts.statisticsThroughRelations));
-      await _until(tester, find.text(first.texts.statisticsEmpty));
+      await _until(tester, find.text(first.texts.statisticsPeriodEmpty));
       await _tap(
         tester,
         find.byTooltip(first.texts.statisticsExpandPeriodSelector),
@@ -610,7 +636,12 @@ void main() {
       expect(find.text(app.texts.statisticsPeriodActions(1)), findsOneWidget);
       expect(app.reads, initialReads + 1);
 
-      await _tap(tester, find.text(app.texts.statisticsIntermediateIntentions));
+      await _selectView(
+        tester,
+        app.texts,
+        from: StatisticsView.rootIntentions,
+        to: StatisticsView.intermediateIntentions,
+      );
       await _until(tester, find.text('Намерение 2'));
       await app.coverHome(tester);
       final coveredReads = app.reads;
@@ -625,7 +656,7 @@ void main() {
       );
       expect(app.reads, coveredReads);
       await app.back(tester);
-      await _until(tester, find.text(app.texts.statisticsPeriodActions(0)));
+      await _until(tester, find.text(app.texts.statisticsPeriodEmpty));
       expect(app.reads, coveredReads + 1);
 
       await app.coverHome(tester);
@@ -644,10 +675,22 @@ void main() {
       expect(app.reads, recreatingReads);
       await openHome(tester);
       await _until(tester, find.text(app.texts.statisticsPeriodActions(1)));
-      expect(find.text(app.texts.statisticsEmpty), findsOneWidget);
+      expect(
+        find.text(
+          app.texts.statisticsViewEmpty(
+            app.texts.statisticsIntermediateIntentions,
+          ),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('Намерение 2'), findsNothing);
       expect(app.reads, recreatingReads + 1);
-      await _tap(tester, find.text(app.texts.statisticsTerminalIntentions));
+      await _selectView(
+        tester,
+        app.texts,
+        from: StatisticsView.intermediateIntentions,
+        to: StatisticsView.terminalIntentions,
+      );
       await _until(tester, find.text('Намерение 4'));
       expect(find.text(app.texts.detailsArchived), findsOneWidget);
       expect(
@@ -660,8 +703,7 @@ void main() {
       await app.action(tester, DeleteAction(seedActionId(202)));
       expect(app.reads, deletingReads);
       await app.back(tester);
-      await _until(tester, find.text(app.texts.statisticsPeriodActions(0)));
-      expect(find.text(app.texts.statisticsEmpty), findsOneWidget);
+      await _until(tester, find.text(app.texts.statisticsPeriodEmpty));
       expect(app.reads, deletingReads + 1);
       expect(tester.takeException(), isNull);
     },
@@ -1022,4 +1064,16 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
   await tester.tap(finder);
   await tester.pumpAndSettle();
+}
+
+/// Открывает лист «Считать действия по» через выбор текущего вида [from] и
+/// выбирает в нём вид [to].
+Future<void> _selectView(
+  WidgetTester tester,
+  AppLocalizations texts, {
+  required StatisticsView from,
+  required StatisticsView to,
+}) async {
+  await _tap(tester, find.text(from.title(texts)));
+  await _tap(tester, find.widgetWithText(OptionRow, to.title(texts)));
 }

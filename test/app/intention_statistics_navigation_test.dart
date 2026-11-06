@@ -9,6 +9,7 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/action/presentation/day/action_day_date_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
@@ -45,7 +46,14 @@ void main() {
     ]) {
       _scroll(tester, find.byType(HomePage)).position.jumpTo(0);
       await tester.pumpAndSettle();
-      await _tap(tester, find.text(_viewLabel(app.texts, view)));
+      await _tap(
+        tester,
+        find.text(_viewLabel(app.texts, app.home.selection.view)),
+      );
+      await _tap(
+        tester,
+        find.widgetWithText(OptionRow, _viewLabel(app.texts, view)),
+      );
       await _wait(tester, () => app.home.read is HomeStatisticsData);
       final row = find.text('Намерение $id');
       await _scrollTo(tester, row, find.byType(HomePage));

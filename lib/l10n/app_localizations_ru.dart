@@ -40,6 +40,28 @@ class AppLocalizationsRu extends AppLocalizations {
   String get statisticsThroughRelations => 'Через связи';
 
   @override
+  String get statisticsViewSheetTitle => 'Считать действия по';
+
+  @override
+  String get statisticsRootIntentionsHint => 'С чего начинается каждый путь';
+
+  @override
+  String get statisticsIntermediateIntentionsHint =>
+      'Звенья между корневым и конечным';
+
+  @override
+  String get statisticsTerminalIntentionsHint =>
+      'Последняя причина прямо над действием';
+
+  @override
+  String get statisticsThroughRelationsHint =>
+      'Все намерения, которым служит действие';
+
+  @override
+  String get statisticsThroughRelationsNote =>
+      'Вид считает по связям на сейчас и меняется вместе с ними.';
+
+  @override
   String get statisticsMonthTab => 'Месяц';
 
   @override
@@ -212,6 +234,15 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get statisticsLoading => 'Загружаем статистику…';
+
+  @override
+  String get statisticsPeriodEmpty =>
+      'В этом периоде действий нет. Действия, датированные им, будут посчитаны здесь.';
+
+  @override
+  String statisticsViewEmpty(String view) {
+    return 'В виде «$view» в этом периоде элементов нет.';
+  }
 
   @override
   String get statisticsEmpty =>

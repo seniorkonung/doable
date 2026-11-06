@@ -152,7 +152,11 @@ sealed class HomeStatisticsLoaded extends HomeStatisticsReadState {
   HomeStatisticsLoaded withRefreshStatus(
     HomeStatisticsRefreshStatus refreshStatus,
   ) => switch (this) {
-    HomeStatisticsEmpty() => HomeStatisticsEmpty(
+    HomeStatisticsPeriodEmpty() => HomeStatisticsPeriodEmpty(
+      revision: revision,
+      refreshStatus: refreshStatus,
+    ),
+    HomeStatisticsViewEmpty() => HomeStatisticsViewEmpty(
       summary: summary,
       revision: revision,
       refreshStatus: refreshStatus,
@@ -191,8 +195,20 @@ final class HomeStatisticsData extends HomeStatisticsLoaded {
       );
 }
 
-final class HomeStatisticsEmpty extends HomeStatisticsLoaded {
-  HomeStatisticsEmpty({
+/// В периоде нет действий: сводки, выбора вида и каталога нет.
+final class HomeStatisticsPeriodEmpty extends HomeStatisticsLoaded {
+  HomeStatisticsPeriodEmpty({required super.revision, super.refreshStatus})
+    : super(
+        summary: ContributionCounts(planned: 0, contribution: 0),
+        totalItems: 0,
+        items: const [],
+        nextCursor: null,
+      );
+}
+
+/// В периоде есть действия, но в выбранном виде нет элементов.
+final class HomeStatisticsViewEmpty extends HomeStatisticsLoaded {
+  HomeStatisticsViewEmpty({
     required super.summary,
     required super.revision,
     super.refreshStatus,

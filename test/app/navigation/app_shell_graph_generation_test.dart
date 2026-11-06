@@ -18,6 +18,7 @@ import 'package:doable/src/action/presentation/day/action_day_calendar_viewport.
 import 'package:doable/src/action/presentation/day/action_day_root_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data_transfer/application/graph_replacement.dart';
+import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph_format/graph_format_records.dart';
@@ -38,6 +39,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/action_seed.dart';
 import '../../support/app_root_pages.dart';
 import '../../support/controlled_local_date.dart';
 import '../../support/action_day_controls.dart';
@@ -191,7 +193,7 @@ Future<_App> _start(WidgetTester tester) async {
 }
 
 /// Прежний граф: тег «Здоровье» и намерения «Намерение 01» … «Намерение 40»
-/// с этим тегом.
+/// с этим тегом и действие 2025 года.
 void _seed(sqlite.Database database) {
   database.execute('BEGIN');
   seedRawGraph(database, () {
@@ -213,6 +215,13 @@ void _seed(sqlite.Database database) {
           [tagFixtureId(_previousTag), id],
         );
     }
+    // Действие прошлого года: без действий периода Главная не показывает выбор вида.
+    seedAction(
+      database,
+      id: seedUuid(900),
+      path: [tagFixtureId(_firstPrevious)],
+      date: '2025-06-01',
+    );
   });
   database.execute('COMMIT');
 }
@@ -281,7 +290,11 @@ Future<void> _prepareHome(WidgetTester tester, _App app) async {
   await _select(tester, AppDestination.home);
   await _tap(tester, find.text(_l10n.statisticsYearTab));
   await _tap(tester, find.byTooltip(_l10n.statisticsPreviousYear));
-  await _tap(tester, find.text(_l10n.statisticsTerminalIntentions));
+  await _tap(tester, find.text(_l10n.statisticsRootIntentions));
+  await _tap(
+    tester,
+    find.widgetWithText(OptionRow, _l10n.statisticsTerminalIntentions),
+  );
   await _settle(tester);
 
   final home = app.container.read(homeStatisticsViewModelProvider).selection;

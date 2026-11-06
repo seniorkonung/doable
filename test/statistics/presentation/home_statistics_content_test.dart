@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:ui' show Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
@@ -103,29 +103,94 @@ void main() {
           greaterThan(tester.getTopLeft(find.text(titles[i - 1])).dy),
         );
       }
-      final views = [
-        texts.statisticsRootIntentions,
-        texts.statisticsIntermediateIntentions,
-        texts.statisticsTerminalIntentions,
-        texts.statisticsThroughRelations,
-      ];
-      for (var i = 1; i < views.length; ++i) {
-        final previous = tester.getTopLeft(
-          find.widgetWithText(TextButton, views[i - 1]),
-        );
-        final current = tester.getTopLeft(
-          find.widgetWithText(TextButton, views[i]),
-        );
-        expect(
-          current.dy > previous.dy ||
-              (current.dy == previous.dy && current.dx > previous.dx),
-          isTrue,
-        );
-      }
+    },
+  );
 
-      await tester.tap(find.text(texts.statisticsIntermediateIntentions));
+  testWidgets(
+    'выбор вида показывает название и точное число элементов и открывает лист с четырьмя видами и пояснениями',
+    (tester) async {
+      final harness = _Harness(
+        _data([_item(1, 'Высыпаться', 3, 8)], summary: _summary(3, 20)),
+      );
+      await harness.pump(tester);
+      final texts = harness.texts(tester);
+      expect(find.text(texts.statisticsRootIntentions), findsOneWidget);
+      expect(find.text(texts.statisticsTotalItems(1)), findsOneWidget);
+
+      await tester.tap(find.text(texts.statisticsRootIntentions));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Считать действия по'), findsOneWidget);
+      final rows = find.byType(OptionRow);
+      expect(rows, findsNWidgets(4));
+      final names = [
+        for (final row in tester.widgetList<OptionRow>(rows)) row.name,
+      ];
+      expect(names, [
+        'Корневые намерения',
+        'Промежуточные намерения',
+        'Конечные намерения',
+        'Через связи',
+      ]);
+      final hints = [
+        for (final row in tester.widgetList<OptionRow>(rows)) row.hint,
+      ];
+      expect(hints, [
+        'С чего начинается каждый путь',
+        'Звенья между корневым и конечным',
+        'Последняя причина прямо над действием',
+        'Все намерения, которым служит действие',
+      ]);
+      expect(
+        tester
+            .widgetList<OptionRow>(rows)
+            .where((row) => row.trailing == OptionRowTrailing.selected)
+            .map((row) => row.name),
+        ['Корневые намерения'],
+      );
+    },
+  );
+
+  testWidgets('вид выбирается в листе, применяется сразу и закрывает лист', (
+    tester,
+  ) async {
+    final harness = _Harness(_data([_item(1, 'Высыпаться', 3, 8)]));
+    await harness.pump(tester);
+    final texts = harness.texts(tester);
+
+    await tester.tap(find.text(texts.statisticsRootIntentions));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.widgetWithText(OptionRow, texts.statisticsTerminalIntentions),
+    );
+    await tester.pumpAndSettle();
+
+    expect(harness.selectedViews, [StatisticsView.terminalIntentions]);
+    expect(find.byType(OptionRow), findsNothing);
+    expect(find.text(texts.statisticsViewSheetTitle), findsNothing);
+    expect(find.text(texts.statisticsTerminalIntentions), findsOneWidget);
+  });
+
+  testWidgets(
+    'пояснение о связях на сейчас стоит только над видом «Через связи»',
+    (tester) async {
+      final harness = _Harness(_data([_item(1, 'Высыпаться', 3, 8)]));
+      await harness.pump(tester);
+      final texts = harness.texts(tester);
+      expect(find.text(texts.statisticsThroughRelationsNote), findsNothing);
+
+      harness.state.value = HomeStatisticsState(
+        selection: harness.state.value.selection.copyWith(
+          view: StatisticsView.throughRelations,
+        ),
+        read: _data([_item(1, 'Высыпаться', 3, 8)]),
+      );
       await tester.pump();
-      expect(harness.selectedViews, [StatisticsView.intermediateIntentions]);
+
+      expect(
+        find.text('Вид считает по связям на сейчас и меняется вместе с ними.'),
+        findsOneWidget,
+      );
     },
   );
 
@@ -153,7 +218,7 @@ void main() {
     },
   );
   testWidgets(
-    'загрузка, пустой вид и обновление различаются без ложных нулей',
+    'загрузка, пустой период, пустой вид и обновление различаются без ложных нулей',
     (tester) async {
       final harness = _Harness(
         const HomeStatisticsInitialLoad(),
@@ -166,20 +231,31 @@ void main() {
       expect(find.text(texts.statisticsTotalItems(0)), findsNothing);
 
       harness.show(
-        HomeStatisticsEmpty(summary: _summary(4, 21), revision: _revision),
+        HomeStatisticsViewEmpty(summary: _summary(4, 21), revision: _revision),
       );
       await tester.pump();
-      expect(find.text(texts.statisticsEmpty), findsOneWidget);
+      expect(
+        find.text(
+          'В виде «Промежуточные намерения» в этом периоде элементов нет.',
+        ),
+        findsOneWidget,
+      );
       expect(find.text(texts.statisticsTotalItems(0)), findsOneWidget);
       expect(find.text(texts.statisticsPeriodActions(21)), findsOneWidget);
       expect(find.text(texts.statisticsPeriodCompleted(4, 21)), findsOneWidget);
 
-      harness.show(
-        HomeStatisticsEmpty(summary: _summary(0, 0), revision: _revision),
-      );
+      harness.show(HomeStatisticsPeriodEmpty(revision: _revision));
       await tester.pump();
-      expect(find.text(texts.statisticsPeriodActions(0)), findsOneWidget);
-      expect(find.text(texts.statisticsPeriodCompleted(0, 0)), findsOneWidget);
+      expect(
+        find.text(
+          'В этом периоде действий нет. Действия, датированные им, будут посчитаны здесь.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(texts.statisticsPeriodSummary), findsNothing);
+      expect(find.text(texts.statisticsViewLabel), findsNothing);
+      expect(find.text(texts.statisticsIntermediateIntentions), findsNothing);
+      expect(find.text(texts.statisticsTotalItems(0)), findsNothing);
 
       harness.show(
         _data([
@@ -586,30 +662,15 @@ void main() {
           maxScrolls: 20,
         );
         await tester.pumpAndSettle();
-        final source = find.text(texts.statisticsRootIntentions);
-        final node = tester.getSemantics(source).getSemanticsData();
-        expect(node.flagsCollection.isSelected, Tristate.isTrue);
-        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-        await tester.pump();
-        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.tap(find.text(texts.statisticsRootIntentions));
         await tester.pumpAndSettle();
-        expect(
-          find.text(texts.statisticsThroughRelations).hitTestable(),
-          findsOneWidget,
+        await tester.tap(
+          find.widgetWithText(OptionRow, texts.statisticsThroughRelations),
         );
-        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-        await tester.pump();
+        await tester.pumpAndSettle();
         expect(harness.selectedViews.last, StatisticsView.throughRelations);
-        expect(
-          tester
-              .getSemantics(find.text(texts.statisticsThroughRelations))
-              .getSemanticsData()
-              .flagsCollection
-              .isSelected,
-          Tristate.isTrue,
-        );
+        expect(find.byType(OptionRow), findsNothing);
+        expect(find.text(texts.statisticsThroughRelations), findsOneWidget);
 
         final selection = harness.state.value.selection;
         await harness.pump(

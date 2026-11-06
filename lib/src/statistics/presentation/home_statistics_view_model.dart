@@ -315,18 +315,20 @@ final class HomeStatisticsViewModel extends _$HomeStatisticsViewModel {
     _readingGeneration = null;
     _requiredRevision = first.revision;
     state = state.copyWith(
-      read: first.totalItems == 0
-          ? HomeStatisticsEmpty(
-              summary: first.summary,
-              revision: first.revision,
-            )
-          : HomeStatisticsData(
-              summary: first.summary,
-              totalItems: first.totalItems,
-              items: items,
-              revision: first.revision,
-              nextCursor: cursor,
-            ),
+      read: switch ((first.summary.planned, first.totalItems)) {
+        (0, _) => HomeStatisticsPeriodEmpty(revision: first.revision),
+        (_, 0) => HomeStatisticsViewEmpty(
+          summary: first.summary,
+          revision: first.revision,
+        ),
+        _ => HomeStatisticsData(
+          summary: first.summary,
+          totalItems: first.totalItems,
+          items: items,
+          revision: first.revision,
+          nextCursor: cursor,
+        ),
+      },
     );
   }
 

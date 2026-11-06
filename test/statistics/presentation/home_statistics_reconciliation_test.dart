@@ -461,17 +461,17 @@ void main() {
     },
   );
 
-  test('пустой вид обновляет сводку с теми же признаками обновления', () async {
+  test('пустой период получает те же признаки обновления', () async {
     final h = _Harness();
     addTearDown(h.dispose);
     h.reader.first(0, count: 0);
     await pumpEventQueue();
     await h.change(1);
-    expect(h.state.read, isA<HomeStatisticsEmpty>());
+    expect(h.state.read, isA<HomeStatisticsPeriodEmpty>());
     expect(h.loaded.refreshStatus, isA<HomeStatisticsRefreshing>());
     h.reader.fail(1, const StatisticsReadUnavailableFailure());
     await pumpEventQueue();
-    expect(h.state.read, isA<HomeStatisticsEmpty>());
+    expect(h.state.read, isA<HomeStatisticsPeriodEmpty>());
     expect(h.loaded.refreshStatus, isA<HomeStatisticsRefreshFailure>());
     final retry = h.model.retryRefresh();
     h.reader.first(2, revision: 1);

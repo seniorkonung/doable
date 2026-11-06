@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../l10n/app_localizations.dart';
@@ -7,6 +9,7 @@ import '../application/contribution_counts.dart';
 import '../application/statistics_read_contract.dart';
 import 'home_statistics_state.dart';
 import 'statistics_read_notice.dart';
+import 'statistics_view_sheet.dart';
 
 /// Единая прокрутка выбора периода, сводки и ленивого каталога.
 /// Чтениями и допустимостью повтора владеет модель страницы.
@@ -89,85 +92,103 @@ final class _HomeStatisticsContentState extends State<HomeStatisticsContent> {
                   controller: _scrollController,
                   slivers: [
                     SliverToBoxAdapter(child: widget.periodSelector),
-                    if (read case HomeStatisticsLoaded(:final summary))
-                      SliverToBoxAdapter(
-                        child: _PeriodSummary(summary: summary),
-                      ),
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(texts.statisticsViewLabel),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                for (final view in StatisticsView.values)
-                                  _ViewButton(
-                                    view: view,
-                                    selected:
-                                        widget.state.selection.view == view,
-                                    onPressed: () =>
-                                        widget.onViewSelected(view),
-                                  ),
-                              ],
-                            ),
-                            if (read case HomeStatisticsLoaded(
-                              :final totalItems,
-                            ))
-                              Text(texts.statisticsTotalItems(totalItems)),
-                          ],
-                        ),
-                      ),
-                    ),
-                    switch (read) {
-                      HomeStatisticsData() => SliverList.builder(
-                        // Ленивое построение: https://api.flutter.dev/flutter/widgets/SliverList/SliverList.builder.html
-                        itemCount: read.items.length,
-                        itemBuilder: (context, index) {
-                          _scheduleLoadMore(index, read);
-                          return _StatisticsRow(
-                            item: read.items[index],
-                            periodActions: read.summary.planned,
-                            onPressed: () =>
-                                widget.onOpenIntention(read.items[index].id),
-                          );
-                        },
-                      ),
-                      HomeStatisticsInitialLoad() => SliverToBoxAdapter(
-                        child: StatisticsReadNotice(
-                          message: texts.statisticsLoading,
-                        ),
-                      ),
-                      HomeStatisticsInitialFailure(
-                        :final failure,
-                        :final canRetry,
-                      ) =>
-                        SliverToBoxAdapter(
-                          child: StatisticsReadNotice(
-                            message: statisticsReadFailureMessage(
-                              texts,
-                              failure,
-                              StatisticsReadStage.initial,
-                            ),
-                            onRetry: canRetry ? widget.onRetryFirstPage : null,
-                          ),
-                        ),
-                      HomeStatisticsEmpty() => SliverToBoxAdapter(
-                        child: StatisticsReadNotice(
-                          message: texts.statisticsEmpty,
-                        ),
-                      ),
-                    },
-                    if (read case HomeStatisticsData(:final pageStatus))
-                      SliverToBoxAdapter(child: _pageNotice(texts, pageStatus)),
+                    ..._slivers(texts, read),
                   ],
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _slivers(AppLocalizations texts, HomeStatisticsReadState read) =>
+      switch (read) {
+        HomeStatisticsPeriodEmpty() => [
+          SliverToBoxAdapter(
+            child: StatisticsReadNotice(message: texts.statisticsPeriodEmpty),
+          ),
+        ],
+        HomeStatisticsData() => [
+          SliverToBoxAdapter(child: _PeriodSummary(summary: read.summary)),
+          _viewSelector(read.totalItems),
+          SliverList.builder(
+            // Ленивое построение: https://api.flutter.dev/flutter/widgets/SliverList/SliverList.builder.html
+            itemCount: read.items.length,
+            itemBuilder: (context, index) {
+              _scheduleLoadMore(index, read);
+              return _StatisticsRow(
+                item: read.items[index],
+                periodActions: read.summary.planned,
+                onPressed: () => widget.onOpenIntention(read.items[index].id),
+              );
+            },
+          ),
+          SliverToBoxAdapter(child: _pageNotice(texts, read.pageStatus)),
+        ],
+        HomeStatisticsViewEmpty() => [
+          SliverToBoxAdapter(child: _PeriodSummary(summary: read.summary)),
+          _viewSelector(0),
+          SliverToBoxAdapter(
+            child: StatisticsReadNotice(
+              message: texts.statisticsViewEmpty(
+                widget.state.selection.view.title(texts),
+              ),
+            ),
+          ),
+        ],
+        HomeStatisticsInitialLoad() => [
+          _viewSelector(null),
+          SliverToBoxAdapter(
+            child: StatisticsReadNotice(message: texts.statisticsLoading),
+          ),
+        ],
+        HomeStatisticsInitialFailure(:final failure, :final canRetry) => [
+          _viewSelector(null),
+          SliverToBoxAdapter(
+            child: StatisticsReadNotice(
+              message: statisticsReadFailureMessage(
+                texts,
+                failure,
+                StatisticsReadStage.initial,
+              ),
+              onRetry: canRetry ? widget.onRetryFirstPage : null,
+            ),
+          ),
+        ],
+      };
+
+  /// Выбор вида с числом его элементов; пока число не подтверждено, оно не
+  /// показывается. Для вида «Через связи» над каталогом стоит пояснение.
+  Widget _viewSelector(int? totalItems) {
+    final view = widget.state.selection.view;
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(AppLocalizations.of(context).statisticsViewLabel),
+            const SizedBox(height: 8),
+            _ViewSelector(
+              view: view,
+              totalItems: totalItems,
+              onPressed: () => unawaited(
+                showStatisticsViewSheet(
+                  context,
+                  selected: view,
+                  onSelected: widget.onViewSelected,
+                ),
+              ),
+            ),
+            if (view == StatisticsView.throughRelations)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  AppLocalizations.of(context).statisticsThroughRelationsNote,
+                ),
+              ),
           ],
         ),
       ),
@@ -262,47 +283,32 @@ final class _PeriodSummary extends StatelessWidget {
   }
 }
 
-final class _ViewButton extends StatelessWidget {
-  const _ViewButton({
+final class _ViewSelector extends StatelessWidget {
+  const _ViewSelector({
     required this.view,
-    required this.selected,
+    required this.totalItems,
     required this.onPressed,
   });
 
   final StatisticsView view;
-  final bool selected;
+  final int? totalItems;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     final texts = AppLocalizations.of(context);
-    final label = switch (view) {
-      StatisticsView.rootIntentions => texts.statisticsRootIntentions,
-      StatisticsView.intermediateIntentions =>
-        texts.statisticsIntermediateIntentions,
-      StatisticsView.terminalIntentions => texts.statisticsTerminalIntentions,
-      StatisticsView.throughRelations => texts.statisticsThroughRelations,
-    };
-    final colors = Theme.of(context).colorScheme;
-    return MergeSemantics(
-      child: Semantics(
-        selected: selected,
-        inMutuallyExclusiveGroup: true,
-        child: TextButton(
-          onPressed: onPressed,
-          style: TextButton.styleFrom(
-            minimumSize: const Size(64, 48),
-            backgroundColor: selected ? colors.secondaryContainer : null,
-            foregroundColor: selected ? colors.onSecondaryContainer : null,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (selected) const Icon(Icons.check, size: 18),
-              Text(label, textAlign: TextAlign.center),
-            ],
-          ),
-        ),
+    // Стандартная плитка обеспечивает фокус, клавиатуру и действие диктора.
+    // https://api.flutter.dev/flutter/material/ListTile-class.html
+    return Card(
+      margin: EdgeInsets.zero,
+      child: ListTile(
+        title: Text(view.title(texts)),
+        subtitle: switch (totalItems) {
+          final count? => Text(texts.statisticsTotalItems(count)),
+          null => null,
+        },
+        trailing: const Icon(Icons.arrow_drop_down),
+        onTap: onPressed,
       ),
     );
   }

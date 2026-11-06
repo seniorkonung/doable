@@ -201,16 +201,9 @@ AppDestination _selected(WidgetTester tester) =>
 Future<void> _expectEmptyHome(WidgetTester tester) async {
   final home = find.byType(HomePage);
   final l10n = AppLocalizations.of(tester.element(home));
-  await _until(tester, find.text(l10n.statisticsPeriodActions(0)));
-  await tester.scrollUntilVisible(
-    find.text(l10n.statisticsEmpty),
-    200,
-    scrollable: find.descendant(of: home, matching: find.byType(Scrollable)),
-  );
-  expect(find.text(l10n.statisticsEmpty), findsOneWidget);
-  expect(find.text(l10n.statisticsPeriodActions(0)), findsOneWidget);
-  expect(find.text(l10n.statisticsPeriodCompleted(0, 0)), findsOneWidget);
-  expect(find.text(l10n.statisticsTotalItems(0)), findsOneWidget);
+  await _until(tester, find.text(l10n.statisticsPeriodEmpty));
+  expect(find.text(l10n.statisticsPeriodSummary), findsNothing);
+  expect(find.text(l10n.statisticsTotalItems(0)), findsNothing);
 }
 
 void _storeIntention(

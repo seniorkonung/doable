@@ -166,10 +166,19 @@ void main() {
     );
     await pumpEventQueue();
 
-    expect(harness.state.read, isA<HomeStatisticsEmpty>());
+    expect(harness.state.read, isA<HomeStatisticsViewEmpty>());
     expect(harness.loaded.summary.planned, 21);
     expect(harness.loaded.summary.contribution, 4);
     expect(harness.loaded.totalItems, 0);
+  });
+
+  test('период без действий не получает сводки вида', () async {
+    final harness = _Harness();
+    addTearDown(harness.dispose);
+    harness.reader.first(0, []);
+    await pumpEventQueue();
+
+    expect(harness.state.read, isA<HomeStatisticsPeriodEmpty>());
   });
 
   test('подгрузка за 30 элементов получает последовательные порции по 100 без дублей', () async {

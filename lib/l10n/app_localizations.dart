@@ -158,6 +158,42 @@ abstract class AppLocalizations {
   /// **'Through relations'**
   String get statisticsThroughRelations;
 
+  /// Заголовок листа выбора вида статистики на Главной
+  ///
+  /// In en, this message translates to:
+  /// **'Count actions by'**
+  String get statisticsViewSheetTitle;
+
+  /// Пояснение вида «Корневые намерения» в листе выбора вида
+  ///
+  /// In en, this message translates to:
+  /// **'Where each path starts'**
+  String get statisticsRootIntentionsHint;
+
+  /// Пояснение вида «Промежуточные намерения» в листе выбора вида
+  ///
+  /// In en, this message translates to:
+  /// **'Links between the root and the final intention'**
+  String get statisticsIntermediateIntentionsHint;
+
+  /// Пояснение вида «Конечные намерения» в листе выбора вида
+  ///
+  /// In en, this message translates to:
+  /// **'The last reason right above the action'**
+  String get statisticsTerminalIntentionsHint;
+
+  /// Пояснение вида «Через связи» в листе выбора вида
+  ///
+  /// In en, this message translates to:
+  /// **'Every intention the action serves'**
+  String get statisticsThroughRelationsHint;
+
+  /// Пояснение над каталогом вида «Через связи»: вид считает по текущим связям
+  ///
+  /// In en, this message translates to:
+  /// **'This view counts by the relations as they are now and changes with them.'**
+  String get statisticsThroughRelationsNote;
+
   /// Вкладка статистики календарного месяца
   ///
   /// In en, this message translates to:
@@ -307,6 +343,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Loading statistics…'**
   String get statisticsLoading;
+
+  /// Сообщение Главной вместо сводки, выбора вида и каталога, когда в периоде нет действий
+  ///
+  /// In en, this message translates to:
+  /// **'There are no actions in this period. Actions dated within it will be counted here.'**
+  String get statisticsPeriodEmpty;
+
+  /// Сообщение Главной, когда в периоде есть действия, а в выбранном виде нет элементов
+  ///
+  /// In en, this message translates to:
+  /// **'There are no items in the “{view}” view for this period.'**
+  String statisticsViewEmpty(String view);
 
   /// Подтверждённый пустой вид, в том числе при непустой сводке периода
   ///
