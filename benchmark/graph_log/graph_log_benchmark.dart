@@ -558,8 +558,11 @@ Future<void> _writeRecordsOfLength(
       counts: GraphRecordCounts(
         tags: 0,
         intentions: records,
+        deletedIntentions: 0,
         tagAssignments: 0,
         longTermRelations: 0,
+        deletedRelationPairs: 0,
+        actions: 0,
         dailyChoices: 0,
       ),
     ),

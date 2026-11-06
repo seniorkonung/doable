@@ -151,8 +151,11 @@ void main() {
       counts: GraphRecordCounts(
         tags: 2,
         intentions: 4,
+        deletedIntentions: 0,
         tagAssignments: 3,
         longTermRelations: 3,
+        deletedRelationPairs: 0,
+        actions: 0,
         dailyChoices: 2,
       ),
     );

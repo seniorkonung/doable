@@ -45,8 +45,11 @@ final class GraphLogFixture {
   GraphRecordCounts get counts => GraphRecordCounts(
     tags: tags,
     intentions: intentions,
+    deletedIntentions: 0,
     tagAssignments: tagAssignments,
     longTermRelations: longTermRelations,
+    deletedRelationPairs: 0,
+    actions: 0,
     dailyChoices: dailyChoices,
   );
 

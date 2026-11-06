@@ -34,7 +34,10 @@ import '../../graph_format/graph_format_codec.dart'
     show GraphFormatCodec, GraphFormatVersion;
 import '../../graph_format/graph_format_records.dart'
     show
+        ActionRecord,
         DailyChoiceRecord,
+        DeletedIntentionRecord,
+        DeletedRelationPairRecord,
         GraphEntityRecord,
         GraphRecordCounts,
         IntentionRecord,

@@ -293,6 +293,12 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
                 updatedAt: record.updatedAt.value.microsecondsSinceEpoch,
               ),
             );
+          case DeletedIntentionRecord() ||
+              DeletedRelationPairRecord() ||
+              ActionRecord():
+            throw UnimplementedError(
+              'Замена графа ещё не вставляет действия и надгробия.',
+            );
           case DailyChoiceRecord(:final choice, :final path):
             batch.insert(
               _database.dailyChoices,
@@ -364,14 +370,21 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
           '''SELECT
             (SELECT count(*) FROM tags) AS tags,
             (SELECT count(*) FROM intentions) AS intentions,
+            (SELECT count(*) FROM deleted_intentions) AS deleted_intentions,
             (SELECT count(*) FROM tag_assignments) AS tag_assignments,
             (SELECT count(*) FROM long_term_relations) AS long_term_relations,
+            (SELECT count(*) FROM deleted_relation_pairs)
+              AS deleted_relation_pairs,
+            (SELECT count(*) FROM actions) AS actions,
             (SELECT count(*) FROM daily_choices) AS daily_choices''',
           readsFrom: {
             _database.tags,
             _database.intentions,
+            _database.deletedIntentions,
             _database.tagAssignments,
             _database.longTermRelations,
+            _database.deletedRelationPairs,
+            _database.actions,
             _database.dailyChoices,
           },
         )
@@ -379,8 +392,11 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
     return GraphRecordCounts(
       tags: row.read<int>('tags'),
       intentions: row.read<int>('intentions'),
+      deletedIntentions: row.read<int>('deleted_intentions'),
       tagAssignments: row.read<int>('tag_assignments'),
       longTermRelations: row.read<int>('long_term_relations'),
+      deletedRelationPairs: row.read<int>('deleted_relation_pairs'),
+      actions: row.read<int>('actions'),
       dailyChoices: row.read<int>('daily_choices'),
     );
   }
@@ -389,15 +405,21 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
 int _recordTotal(GraphRecordCounts counts) =>
     counts.tags +
     counts.intentions +
+    counts.deletedIntentions +
     counts.tagAssignments +
     counts.longTermRelations +
+    counts.deletedRelationPairs +
+    counts.actions +
     counts.dailyChoices;
 
 bool _sameRecordCounts(GraphRecordCounts a, GraphRecordCounts b) =>
     a.tags == b.tags &&
     a.intentions == b.intentions &&
+    a.deletedIntentions == b.deletedIntentions &&
     a.tagAssignments == b.tagAssignments &&
     a.longTermRelations == b.longTermRelations &&
+    a.deletedRelationPairs == b.deletedRelationPairs &&
+    a.actions == b.actions &&
     a.dailyChoices == b.dailyChoices;
 
 /// Ход замены графа: доля обработанных записей от [_total], которая

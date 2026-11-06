@@ -185,8 +185,11 @@ GraphFormatHeader _header({
   counts: GraphRecordCounts(
     tags: tags,
     intentions: intentions,
+    deletedIntentions: 0,
     tagAssignments: 7,
     longTermRelations: longTermRelations,
+    deletedRelationPairs: 0,
+    actions: 0,
     dailyChoices: dailyChoices,
   ),
 );

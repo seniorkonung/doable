@@ -37,8 +37,13 @@ Future<GraphSnapshotEntry> insertSameGraphReplacement(
         counts: GraphRecordCounts(
           tags: records.whereType<TagRecord>().length,
           intentions: records.whereType<IntentionRecord>().length,
+          deletedIntentions: records.whereType<DeletedIntentionRecord>().length,
           tagAssignments: records.whereType<TagAssignmentRecord>().length,
           longTermRelations: records.whereType<LongTermRelationRecord>().length,
+          deletedRelationPairs: records
+              .whereType<DeletedRelationPairRecord>()
+              .length,
+          actions: records.whereType<ActionRecord>().length,
           dailyChoices: records.whereType<DailyChoiceRecord>().length,
         ),
       ),

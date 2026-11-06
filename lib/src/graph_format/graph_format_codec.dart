@@ -1,6 +1,12 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import '../action/domain/action.dart';
+import '../action/domain/action_id.dart';
+import '../action/domain/action_path.dart';
+import '../action/domain/action_priority.dart';
+import '../action/domain/action_schedule.dart';
+import '../action/domain/action_text.dart';
 import '../daily_choice/domain/choice_path_step_id.dart';
 import '../daily_choice/domain/daily_choice.dart';
 import '../daily_choice/domain/daily_choice_description.dart';
@@ -144,8 +150,11 @@ abstract final class GraphFormatCodec {
         'counts': {
           'tags': counts.tags,
           'intentions': counts.intentions,
+          'deletedIntentions': counts.deletedIntentions,
           'tagAssignments': counts.tagAssignments,
           'longTermRelations': counts.longTermRelations,
+          'deletedRelationPairs': counts.deletedRelationPairs,
+          'actions': counts.actions,
           'dailyChoices': counts.dailyChoices,
         },
       }),
@@ -274,8 +283,11 @@ const _formatMarker = 'doable-graph';
 
 const _tagKind = 'tag';
 const _intentionKind = 'intention';
+const _deletedIntentionKind = 'deletedIntention';
 const _tagAssignmentKind = 'tagAssignment';
 const _relationKind = 'longTermRelation';
+const _deletedRelationPairKind = 'deletedRelationPair';
+const _actionKind = 'action';
 const _dailyChoiceKind = 'dailyChoice';
 
 const _createdFact = 'created';
@@ -311,6 +323,11 @@ Map<String, Object?> _writeRecord(GraphEntityRecord record) => switch (record) {
     'createdAt': _writeTimestamp(intention.createdAt.value),
     'updatedAt': _writeTimestamp(intention.updatedAt.value),
   },
+  DeletedIntentionRecord(:final id, :final title) => {
+    'kind': _deletedIntentionKind,
+    'id': id.toCanonicalString(),
+    'title': title,
+  },
   TagAssignmentRecord(:final assignment) => {
     'kind': _tagAssignmentKind,
     ..._writeTagAssignment(assignment),
@@ -320,10 +337,7 @@ Map<String, Object?> _writeRecord(GraphEntityRecord record) => switch (record) {
     'id': relation.id.toCanonicalString(),
     'sourceIntentionId': relation.sourceIntentionId.toCanonicalString(),
     'relatedIntentionId': relation.relatedIntentionId.toCanonicalString(),
-    'type': switch (relation.type) {
-      LongTermRelationType.need => 'need',
-      LongTermRelationType.can => 'can',
-    },
+    'type': _writeRelationType(relation.type),
     'priority': switch (relation.priority) {
       RelationPriority.p1 => 'P1',
       RelationPriority.p2 => 'P2',
@@ -337,6 +351,42 @@ Map<String, Object?> _writeRecord(GraphEntityRecord record) => switch (record) {
     },
     'createdAt': _writeTimestamp(relation.createdAt.value),
     'updatedAt': _writeTimestamp(relation.updatedAt.value),
+  },
+  DeletedRelationPairRecord(
+    :final sourceIntentionId,
+    :final relatedIntentionId,
+    :final type,
+  ) =>
+    {
+      'kind': _deletedRelationPairKind,
+      'sourceIntentionId': sourceIntentionId.toCanonicalString(),
+      'relatedIntentionId': relatedIntentionId.toCanonicalString(),
+      'type': _writeRelationType(type),
+    },
+  final ActionRecord action => {
+    'kind': _actionKind,
+    'id': action.id.toCanonicalString(),
+    'title': action.title.value,
+    'description': action.description?.value,
+    'date': action.date.toCanonicalString(),
+    // `null` — «Весь день».
+    'hour': switch (action.schedule) {
+      ActionAllDay() => null,
+      ActionAtHour(:final hour) => hour,
+    },
+    'priority': switch (action.priority) {
+      ActionPriority.p1 => 'P1',
+      ActionPriority.p2 => 'P2',
+      ActionPriority.p3 => 'P3',
+      ActionPriority.p4 => 'P4',
+    },
+    'completed': action.isCompleted,
+    'path': [
+      for (final intentionId in action.path.intentions)
+        intentionId.toCanonicalString(),
+    ],
+    'createdAt': _writeTimestamp(action.createdAt.value),
+    'updatedAt': _writeTimestamp(action.updatedAt.value),
   },
   DailyChoiceRecord(:final choice, :final path) => {
     'kind': _dailyChoiceKind,
@@ -367,10 +417,19 @@ Map<String, Object?> _writeRecord(GraphEntityRecord record) => switch (record) {
   },
 };
 
+String _writeRelationType(LongTermRelationType type) => switch (type) {
+  LongTermRelationType.need => 'need',
+  LongTermRelationType.can => 'can',
+};
+
 Map<String, Object?> _writeEntityKey(GraphEntityKey entity) => switch (entity) {
   TagKey(:final id) => {'entity': _tagKind, 'id': id.toCanonicalString()},
   IntentionKey(:final id) => {
     'entity': _intentionKind,
+    'id': id.toCanonicalString(),
+  },
+  DeletedIntentionKey(:final id) => {
+    'entity': _deletedIntentionKind,
     'id': id.toCanonicalString(),
   },
   TagAssignmentKey(:final assignment) => {
@@ -381,6 +440,13 @@ Map<String, Object?> _writeEntityKey(GraphEntityKey entity) => switch (entity) {
     'entity': _relationKind,
     'id': id.toCanonicalString(),
   },
+  DeletedRelationPairKey(:final sourceIntentionId, :final relatedIntentionId) =>
+    {
+      'entity': _deletedRelationPairKind,
+      'sourceIntentionId': sourceIntentionId.toCanonicalString(),
+      'relatedIntentionId': relatedIntentionId.toCanonicalString(),
+    },
+  ActionKey(:final id) => {'entity': _actionKind, 'id': id.toCanonicalString()},
   DailyChoiceKey(:final id) => {
     'entity': _dailyChoiceKind,
     'id': id.toCanonicalString(),
@@ -424,8 +490,20 @@ GraphEntityRecord _readEntity(String kind, _JsonFields fields) =>
         ),
       ),
       _intentionKind => IntentionRecord(_readIntention(fields)),
+      _deletedIntentionKind => DeletedIntentionRecord(
+        id: _readIntentionId(fields.string('id')),
+        title: _readIntentionTitle(fields.string('title')),
+      ),
       _tagAssignmentKind => TagAssignmentRecord(_readTagAssignment(fields)),
       _relationKind => _readRelation(fields),
+      _deletedRelationPairKind => DeletedRelationPairRecord(
+        sourceIntentionId: _readIntentionId(fields.string('sourceIntentionId')),
+        relatedIntentionId: _readIntentionId(
+          fields.string('relatedIntentionId'),
+        ),
+        type: _readRelationType(fields.string('type')),
+      ),
+      _actionKind => _readAction(fields),
       _dailyChoiceKind => _readDailyChoice(fields),
       _ => throw const GraphFormatCorruption(),
     };
@@ -435,24 +513,30 @@ GraphEntityKey _readEntityKey(_JsonFields fields) => switch (fields.string(
 )) {
   _tagKind => TagKey(_readTagId(fields.string('id'))),
   _intentionKind => IntentionKey(_readIntentionId(fields.string('id'))),
+  _deletedIntentionKind => DeletedIntentionKey(
+    _readIntentionId(fields.string('id')),
+  ),
   _tagAssignmentKind => TagAssignmentKey(_readTagAssignment(fields)),
   _relationKind => LongTermRelationKey(_readRelationId(fields.string('id'))),
+  _deletedRelationPairKind => DeletedRelationPairKey(
+    sourceIntentionId: _readIntentionId(fields.string('sourceIntentionId')),
+    relatedIntentionId: _readIntentionId(fields.string('relatedIntentionId')),
+  ),
+  _actionKind => ActionKey(_readActionId(fields.string('id'))),
   _dailyChoiceKind => DailyChoiceKey(_readDailyChoiceId(fields.string('id'))),
   _ => throw const GraphFormatCorruption(),
 };
 
 /// Название и описание хранятся в той форме, к которой их приводит ввод.
 Intention _readIntention(_JsonFields fields) {
-  final title = fields.string('title');
   final description = fields.nullableString('description');
-  if (IntentionText.normalizeTitle(title) != title ||
-      (description != null &&
-          IntentionText.normalizeDescription(description) != description)) {
+  if (description != null &&
+      IntentionText.normalizeDescription(description) != description) {
     throw const GraphFormatCorruption();
   }
   return Intention(
     id: _readIntentionId(fields.string('id')),
-    title: title,
+    title: _readIntentionTitle(fields.string('title')),
     description: description,
     readiness: fields.boolean('actionReady')
         ? IntentionReadiness.ready
@@ -463,6 +547,13 @@ Intention _readIntention(_JsonFields fields) {
     createdAt: IntentionTimestamp(_readTimestamp(fields.string('createdAt'))),
     updatedAt: IntentionTimestamp(_readTimestamp(fields.string('updatedAt'))),
   );
+}
+
+String _readIntentionTitle(String title) {
+  if (IntentionText.normalizeTitle(title) != title) {
+    throw const GraphFormatCorruption();
+  }
+  return title;
 }
 
 TagAssignment _readTagAssignment(_JsonFields fields) => TagAssignment(
@@ -476,11 +567,7 @@ LongTermRelationRecord _readRelation(_JsonFields fields) {
     id: _readRelationId(fields.string('id')),
     sourceIntentionId: _readIntentionId(fields.string('sourceIntentionId')),
     relatedIntentionId: _readIntentionId(fields.string('relatedIntentionId')),
-    type: switch (fields.string('type')) {
-      'need' => LongTermRelationType.need,
-      'can' => LongTermRelationType.can,
-      _ => throw const GraphFormatCorruption(),
-    },
+    type: _readRelationType(fields.string('type')),
     priority: switch (fields.string('priority')) {
       'P1' => RelationPriority.p1,
       'P2' => RelationPriority.p2,
@@ -497,6 +584,50 @@ LongTermRelationRecord _readRelation(_JsonFields fields) {
         : RelationScope.active,
     createdAt: RelationTimestamp(_readTimestamp(fields.string('createdAt'))),
     updatedAt: RelationTimestamp(_readTimestamp(fields.string('updatedAt'))),
+  );
+}
+
+LongTermRelationType _readRelationType(String text) => switch (text) {
+  'need' => LongTermRelationType.need,
+  'can' => LongTermRelationType.can,
+  _ => throw const GraphFormatCorruption(),
+};
+
+/// Название и описание хранятся в той форме, к которой их приводит ввод.
+ActionRecord _readAction(_JsonFields fields) {
+  final id = _readActionId(fields.string('id'));
+  final storedTitle = fields.string('title');
+  final title = ActionTitle(storedTitle);
+  final storedDescription = fields.nullableString('description');
+  final description = storedDescription == null
+      ? null
+      : ActionDescription.fromInput(storedDescription);
+  if (title.value != storedTitle || description?.value != storedDescription) {
+    throw const GraphFormatCorruption();
+  }
+  return ActionRecord(
+    id: id,
+    title: title,
+    description: description,
+    date: CalendarDate.parseCanonical(fields.string('date')),
+    schedule: switch (fields.nullableInteger('hour')) {
+      null => const ActionAllDay(),
+      final hour => ActionAtHour(hour),
+    },
+    priority: switch (fields.string('priority')) {
+      'P1' => ActionPriority.p1,
+      'P2' => ActionPriority.p2,
+      'P3' => ActionPriority.p3,
+      'P4' => ActionPriority.p4,
+      _ => throw const GraphFormatCorruption(),
+    },
+    isCompleted: fields.boolean('completed'),
+    path: ActionPath([
+      for (final intentionId in fields.strings('path'))
+        _readIntentionId(intentionId),
+    ]),
+    createdAt: ActionTimestamp(_readTimestamp(fields.string('createdAt'))),
+    updatedAt: ActionTimestamp(_readTimestamp(fields.string('updatedAt'))),
   );
 }
 
@@ -588,8 +719,11 @@ GraphRecordCounts _readCounts(Map<String, Object?> object) {
   final counts = GraphRecordCounts(
     tags: fields.integer('tags'),
     intentions: fields.integer('intentions'),
+    deletedIntentions: fields.integer('deletedIntentions'),
     tagAssignments: fields.integer('tagAssignments'),
     longTermRelations: fields.integer('longTermRelations'),
+    deletedRelationPairs: fields.integer('deletedRelationPairs'),
+    actions: fields.integer('actions'),
     dailyChoices: fields.integer('dailyChoices'),
   );
   fields.ensureAllRead();
@@ -628,6 +762,11 @@ LongTermRelationId _readRelationId(String text) =>
         throw const GraphFormatCorruption(),
     };
 
+ActionId _readActionId(String text) => switch (ActionId.decode(text)) {
+  ActionIdDecodingSuccess(:final id) => id,
+  InvalidActionIdDecoding() => throw const GraphFormatCorruption(),
+};
+
 DailyChoiceId _readDailyChoiceId(String text) =>
     switch (DailyChoiceId.decode(text)) {
       DailyChoiceIdDecodingSuccess(:final id) => id,
@@ -659,9 +798,17 @@ final class _JsonFields {
 
   int integer(String name) => _read<int>(name);
 
+  int? nullableInteger(String name) => _read<int?>(name);
+
   Map<String, Object?> object(String name) => _read<Map<String, Object?>>(name);
 
   List<Object?> list(String name) => _read<List<Object?>>(name);
+
+  /// Список строк; элемент другого типа делает запись повреждённой.
+  List<String> strings(String name) => [
+    for (final element in list(name))
+      element is String ? element : throw const GraphFormatCorruption(),
+  ];
 
   void ensureAllRead() {
     if (_readCount != _object.length) throw const GraphFormatCorruption();

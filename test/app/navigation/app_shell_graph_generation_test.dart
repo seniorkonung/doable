@@ -338,8 +338,11 @@ Future<UnregisteredGraphSnapshot> _writeReplacementSnapshot(
   final counts = GraphRecordCounts(
     tags: 1,
     intentions: _intentionCount,
+    deletedIntentions: 0,
     tagAssignments: _intentionCount,
     longTermRelations: 0,
+    deletedRelationPairs: 0,
+    actions: 0,
     dailyChoices: 0,
   );
   final records = [
@@ -350,8 +353,11 @@ Future<UnregisteredGraphSnapshot> _writeReplacementSnapshot(
       'counts': {
         'tags': counts.tags,
         'intentions': counts.intentions,
+        'deletedIntentions': counts.deletedIntentions,
         'tagAssignments': counts.tagAssignments,
         'longTermRelations': counts.longTermRelations,
+        'deletedRelationPairs': counts.deletedRelationPairs,
+        'actions': counts.actions,
         'dailyChoices': counts.dailyChoices,
       },
     },

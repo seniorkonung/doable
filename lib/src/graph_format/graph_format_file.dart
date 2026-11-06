@@ -4,21 +4,25 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import '../intention/domain/intention.dart';
+import '../intention/domain/intention_id.dart';
 import '../tag/domain/tag_position.dart';
 import 'graph_format_codec.dart';
 import 'graph_format_records.dart';
 
 /// Файл формата — gzip поверх JSON Lines в UTF-8: строка заголовка, затем
-/// секции тегов, намерений, назначений тегов, долговременных связей и
+/// секции тегов, намерений, надгробий удалённых намерений, назначений тегов,
+/// долговременных связей, надгробий удалённых связей, действий с путями и
 /// дневных выборов по строке на запись. Так устроены файл экспорта и снимок.
 abstract final class GraphFormatFile {
   /// Сжатые байты файла с заголовком [header] и записями [records].
   ///
   /// Записи кодируются по мере прослушивания результата. Они должны идти по
-  /// секциям в количествах заголовка, места тегов — не повторяться, а
-  /// намерения — строго по [compareIntentionsInFormatOrder], иначе поток
-  /// завершается [StateError]: такой файл чтение не примет. Запись длиннее предела завершает поток
-  /// отказом [GraphRecordTooLong].
+  /// секциям в количествах заголовка, места тегов — не повторяться, намерения
+  /// — строго по [compareIntentionsInFormatOrder], а путь действия и пара
+  /// надгробия связи — ссылаться на намерения и надгробия намерений
+  /// предшествующих строк, иначе поток завершается [StateError]: такой файл
+  /// чтение не примет. Запись длиннее предела завершает поток отказом
+  /// [GraphRecordTooLong].
   static Stream<List<int>> write(
     GraphFormatHeader header,
     Stream<GraphEntityRecord> records,
@@ -29,8 +33,10 @@ abstract final class GraphFormatFile {
   /// Чужой, повреждённый или обрезанный файл даёт [GraphFormatCorruption]
   /// здесь или в [GraphFormatFileReading.records], файл более новой версии —
   /// [GraphFormatVersionTooNew]. Повреждение — в том числе повторённое место
-  /// тега и намерения не строго по [compareIntentionsInFormatOrder]: в таком
-  /// порядке их перечисляет база, поэтому прочитанные записи канонические.
+  /// тега, намерения не строго по [compareIntentionsInFormatOrder]: в таком
+  /// порядке их перечисляет база, поэтому прочитанные записи канонические, и
+  /// путь действия или пара надгробия связи со ссылкой на намерение, которого
+  /// нет в предшествующих строках.
   /// Ошибки самого [file] передаются как есть.
   static Future<GraphFormatFileReading> read(Stream<List<int>> file) async {
     final lines = StreamIterator(
@@ -122,7 +128,8 @@ Stream<List<int>> _writeLines(
   await for (final record in records) {
     if (!sections.accept(record)) {
       throw StateError(
-        'Запись не совпадает с секциями заголовка или порядком намерений.',
+        'Запись не совпадает с секциями заголовка, порядком намерений или '
+        'ссылками на предшествующие записи.',
       );
     }
     yield _terminated(GraphFormatCodec.encode(record));
@@ -253,7 +260,8 @@ final class _Chunks implements Sink<List<int>> {
 }
 
 /// Сверяет записи с секциями, размеры которых задают количества заголовка,
-/// с единственностью мест тегов и с каноническим порядком намерений.
+/// с единственностью мест тегов, с каноническим порядком намерений и со
+/// ссылками путей действий и надгробий связей на предшествующие намерения.
 final class _Sections {
   _Sections(GraphRecordCounts counts)
     : _remaining = [
@@ -266,11 +274,16 @@ final class _Sections {
   final _tagPositions = <TagPosition>{};
   Intention? _lastIntention;
 
+  /// Намерения и надгробия намерений предшествующих строк: на них могут
+  /// ссылаться путь действия и пара надгробия связи.
+  final _knownIntentions = <IntentionId>{};
+
   bool get isComplete => _remaining.every((count) => count == 0);
 
   /// Учитывает [record], если запись следующая по порядку секций, место тега
-  /// не встречалось раньше, а намерение идёт строго после предыдущего по
-  /// [compareIntentionsInFormatOrder].
+  /// не встречалось раньше, намерение идёт строго после предыдущего по
+  /// [compareIntentionsInFormatOrder], а путь действия и пара надгробия связи
+  /// ссылаются только на уже встреченные намерения и надгробия намерений.
   bool accept(GraphEntityRecord record) {
     while (_current < _remaining.length && _remaining[_current] == 0) {
       _current++;
@@ -289,6 +302,22 @@ final class _Sections {
         return false;
       }
       _lastIntention = intention;
+      _knownIntentions.add(intention.id);
+    }
+    switch (record) {
+      case DeletedIntentionRecord(:final id):
+        _knownIntentions.add(id);
+      case DeletedRelationPairRecord(
+        :final sourceIntentionId,
+        :final relatedIntentionId,
+      ):
+        if (!_knownIntentions.contains(sourceIntentionId) ||
+            !_knownIntentions.contains(relatedIntentionId)) {
+          return false;
+        }
+      case ActionRecord(:final path):
+        if (!path.intentions.every(_knownIntentions.contains)) return false;
+      default:
     }
     _remaining[_current]--;
     return true;
@@ -300,23 +329,32 @@ final class _Sections {
 enum _Section {
   tags,
   intentions,
+  deletedIntentions,
   tagAssignments,
   longTermRelations,
+  deletedRelationPairs,
+  actions,
   dailyChoices;
 
   static _Section of(GraphEntityRecord record) => switch (record) {
     TagRecord() => tags,
     IntentionRecord() => intentions,
+    DeletedIntentionRecord() => deletedIntentions,
     TagAssignmentRecord() => tagAssignments,
     LongTermRelationRecord() => longTermRelations,
+    DeletedRelationPairRecord() => deletedRelationPairs,
+    ActionRecord() => actions,
     DailyChoiceRecord() => dailyChoices,
   };
 
   int countIn(GraphRecordCounts counts) => switch (this) {
     tags => counts.tags,
     intentions => counts.intentions,
+    deletedIntentions => counts.deletedIntentions,
     tagAssignments => counts.tagAssignments,
     longTermRelations => counts.longTermRelations,
+    deletedRelationPairs => counts.deletedRelationPairs,
+    actions => counts.actions,
     dailyChoices => counts.dailyChoices,
   };
 }

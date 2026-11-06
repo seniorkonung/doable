@@ -835,8 +835,11 @@ bool _notCancelled() => false;
 int _total(GraphRecordCounts counts) =>
     counts.tags +
     counts.intentions +
+    counts.deletedIntentions +
     counts.tagAssignments +
     counts.longTermRelations +
+    counts.deletedRelationPairs +
+    counts.actions +
     counts.dailyChoices;
 
 /// Пишет [bytes] в [file] без сброса на диск: файлы порций пересборки и

@@ -105,8 +105,11 @@ abstract final class GraphStateAssembly {
       GraphRecordCounts(
         tags: counts[_Section.tags.index],
         intentions: counts[_Section.intentions.index],
+        deletedIntentions: counts[_Section.deletedIntentions.index],
         tagAssignments: counts[_Section.tagAssignments.index],
         longTermRelations: counts[_Section.longTermRelations.index],
+        deletedRelationPairs: counts[_Section.deletedRelationPairs.index],
+        actions: counts[_Section.actions.index],
         dailyChoices: counts[_Section.dailyChoices.index],
       ),
       _assembledRecords(base, outcomes, _Creations(created)),
@@ -275,15 +278,21 @@ bool _precedes(GraphEntityRecord created, GraphEntityRecord base) =>
 enum _Section {
   tags,
   intentions,
+  deletedIntentions,
   tagAssignments,
   longTermRelations,
+  deletedRelationPairs,
+  actions,
   dailyChoices;
 
   static _Section of(GraphEntityRecord record) => switch (record) {
     TagRecord() => tags,
     IntentionRecord() => intentions,
+    DeletedIntentionRecord() => deletedIntentions,
     TagAssignmentRecord() => tagAssignments,
     LongTermRelationRecord() => longTermRelations,
+    DeletedRelationPairRecord() => deletedRelationPairs,
+    ActionRecord() => actions,
     DailyChoiceRecord() => dailyChoices,
   };
 }

@@ -3,6 +3,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:doable/src/action/domain/action.dart';
+import 'package:doable/src/action/domain/action_id.dart';
+import 'package:doable/src/action/domain/action_path.dart';
+import 'package:doable/src/action/domain/action_priority.dart';
+import 'package:doable/src/action/domain/action_schedule.dart';
+import 'package:doable/src/action/domain/action_text.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
@@ -74,13 +80,7 @@ void main() {
         const tagCount = 200000;
         final header = GraphFormatHeader(
           writtenAt: DateTime.utc(2026, 10, 17),
-          counts: GraphRecordCounts(
-            tags: tagCount,
-            intentions: 0,
-            tagAssignments: 0,
-            longTermRelations: 0,
-            dailyChoices: 0,
-          ),
+          counts: _counts(tags: tagCount),
         );
         var producedTags = 0;
         Stream<GraphEntityRecord> tags() async* {
@@ -132,13 +132,7 @@ void main() {
       final header = GraphFormatCodec.encodeHeader(
         GraphFormatHeader(
           writtenAt: DateTime.utc(2026, 10, 17),
-          counts: GraphRecordCounts(
-            tags: 0,
-            intentions: 1,
-            tagAssignments: 0,
-            longTermRelations: 0,
-            dailyChoices: 0,
-          ),
+          counts: _counts(intentions: 1),
         ),
       );
       List<int> fileWith(List<int> line) =>
@@ -187,6 +181,21 @@ void main() {
       final deletion =
           '{"kind":"deletion","entity":"dailyChoice",'
           '"id":"${_dailyChoiceIds[1]}"}';
+      // Положение строк эталона: надгробия и действия между намерениями,
+      // связями и дневными выборами.
+      const deletedIntention = 7;
+      const deletedPair = 14;
+      const firstAction = 15;
+      const unknownIntentionId = '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f99';
+      // Заголовок до появления разделов надгробий и действий.
+      const previousHeader =
+          '{"format":"doable-graph","version":1,'
+          '"writtenAt":"2026-10-03T18:42:07.654321Z","counts":{"tags":2,'
+          '"intentions":4,"tagAssignments":3,"longTermRelations":3,'
+          '"dailyChoices":2}}';
+      final firstActionPath =
+          '"path":["${_intentionIds[0]}","${_intentionIds[1]}",'
+          '"${_intentionIds[3]}"]';
 
       final invalidFiles = <String, List<int>>{
         'не gzip': [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
@@ -237,6 +246,63 @@ void main() {
           lines[5],
           ...lines.skip(7),
         ]),
+        'заголовок прежнего состава без счётчиков новых разделов': file([
+          previousHeader,
+          ...lines.skip(1),
+        ]),
+        'надгробие намерения после действий': file([
+          ...lines.take(deletedIntention),
+          ...lines.sublist(deletedIntention + 1, firstAction + 3),
+          lines[deletedIntention],
+          ...lines.skip(firstAction + 3),
+        ]),
+        'действие раньше надгробия пары': file([
+          ...lines.take(deletedPair),
+          lines[firstAction],
+          lines[deletedPair],
+          ...lines.skip(firstAction + 1),
+        ]),
+        'путь действия ссылается на намерение вне предшествующих строк': file([
+          ...lines.take(firstAction),
+          lines[firstAction].replaceFirst(
+            '"path":["${_intentionIds[0]}"',
+            '"path":["$unknownIntentionId"',
+          ),
+          ...lines.skip(firstAction + 1),
+        ]),
+        'путь действия ссылается на удалённое намерение без надгробия': file([
+          lines.first
+              .replaceFirst('"deletedIntentions":1', '"deletedIntentions":0')
+              .replaceFirst(
+                '"deletedRelationPairs":1',
+                '"deletedRelationPairs":0',
+              ),
+          ...lines.sublist(1, deletedIntention),
+          ...lines.sublist(deletedIntention + 1, deletedPair),
+          ...lines.skip(firstAction),
+        ]),
+        'надгробие пары ссылается на намерение вне предшествующих строк': file([
+          ...lines.take(deletedPair),
+          lines[deletedPair].replaceFirst(
+            '"relatedIntentionId":"${_intentionIds[4]}"',
+            '"relatedIntentionId":"$unknownIntentionId"',
+          ),
+          ...lines.skip(deletedPair + 1),
+        ]),
+        'пустой путь действия': file([
+          ...lines.take(firstAction),
+          lines[firstAction].replaceFirst(firstActionPath, '"path":[]'),
+          ...lines.skip(firstAction + 1),
+        ]),
+        'повтор намерения в пути действия': file([
+          ...lines.take(firstAction),
+          lines[firstAction].replaceFirst(
+            firstActionPath,
+            '"path":["${_intentionIds[0]}","${_intentionIds[1]}",'
+            '"${_intentionIds[0]}"]',
+          ),
+          ...lines.skip(firstAction + 1),
+        ]),
       };
 
       for (final MapEntry(key: reason, value: bytes) in invalidFiles.entries) {
@@ -279,13 +345,7 @@ void main() {
         'намерения не в каноническом порядке', () async {
       final header = GraphFormatHeader(
         writtenAt: DateTime.utc(2026, 10, 17),
-        counts: GraphRecordCounts(
-          tags: 1,
-          intentions: 2,
-          tagAssignments: 0,
-          longTermRelations: 0,
-          dailyChoices: 0,
-        ),
+        counts: _counts(tags: 1, intentions: 2),
       );
       final [tag, _, health, running, ..., lastChoice] =
           _expectedGoldenRecords();
@@ -301,6 +361,39 @@ void main() {
         await expectLater(
           GraphFormatFile.write(
             header,
+            Stream.fromIterable(records),
+          ).drain<void>(),
+          throwsStateError,
+          reason: reason,
+        );
+      }
+    });
+
+    test('запись отклоняет путь действия и пару надгробия связи со ссылкой на '
+        'намерение вне предшествующих строк', () async {
+      final records = _expectedGoldenRecords();
+      final health = records.whereType<IntentionRecord>().first;
+      final pair = records.whereType<DeletedRelationPairRecord>().single;
+      final jogging = records.whereType<ActionRecord>().last;
+      final invalidFiles = {
+        'путь действия без своего намерения': (
+          _counts(intentions: 1, actions: 1),
+          <GraphEntityRecord>[health, jogging],
+        ),
+        'надгробие пары без своих намерений': (
+          _counts(intentions: 1, deletedRelationPairs: 1),
+          <GraphEntityRecord>[health, pair],
+        ),
+      };
+
+      for (final MapEntry(key: reason, value: (counts, records))
+          in invalidFiles.entries) {
+        await expectLater(
+          GraphFormatFile.write(
+            GraphFormatHeader(
+              writtenAt: DateTime.utc(2026, 10, 17),
+              counts: counts,
+            ),
             Stream.fromIterable(records),
           ).drain<void>(),
           throwsStateError,
@@ -391,6 +484,7 @@ const _intentionIds = [
   '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f12',
   '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f13',
   '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f14',
+  '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f15',
 ];
 const _relationIds = [
   '2a3b4c5d-6e7f-4a80-b91c-0d1e2f3a4b11',
@@ -401,6 +495,11 @@ const _dailyChoiceIds = [
   '3c4d5e6f-7a8b-4c9d-a0e1-1f2a3b4c5d11',
   '3c4d5e6f-7a8b-4c9d-a0e1-1f2a3b4c5d12',
 ];
+const _actionIds = [
+  '5e6f7a8b-9c0d-4eaf-b012-3a4b5c6d7e11',
+  '5e6f7a8b-9c0d-4eaf-b012-3a4b5c6d7e12',
+  '5e6f7a8b-9c0d-4eaf-b012-3a4b5c6d7e13',
+];
 const _stepIds = [
   '4d5e6f7a-8b9c-4dae-bf01-2a3b4c5d6e11',
   '4d5e6f7a-8b9c-4dae-bf01-2a3b4c5d6e12',
@@ -409,19 +508,43 @@ const _stepIds = [
 
 GraphFormatHeader _expectedGoldenHeader() => GraphFormatHeader(
   writtenAt: DateTime.utc(2026, 10, 3, 18, 42, 7, 654, 321),
-  counts: GraphRecordCounts(
+  counts: _counts(
     tags: 2,
     intentions: 4,
+    deletedIntentions: 1,
     tagAssignments: 3,
     longTermRelations: 3,
+    deletedRelationPairs: 1,
+    actions: 3,
     dailyChoices: 2,
   ),
 );
 
-/// Допустимый сохранённый граф: путь первого дневного выбора проходит через
-/// ныне архивированную связь к архивированному намерению, а синий тег «Дом»
-/// назначен сначала намерению «Бегать по утрам», затем «Здоровье»; тег
-/// «Спорт» без цвета.
+GraphRecordCounts _counts({
+  int tags = 0,
+  int intentions = 0,
+  int deletedIntentions = 0,
+  int tagAssignments = 0,
+  int longTermRelations = 0,
+  int deletedRelationPairs = 0,
+  int actions = 0,
+  int dailyChoices = 0,
+}) => GraphRecordCounts(
+  tags: tags,
+  intentions: intentions,
+  deletedIntentions: deletedIntentions,
+  tagAssignments: tagAssignments,
+  longTermRelations: longTermRelations,
+  deletedRelationPairs: deletedRelationPairs,
+  actions: actions,
+  dailyChoices: dailyChoices,
+);
+
+/// Допустимый сохранённый граф: путь первого действия проходит через ныне
+/// архивированную связь к архивированному намерению, путь второго кончается
+/// удалённым намерением через удалённую связь, путь третьего состоит из одного
+/// намерения, а синий тег «Дом» назначен сначала намерению «Бегать по утрам»,
+/// затем «Здоровье»; тег «Спорт» без цвета.
 List<GraphEntityRecord> _expectedGoldenRecords() {
   final home = _tagId(_tagIds[0]);
   final sport = _tagId(_tagIds[1]);
@@ -429,6 +552,7 @@ List<GraphEntityRecord> _expectedGoldenRecords() {
   final running = _intentionId(_intentionIds[1]);
   final jogging = _intentionId(_intentionIds[2]);
   final swimming = _intentionId(_intentionIds[3]);
+  final yoga = _intentionId(_intentionIds[4]);
   final needRunning = _relationId(_relationIds[0]);
   final needJogging = _relationId(_relationIds[1]);
   final canSwim = _relationId(_relationIds[2]);
@@ -500,6 +624,7 @@ List<GraphEntityRecord> _expectedGoldenRecords() {
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 10, 2, 8, 15, 30)),
       ),
     ),
+    DeletedIntentionRecord(id: yoga, title: 'Заниматься йогой'),
     TagAssignmentRecord(TagAssignment(tagId: home, intentionId: running)),
     TagAssignmentRecord(TagAssignment(tagId: sport, intentionId: jogging)),
     TagAssignmentRecord(TagAssignment(tagId: home, intentionId: health)),
@@ -535,6 +660,47 @@ List<GraphEntityRecord> _expectedGoldenRecords() {
       scope: RelationScope.archived,
       createdAt: RelationTimestamp(DateTime.utc(2026, 10, 1, 6, 34)),
       updatedAt: RelationTimestamp(DateTime.utc(2026, 10, 2, 10, 45, 10)),
+    ),
+    DeletedRelationPairRecord(
+      sourceIntentionId: health,
+      relatedIntentionId: yoga,
+      type: LongTermRelationType.need,
+    ),
+    ActionRecord(
+      id: _actionId(_actionIds[0]),
+      title: ActionTitle('Сходить в бассейн'),
+      description: null,
+      path: ActionPath([health, running, swimming]),
+      date: CalendarDate.fromParts(2026, 10, 2),
+      schedule: const ActionAllDay(),
+      priority: ActionPriority.p2,
+      isCompleted: false,
+      createdAt: ActionTimestamp(DateTime.utc(2026, 10, 1, 7)),
+      updatedAt: ActionTimestamp(DateTime.utc(2026, 10, 1, 7)),
+    ),
+    ActionRecord(
+      id: _actionId(_actionIds[1]),
+      title: ActionTitle('Позаниматься 🧘'),
+      description: ActionDescription.fromInput('  утром\n'),
+      path: ActionPath([health, yoga]),
+      date: CalendarDate.fromParts(2026, 2, 28),
+      schedule: ActionAtHour(0),
+      priority: ActionPriority.p4,
+      isCompleted: true,
+      createdAt: ActionTimestamp(DateTime.utc(2026, 10, 1, 7, 1, 0, 0, 1)),
+      updatedAt: ActionTimestamp(DateTime.utc(2026, 10, 2, 11, 30, 0, 500)),
+    ),
+    ActionRecord(
+      id: _actionId(_actionIds[2]),
+      title: ActionTitle('Пробежка 5 км'),
+      description: null,
+      path: ActionPath([jogging]),
+      date: CalendarDate.fromParts(2026, 10, 3),
+      schedule: ActionAtHour(23),
+      priority: ActionPriority.p1,
+      isCompleted: false,
+      createdAt: ActionTimestamp(DateTime.utc(2026, 10, 1, 7, 2)),
+      updatedAt: ActionTimestamp(DateTime.utc(2026, 10, 1, 7, 2)),
     ),
     DailyChoiceRecord(
       choice: DailyChoice(
@@ -591,6 +757,9 @@ IntentionId _intentionId(String value) =>
 
 LongTermRelationId _relationId(String value) =>
     (LongTermRelationId.decode(value) as LongTermRelationIdDecodingSuccess).id;
+
+ActionId _actionId(String value) =>
+    (ActionId.decode(value) as ActionIdDecodingSuccess).id;
 
 DailyChoiceId _dailyChoiceId(String value) =>
     (DailyChoiceId.decode(value) as DailyChoiceIdDecodingSuccess).id;

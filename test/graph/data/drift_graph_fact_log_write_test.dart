@@ -388,8 +388,11 @@ List<String> _factKinds(GraphLogPackage package) => [
       GraphEntityDeleted(:final entity) => switch (entity) {
         TagKey() => 'удаление тега',
         IntentionKey() => 'удаление намерения',
+        DeletedIntentionKey() => 'удаление надгробия намерения',
         TagAssignmentKey() => 'удаление назначения',
         LongTermRelationKey() => 'удаление связи',
+        DeletedRelationPairKey() => 'удаление надгробия связи',
+        ActionKey() => 'удаление действия',
         DailyChoiceKey() => 'удаление дневного выбора',
       },
     },
@@ -398,8 +401,11 @@ List<String> _factKinds(GraphLogPackage package) => [
 String _entityOf(GraphEntityRecord record) => switch (record) {
   TagRecord() => 'тега',
   IntentionRecord() => 'намерения',
+  DeletedIntentionRecord() => 'надгробия намерения',
   TagAssignmentRecord() => 'назначения',
   LongTermRelationRecord() => 'связи',
+  DeletedRelationPairRecord() => 'надгробия связи',
+  ActionRecord() => 'действия',
   DailyChoiceRecord() => 'дневного выбора',
 };
 
