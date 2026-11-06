@@ -229,7 +229,7 @@ void main() {
   );
 
   test(
-    'зависимости намерения и шаг пути блокируют удаление вместе с назначениями',
+    'связи намерения блокируют его удаление вместе с назначениями',
     () async {
       final before = graph();
 
@@ -244,15 +244,6 @@ void main() {
       expect(
         (archived as ResultFailure).failure,
         isA<IntentionHasBlockingRelationsFailure>(),
-      );
-      expect(graph(), before);
-
-      final relation = await repository.execute(
-        DeleteLongTermRelation(_relation(101)),
-      );
-      expect(
-        (relation as GraphCommandFailed).failure,
-        isA<LongTermRelationReferencedByDailyPathFailure>(),
       );
       expect(graph(), before);
     },

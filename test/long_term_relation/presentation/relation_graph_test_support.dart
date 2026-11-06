@@ -572,7 +572,6 @@ DailyChoiceCommandResult testDailyFieldsUpdatedResult({
             releasedRelationIds: const [],
             occupiedRelationIds: const [],
             intentionCounts: counts,
-            relationPermissions: const {},
           ),
         ],
       ),

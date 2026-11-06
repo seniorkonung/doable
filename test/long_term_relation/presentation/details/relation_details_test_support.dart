@@ -16,7 +16,6 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -264,8 +263,6 @@ LongTermRelationDetails testRelationDetails({
   RelationScope scope = RelationScope.active,
   int creationSequence = 1,
   String? description,
-  LongTermRelationPermissions permissions =
-      const LongTermRelationPermissions.unrestricted(),
   DateTime? createdAt,
   DateTime? updatedAt,
 }) => LongTermRelationDetails(
@@ -293,5 +290,4 @@ LongTermRelationDetails testRelationDetails({
   description: description == null
       ? null
       : LongTermRelationDescription.fromInput(description),
-  permissions: permissions,
 );

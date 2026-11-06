@@ -3,7 +3,6 @@ import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
@@ -18,9 +17,6 @@ void main() {
       _source: _counts(),
       _selected: _counts(),
     };
-    final permissions = <LongTermRelationId, LongTermRelationPermissions>{
-      _relation: const LongTermRelationPermissions.referencedByDailyPath(),
-    };
     final change = DailyChoiceChange(
       revision: revision,
       before: null,
@@ -28,32 +24,13 @@ void main() {
       releasedRelationIds: const [],
       occupiedRelationIds: [_relation],
       intentionCounts: counts,
-      relationPermissions: permissions,
     );
 
     counts.clear();
-    permissions.clear();
     expect(change.before, isNull);
     expect(change.after!.id, choice.id);
     expect(change.releasedRelationIds, isEmpty);
     expect(change.occupiedRelationIds, {_relation});
-    expect(change.relationPermissions[_relation]!.canDelete, isFalse);
-  });
-
-  test('освобождение пути сохраняет фактическую блокировку другой ссылкой', () {
-    final change = DailyChoiceChange(
-      revision: revision,
-      before: _choice(_source, _selected),
-      after: null,
-      releasedRelationIds: [_relation],
-      occupiedRelationIds: const [],
-      intentionCounts: {_source: _counts(), _selected: _counts()},
-      relationPermissions: {
-        _relation: const LongTermRelationPermissions.referencedByDailyPath(),
-      },
-    );
-
-    expect(change.relationPermissions[_relation]!.canDelete, isFalse);
   });
 
   test('изменение только даты не выдаёт освобождение пути', () {
@@ -73,7 +50,6 @@ void main() {
       releasedRelationIds: const [],
       occupiedRelationIds: const [],
       intentionCounts: {_source: _counts(), _selected: _counts()},
-      relationPermissions: const {},
     );
 
     expect(change.before!.date, before.date);
@@ -92,49 +68,8 @@ void main() {
         releasedRelationIds: const [],
         occupiedRelationIds: [_relation],
         intentionCounts: {_source: _counts()},
-        relationPermissions: {
-          _relation: const LongTermRelationPermissions.unknown(),
-        },
       ),
       throwsA(isA<DailyChoiceChangeValidationException>()),
-    );
-    expect(
-      () => DailyChoiceChange(
-        revision: revision,
-        before: null,
-        after: choice,
-        releasedRelationIds: const [],
-        occupiedRelationIds: [_relation],
-        intentionCounts: {_source: _counts(), _selected: _counts()},
-        relationPermissions: const {},
-      ),
-      throwsA(
-        isA<DailyChoiceChangeValidationException>().having(
-          (error) => error.failure,
-          'причина',
-          DailyChoiceChangeValidationFailure.missingPermissions,
-        ),
-      ),
-    );
-    expect(
-      () => DailyChoiceChange(
-        revision: revision,
-        before: null,
-        after: choice,
-        releasedRelationIds: const [],
-        occupiedRelationIds: [_relation],
-        intentionCounts: {_source: _counts(), _selected: _counts()},
-        relationPermissions: {
-          _relation: const LongTermRelationPermissions.unknown(),
-        },
-      ),
-      throwsA(
-        isA<DailyChoiceChangeValidationException>().having(
-          (error) => error.failure,
-          'причина',
-          DailyChoiceChangeValidationFailure.unconfirmedPermissions,
-        ),
-      ),
     );
     final change = DailyChoiceChange(
       revision: const _Revision(5),
@@ -143,9 +78,6 @@ void main() {
       releasedRelationIds: const [],
       occupiedRelationIds: [_relation],
       intentionCounts: {_source: _counts(), _selected: _counts()},
-      relationPermissions: {
-        _relation: const LongTermRelationPermissions.referencedByDailyPath(),
-      },
     );
     expect(
       () => ConfirmedGraphResult(revision: revision, value: _Outcome([change])),

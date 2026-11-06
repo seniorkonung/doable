@@ -29,8 +29,9 @@ LongTermRelationId _relationId(int number) => (LongTermRelationId.decode(
 ) as LongTermRelationIdDecodingSuccess).id;
 
 void main() {
-  // Активность связи и защита дневным путём управляют независимыми частями
-  // панели, а тип меняет только шапку: двух комбинаций хватает на все значения.
+  // Активность связи и вход в сохранённый дневной путь не влияют на
+  // отсутствие её тегов, а тип меняет только шапку: двух комбинаций хватает на
+  // все значения.
   for (final (number, usedByDailyPath, type) in [
     (101, false, 'need'),
     (102, true, 'can'),
@@ -147,15 +148,6 @@ void main() {
           find.text(l10n.relationSheetArchivedNote),
           number == 101 ? findsNothing : findsOneWidget,
         );
-
-        await tester.tap(find.bySemanticsLabel(l10n.relationSheetOptionsLabel));
-        await tester.pumpAndSettle();
-        expect(
-          find.text(l10n.relationDetailsPathProtection),
-          usedByDailyPath ? findsOneWidget : findsNothing,
-        );
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
 
         for (final (participantNumber, tagNumber) in [
           (1, firstTagNumber),

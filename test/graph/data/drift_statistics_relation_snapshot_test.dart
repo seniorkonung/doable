@@ -360,12 +360,11 @@ void main() {
         durabilityRelation(105),
       ]),
     );
-    for (final (number, source, related, type, priority, sequence, referenced)
-        in [
-          (101, 1, 2, LongTermRelationType.need, RelationPriority.p2, 1, true),
-          (102, 2, 3, LongTermRelationType.can, RelationPriority.p2, 2, true),
-          (105, 4, 2, LongTermRelationType.need, RelationPriority.p4, 5, false),
-        ]) {
+    for (final (number, source, related, type, priority, sequence) in [
+      (101, 1, 2, LongTermRelationType.need, RelationPriority.p2, 1),
+      (102, 2, 3, LongTermRelationType.can, RelationPriority.p2, 2),
+      (105, 4, 2, LongTermRelationType.need, RelationPriority.p4, 5),
+    ]) {
       final change = changes.singleWhere(
         (change) => change.id == durabilityRelation(number),
       );
@@ -379,10 +378,6 @@ void main() {
       }
       expect(change.before.scope, RelationScope.active);
       expect(change.after.scope, RelationScope.archived);
-      expect(change.permissions.isConfirmed, isTrue);
-      expect(change.permissions.canDelete, !referenced);
-      expect(change.permissions.canEditDescriptionAndPriority, isTrue);
-      expect(change.permissions.canChangeArchiveState, isTrue);
     }
     expect(probe.reads, reads, reason: 'Пересборка ленивая');
     final graph = await repository.loadStatisticsRelationSnapshot();
@@ -490,14 +485,13 @@ final class _SnapshotProbe extends LocalDatabaseConnectionObserver {
     LocalDatabaseSqlStatement statement,
     List<Map<String, Object?>> rows,
   ) async {
-    if (cascadedRelationRows case final captured?) {
+    if (cascadedRelationRows case final captured?
+        when statement.statements.single.contains(
+          'WHERE relation.is_archived = 0',
+        )) {
       for (final row in rows) {
-        if (row.containsKey('source_intention_id') &&
-            row.containsKey('related_intention_id') &&
-            row.containsKey('is_referenced')) {
-          expect(_inTransaction, isTrue);
-          captured.add(Map.of(row));
-        }
+        expect(_inTransaction, isTrue);
+        captured.add(Map.of(row));
       }
     }
     if (!statement.statements.single.startsWith(

@@ -141,18 +141,6 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
         final relationIds = command.path.steps
             .map((step) => step.relationId)
             .toSet();
-        final permissions = <LongTermRelationId, LongTermRelationPermissions>{};
-        final orderedIds = relationIds.toList();
-        for (var start = 0; start < orderedIds.length; start += 400) {
-          permissions.addAll(
-            await _relationCountAggregates.readPermissions(
-              orderedIds.skip(start).take(400),
-            ),
-          );
-        }
-        if (permissions.values.any((permission) => permission.canDelete)) {
-          throw const StoredGraphCorruption();
-        }
         record(DiagnosticsSucceeded(stopwatch.elapsed));
         return _GraphWriteResult(
           didMutate: true,
@@ -167,7 +155,6 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
                 releasedRelationIds: const [],
                 occupiedRelationIds: relationIds,
                 intentionCounts: affectedCounts,
-                relationPermissions: permissions,
               ),
             ],
           ),
@@ -334,7 +321,6 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
                 releasedRelationIds: const [],
                 occupiedRelationIds: const [],
                 intentionCounts: counts,
-                relationPermissions: const {},
               ),
             ],
           ),
@@ -416,18 +402,6 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
             throw const StoredGraphCorruption();
           }
         }
-        final permissions = <LongTermRelationId, LongTermRelationPermissions>{};
-        final relationIds = released.toList();
-        for (var start = 0; start < relationIds.length; start += 400) {
-          permissions.addAll(
-            await _relationCountAggregates.readPermissions(
-              relationIds.skip(start).take(400),
-            ),
-          );
-        }
-        if (permissions.length != released.length) {
-          throw const StoredGraphCorruption();
-        }
         record(DiagnosticsSucceeded(stopwatch.elapsed));
         return _GraphWriteResult(
           didMutate: true,
@@ -441,7 +415,6 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
                 releasedRelationIds: released,
                 occupiedRelationIds: const [],
                 intentionCounts: counts,
-                relationPermissions: permissions,
               ),
             ],
           ),

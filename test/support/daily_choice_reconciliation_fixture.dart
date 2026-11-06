@@ -8,7 +8,6 @@ import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -54,9 +53,6 @@ DailyChoiceCommandResult reconciliationChoiceCreated({
     releasedRelationIds: const [],
     occupiedRelationIds: [pathRelationId],
     intentionCounts: counts,
-    relationPermissions: {
-      pathRelationId: const LongTermRelationPermissions.referencedByDailyPath(),
-    },
   );
   return GraphCommandSucceeded<
     DailyChoiceCommandSuccess,
@@ -115,9 +111,6 @@ DailyChoiceCommandResult reconciliationChoiceDeleted({
     releasedRelationIds: [pathRelationId],
     occupiedRelationIds: const [],
     intentionCounts: counts,
-    relationPermissions: {
-      pathRelationId: const LongTermRelationPermissions.unrestricted(),
-    },
   );
   return GraphCommandSucceeded<
     DailyChoiceCommandSuccess,

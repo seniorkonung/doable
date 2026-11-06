@@ -1,18 +1,12 @@
 part of 'drift_personal_graph_repository.dart';
 
-/// Состояние связи до каскада, показание времени, записанное каскадом, и
-/// неизменившиеся разрешения из той же транзакции. Изменение получает ревизию
-/// только после подтверждения каскада.
+/// Состояние связи до каскада и показание времени, записанное каскадом.
+/// Изменение получает ревизию только после подтверждения каскада.
 final class _CascadedRelationArchive {
-  const _CascadedRelationArchive(
-    this.before,
-    this.archivedAt,
-    this.permissions,
-  );
+  const _CascadedRelationArchive(this.before, this.archivedAt);
 
   final relation_domain.LongTermRelation before;
   final relation_domain.RelationTimestamp archivedAt;
-  final LongTermRelationPermissions permissions;
 
   LongTermRelationUpdatedChange toChange(GraphRevision revision) =>
       LongTermRelationUpdatedChange(
@@ -29,7 +23,6 @@ final class _CascadedRelationArchive {
           createdAt: before.createdAt,
           updatedAt: archivedAt,
         ),
-        permissions: permissions,
       );
 }
 
@@ -216,7 +209,6 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
         relation: after,
         description: description,
         affectedCounts: const {},
-        permissions: await _readRelationPermissions(before.id),
         didMutate: false,
       );
     }
@@ -273,7 +265,6 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
       relation: verifiedAfter,
       description: storedAfter.description,
       affectedCounts: affectedCounts,
-      permissions: await _readRelationPermissions(verifiedAfter.id),
       didMutate: true,
     );
   }
@@ -319,7 +310,6 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
         relation: after,
         description: storedBefore.description,
         affectedCounts: const {},
-        permissions: await _readRelationPermissions(before.id),
         didMutate: false,
       );
     }
@@ -357,7 +347,6 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
       relation: verifiedAfter,
       description: storedAfter.description,
       affectedCounts: affectedCounts,
-      permissions: await _readRelationPermissions(verifiedAfter.id),
       didMutate: true,
     );
   }
@@ -370,9 +359,6 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
       throw _LongTermRelationNotFound(relationId);
     }
     final relation = stored.toDomain();
-    if (!(await _readRelationPermissions(relationId)).canDelete) {
-      throw _LongTermRelationReferencedByDailyPath(relationId);
-    }
 
     final deletedRows = await (_database.delete(
       _database.longTermRelations,
@@ -497,7 +483,6 @@ final class _CommittedLongTermRelationsAddition
             LongTermRelationCreatedChange(
               revision: revision,
               relation: relation,
-              permissions: const LongTermRelationPermissions.unrestricted(),
             ),
         ],
       );
@@ -510,7 +495,6 @@ final class _CommittedLongTermRelationUpdate
     required this.relation,
     required this.description,
     required Map<IntentionId, RelationCounts> affectedCounts,
-    required this.permissions,
     required this.didMutate,
   }) : affectedCounts = Map.unmodifiable(affectedCounts);
 
@@ -518,7 +502,6 @@ final class _CommittedLongTermRelationUpdate
   final relation_domain.LongTermRelation relation;
   final LongTermRelationDescription? description;
   final Map<IntentionId, RelationCounts> affectedCounts;
-  final LongTermRelationPermissions permissions;
 
   @override
   final bool didMutate;
@@ -529,7 +512,6 @@ final class _CommittedLongTermRelationUpdate
         before: before,
         relation: relation,
         description: description,
-        permissions: permissions,
         changes: didMutate
             ? [
                 for (final entry in affectedCounts.entries)
@@ -542,14 +524,12 @@ final class _CommittedLongTermRelationUpdate
                   revision: revision,
                   before: before,
                   after: relation,
-                  permissions: permissions,
                 ),
               ]
             : [
                 LongTermRelationUnchangedChange(
                   revision: revision,
                   relation: relation,
-                  permissions: permissions,
                 ),
               ],
       );
@@ -595,9 +575,6 @@ LongTermRelationCommandFailure _classifyLongTermRelationCommandFailure(
   }
   if (error case _LongTermRelationNotFound(:final relationId)) {
     return LongTermRelationNotFoundFailure(relationId);
-  }
-  if (error case _LongTermRelationReferencedByDailyPath(:final relationId)) {
-    return LongTermRelationReferencedByDailyPathFailure(relationId);
   }
   if (error case _LongTermRelationParticipantNotFound(:final role, :final id)) {
     return LongTermRelationParticipantNotFoundFailure(
@@ -659,12 +636,6 @@ final class _LongTermRelationArchivedTypeChange implements Exception {
 
 final class _LongTermRelationNotFound implements Exception {
   const _LongTermRelationNotFound(this.relationId);
-
-  final LongTermRelationId relationId;
-}
-
-final class _LongTermRelationReferencedByDailyPath implements Exception {
-  const _LongTermRelationReferencedByDailyPath(this.relationId);
 
   final LongTermRelationId relationId;
 }

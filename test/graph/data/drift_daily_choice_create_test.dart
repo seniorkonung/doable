@@ -169,7 +169,6 @@ void main() {
       change.revision.compareTo(confirmed.revision),
       GraphRevisionOrder.same,
     );
-    expect(change.relationPermissions[_relation(101)]!.canDelete, isFalse);
     expect(
       (before as DailyChoiceReadSuccess).value.revision.compareTo(
         confirmed.revision,

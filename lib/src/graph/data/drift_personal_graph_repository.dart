@@ -66,7 +66,6 @@ import '../../intention/domain/intention_text.dart';
 import '../../long_term_relation/application/long_term_relation_command.dart';
 import '../../long_term_relation/application/long_term_relation_id_generator.dart';
 import '../../long_term_relation/application/long_term_relation_projection.dart';
-import '../../long_term_relation/application/long_term_relation_permissions.dart';
 import '../../long_term_relation/application/relation_counts.dart';
 import '../../long_term_relation/application/relation_group_page.dart';
 import '../../long_term_relation/application/relation_pair_probe.dart';
@@ -540,12 +539,6 @@ final class DriftPersonalGraphRepository
     }
     return Map.unmodifiable(counts);
   }
-
-  Future<LongTermRelationPermissions> _readRelationPermissions(
-    LongTermRelationId id,
-  ) async =>
-      (await _relationCountAggregates.readPermissions([id]))[id] ??
-      (throw const StoredGraphCorruption());
 
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
@@ -1039,9 +1032,7 @@ final class DriftPersonalGraphRepository
           '''SELECT relation.creation_sequence, relation.id,
                 relation.source_intention_id, relation.related_intention_id,
                 relation.type, relation.priority, relation.is_archived,
-                relation.created_at, relation.updated_at,
-                EXISTS(SELECT 1 FROM daily_choice_path_steps AS step
-                       WHERE step.long_term_relation_id = relation.id) AS is_referenced
+                relation.created_at, relation.updated_at
          FROM long_term_relations AS relation
          WHERE relation.is_archived = 0 AND
                (relation.source_intention_id = ? OR relation.related_intention_id = ?)''',
@@ -1049,10 +1040,7 @@ final class DriftPersonalGraphRepository
             Variable<String>(serializedId),
             Variable<String>(serializedId),
           ],
-          readsFrom: {
-            _database.longTermRelations,
-            _database.dailyChoicePathSteps,
-          },
+          readsFrom: {_database.longTermRelations},
         )
         .get();
     final archivedAt = relation_domain.RelationTimestamp(clock.read());
@@ -1061,11 +1049,6 @@ final class DriftPersonalGraphRepository
         _CascadedRelationArchive(
           StoredLongTermRelation.decode(row.data).toDomain(),
           archivedAt,
-          switch (requiredStoredInteger(row.data, 'is_referenced')) {
-            0 => const LongTermRelationPermissions.unrestricted(),
-            1 => const LongTermRelationPermissions.referencedByDailyPath(),
-            _ => throw const StoredGraphCorruption(),
-          },
         ),
     ];
     await _database.customUpdate(

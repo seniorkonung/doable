@@ -20,11 +20,14 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/action_seed.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 void main() {
+  late sqlite.Database raw;
   late AppDatabase database;
   late InMemoryDiagnosticsSink diagnostics;
   late DriftPersonalGraphRepository repository;
@@ -37,7 +40,7 @@ void main() {
   late LongTermRelationId replacementRelationId;
 
   setUp(() async {
-    database = AppDatabase(openInMemoryLocalDatabase());
+    database = AppDatabase(openInMemoryLocalDatabase(setup: (db) => raw = db));
     await database.open();
     diagnostics = InMemoryDiagnosticsSink();
     sourceId = _intentionId(_uuid(1));
@@ -152,6 +155,57 @@ void main() {
       expect((await _storedIntention(database, relatedId))['is_archived'], 0);
     },
   );
+
+  test('удаление связи из пути действия сохраняет действие и путь и оставляет '
+      'надгробие пары с типом', () async {
+    await _create(repository, sourceId, relatedId);
+    await _create(
+      repository,
+      relatedId,
+      thirdId,
+      group: IntentionRelationGroup.canUse,
+    );
+    seedRawGraph(raw, () {
+      seedAction(
+        raw,
+        id: seedUuid(11),
+        path: [
+          sourceId.toCanonicalString(),
+          relatedId.toCanonicalString(),
+          thirdId.toCanonicalString(),
+        ],
+      );
+    });
+    List<Map<String, Object?>> rows(String sql) => [
+      for (final row in raw.select(sql)) Map<String, Object?>.of(row),
+    ];
+    final action = rows('SELECT * FROM actions');
+    final path = rows('SELECT * FROM action_path_items ORDER BY position');
+    final otherRelationBefore = await _storedRelation(
+      database,
+      secondRelationId,
+    );
+
+    final deleted = _confirmedDeleted(
+      await repository.execute(DeleteLongTermRelation(relationId)),
+    );
+
+    expect(deleted.value.relation.id, relationId);
+    expect(await _storedRelationOrNull(database, relationId), isNull);
+    expect(
+      await _storedRelation(database, secondRelationId),
+      otherRelationBefore,
+    );
+    expect(rows('SELECT * FROM actions'), action);
+    expect(rows('SELECT * FROM action_path_items ORDER BY position'), path);
+    expect(rows('SELECT * FROM deleted_relation_pairs'), [
+      {
+        'source_intention_id': sourceId.toCanonicalString(),
+        'related_intention_id': relatedId.toCanonicalString(),
+        'type': 'need',
+      },
+    ]);
+  });
 
   test(
     'повтор и устаревшее изменение не восстанавливают удалённую связь',

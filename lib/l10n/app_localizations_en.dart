@@ -2337,10 +2337,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'The relation couldn’t be deleted because its current state conflicts with the operation.';
 
   @override
-  String get relationDeleteReferencedByDailyPath =>
-      'This relation is used by a saved daily path. Delete the daily choices that use it first.';
-
-  @override
   String get relationDeleteUnavailable =>
       'The relation couldn’t be deleted. Try again.';
 
@@ -2390,10 +2386,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get relationDetailsPriorityLabel => 'Priority';
-
-  @override
-  String get relationDetailsPathProtection =>
-      'This relation is used in a saved daily path, so it cannot be deleted.';
 
   @override
   String relationSheetArchivedLabel(String phrase) {

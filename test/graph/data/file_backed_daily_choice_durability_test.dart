@@ -4,7 +4,6 @@ import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -84,17 +83,6 @@ void main() {
         durabilityRelation(102),
       ]);
     }
-    final relation = await repository
-        .watchRelation(durabilityRelation(101))
-        .first;
-    expect(
-      (relation as LongTermRelationReadSuccess)
-          .value
-          .value!
-          .permissions
-          .canDelete,
-      isFalse,
-    );
     await _expectIntegrity(database);
 
     for (final (command, expectedSchedule, expectedPriority) in [

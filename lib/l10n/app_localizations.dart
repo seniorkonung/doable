@@ -3636,12 +3636,6 @@ abstract class AppLocalizations {
   /// **'The relation couldn’t be deleted because its current state conflicts with the operation.'**
   String get relationDeleteConflict;
 
-  /// Конфликт удаления используемой дневным путём связи
-  ///
-  /// In en, this message translates to:
-  /// **'This relation is used by a saved daily path. Delete the daily choices that use it first.'**
-  String get relationDeleteReferencedByDailyPath;
-
   /// Устранимая недоступность удаления связи
   ///
   /// In en, this message translates to:
@@ -3725,12 +3719,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Priority'**
   String get relationDetailsPriorityLabel;
-
-  /// Причина недоступности удаления связи в подробностях
-  ///
-  /// In en, this message translates to:
-  /// **'This relation is used in a saved daily path, so it cannot be deleted.'**
-  String get relationDetailsPathProtection;
 
   /// Доступное название панели архивированной связи; phrase — полная формулировка связи
   ///

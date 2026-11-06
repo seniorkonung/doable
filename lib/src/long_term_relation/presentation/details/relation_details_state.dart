@@ -2,7 +2,6 @@ import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
-import '../../application/long_term_relation_permissions.dart';
 import '../../domain/long_term_relation_description.dart';
 
 /// Состояние подробного просмотра одной долговременной связи.
@@ -25,24 +24,19 @@ final class RelationDetailsLoading extends RelationDetailsState {
   const RelationDetailsLoading({required super.isOperationRunning});
 }
 
-/// Подтверждённые данные связи; разрешение может получить более новую ревизию
-/// до завершения повторного чтения остальных полей.
+/// Подтверждённые данные связи.
 final class RelationDetailsLoaded extends RelationDetailsState {
-  RelationDetailsLoaded({
+  const RelationDetailsLoaded({
     required this.details,
     required this.revision,
     required super.isOperationRunning,
-    LongTermRelationPermissions? permissions,
     this.refreshStatus = const RelationDetailsFresh(),
     this.lifecycleChange,
     this.editFailure,
-  }) : permissions = permissions ?? details.permissions;
+  });
 
   final LongTermRelationDetails details;
   final GraphRevision revision;
-
-  /// Подтверждённое разрешение с собственного пакета графа или полного чтения.
-  final LongTermRelationPermissions permissions;
   final RelationDetailsRefreshStatus refreshStatus;
   final RelationDetailsLifecycleChange? lifecycleChange;
 
@@ -56,7 +50,6 @@ final class RelationDetailsLoaded extends RelationDetailsState {
   RelationDetailsLoaded copyWith({
     LongTermRelationDetails? details,
     GraphRevision? revision,
-    LongTermRelationPermissions? permissions,
     bool? isOperationRunning,
     RelationDetailsRefreshStatus? refreshStatus,
     RelationDetailsLifecycleChange? lifecycleChange,
@@ -66,7 +59,6 @@ final class RelationDetailsLoaded extends RelationDetailsState {
   }) => RelationDetailsLoaded(
     details: details ?? this.details,
     revision: revision ?? this.revision,
-    permissions: permissions ?? this.permissions,
     isOperationRunning: isOperationRunning ?? this.isOperationRunning,
     refreshStatus: refreshStatus ?? this.refreshStatus,
     lifecycleChange: clearLifecycleChange

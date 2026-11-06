@@ -139,8 +139,6 @@ void main() {
     expect(change.after, isNull);
     expect(change.releasedRelationIds, {_relation(101), _relation(102)});
     expect(change.occupiedRelationIds, isEmpty);
-    expect(change.relationPermissions[_relation(101)]!.canDelete, isTrue);
-    expect(change.relationPermissions[_relation(102)]!.canDelete, isTrue);
     expect((await read(id)).value, isNull);
     expect(raw.select('SELECT * FROM daily_choice_path_steps'), isEmpty);
     expect(raw.select('SELECT * FROM intentions'), hasLength(3));
@@ -158,19 +156,13 @@ void main() {
     );
   });
 
-  test('другая запись сохраняет прямую и путевую зависимости', () async {
+  test('удаление выбора сохраняет путь другого выбора', () async {
     final removed = await createChoice();
     final retained = await createChoice();
     final result = await repository.execute(DeleteDailyChoice(removed));
 
-    final change =
-        ((result as GraphCommandSucceeded).value.value as DailyChoiceDeleted)
-                .changes
-                .single
-            as DailyChoiceChange;
+    expect(result, isA<GraphCommandSucceeded>());
     expect((await read(retained)).value!.path, hasLength(2));
-    expect(change.relationPermissions[_relation(101)]!.canDelete, isFalse);
-    expect(change.relationPermissions[_relation(102)]!.canDelete, isFalse);
     expect(raw.select('SELECT * FROM daily_choice_path_steps'), hasLength(2));
   });
 
@@ -205,7 +197,6 @@ void main() {
                 .single
             as DailyChoiceChange;
     expect(change.releasedRelationIds, hasLength(length));
-    expect(change.relationPermissions, hasLength(length));
     expect(raw.select('SELECT * FROM daily_choice_path_steps'), isEmpty);
   });
 

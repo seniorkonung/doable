@@ -1665,10 +1665,6 @@
   "@relationDeleteConflict": {
     "description": "Конфликт актуального состояния при удалении связи"
   },
-  "relationDeleteReferencedByDailyPath": "This relation is used by a saved daily path. Delete the daily choices that use it first.",
-  "@relationDeleteReferencedByDailyPath": {
-    "description": "Конфликт удаления используемой дневным путём связи"
-  },
   "relationDeleteUnavailable": "The relation couldn’t be deleted. Try again.",
   "@relationDeleteUnavailable": {
     "description": "Устранимая недоступность удаления связи"
@@ -1725,8 +1721,6 @@
   "@relationDetailsPriorityLabel": {
     "description": "Подпись приоритета связи в подробном просмотре"
   },
-  "relationDetailsPathProtection": "This relation is used in a saved daily path, so it cannot be deleted.",
-  "@relationDetailsPathProtection": {"description": "Причина недоступности удаления связи в подробностях"},
   "relationSheetArchivedLabel": "{phrase}. Archived",
   "@relationSheetArchivedLabel": {
     "description": "Доступное название панели архивированной связи; phrase — полная формулировка связи",

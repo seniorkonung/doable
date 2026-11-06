@@ -3,9 +3,7 @@ import 'package:drift/drift.dart';
 import '../../data/local/app_database.dart';
 import '../../data/local/sqlite_relation_integrity_functions.dart';
 import '../../intention/domain/intention_id.dart';
-import '../../long_term_relation/application/long_term_relation_permissions.dart';
 import '../../long_term_relation/application/relation_counts.dart';
-import '../../long_term_relation/domain/long_term_relation_id.dart';
 
 final class RelationCountAggregate {
   const RelationCountAggregate({
@@ -65,59 +63,6 @@ final class DriftRelationCountAggregates {
         entry.value:
             bySerializedId[entry.key] ??
             (throw StateError('SQLite не вернул агрегат намерения.')),
-    });
-  }
-
-  Future<Map<LongTermRelationId, LongTermRelationPermissions>> readPermissions(
-    Iterable<LongTermRelationId> relationIds,
-  ) async {
-    final requested = <String, LongTermRelationId>{
-      for (final id in relationIds) id.toCanonicalString(): id,
-    };
-    if (requested.isEmpty) return const {};
-
-    final values = List.filled(requested.length, '(?)').join(', ');
-    final rows = await _database
-        .customSelect(
-          '''
-        /* doable_daily_path_permissions */
-        WITH requested(relation_id) AS (VALUES $values)
-        SELECT requested.relation_id,
-          relation.id IS NOT NULL AS relation_exists,
-          EXISTS (
-            SELECT 1 FROM daily_choice_path_steps AS step
-              INDEXED BY daily_choice_path_steps_relation
-            WHERE step.long_term_relation_id = requested.relation_id
-          ) AS referenced_by_daily_path
-        FROM requested
-        LEFT JOIN long_term_relations AS relation
-          ON relation.id = requested.relation_id
-      ''',
-          variables: [for (final id in requested.keys) Variable<String>(id)],
-          readsFrom: {
-            _database.longTermRelations,
-            _database.dailyChoicePathSteps,
-          },
-        )
-        .get();
-
-    final bySerializedId = <String, LongTermRelationPermissions>{};
-    for (final row in rows) {
-      if (row.read<int>('relation_exists') != 1) {
-        throw StateError('SQLite не нашёл связь для разрешения.');
-      }
-      final reference = row.read<int>('referenced_by_daily_path');
-      bySerializedId[row.read<String>('relation_id')] = switch (reference) {
-        0 => const LongTermRelationPermissions.unrestricted(),
-        1 => const LongTermRelationPermissions.referencedByDailyPath(),
-        _ => throw StateError('SQLite вернул недопустимое разрешение.'),
-      };
-    }
-    return Map.unmodifiable({
-      for (final entry in requested.entries)
-        entry.value:
-            bySerializedId[entry.key] ??
-            (throw StateError('SQLite не вернул разрешение связи.')),
     });
   }
 }

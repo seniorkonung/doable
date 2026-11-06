@@ -2367,10 +2367,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Связь не удалось удалить из-за конфликта актуального состояния.';
 
   @override
-  String get relationDeleteReferencedByDailyPath =>
-      'Связь используется в сохранённом дневном пути. Сначала удалите использующие её дневные выборы.';
-
-  @override
   String get relationDeleteUnavailable =>
       'Не удалось удалить связь. Повторите попытку.';
 
@@ -2420,10 +2416,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get relationDetailsPriorityLabel => 'Приоритет';
-
-  @override
-  String get relationDetailsPathProtection =>
-      'Связь используется в сохранённом дневном пути, поэтому удалить её нельзя.';
 
   @override
   String relationSheetArchivedLabel(String phrase) {
