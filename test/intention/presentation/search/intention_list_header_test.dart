@@ -7,6 +7,8 @@ import 'package:doable/src/intention/presentation/catalog/intention_catalog_purp
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/search/intention_list_header.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -121,8 +123,12 @@ void main() {
       'только тип',
       (tester) async {
         final semantics = tester.ensureSemantics();
-        final purpose = SelectDailyChoiceSource(
+        final purpose = SelectRelationParticipant(
           session: IntentionSearchSession(),
+          pairProbe: RelationPairProbe(
+            counterpartId: testSummary(index: 999).id,
+            candidateRole: RelationParticipantRole.related,
+          ),
         );
         await _open(tester, purpose, locale);
         final title = ru ? 'Все' : 'All';

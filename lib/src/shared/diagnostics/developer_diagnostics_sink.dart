@@ -79,18 +79,6 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
       'isContinuation': isContinuation,
       ..._encodeStatus(event.status),
     },
-  ChoicePathContinuationReadDiagnosticsEvent(
-    :final stage,
-    :final pageSize,
-    :final isContinuation,
-  ) =>
-    {
-      'operation': 'choicePathContinuationRead',
-      'stage': stage.name,
-      ..._encodeStatus(event.status),
-      'pageSize': pageSize,
-      'isContinuation': isContinuation,
-    },
   DailyChoicePathValidationDiagnosticsEvent() => {
     'operation': 'dailyChoicePathValidation',
     'stage': 'validation',

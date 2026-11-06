@@ -14,8 +14,6 @@ import '../../data/local/fts_query.dart';
 import '../../data/local/sqlite_failure_classifier.dart';
 import '../../daily_choice/application/daily_choice_details.dart';
 import '../../daily_choice/application/daily_choice_catalog.dart';
-import '../../daily_choice/application/choice_path_continuations.dart';
-import '../../daily_choice/application/choice_path_draft.dart';
 import '../../daily_choice/application/confirmed_choice_path.dart';
 import '../../daily_choice/application/daily_choice_command.dart';
 import '../../daily_choice/application/daily_choice_day_statuses.dart';
@@ -113,7 +111,6 @@ part 'drift_personal_graph_repository_action_commands.dart';
 part 'drift_personal_graph_repository_relation_commands.dart';
 part 'drift_personal_graph_repository_relation_details.dart';
 part 'drift_personal_graph_repository_relation_groups.dart';
-part 'drift_personal_graph_repository_choice_path_reads.dart';
 part 'drift_personal_graph_repository_tag_reads.dart';
 part 'drift_personal_graph_repository_tag_commands.dart';
 part 'drift_personal_graph_repository_fact_log.dart';
@@ -309,11 +306,6 @@ final class DriftPersonalGraphRepository
 
   DriftRelationCountAggregates get _relationCountAggregates =>
       DriftRelationCountAggregates(_database);
-
-  @override
-  Future<ChoicePathContinuationResult> getChoicePathContinuations(
-    ChoicePathContinuationQuery query,
-  ) => _readChoicePathContinuations(query);
 
   @override
   Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>

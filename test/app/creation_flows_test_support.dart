@@ -40,151 +40,56 @@ ScrollPosition _dailyChoiceScrollPosition(WidgetTester tester) => tester
     )
     .position;
 
-/// Три потока общей кнопки с настоящим локальным графом.
-enum _Flow {
-  intention(
-    'намерение',
-    'intentions',
-    5,
-    'intention-editor-submit',
-    IntentionDetailsRoute.name,
-  ),
-  topDown(
-    'дневной выбор от намерения',
-    'daily_choices',
-    0,
-    'daily-choice-submit',
-    null,
-  ),
-  bottomUp(
-    'дневной выбор от действия',
-    'daily_choices',
-    0,
-    'daily-choice-submit',
-    null,
+/// Таблица и число строк намерений в графе до создания.
+const _intentionsTable = 'intentions';
+const _initialIntentionRows = 5;
+const _intentionSubmit = 'intention-editor-submit';
+
+/// Открывает форму намерения двойным нажатием общей кнопки: запуск один.
+Future<void> _openIntentionEditor(
+  WidgetTester tester,
+  _App app,
+  IntentionCreationOrigin origin,
+) async {
+  await _until(
+    tester,
+    () => quickCreationAction().hitTestable().evaluate().isNotEmpty,
   );
-
-  const _Flow(
-    this.label,
-    this.table,
-    this.initialRows,
-    this.submit,
-    this.resultRoute,
+  final history = [for (final route in app.router.stackData) route.matchId];
+  await openQuickCreation(
+    tester,
+    QuickCreationMode.intention,
+    openedPage: _key('intention-editor-title'),
+    wait: (tester, finder) =>
+        _until(tester, () => finder.evaluate().isNotEmpty),
+    activate: (tester, button) async {
+      final position = tester.getCenter(button);
+      await tester.tapAt(position);
+      await tester.tapAt(position);
+    },
   );
-  final String label;
-  final String table;
-  final int initialRows;
-  final String submit;
+  expect(app.router.stackData, hasLength(history.length + 1));
+  expect(
+    app.router.stackData.take(history.length).map((route) => route.matchId),
+    orderedEquals(history),
+  );
+  expect(app.router.current.name, IntentionEditorRoute.name);
+  // Под модальной панелью намерения исходная панель видна, но недоступна.
+  expect(find.byType(AppNavigationBar).hitTestable(), findsNothing);
+}
 
-  /// Маршрут созданной сущности; дневной выбор возвращает на исходную страницу.
-  final String? resultRoute;
+Future<void> _fillIntentionEditor(WidgetTester tester) async {
+  await tester.enterText(_key('intention-editor-title'), 'Новое');
+  await tester.enterText(
+    _key('intention-editor-description'),
+    'Сохранённое описание',
+  );
+  await tester.pumpAndSettle();
+}
 
-  Future<void> open(
-    WidgetTester tester,
-    _App app,
-    IntentionCreationOrigin origin,
-  ) async {
-    await _until(
-      tester,
-      () => quickCreationAction().hitTestable().evaluate().isNotEmpty,
-    );
-    final history = [for (final route in app.router.stackData) route.matchId];
-    await openQuickCreation(
-      tester,
-      switch (this) {
-        intention => QuickCreationMode.intention,
-        topDown || bottomUp => QuickCreationMode.dailyChoice,
-      },
-      openedPage: switch (this) {
-        intention => _key('intention-editor-title'),
-        topDown || bottomUp => find.byType(QuickCreationDailyChoiceStartSheet),
-      },
-      wait: (tester, finder) =>
-          _until(tester, () => finder.evaluate().isNotEmpty),
-      activate: (tester, button) async {
-        final position = tester.getCenter(button);
-        await tester.tapAt(position);
-        await tester.tapAt(position);
-      },
-    );
-    if (this == topDown || this == bottomUp) {
-      await chooseQuickCreationDailyChoiceStart(
-        tester,
-        this == topDown
-            ? ChoicePathDraftDirection.topDown
-            : ChoicePathDraftDirection.bottomUp,
-        openedPage: _key(
-          this == topDown
-              ? 'daily-choice-source-filter'
-              : 'daily-choice-action-filter',
-        ),
-        wait: (tester, finder) =>
-            _until(tester, () => finder.evaluate().isNotEmpty),
-      );
-    }
-    expect(app.router.stackData, hasLength(history.length + 1));
-    expect(
-      app.router.stackData.take(history.length).map((route) => route.matchId),
-      orderedEquals(history),
-    );
-    expect(app.router.current.name, switch (this) {
-      intention => IntentionEditorRoute.name,
-      topDown => DailyChoiceSourcePickerRoute.name,
-      bottomUp => DailyChoiceActionPickerRoute.name,
-    });
-    // Под модальной панелью намерения исходная панель видна, но недоступна.
-    expect(find.byType(AppNavigationBar).hitTestable(), findsNothing);
-    if (this != intention) expect(find.byType(AppNavigationBar), findsNothing);
-  }
-
-  Future<void> fill(WidgetTester tester) async {
-    switch (this) {
-      case intention:
-        await tester.enterText(_key('intention-editor-title'), 'Новое');
-        await tester.enterText(
-          _key('intention-editor-description'),
-          'Сохранённое описание',
-        );
-      case topDown || bottomUp:
-        final prefix = this == topDown ? 'source' : 'action';
-        final number = this == topDown ? 1 : 4;
-        final row = _key('daily-choice-$prefix-${durabilityUuid(number)}');
-        await _tap(tester, row);
-        expect(find.byType(AppNavigationBar), findsNothing);
-        await _tap(tester, _key('choice-path-continue-${durabilityUuid(103)}'));
-        await _tap(
-          tester,
-          _key(
-            this == topDown
-                ? 'choice-path-select-action'
-                : 'choice-path-select-source',
-          ),
-        );
-        await _tap(tester, _key('choice-path-open-confirmation'));
-        expect(find.byType(AppNavigationBar), findsNothing);
-        await setDailyChoiceCreationDate(
-          tester,
-          CalendarDate.fromParts(2026, 10, 9),
-        );
-        await tester.enterText(
-          _key('daily-choice-description'),
-          'Сохранённое описание',
-        );
-    }
-    await tester.pumpAndSettle();
-  }
-
-  void expectStored(Map<String, Object?> row) {
-    expect(row['description'], 'Сохранённое описание');
-    switch (this) {
-      case intention:
-        expect(row['title'], 'Новое');
-      case topDown || bottomUp:
-        expect(row['source_intention_id'], durabilityUuid(1));
-        expect(row['selected_intention_id'], durabilityUuid(4));
-        expect(row['choice_date'], '2026-10-09');
-    }
-  }
+void _expectIntentionStored(Map<String, Object?> row) {
+  expect(row['description'], 'Сохранённое описание');
+  expect(row['title'], 'Новое');
 }
 
 final class _App {
@@ -328,9 +233,9 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
-Future<void> _submit(WidgetTester tester, _App app, _Flow flow) async {
-  await _reveal(tester, _key(flow.submit));
-  await tester.tap(_key(flow.submit));
+Future<void> _submit(WidgetTester tester, _App app) async {
+  await _reveal(tester, _key(_intentionSubmit));
+  await tester.tap(_key(_intentionSubmit));
   await _until(tester, () => app.observer.attempts == 1);
   await tester.pump();
 }
@@ -347,25 +252,16 @@ Future<void> _reveal(WidgetTester tester, Finder finder) async {
   await tester.pump();
 }
 
-Future<void> _closeCreation(WidgetTester tester, _App app, _Flow flow) async {
+Future<void> _closeCreation(WidgetTester tester, _App app) async {
   final ownedRoute = app.router.current.matchId;
-  if (flow == _Flow.intention) {
-    await tester.tap(_key('intention-editor-close'));
-    await _until(
-      tester,
-      () => _key('intention-editor-close-discard').evaluate().isNotEmpty,
-    );
-    await tester.pump(const Duration(milliseconds: 400));
-    await tester.ensureVisible(_key('intention-editor-close-discard'));
-    await tester.tap(_key('intention-editor-close-discard'));
-  } else {
-    final label = app.observer.attempts == 0
-        ? app.l10n.creationCancelAction
-        : app.l10n.creationLeaveAction;
-    final button = find.widgetWithText(TextButton, label);
-    await tester.ensureVisible(button);
-    await tester.tap(button);
-  }
+  await tester.tap(_key('intention-editor-close'));
+  await _until(
+    tester,
+    () => _key('intention-editor-close-discard').evaluate().isNotEmpty,
+  );
+  await tester.pump(const Duration(milliseconds: 400));
+  await tester.ensureVisible(_key('intention-editor-close-discard'));
+  await tester.tap(_key('intention-editor-close-discard'));
   await _until(
     tester,
     () => app.router.stackData.every((route) => route.matchId != ownedRoute),

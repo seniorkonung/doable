@@ -26,8 +26,6 @@ final class IntentionChoicesSliver extends ConsumerStatefulWidget {
     required this.intentionId,
     required this.pageInstance,
     required this.onOpenDailyChoice,
-    required this.onAddAsSource,
-    required this.onAddAsSelected,
     super.key,
   });
 
@@ -36,14 +34,6 @@ final class IntentionChoicesSliver extends ConsumerStatefulWidget {
 
   /// Открывает сохранённый путь дневного выбора по его идентификатору.
   final ValueChanged<DailyChoiceId> onOpenDailyChoice;
-
-  /// Начинает дневной выбор от этого намерения; без обработчика у роли
-  /// «исходное» нет «Добавить».
-  final VoidCallback? onAddAsSource;
-
-  /// Начинает дневной выбор, который заканчивается этим намерением; без
-  /// обработчика у роли «выбранное» нет «Добавить».
-  final VoidCallback? onAddAsSelected;
 
   @override
   ConsumerState<IntentionChoicesSliver> createState() =>
@@ -98,44 +88,18 @@ final class _IntentionChoicesSliverState
   }
 
   /// Подсказка называет роль, только когда её подтверждённый список не пуст;
-  /// без «Добавить» и без подсказки строки нет.
+  /// у пустого списка строки нет.
   AddRow? _addRow(AppLocalizations l10n, IntentionChoicesState state) {
-    final (hint, addLabel, onAdd) = switch (state.role) {
-      DailyChoiceRelationRole.source => (
-        l10n.detailsChoicesSourceHint,
-        l10n.detailsChoicesAddSourceLabel,
-        widget.onAddAsSource,
-      ),
-      DailyChoiceRelationRole.selected => (
-        l10n.detailsChoicesSelectedHint,
-        l10n.detailsChoicesAddSelectedLabel,
-        widget.onAddAsSelected,
-      ),
+    final hint = switch (state.role) {
+      DailyChoiceRelationRole.source => l10n.detailsChoicesSourceHint,
+      DailyChoiceRelationRole.selected => l10n.detailsChoicesSelectedHint,
     };
-    const addKey = ValueKey('intention-choices-add');
-    final hasItems = switch (state) {
-      IntentionChoicesLoaded() => true,
+    return switch (state) {
+      IntentionChoicesLoaded() => AddRow.hintOnly(hint: hint),
       IntentionChoicesInitialLoad() ||
       IntentionChoicesInitialFailure() ||
       IntentionChoicesIntentionNotFound() ||
-      IntentionChoicesEmpty() => false,
-    };
-    return switch ((hasItems, onAdd)) {
-      (true, final onAdd?) => AddRow.hint(
-        hint: hint,
-        addText: l10n.detailsChoicesAdd,
-        addLabel: addLabel,
-        onAdd: onAdd,
-        addKey: addKey,
-      ),
-      (true, null) => AddRow.hintOnly(hint: hint),
-      (false, final onAdd?) => AddRow.addOnly(
-        addText: l10n.detailsChoicesAdd,
-        addLabel: addLabel,
-        onAdd: onAdd,
-        addKey: addKey,
-      ),
-      (false, null) => null,
+      IntentionChoicesEmpty() => null,
     };
   }
 

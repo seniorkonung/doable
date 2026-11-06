@@ -1,14 +1,12 @@
 import 'dart:ui' show Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
-import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/intention/application/intention_catalog.dart'
@@ -37,10 +35,10 @@ void main() {
     expect(find.byType(DailyChoiceCatalogPage), findsOneWidget);
     expect(find.byType(HomePage), findsNothing);
     expect(_selected(tester), AppDestination.dailyChoices);
-    await openDailyChoiceQuickCreation(
+    await openQuickCreation(
       tester,
-      ChoicePathDraftDirection.bottomUp,
-      openedPage: find.byType(DailyChoiceActionPickerPage),
+      QuickCreationMode.intention,
+      openedPage: find.byType(IntentionEditorPage),
     );
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();

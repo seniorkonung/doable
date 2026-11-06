@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
@@ -232,11 +231,6 @@ final _relationId = (LongTermRelationId.decode(
 final class _ControlledRepository
     with TagReadContractTestFallback
     implements PersonalGraphRepository {
-  @override
-  Future<ChoicePathContinuationResult> getChoicePathContinuations(
-    ChoicePathContinuationQuery query,
-  ) => throw UnimplementedError();
-
   final commands = <Object>[];
   final _results = <Completer<Object>>[];
 

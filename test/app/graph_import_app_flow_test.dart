@@ -4,7 +4,6 @@ import 'dart:io';
 
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
-import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/settings/settings_page.dart';
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
@@ -41,56 +40,53 @@ import '../support/app_root_pages.dart';
 import '../support/graph_import_app_harness.dart';
 import '../support/graph_import_files.dart';
 import '../support/intention_catalog_controls.dart';
-import '../support/quick_creation.dart';
 import '../support/temporary_import_document.dart';
 
 void main() {
-  testWidgets('сценарии «Импорт экспорта воспроизводит граф», «Настройки '
-      'установки не переносятся» и «Импорт в пустой граф без подтверждения»: '
-      'новая установка без подтверждения импортирует файл экспорта другой '
-      'установки с теми же сущностями, данными, включая синий тег и тег без '
-      'цвета, порядками и путём дневного выбора, а её режим быстрого создания '
-      'остаётся прежним', (tester) async {
-    late _ExportedGraph exported;
-    final source = await ImportAppHarness.start(
-      tester,
-      at: DateTime(2026, 10, 3, 12),
-      quickCreationMode: QuickCreationMode.dailyChoice,
-      seed: (graph) async => exported = await _seedExportedGraph(graph),
-    );
-    final sourceGraph = await source.graphState();
-    await source.openSettings();
-    expectQuickCreationMode(tester, QuickCreationMode.dailyChoice);
-    final file = await source.export();
-    await source.shutDown();
-
-    final target = await ImportAppHarness.start(
-      tester,
-      at: DateTime(2026, 10, 6, 9),
-      quickCreationMode: QuickCreationMode.intention,
-    );
-    await target.openSettings();
-    target.chooseForImport(file);
-    // Импорт в пустой граф не ждёт подтверждения: без него замена не
-    // началась бы, и сообщения об успехе не было бы.
-    await target.startImport();
-    await app_flow.until(tester, find.text('Данные импортированы'));
-
-    expect(find.byType(SettingsPage), findsOneWidget);
-    expect(await target.graphState(), sourceGraph);
-    expectQuickCreationMode(tester, QuickCreationMode.intention);
-    await _applyTagCondition(tester, exported.tag);
-    for (final (title, finds) in [
-      (exported.assignedFirst, findsOneWidget),
-      (exported.assignedSecond, findsOneWidget),
-      ('Здоровье', findsNothing),
-    ]) {
-      expect(
-        find.descendant(of: intentionCatalogList, matching: find.text(title)),
-        finds,
+  testWidgets(
+    'сценарии «Импорт экспорта воспроизводит граф» и «Импорт в пустой '
+    'граф без подтверждения»: '
+    'новая установка без подтверждения импортирует файл экспорта другой '
+    'установки с теми же сущностями, данными, включая синий тег и тег без '
+    'цвета, порядками и путём дневного выбора',
+    (tester) async {
+      late _ExportedGraph exported;
+      final source = await ImportAppHarness.start(
+        tester,
+        at: DateTime(2026, 10, 3, 12),
+        seed: (graph) async => exported = await _seedExportedGraph(graph),
       );
-    }
-  });
+      final sourceGraph = await source.graphState();
+      await source.openSettings();
+      final file = await source.export();
+      await source.shutDown();
+
+      final target = await ImportAppHarness.start(
+        tester,
+        at: DateTime(2026, 10, 6, 9),
+      );
+      await target.openSettings();
+      target.chooseForImport(file);
+      // Импорт в пустой граф не ждёт подтверждения: без него замена не
+      // началась бы, и сообщения об успехе не было бы.
+      await target.startImport();
+      await app_flow.until(tester, find.text('Данные импортированы'));
+
+      expect(find.byType(SettingsPage), findsOneWidget);
+      expect(await target.graphState(), sourceGraph);
+      await _applyTagCondition(tester, exported.tag);
+      for (final (title, finds) in [
+        (exported.assignedFirst, findsOneWidget),
+        (exported.assignedSecond, findsOneWidget),
+        ('Здоровье', findsNothing),
+      ]) {
+        expect(
+          find.descendant(of: intentionCatalogList, matching: find.text(title)),
+          finds,
+        );
+      }
+    },
+  );
 
   testWidgets('сценарии «Подтверждение показывает дату и состав файла», '
       '«Копия после замены графа» и «Ошибочный импорт отменяется '

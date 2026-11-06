@@ -2,17 +2,14 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:doable/src/app/quick_creation/file_quick_creation_mode_store.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
-import 'package:doable/src/app/quick_creation/quick_creation_mode_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../support/in_memory_diagnostics_sink.dart';
 import 'controlled_mode_io.dart';
 
-const _initial = QuickCreationMode.dailyChoice;
-const _a = QuickCreationMode.intention;
-const _b = QuickCreationMode.dailyChoice;
+/// Прежний ключ неизвестен режимам, поэтому отличает нетронутый файл от записи.
+const _initial = 'daily-choice';
+const _saved = QuickCreationMode.intention;
 
 void main() {
   late Directory directory;
@@ -23,13 +20,8 @@ void main() {
     modeFile = File.fromUri(
       directory.uri.resolve('settings/quick_creation_mode'),
     );
-    expect(
-      await FileQuickCreationModeStore(
-        localDataDirectory: directory,
-        diagnosticsSink: InMemoryDiagnosticsSink(),
-      ).save(_initial),
-      isA<QuickCreationModeSaved>(),
-    );
+    await modeFile.parent.create();
+    await modeFile.writeAsString(_initial);
   });
   tearDown(() => directory.delete(recursive: true));
 
@@ -41,8 +33,8 @@ void main() {
     (ModeWriteStep.rename, 'ffs'),
   ]) {
     test('${step.label}: отдельный процесс восстанавливает последний успех '
-        '$outcomes без объединения выборов', () async {
-      final modes = [_a, _b, if (outcomes.length == 3) _a];
+        '$outcomes', () async {
+      final modes = List.filled(outcomes.length, _saved);
       final worker = await _Worker.start(directory, [
         step.name,
         outcomes,
@@ -54,14 +46,14 @@ void main() {
 
       for (var i = 0; i < modes.length; i++) {
         await worker.next('held');
-        expect(await modeFile.readAsString(), expected.storageKey);
+        expect(await modeFile.readAsString(), expected);
 
         worker.process.stdin.writeln('release');
         final finished = await worker.next('finished');
         final succeeds = outcomes[i] == 's';
         expect(finished['saved'], succeeds);
-        if (succeeds) expected = modes[i];
-        expect(await modeFile.readAsString(), expected.storageKey);
+        if (succeeds) expected = _saved.storageKey;
+        expect(await modeFile.readAsString(), expected);
       }
       await worker.finish();
       expect(worker.diagnostics, [
@@ -75,7 +67,7 @@ void main() {
             },
       ]);
       expect(await modeFile.parent.list().length, 1);
-      await _expectNewProcess(directory, expected);
+      await _expectNewProcess(directory);
     });
   }
 
@@ -84,32 +76,29 @@ void main() {
     final worker = await _Worker.start(directory, [
       ModeWriteStep.rename.name,
       'sss',
-      [_a, _b, _initial].map((mode) => mode.storageKey).join(','),
+      List.filled(3, _saved.storageKey).join(','),
     ]);
     addTearDown(worker.stop);
     await worker.next('held');
     worker.process.stdin.writeln('release');
     expect((await worker.next('finished'))['saved'], isTrue);
     await worker.next('held');
-    expect(await modeFile.readAsString(), _a.storageKey);
+    expect(await modeFile.readAsString(), _saved.storageKey);
 
     expect(worker.process.kill(ProcessSignal.sigkill), isTrue);
     await worker.finish(killed: true);
 
     expect(worker.diagnostics, isEmpty);
-    await _expectNewProcess(directory, _a);
-    expect(await modeFile.readAsString(), _a.storageKey);
+    await _expectNewProcess(directory);
+    expect(await modeFile.readAsString(), _saved.storageKey);
   });
 }
 
-Future<void> _expectNewProcess(
-  Directory directory,
-  QuickCreationMode mode,
-) async {
+Future<void> _expectNewProcess(Directory directory) async {
   final reader = await _Worker.start(directory, ['read']);
   addTearDown(reader.stop);
   final restored = await reader.next('mode');
-  expect(restored['mode'], mode.storageKey);
+  expect(restored['mode'], _saved.storageKey);
   await reader.finish();
   expect(reader.diagnostics, isEmpty);
 }

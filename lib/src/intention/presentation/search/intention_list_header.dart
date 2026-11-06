@@ -45,10 +45,7 @@ final class _IntentionListHeaderState
     final provider = intentionCatalogViewModelProvider(widget.purpose);
     final catalog = ref.watch(provider);
     final selection = ref.read(provider.notifier).selection;
-    final type = switch (selection.type) {
-      IntentionTypeOpen(:final selected) => selected,
-      IntentionTypePinnedToActions() => IntentionTypeChoice.actions,
-    };
+    final type = selection.type;
     final title = switch (selection.scope) {
       IntentionScopeOpen(:final selected) => l10n.intentionPickerScopeHeader(
         selected.name,

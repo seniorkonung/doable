@@ -5,7 +5,6 @@ import '../../../design_system/components/catalog_row.dart';
 import '../../../tag/domain/tag_id.dart';
 import '../../application/intention_catalog.dart';
 import '../search/intention_row_content.dart';
-import '../search/intention_search_kind.dart';
 
 /// Строка каталога для найденного намерения: вся карточка открывает его
 /// страницу, а содержание то же, что у строки экрана выбора.
@@ -33,7 +32,6 @@ final class IntentionCatalogRow extends StatelessWidget {
       l10n,
       summary: summary,
       requiredTagIds: requiredTagIds,
-      namesKind: IntentionSearchKind.catalog.namesKind,
     );
 
     return CatalogRow(

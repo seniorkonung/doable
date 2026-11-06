@@ -348,30 +348,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'То, что вы хотите сделать или изменить';
 
   @override
-  String get quickCreationModeDailyChoice => 'Новый дневной выбор';
-
-  @override
-  String get quickCreationModeDailyChoiceHint =>
-      'Действие для намерения в выбранный день';
-
-  @override
-  String get quickCreationDailyChoiceStartPrompt => 'С чего начать';
-
-  @override
-  String get quickCreationDailyChoiceFromIntention => 'От намерения';
-
-  @override
-  String get quickCreationDailyChoiceFromIntentionHint =>
-      'Сначала намерение, затем действие для него';
-
-  @override
-  String get quickCreationDailyChoiceFromAction => 'От действия';
-
-  @override
-  String get quickCreationDailyChoiceFromActionHint =>
-      'Сначала действие, затем намерение, которому оно служит';
-
-  @override
   String get commonLoading => 'Загрузка…';
 
   @override
@@ -703,17 +679,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get detailsChoicesSelectedHint =>
       'Дневные выборы, которые заканчиваются этим намерением.';
-
-  @override
-  String get detailsChoicesAdd => 'Добавить';
-
-  @override
-  String get detailsChoicesAddSourceLabel =>
-      'Создать дневной выбор, который начинается с этого намерения';
-
-  @override
-  String get detailsChoicesAddSelectedLabel =>
-      'Создать дневной выбор, который заканчивается этим действием';
 
   @override
   String get detailsTitle => 'Подробности намерения';
@@ -2218,69 +2183,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationSheetDeleteDialogConfirm => 'Удалить';
 
   @override
-  String get actionPickerLoading => 'Загружаем действия…';
-
-  @override
-  String get actionPickerEmpty => 'Доступных активных действий нет.';
-
-  @override
-  String get actionPickerUnavailable =>
-      'Не удалось загрузить действия. Повторите попытку.';
-
-  @override
-  String get actionPickerCorruption =>
-      'Сохранённые данные действий повреждены и не могут быть показаны.';
-
-  @override
-  String get actionPickerUnexpected =>
-      'Не удалось загрузить действия из-за непредвиденной ошибки.';
-
-  @override
-  String get sourcePickerEmpty => 'Доступных активных намерений нет.';
-
-  @override
-  String get dailyChoicePickerPurposeCreationSource =>
-      'Новый дневной выбор: исходное намерение';
-
-  @override
-  String get dailyChoicePickerPurposeCreationAction =>
-      'Новый дневной выбор: конечное действие';
-
-  @override
-  String get dailyChoicePickerFlowCreationFromSource =>
-      'Новый дневной выбор, от намерения';
-
-  @override
-  String get dailyChoicePickerFlowCreationFromAction =>
-      'Новый дневной выбор, от действия';
-
-  @override
-  String get dailyChoicePickerStepCurrent => 'Вы здесь';
-
-  @override
-  String get dailyChoicePickerStepSource => 'Исходное намерение';
-
-  @override
-  String get dailyChoicePickerStepAction => 'Конечное действие';
-
-  @override
-  String get dailyChoicePickerStepPathDown => 'Путь вниз к действию';
-
-  @override
-  String get dailyChoicePickerStepPathDownNote =>
-      'Каждый следующий шаг — то, что нужно или можно для предыдущего';
-
-  @override
-  String get dailyChoicePickerStepPathUp => 'Путь вверх к исходному намерению';
-
-  @override
-  String get dailyChoicePickerStepPathUpNote => 'Нужен хотя бы один шаг';
-
-  @override
-  String get dailyChoicePickerStepDetails =>
-      'Дата, время, приоритет и описание';
-
-  @override
   String get intentionPickerArchived => 'в архиве';
 
   @override
@@ -2347,10 +2249,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get intentionPickerTypeActionsOnly => 'Только действия';
-
-  @override
-  String get intentionPickerActionTypeNote =>
-      'Конечным в дневном выборе может быть только действие';
 
   @override
   String get intentionPickerSortCaption => 'Сортировка';
@@ -2469,9 +2367,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerIntentionsHeader => 'Намерения';
 
   @override
-  String get intentionPickerLoadingMoreActions => 'Загружаем ещё действия';
-
-  @override
   String get intentionPickerLoadingMoreIntentions => 'Загружаем ещё намерения';
 
   @override
@@ -2541,12 +2436,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get intentionCatalogEmptyArchiveText =>
       'Архивированное намерение уходит из активного списка и остаётся здесь.';
-
-  @override
-  String get intentionPickerActionTitle => 'Выбор действия';
-
-  @override
-  String get intentionPickerIntentionTitle => 'Выбор намерения';
 
   @override
   String get participantPickerTitle => 'Выбор намерений';
@@ -2632,133 +2521,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get relationEditorDescriptionInvalidUnicode =>
       'Введите корректный Unicode-текст без NUL.';
-
-  @override
-  String get choicePathTitle => 'Выбор пути к действию';
-
-  @override
-  String get choicePathBottomTitle => 'Выбор основания для действия';
-
-  @override
-  String get choicePathBottomTraversal => 'Обход: от действия к основанию';
-
-  @override
-  String get choicePathBottomPathDirection =>
-      'Направление связей: от основания к действию';
-
-  @override
-  String choicePathFixedAction(String action) {
-    return 'Выбранное действие: $action';
-  }
-
-  @override
-  String get choicePathActionPending => 'Загружаем выбранное действие…';
-
-  @override
-  String choicePathCurrentSource(String source) {
-    return 'Основание: $source';
-  }
-
-  @override
-  String get choicePathSourceSelected => 'Основание подтверждено';
-
-  @override
-  String choicePathSelectSource(String source) {
-    return 'Подтвердить основание «$source»';
-  }
-
-  @override
-  String get choicePathBottomNoPath =>
-      'Для этого действия сейчас нет допустимых входящих связей. Выберите другое действие.';
-
-  @override
-  String get choicePathDirection => 'Путь от исходного намерения к действию';
-
-  @override
-  String choicePathSource(String source) {
-    return 'Исходное намерение: $source';
-  }
-
-  @override
-  String get choicePathSourcePending => 'Загружаем исходное намерение…';
-
-  @override
-  String choicePathReturnTo(String source) {
-    return 'Вернуться к «$source»';
-  }
-
-  @override
-  String choicePathStepSemantics(int index, String phrase, String priority) {
-    return 'Шаг $index: $phrase. Приоритет $priority';
-  }
-
-  @override
-  String get choicePathActionSelected => 'Действие выбрано';
-
-  @override
-  String choicePathSelectAction(String action) {
-    return 'Выбрать действие «$action»';
-  }
-
-  @override
-  String get choicePathSelectionNotSaved => 'Связь «я сегодня» ещё не создана.';
-
-  @override
-  String get choicePathContinuations => 'Доступные продолжения';
-
-  @override
-  String get choicePathLoading => 'Проверяем доступные продолжения…';
-
-  @override
-  String get choicePathNoPath =>
-      'Из этого намерения сейчас нет допустимого пути к другому действию. Продолжениями становятся только связи, ведущие к готовому действию. Отметьте намерение готовым или свяжите его с действием.';
-
-  @override
-  String get choicePathNoFurtherPath =>
-      'Дальнейших допустимых продолжений нет.';
-
-  @override
-  String get choicePathTopNoFurtherPath =>
-      'Дальнейших допустимых продолжений нет. Продолжениями становятся только связи, ведущие к готовому действию. Отметьте намерение готовым или свяжите его с действием.';
-
-  @override
-  String get choicePathOpenRelations => 'Открыть связи';
-
-  @override
-  String get choicePathConflict =>
-      'Граф изменился. Актуализируйте путь перед дальнейшим выбором.';
-
-  @override
-  String get choicePathRefresh => 'Актуализировать путь';
-
-  @override
-  String get choicePathNotFound => 'Намерение пути больше не существует.';
-
-  @override
-  String get choicePathUnavailable =>
-      'Продолжения временно недоступны. Повторите попытку.';
-
-  @override
-  String get choicePathCorruption =>
-      'Сохранённые данные пути повреждены. Продолжение недоступно.';
-
-  @override
-  String get choicePathUnexpected =>
-      'Не удалось проверить продолжения из-за непредвиденной ошибки.';
-
-  @override
-  String get choicePathLoadMore => 'Показать ещё продолжения';
-
-  @override
-  String get choicePathLoadingMore => 'Загружаем следующую порцию…';
-
-  @override
-  String choicePathContinueSemantics(String phrase, String priority) {
-    return 'Продолжить по связи: $phrase. Приоритет $priority';
-  }
-
-  @override
-  String get dailyChoiceCreationTitle => 'Подтвердить дневной выбор';
 
   @override
   String get dailyChoiceAllDay => 'Весь день';
@@ -3069,40 +2831,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get dailyChoiceDateYesterday => 'Вчера';
-
-  @override
-  String get dailyChoiceCreationPath => 'Подтверждаемый путь';
-
-  @override
-  String dailyChoiceCreationAction(String action) {
-    return 'Выбранное действие: $action';
-  }
-
-  @override
-  String get dailyChoiceCreationDescription => 'Описание (необязательно)';
-
-  @override
-  String get dailyChoiceCreationCompleted => 'Уже выполнено';
-
-  @override
-  String get dailyChoiceCreationCompletedHint =>
-      'Отметьте, если действие уже выполнено для этой даты';
-
-  @override
-  String get dailyChoiceCreationSave => 'Сохранить дневной выбор';
-
-  @override
-  String get dailyChoiceCreationSaving => 'Сохраняем…';
-
-  @override
-  String get dailyChoiceCreationCancel => 'Отмена';
-
-  @override
-  String get dailyChoiceCreationRefreshPath =>
-      'Вернуться к пути и актуализировать его';
-
-  @override
-  String get choicePathOpenConfirmation => 'Перейти к подтверждению выбора';
 
   @override
   String get creationCancelAction => 'Отменить создание';

@@ -1,12 +1,10 @@
 /// Режим быстрого создания; порядок значений задаёт порядок меню.
 enum QuickCreationMode {
-  intention,
-  dailyChoice;
+  intention;
 
   /// Постоянный формат настройки установки, независимый от имени и индекса.
   String get storageKey => switch (this) {
     QuickCreationMode.intention => 'intention',
-    QuickCreationMode.dailyChoice => 'daily-choice',
   };
 
   /// Проверяет внешнее значение; неизвестный ключ не получает режим по умолчанию.

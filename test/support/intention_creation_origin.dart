@@ -8,19 +8,14 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../daily_choice/presentation/daily_choice_picker_launch_test_support.dart'
-    show TestDailyChoicePickerLaunch;
 import 'app_root_pages.dart';
 
-/// Исходные страницы самостоятельного создания, включая чужой поиск действия.
+/// Исходные страницы самостоятельного создания, включая глубокую страницу.
 enum IntentionCreationOrigin {
   home('Главной', AppDestination.home),
   dailyChoices('каталогом дневных выборов', AppDestination.dailyChoices),
   graph('каталогом намерений', AppDestination.intentionGraph),
-  deep(
-    'страницей намерения над поиском действия',
-    AppDestination.intentionGraph,
-  );
+  deep('страницей намерения над каталогом', AppDestination.intentionGraph);
 
   const IntentionCreationOrigin(this.description, this.destination);
   final String description;
@@ -48,15 +43,6 @@ enum IntentionCreationOrigin {
     }
     if (this == deep) {
       unawaited(
-        router.push<void>(
-          DailyChoiceActionPickerRoute(launch: TestDailyChoicePickerLaunch()),
-        ),
-      );
-      final filter = find.byKey(const ValueKey('daily-choice-action-filter'));
-      await waitFor(tester, filter);
-      await tester.pumpAndSettle();
-      await tester.enterText(filter, IntentionCreationHistory.taskFilter);
-      unawaited(
         router.push<void>(IntentionDetailsRoute(intentionId: participantId)),
       );
       await waitFor(
@@ -69,12 +55,11 @@ enum IntentionCreationOrigin {
   }
 }
 
-/// Точные экземпляры исходных маршрутов и состояние чужой задачи под созданием.
+/// Точные экземпляры исходных маршрутов под созданием.
 final class IntentionCreationHistory {
   IntentionCreationHistory(this.origin, this.routes);
   final IntentionCreationOrigin origin;
   final List<RouteData> routes;
-  static const taskFilter = 'Намерение 3';
 
   void expectPrefix(StackRouter router) => expect(
     router.stackData.take(routes.length),
@@ -100,18 +85,6 @@ final class IntentionCreationHistory {
     expect(
       router.stackData,
       orderedEquals(routes.take(routes.length - 1).map(same)),
-    );
-    expect(
-      tester
-          .widget<EditableText>(
-            find.descendant(
-              of: find.byKey(const ValueKey('daily-choice-action-filter')),
-              matching: find.byType(EditableText),
-            ),
-          )
-          .controller
-          .text,
-      taskFilter,
     );
   }
 }

@@ -136,24 +136,17 @@ final class _ShowAndSortSheetState extends ConsumerState<_ShowAndSortSheet> {
                 _sortMenu.close();
               },
             ),
-          if (selection.type case IntentionTypeOpen(:final selected))
-            SelectRow(
-              label: l10n.intentionPickerTypeCaption,
-              items: typeItems,
-              value: selected,
-              onChanged: model.changeType,
-              controller: _typeMenu,
-              onOpen: () {
-                _scopeMenu.close();
-                _sortMenu.close();
-              },
-            ),
-          if (selection.type is IntentionTypePinnedToActions)
-            SelectRow<IntentionTypeChoice>.disabled(
-              label: l10n.intentionPickerTypeCaption,
-              value: l10n.intentionPickerTypeActionsOnly,
-              note: l10n.intentionPickerActionTypeNote,
-            ),
+          SelectRow(
+            label: l10n.intentionPickerTypeCaption,
+            items: typeItems,
+            value: selection.type,
+            onChanged: model.changeType,
+            controller: _typeMenu,
+            onOpen: () {
+              _scopeMenu.close();
+              _sortMenu.close();
+            },
+          ),
           SelectRow(
             label: l10n.intentionPickerSortCaption,
             items: [

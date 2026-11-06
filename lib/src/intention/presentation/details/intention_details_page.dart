@@ -8,7 +8,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/navigation/ordinary_page_scaffold.dart';
 import '../../../app/routing/app_router.gr.dart';
-import '../../../daily_choice/application/choice_path_draft.dart';
 import '../../../daily_choice/presentation/details/daily_choice_sheet.dart';
 import '../../../daily_choice/presentation/intention_choices/intention_choices_sliver.dart';
 import '../../../daily_choice/presentation/intention_choices/intention_choices_state.dart';
@@ -658,7 +657,6 @@ final class _LoadedDetails extends StatelessWidget {
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final intention = state.intention;
-    final isActive = intention.archiveState == IntentionArchiveState.active;
     return CustomScrollView(
       controller: scrollController,
       slivers: [
@@ -771,22 +769,6 @@ final class _LoadedDetails extends StatelessWidget {
                 pageInstance: pageInstance,
                 onOpenDailyChoice: (choiceId) =>
                     unawaited(showDailyChoiceSheet(context, choiceId)),
-                // Создание дневного выбора не изменяет намерение, поэтому
-                // изменяющая операция его не выключает: недопустимое начало
-                // отклоняет модель пути.
-                onAddAsSource: isActive
-                    ? () => _startChoicePath(
-                        context,
-                        ChoicePathDraftDirection.topDown,
-                      )
-                    : null,
-                onAddAsSelected:
-                    isActive && intention.readiness == IntentionReadiness.ready
-                    ? () => _startChoicePath(
-                        context,
-                        ChoicePathDraftDirection.bottomUp,
-                      )
-                    : null,
               ),
             if (selectedTab == IntentionDetailsTab.statistics)
               statisticsSection,
@@ -819,18 +801,6 @@ final class _LoadedDetails extends StatelessWidget {
       ],
     );
   }
-
-  void _startChoicePath(
-    BuildContext context,
-    ChoicePathDraftDirection direction,
-  ) => unawaited(
-    context.router.push(
-      ChoicePathRoute(
-        sourceIntentionId: state.intention.id,
-        direction: direction,
-      ),
-    ),
-  );
 }
 
 final class _DetailsStatus extends StatelessWidget {

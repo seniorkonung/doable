@@ -9,7 +9,6 @@ void main() {
   const russianMessages = [
     'Быстрое создание',
     'Новое намерение',
-    'Новый дневной выбор',
     'Сменить режим',
     'Что создаёт кнопка',
     'Нажмите и удерживайте, чтобы сменить режим',
@@ -17,7 +16,6 @@ void main() {
   const englishMessages = [
     'Quick create',
     'New intention',
-    'New daily choice',
     'Change mode',
     'What the button creates',
     'Touch and hold to change mode',

@@ -5,6 +5,8 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_purpose_sheet.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,7 +18,7 @@ import '../catalog/catalog_test_support.dart';
 void main() {
   for (final locale in [const Locale('ru'), const Locale('en')]) {
     final ru = locale.languageCode == 'ru';
-    final title = ru ? 'Выбор намерения' : 'Choose an intention';
+    final title = ru ? 'Выбор намерений' : 'Choose intentions';
     final sheetTitle = ru ? 'Что вы выбираете' : 'What you are choosing';
     final back = ru ? 'Вернуться к списку' : 'Back to the list';
 
@@ -25,7 +27,7 @@ void main() {
       (tester) async {
         final h = await _open(tester, locale);
         await tester.enterText(
-          find.byKey(const ValueKey('daily-choice-source-filter')),
+          find.byKey(const ValueKey('participant-picker-filter')),
           'бег',
         );
         await tester.pump(const Duration(milliseconds: 300));
@@ -46,7 +48,7 @@ void main() {
         );
         await tester.pumpAndSettle();
         final list = find.byKey(
-          const PageStorageKey<String>('daily-choice-source-list'),
+          const PageStorageKey<String>('participant-picker-list'),
         );
         await tester.drag(list, const Offset(0, -400));
         await tester.pumpAndSettle();
@@ -150,7 +152,13 @@ _open(WidgetTester tester, Locale locale) async {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: IntentionPickerView(
-          purpose: SelectDailyChoiceSource(session: IntentionSearchSession()),
+          purpose: SelectRelationParticipant(
+            session: IntentionSearchSession(),
+            pairProbe: RelationPairProbe(
+              counterpartId: testSummary(index: 999).id,
+              candidateRole: RelationParticipantRole.related,
+            ),
+          ),
           purposeDescription: IntentionPickerPurposeDescription(
             subtitle: _subtitle,
             sheetLine: _sheetLine,

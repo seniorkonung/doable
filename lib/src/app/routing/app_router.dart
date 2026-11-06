@@ -18,8 +18,6 @@ final class AppRouter extends RootStackRouter {
           AutoRoute(page: destination.page),
       ],
     ),
-    AutoRoute(page: DailyChoiceActionPickerRoute.page),
-    AutoRoute(page: DailyChoiceSourcePickerRoute.page),
     // Создание намерения — модальная нижняя панель над сохранённой корневой
     // страницей в этом же стеке (ADR-0018). Маршрут прозрачен и сам по фону
     // не закрывается: закрытие решает сессия создания, а вход и выход
@@ -36,8 +34,6 @@ final class AppRouter extends RootStackRouter {
     AutoRoute(page: IntentionDetailsRoute.page),
     AutoRoute(page: IntentionEditRoute.page),
     AutoRoute(page: DailyChoiceDateCatalogRoute.page),
-    AutoRoute(page: ChoicePathRoute.page),
-    AutoRoute(page: DailyChoiceCreationRoute.page),
     AutoRoute(page: RelationBatchPickerRoute.page),
     AutoRoute(page: SettingsRoute.page),
   ];

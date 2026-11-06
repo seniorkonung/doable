@@ -10,7 +10,9 @@ void _registerOrdinaryLayoutTests() {
   for (final insets in [_safeArea, _keyboardOpen]) {
     final conditions = '${locale.languageCode}, ${insets.name}';
     testWidgets('быстрое создание из каталогов при тексте 2×, $conditions: '
-        'кнопка помещается в панели и запускает оба режима', (tester) async {
+        'кнопка помещается в панели и запускает создание намерения', (
+      tester,
+    ) async {
       final semantics = tester.ensureSemantics();
       try {
         final app = await _start(
@@ -32,20 +34,10 @@ void _registerOrdinaryLayoutTests() {
         await tester.pumpAndSettle();
         await _select(tester, AppDestination.dailyChoices);
         _expectQuickCreationInPanel(tester, insets);
-        await openDailyChoiceQuickCreation(
-          tester,
-          ChoicePathDraftDirection.bottomUp,
-          openedPage: find.byType(DailyChoiceActionPickerPage),
-          wait: _until,
-        );
-        expect(find.byType(DailyChoiceActionPickerPage), findsOneWidget);
-        await app.router.maybePop();
-        await tester.pumpAndSettle();
-        _expectQuickCreationInPanel(tester, insets);
         final l10n = lookupAppLocalizations(locale);
         final name =
             '${l10n.quickCreationLabel}, '
-            '${l10n.quickCreationModeDailyChoice}';
+            '${l10n.quickCreationModeIntention}';
         expect(
           find.semantics.byPredicate((node) => node.label == name),
           findsOneWidget,

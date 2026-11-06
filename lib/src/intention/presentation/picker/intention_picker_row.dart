@@ -4,16 +4,13 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../design_system/components/picker_row.dart';
 import '../../../tag/domain/tag_id.dart';
 import '../../application/intention_catalog.dart';
-import '../catalog/intention_catalog_purpose.dart';
 import '../search/intention_row_content.dart';
-import '../search/intention_search_kind.dart';
 
 /// Строка экрана выбора для найденного намерения: название, начало описания,
 /// метка архива у архивированного намерения, молния у действия и теги, где
 /// обязательные для выдачи идут первыми.
 final class IntentionPickerRow extends StatelessWidget {
   IntentionPickerRow({
-    required this.purpose,
     required this.summary,
     required this.requiredTagIds,
     required VoidCallback onPick,
@@ -22,7 +19,6 @@ final class IntentionPickerRow extends StatelessWidget {
   }) : _behavior = _Pick(onPick);
 
   IntentionPickerRow.checkable({
-    required this.purpose,
     required this.summary,
     required this.requiredTagIds,
     required bool chosen,
@@ -32,7 +28,6 @@ final class IntentionPickerRow extends StatelessWidget {
   }) : _behavior = _Check(onPick, chosen);
 
   IntentionPickerRow.occupied({
-    required this.purpose,
     required this.summary,
     required String reason,
     required this.onOpenPage,
@@ -40,7 +35,6 @@ final class IntentionPickerRow extends StatelessWidget {
   }) : requiredTagIds = const {},
        _behavior = _Occupied(reason);
 
-  final IntentionPickerPurpose purpose;
   final IntentionSummary summary;
 
   /// Обязательные теги применённого запроса, который отобрал строку, а не
@@ -58,7 +52,6 @@ final class IntentionPickerRow extends StatelessWidget {
       l10n,
       summary: summary,
       requiredTagIds: requiredTagIds,
-      namesKind: IntentionSearchKind.of(purpose).namesKind,
     );
 
     final pageLabel = content.isAction

@@ -2,8 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
-import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
@@ -789,15 +787,6 @@ void main() {
         (detail as DailyChoiceReadSuccess).value.value!.path,
         hasLength(_pathLength),
       );
-
-      final draft = ChoicePathDraftStart(_intention(1));
-      fixture.trace.clear();
-      final continuations =
-          (await fixture.repository.getChoicePathContinuations(
-            ChoicePathContinuationQuery(draft: draft, pageSize: 1),
-          ) as ChoicePathContinuationSuccess).value;
-      expect(continuations.items, hasLength(1));
-      _expectEachReadAtMost(fixture.trace, 2);
 
       expect(
         await fixture.repository.execute(

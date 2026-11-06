@@ -44,7 +44,6 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   /// охвата.
   late IntentionScope _scope;
 
-  /// Выбранный тип; действует, только когда назначение открывает выбор типа.
   late IntentionTypeChoice _type;
   late String _titleFilterText;
   late IntentionTagFilter _tagFilter;
@@ -63,18 +62,11 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   IntentionCatalogSelection get selection => IntentionCatalogSelection(
     scope: switch (_purpose) {
       BrowseIntentionCatalog() => IntentionScopeOpen(_scope),
-      SelectDailyChoiceAction() ||
-      SelectDailyChoiceSource() ||
       SelectRelationParticipant() => const IntentionScopeFixed(
         IntentionScope.active,
       ),
     },
-    type: switch (_purpose) {
-      SelectDailyChoiceAction() => const IntentionTypePinnedToActions(),
-      BrowseIntentionCatalog() ||
-      SelectDailyChoiceSource() ||
-      SelectRelationParticipant() => IntentionTypeOpen(_type),
-    },
+    type: _type,
     titleFilterText: _titleFilterText,
     tagFilter: _tagFilter,
     order: _order,
@@ -130,31 +122,22 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       query = IntentionCatalogQuery(
         scope: catalogScope,
         readinessFilter: switch (type) {
-          IntentionTypePinnedToActions() => IntentionReadinessFilter.readyOnly,
-          IntentionTypeOpen(selected: IntentionTypeChoice.all) =>
-            IntentionReadinessFilter.all,
-          IntentionTypeOpen(selected: IntentionTypeChoice.intentions) =>
+          IntentionTypeChoice.all => IntentionReadinessFilter.all,
+          IntentionTypeChoice.intentions =>
             IntentionReadinessFilter.notReadyOnly,
-          IntentionTypeOpen(selected: IntentionTypeChoice.actions) =>
-            IntentionReadinessFilter.readyOnly,
+          IntentionTypeChoice.actions => IntentionReadinessFilter.readyOnly,
         },
         titleFilter: _titleFilterText,
         tagFilter: _tagFilter,
         pairProbe: switch (purpose) {
           SelectRelationParticipant(:final pairProbe) => pairProbe,
-          BrowseIntentionCatalog() ||
-          SelectDailyChoiceAction() ||
-          SelectDailyChoiceSource() => null,
+          BrowseIntentionCatalog() => null,
         },
         order: _order,
         pageSize: _policy.pageSize,
-        counting: switch ((selection.scope, type)) {
-          (IntentionScopeOpen(), IntentionTypeOpen()) =>
-            IntentionCatalogCounting.byScopeAndType,
-          (IntentionScopeFixed(), IntentionTypeOpen()) =>
-            IntentionCatalogCounting.byType,
-          (_, IntentionTypePinnedToActions()) =>
-            IntentionCatalogCounting.totalOnly,
+        counting: switch (selection.scope) {
+          IntentionScopeOpen() => IntentionCatalogCounting.byScopeAndType,
+          IntentionScopeFixed() => IntentionCatalogCounting.byType,
         },
       );
     } on IntentionCatalogQueryValidationException catch (error) {
@@ -189,9 +172,8 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     _applyParametersImmediately();
   }
 
-  /// Применяет выбор типа, только когда назначение открывает выбор типа.
   void changeType(IntentionTypeChoice type) {
-    if (selection.type is! IntentionTypeOpen || _type == type) {
+    if (_type == type) {
       return;
     }
     _type = type;
@@ -208,7 +190,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 
   /// Есть ли параметр показа, отличный от начального.
   ///
-  /// Закреплённые охват и тип не меняются выбором, поэтому всегда начальные.
+  /// Закреплённый охват не меняется выбором, поэтому всегда начальный.
   bool get canResetShowParameters =>
       _scope != _initialScope ||
       _type != _initialType ||

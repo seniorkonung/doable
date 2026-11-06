@@ -46,21 +46,30 @@ void main() {
     },
   );
 
-  for (final (mode, key) in [
-    (QuickCreationMode.intention, 'intention'),
-    (QuickCreationMode.dailyChoice, 'daily-choice'),
-  ]) {
-    test('сохраняет ключ $key и читает режим новым хранилищем', () async {
-      expect(await store().save(mode), isA<QuickCreationModeSaved>());
-      expect(await modeFile.readAsString(), key);
-      expect(await store().read(), mode);
-      expect(
-        await modeFile.parent.list().map((entity) => entity.path).toList(),
-        [modeFile.path],
-      );
-      expect(diagnostics.events, isEmpty);
-    });
-  }
+  test('сохраняет ключ intention и читает режим новым хранилищем', () async {
+    expect(
+      await store().save(QuickCreationMode.intention),
+      isA<QuickCreationModeSaved>(),
+    );
+    expect(await modeFile.readAsString(), 'intention');
+    expect(await store().read(), QuickCreationMode.intention);
+    expect(await modeFile.parent.list().map((entity) => entity.path).toList(), [
+      modeFile.path,
+    ]);
+    expect(diagnostics.events, isEmpty);
+  });
+
+  test('прежний ключ daily-choice неизвестен: читается намерение с категорией '
+      'повреждения, запуск не блокируется, файл не меняется', () async {
+    await modeFile.parent.create();
+    await modeFile.writeAsString('daily-choice');
+
+    expect(await store().read(), QuickCreationMode.intention);
+    _expectFailures(diagnostics, QuickCreationModeDiagnosticsStage.read, [
+      DiagnosticsFailureCode.corruption,
+    ]);
+    expect(await modeFile.readAsString(), 'daily-choice');
+  });
 
   test(
     'неизвестный ключ возвращает начальный режим с категорией повреждения',
@@ -133,17 +142,17 @@ void main() {
 
   for (final step in [ModeWriteStep.write, ModeWriteStep.rename]) {
     // Отказ после успеха и два отказа подряд с последующим успехом; остальные
-    // сочетания идут теми же ветвями очереди.
+    // сочетания идут теми же ветвями очереди. Прежний ключ в файле отличает
+    // нетронутую настройку от записанной.
     for (final (failFirst, failSecond) in [(false, true), (true, true)]) {
       test(
         '${step.label}: исходы А=${failFirst ? 'отказ' : 'успех'}, '
         'Б=${failSecond ? 'отказ' : 'успех'} сохраняют последний успех',
         () async {
-          const initial = QuickCreationMode.dailyChoice;
-          const firstMode = QuickCreationMode.intention;
-          const secondMode = QuickCreationMode.dailyChoice;
+          const legacy = 'daily-choice';
+          const saved = 'intention';
           await modeFile.parent.create();
-          await modeFile.writeAsString(initial.storageKey);
+          await modeFile.writeAsString(legacy);
           final first = ModeWriteAttempt(
             holdAt: step,
             failAt: failFirst ? step : null,
@@ -162,46 +171,37 @@ void main() {
               adapter,
               initialMode: await adapter.read(),
             );
+            diagnostics.events.clear();
             final controller = container.read(
               quickCreationModeControllerProvider.notifier,
             );
-            final savingFirst = controller.select(firstMode);
-            expect(
-              container.read(quickCreationModeControllerProvider),
-              firstMode,
-            );
+            final savingFirst = controller.select(QuickCreationMode.intention);
             await _waitUntilHeld(first, savingFirst);
-            final savingSecond = controller.select(secondMode);
-            expect(
-              container.read(quickCreationModeControllerProvider),
-              secondMode,
-            );
+            final savingSecond = controller.select(QuickCreationMode.intention);
             var secondFinished = false;
             unawaited(savingSecond.then((_) => secondFinished = true));
             await Future<void>(() {});
 
             expect(secondFinished, isFalse);
-            expect(await store().read(), initial);
-            expect(await modeFile.readAsString(), initial.storageKey);
+            expect(await modeFile.readAsString(), legacy);
 
             first.release.complete();
             _expectOutcome(await savingFirst, failed: failFirst);
             await _waitUntilHeld(second, savingSecond);
-            expect(
-              container.read(quickCreationModeControllerProvider),
-              secondMode,
-            );
-            final afterFirst = failFirst ? initial : firstMode;
-            expect(await store().read(), afterFirst);
+            final afterFirst = failFirst ? legacy : saved;
+            expect(await modeFile.readAsString(), afterFirst);
             expect(secondFinished, isFalse);
 
             second.release.complete();
             _expectOutcome(await savingSecond, failed: failSecond);
             expect(
               container.read(quickCreationModeControllerProvider),
-              secondMode,
+              QuickCreationMode.intention,
             );
-            expect(await store().read(), failSecond ? afterFirst : secondMode);
+            expect(
+              await modeFile.readAsString(),
+              failSecond ? afterFirst : saved,
+            );
             // Содержимое сбрасывается на диск до замены файла настройки.
             expect([first.flushed, second.flushed], everyElement(isTrue));
             _expectFailures(
@@ -219,10 +219,7 @@ void main() {
                 await controller.select(QuickCreationMode.intention),
                 isA<QuickCreationModeSaved>(),
               );
-              expect(
-                container.read(quickCreationModeControllerProvider),
-                QuickCreationMode.intention,
-              );
+              expect(await modeFile.readAsString(), saved);
               expect(await store().read(), QuickCreationMode.intention);
             }
           });
@@ -231,45 +228,6 @@ void main() {
       );
     }
   }
-
-  test('очередь сохраняет все значения А → Б → А без объединения', () async {
-    final attempts = List.generate(
-      3,
-      (_) => ModeWriteAttempt(holdAt: ModeWriteStep.rename),
-    );
-    final io = ControlledModeIo(modeFile, attempts);
-    const modes = [
-      QuickCreationMode.dailyChoice,
-      QuickCreationMode.intention,
-      QuickCreationMode.dailyChoice,
-    ];
-
-    await io.run(() async {
-      final adapter = store();
-      final container = _container(adapter);
-      final controller = container.read(
-        quickCreationModeControllerProvider.notifier,
-      );
-      final savings = modes.map((mode) {
-        final saving = controller.select(mode);
-        expect(container.read(quickCreationModeControllerProvider), mode);
-        return saving;
-      }).toList();
-      for (var index = 0; index < attempts.length; index++) {
-        final attempt = attempts[index];
-        await _waitUntilHeld(attempt, savings[index]);
-        expect(
-          await store().read(),
-          index == 0 ? QuickCreationMode.intention : modes[index - 1],
-        );
-        attempt.release.complete();
-        expect(await savings[index], isA<QuickCreationModeSaved>());
-        expect(container.read(quickCreationModeControllerProvider), modes.last);
-      }
-      expect(await store().read(), modes.last);
-      expect(diagnostics.events, isEmpty);
-    });
-  });
 
   for (final failCleanup in [false, true]) {
     test('очередь ждёт очистки после отказа и переживает её '
@@ -288,22 +246,18 @@ void main() {
           quickCreationModeControllerProvider.notifier,
         );
         final savingFirst = controller.select(QuickCreationMode.intention);
-        final savingSecond = controller.select(QuickCreationMode.dailyChoice);
+        final savingSecond = controller.select(QuickCreationMode.intention);
         await _waitUntilHeld(first, savingFirst);
-        expect(
-          container.read(quickCreationModeControllerProvider),
-          QuickCreationMode.dailyChoice,
-        );
-        expect(await store().read(), QuickCreationMode.intention);
+        expect(await modeFile.exists(), isFalse);
 
         first.release.complete();
         _expectOutcome(await savingFirst, failed: true);
         expect(await savingSecond, isA<QuickCreationModeSaved>());
         expect(
           container.read(quickCreationModeControllerProvider),
-          QuickCreationMode.dailyChoice,
+          QuickCreationMode.intention,
         );
-        expect(await store().read(), QuickCreationMode.dailyChoice);
+        expect(await modeFile.readAsString(), 'intention');
         _expectFailures(diagnostics, QuickCreationModeDiagnosticsStage.write, [
           DiagnosticsFailureCode.unavailable,
         ]);
@@ -327,21 +281,17 @@ void main() {
           quickCreationModeControllerProvider.notifier,
         );
         final savingFirst = controller.select(QuickCreationMode.intention);
-        final savingSecond = controller.select(QuickCreationMode.dailyChoice);
+        final savingSecond = controller.select(QuickCreationMode.intention);
         await _waitUntilHeld(first, savingFirst);
-        expect(
-          container.read(quickCreationModeControllerProvider),
-          QuickCreationMode.dailyChoice,
-        );
-        expect(await store().read(), QuickCreationMode.intention);
+        expect(await modeFile.exists(), isFalse);
         first.release.complete();
         _expectOutcome(await savingFirst, failed: true);
         expect(await savingSecond, isA<QuickCreationModeSaved>());
         expect(
           container.read(quickCreationModeControllerProvider),
-          QuickCreationMode.dailyChoice,
+          QuickCreationMode.intention,
         );
-        expect(await store().read(), QuickCreationMode.dailyChoice);
+        expect(await modeFile.readAsString(), 'intention');
         _expectFailures(diagnostics, QuickCreationModeDiagnosticsStage.write, [
           DiagnosticsFailureCode.unavailable,
         ]);

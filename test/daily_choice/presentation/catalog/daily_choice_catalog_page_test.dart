@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.dart';
@@ -31,6 +30,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
 
 import 'dart:ui' show Tristate;
@@ -513,60 +513,41 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  // Направление и язык независимы: диагональ покрывает оба направления и языка.
-  for (final (locale, direction, route, cancelKey, name) in const [
-    (
-      Locale('ru'),
-      ChoicePathDraftDirection.topDown,
-      DailyChoiceSourcePickerRoute.name,
-      'daily-choice-source-cancel',
-      'дневной выбор от намерения',
-    ),
-    (
-      Locale('en'),
-      ChoicePathDraftDirection.bottomUp,
-      DailyChoiceActionPickerRoute.name,
-      'daily-choice-action-cancel',
-      'дневной выбор от действия',
-    ),
-  ]) {
-    testWidgets(
-      'каталог без собственной кнопки запускает $name через общую панель '
-      'на языке ${locale.languageCode}',
-      (tester) async {
-        final repository = _Repository();
-        final router = await _open(tester, repository, locale: locale);
-        await tester.pump(const Duration(milliseconds: 400));
-        expect(find.byType(FloatingActionButton), findsNothing);
-        repository.completeFirst([], total: 0);
-        await tester.pumpAndSettle();
-        expect(find.byType(FloatingActionButton), findsNothing);
-        final semantics = tester.ensureSemantics();
-        final l10n = lookupAppLocalizations(locale);
-        expect(
-          find.bySemanticsLabel(l10n.dailyChoiceCreateFromAction),
-          findsNothing,
-        );
-        await openDailyChoiceQuickCreation(
-          tester,
-          direction,
-          openedPage: find.byKey(ValueKey(cancelKey)),
-        );
-        expect(router.current.name, route);
-        await tester.tap(find.byKey(ValueKey(cancelKey)));
-        await tester.pump(const Duration(milliseconds: 400));
-        expectDailyChoicesRootPage(router);
-        expect(repository.queries, hasLength(1));
-        expect(quickCreationAction().hitTestable(), findsOneWidget);
-        expect(
-          find.bySemanticsLabel(
-            '${l10n.quickCreationLabel}, ${QuickCreationMode.dailyChoice.title(l10n)}',
-          ),
-          findsOneWidget,
-        );
-        semantics.dispose();
-      },
-    );
+  for (final locale in const [Locale('ru'), Locale('en')]) {
+    testWidgets('каталог без собственной кнопки запускает создание намерения через '
+        'общую панель на языке ${locale.languageCode}', (tester) async {
+      final repository = _Repository();
+      final router = await _open(tester, repository, locale: locale);
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byType(FloatingActionButton), findsNothing);
+      repository.completeFirst([], total: 0);
+      await tester.pumpAndSettle();
+      expect(find.byType(FloatingActionButton), findsNothing);
+      final semantics = tester.ensureSemantics();
+      final l10n = lookupAppLocalizations(locale);
+      expect(
+        find.bySemanticsLabel(l10n.dailyChoiceCreateFromAction),
+        findsNothing,
+      );
+      await openQuickCreation(
+        tester,
+        QuickCreationMode.intention,
+        openedPage: find.byType(IntentionEditorPage),
+      );
+      expect(router.current.name, IntentionEditorRoute.name);
+      await tester.binding.handlePopRoute();
+      await tester.pump(const Duration(milliseconds: 400));
+      expectDailyChoicesRootPage(router);
+      expect(repository.queries, hasLength(1));
+      expect(quickCreationAction().hitTestable(), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(
+          '${l10n.quickCreationLabel}, ${QuickCreationMode.intention.title(l10n)}',
+        ),
+        findsOneWidget,
+      );
+      semantics.dispose();
+    });
   }
 
   testWidgets('показывает все записи и открывает дубликат по id', (

@@ -344,30 +344,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Something you want to do or change';
 
   @override
-  String get quickCreationModeDailyChoice => 'New daily choice';
-
-  @override
-  String get quickCreationModeDailyChoiceHint =>
-      'An action for an intention on a chosen day';
-
-  @override
-  String get quickCreationDailyChoiceStartPrompt => 'Choose where to start';
-
-  @override
-  String get quickCreationDailyChoiceFromIntention => 'From an intention';
-
-  @override
-  String get quickCreationDailyChoiceFromIntentionHint =>
-      'Pick an intention, then an action for it';
-
-  @override
-  String get quickCreationDailyChoiceFromAction => 'From an action';
-
-  @override
-  String get quickCreationDailyChoiceFromActionHint =>
-      'Pick an action, then the intention it serves';
-
-  @override
   String get commonLoading => 'Loading…';
 
   @override
@@ -698,17 +674,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get detailsChoicesSelectedHint =>
       'Daily choices that end in this intention.';
-
-  @override
-  String get detailsChoicesAdd => 'Add';
-
-  @override
-  String get detailsChoicesAddSourceLabel =>
-      'Create a daily choice that starts from this intention';
-
-  @override
-  String get detailsChoicesAddSelectedLabel =>
-      'Create a daily choice that ends in this action';
 
   @override
   String get detailsTitle => 'Intention details';
@@ -2193,69 +2158,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationSheetDeleteDialogConfirm => 'Delete';
 
   @override
-  String get actionPickerLoading => 'Loading actions…';
-
-  @override
-  String get actionPickerEmpty => 'No active actions are available.';
-
-  @override
-  String get actionPickerUnavailable =>
-      'Actions couldn’t be loaded. Try again.';
-
-  @override
-  String get actionPickerCorruption =>
-      'Saved action data is damaged and can’t be shown.';
-
-  @override
-  String get actionPickerUnexpected =>
-      'Actions couldn’t be loaded because of an unexpected error.';
-
-  @override
-  String get sourcePickerEmpty => 'No active intentions are available.';
-
-  @override
-  String get dailyChoicePickerPurposeCreationSource =>
-      'New daily choice: source intention';
-
-  @override
-  String get dailyChoicePickerPurposeCreationAction =>
-      'New daily choice: selected action';
-
-  @override
-  String get dailyChoicePickerFlowCreationFromSource =>
-      'New daily choice, from an intention';
-
-  @override
-  String get dailyChoicePickerFlowCreationFromAction =>
-      'New daily choice, from an action';
-
-  @override
-  String get dailyChoicePickerStepCurrent => 'You are here';
-
-  @override
-  String get dailyChoicePickerStepSource => 'Source intention';
-
-  @override
-  String get dailyChoicePickerStepAction => 'Selected action';
-
-  @override
-  String get dailyChoicePickerStepPathDown => 'Path down to an action';
-
-  @override
-  String get dailyChoicePickerStepPathDownNote =>
-      'Each next step is what the previous one needs or can use';
-
-  @override
-  String get dailyChoicePickerStepPathUp => 'Path up to the source intention';
-
-  @override
-  String get dailyChoicePickerStepPathUpNote => 'At least one step is needed';
-
-  @override
-  String get dailyChoicePickerStepDetails =>
-      'Date, time, priority, and description';
-
-  @override
   String get intentionPickerArchived => 'archived';
 
   @override
@@ -2322,10 +2224,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get intentionPickerTypeActionsOnly => 'Actions only';
-
-  @override
-  String get intentionPickerActionTypeNote =>
-      'Only an action can be the final intention of a daily choice';
 
   @override
   String get intentionPickerSortCaption => 'Sort by';
@@ -2444,9 +2342,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerIntentionsHeader => 'Intentions';
 
   @override
-  String get intentionPickerLoadingMoreActions => 'Loading more actions';
-
-  @override
   String get intentionPickerLoadingMoreIntentions => 'Loading more intentions';
 
   @override
@@ -2516,12 +2411,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get intentionCatalogEmptyArchiveText =>
       'An intention you archive leaves the active list and stays here.';
-
-  @override
-  String get intentionPickerActionTitle => 'Choose an action';
-
-  @override
-  String get intentionPickerIntentionTitle => 'Choose an intention';
 
   @override
   String get participantPickerTitle => 'Choose intentions';
@@ -2606,137 +2495,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get relationEditorDescriptionInvalidUnicode =>
       'Enter valid Unicode text without NUL.';
-
-  @override
-  String get choicePathTitle => 'Choose a path to an action';
-
-  @override
-  String get choicePathBottomTitle => 'Choose a source for the action';
-
-  @override
-  String get choicePathBottomTraversal =>
-      'Exploration: from the action to a source';
-
-  @override
-  String get choicePathBottomPathDirection =>
-      'Relation direction: from the source to the action';
-
-  @override
-  String choicePathFixedAction(String action) {
-    return 'Selected action: $action';
-  }
-
-  @override
-  String get choicePathActionPending => 'Loading the selected action…';
-
-  @override
-  String choicePathCurrentSource(String source) {
-    return 'Source: $source';
-  }
-
-  @override
-  String get choicePathSourceSelected => 'Source confirmed';
-
-  @override
-  String choicePathSelectSource(String source) {
-    return 'Confirm source “$source”';
-  }
-
-  @override
-  String get choicePathBottomNoPath =>
-      'There are no valid incoming relations for this action right now. Choose another action.';
-
-  @override
-  String get choicePathDirection =>
-      'Path from the source intention to an action';
-
-  @override
-  String choicePathSource(String source) {
-    return 'Source intention: $source';
-  }
-
-  @override
-  String get choicePathSourcePending => 'Loading the source intention…';
-
-  @override
-  String choicePathReturnTo(String source) {
-    return 'Return to “$source”';
-  }
-
-  @override
-  String choicePathStepSemantics(int index, String phrase, String priority) {
-    return 'Step $index: $phrase. Priority $priority';
-  }
-
-  @override
-  String get choicePathActionSelected => 'Action selected';
-
-  @override
-  String choicePathSelectAction(String action) {
-    return 'Choose action “$action”';
-  }
-
-  @override
-  String get choicePathSelectionNotSaved =>
-      'The daily choice has not been created yet.';
-
-  @override
-  String get choicePathContinuations => 'Available continuations';
-
-  @override
-  String get choicePathLoading => 'Checking available continuations…';
-
-  @override
-  String get choicePathNoPath =>
-      'There is no valid path from this intention to another action right now. Only relations leading to a ready action become continuations. Mark an intention as ready or link it to an action.';
-
-  @override
-  String get choicePathNoFurtherPath =>
-      'There are no further valid continuations.';
-
-  @override
-  String get choicePathTopNoFurtherPath =>
-      'There are no further valid continuations. Only relations leading to a ready action become continuations. Mark an intention as ready or link it to an action.';
-
-  @override
-  String get choicePathOpenRelations => 'Open relations';
-
-  @override
-  String get choicePathConflict =>
-      'The graph has changed. Refresh the path before continuing.';
-
-  @override
-  String get choicePathRefresh => 'Refresh path';
-
-  @override
-  String get choicePathNotFound =>
-      'An intention on this path no longer exists.';
-
-  @override
-  String get choicePathUnavailable =>
-      'Continuations are temporarily unavailable. Try again.';
-
-  @override
-  String get choicePathCorruption =>
-      'Saved path data is damaged. Continuation is unavailable.';
-
-  @override
-  String get choicePathUnexpected =>
-      'Continuations could not be checked because of an unexpected error.';
-
-  @override
-  String get choicePathLoadMore => 'Show more continuations';
-
-  @override
-  String get choicePathLoadingMore => 'Loading the next page…';
-
-  @override
-  String choicePathContinueSemantics(String phrase, String priority) {
-    return 'Continue along relation: $phrase. Priority $priority';
-  }
-
-  @override
-  String get dailyChoiceCreationTitle => 'Confirm daily choice';
 
   @override
   String get dailyChoiceAllDay => 'All day';
@@ -3041,40 +2799,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dailyChoiceDateYesterday => 'Yesterday';
-
-  @override
-  String get dailyChoiceCreationPath => 'Path to confirm';
-
-  @override
-  String dailyChoiceCreationAction(String action) {
-    return 'Selected action: $action';
-  }
-
-  @override
-  String get dailyChoiceCreationDescription => 'Description (optional)';
-
-  @override
-  String get dailyChoiceCreationCompleted => 'Already completed';
-
-  @override
-  String get dailyChoiceCreationCompletedHint =>
-      'Mark if the action was already done for this date';
-
-  @override
-  String get dailyChoiceCreationSave => 'Save daily choice';
-
-  @override
-  String get dailyChoiceCreationSaving => 'Saving…';
-
-  @override
-  String get dailyChoiceCreationCancel => 'Cancel';
-
-  @override
-  String get dailyChoiceCreationRefreshPath =>
-      'Return to the path and refresh it';
-
-  @override
-  String get choicePathOpenConfirmation => 'Continue to choice confirmation';
 
   @override
   String get creationCancelAction => 'Cancel creation';

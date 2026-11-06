@@ -1,7 +1,5 @@
 import 'dart:convert';
 
-import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
-import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -48,7 +46,6 @@ void main() {
       for (final point in [
         _FailurePoint.catalogRead,
         _FailurePoint.groupRead,
-        _FailurePoint.continuationRead,
       ]) {
         diagnostics.events.clear();
         diagnostics.logs.clear();
@@ -69,12 +66,6 @@ void main() {
               pageSize: 50,
             ),
           ) as RelationGroupPageFailure).failure.category,
-          _FailurePoint.continuationRead =>
-            (await repository.getChoicePathContinuations(
-              ChoicePathContinuationQuery(
-                draft: ChoicePathDraftStart(durabilityIntention(1)),
-              ),
-            ) as ChoicePathContinuationError).failure.category,
         };
 
         expect(probe.didFail, isTrue);
@@ -198,7 +189,7 @@ final class _RecordingSink implements DiagnosticsSink {
   }
 }
 
-enum _FailurePoint { catalogRead, groupRead, continuationRead }
+enum _FailurePoint { catalogRead, groupRead }
 
 final class _FailureProbe extends LocalDatabaseConnectionObserver {
   _FailurePoint? _point;
@@ -220,8 +211,6 @@ final class _FailureProbe extends LocalDatabaseConnectionObserver {
         sql.contains('FROM daily_choices') &&
             sql.contains('ORDER BY COALESCE(scheduled_minute, -1)'),
       _FailurePoint.groupRead => sql.contains('FROM daily_choices INDEXED BY'),
-      _FailurePoint.continuationRead =>
-        sql.contains('WITH RECURSIVE') || sql.contains('WITH visited(id)'),
       null => false,
     };
     if (targeted) {

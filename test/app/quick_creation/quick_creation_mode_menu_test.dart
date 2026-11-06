@@ -19,34 +19,26 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/app_root_pages.dart';
 
 const _titles = {
-  'ru': ['Новое намерение', 'Новый дневной выбор'],
-  'en': ['New intention', 'New daily choice'],
+  'ru': ['Новое намерение'],
+  'en': ['New intention'],
 };
 const _hints = {
-  'ru': [
-    'То, что вы хотите сделать или изменить',
-    'Действие для намерения в выбранный день',
-  ],
-  'en': [
-    'Something you want to do or change',
-    'An action for an intention on a chosen day',
-  ],
+  'ru': ['То, что вы хотите сделать или изменить'],
+  'en': ['Something you want to do or change'],
 };
 
 void main() {
-  // Выбранная строка определяется индексом режима, а названия — языком: берём
-  // по одному режиму на язык.
-  for (final (language, initial) in [
-    ('ru', QuickCreationMode.intention),
-    ('en', QuickCreationMode.dailyChoice),
-  ]) {
+  const initial = QuickCreationMode.intention;
+  for (final language in ['ru', 'en']) {
     final titles = _titles[language]!;
-    testWidgets('$language: два режима и выбор из «${titles[initial.index]}» '
-        'без запуска создания и изменения исходной истории', (tester) async {
-      final app = await _openApp(tester, language: language, initial: initial);
+    testWidgets('$language: единственный режим «${titles[initial.index]}» '
+        'и его выбор без запуска создания и изменения исходной истории', (
+      tester,
+    ) async {
+      final app = await _openApp(tester, language: language);
       await _openMenu(tester);
 
-      expect(find.byType(OptionRow), findsNWidgets(2));
+      expect(find.byType(OptionRow), findsOneWidget);
       expect(
         find.text(
           language == 'ru' ? 'Что создаёт кнопка' : 'What the button creates',
@@ -87,33 +79,31 @@ void main() {
         }
       }
 
-      final next = QuickCreationMode
-          .values[(initial.index + 1) % QuickCreationMode.values.length];
-      await tester.tap(find.text(titles[next.index]));
-      expect(app.mode, next);
-      expect(app.store.writes.single.mode, next);
+      await tester.tap(find.text(titles[initial.index]));
+      expect(app.mode, initial);
+      expect(app.store.writes.single.mode, initial);
       await tester.pumpAndSettle();
       app.expectOrigin(tester);
 
       await _openMenu(tester);
       expect(
         tester
-            .getSemantics(find.text(titles[next.index]))
+            .getSemantics(find.text(titles[initial.index]))
             .flagsCollection
             .isSelected,
         Tristate.isTrue,
       );
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
-      expect(app.mode, next);
-      expect(app.store.writes.map((write) => write.mode), [next, next]);
+      expect(app.mode, initial);
+      expect(app.store.writes.map((write) => write.mode), [initial, initial]);
       app.expectOrigin(tester);
     });
-    testWidgets('$language: меню показывает значки режимов и галочку '
+    testWidgets('$language: меню показывает значок режима и галочку '
         'у «${titles[initial.index]}»', (tester) async {
-      await _openApp(tester, language: language, initial: initial);
+      await _openApp(tester, language: language);
       await _openMenu(tester);
-      const icons = [DoableIconData.intention, DoableIconData.calendar];
+      const icons = [DoableIconData.intention];
       for (final (index, title) in titles.indexed) {
         final row = find.widgetWithText(OptionRow, title);
         final leading = find.descendant(
@@ -187,10 +177,7 @@ void main() {
   for (final byBack in [false, true]) {
     testWidgets('закрытие ${byBack ? 'назад' : 'фоном'} сохраняет режим, '
         'точную историю, выбранный пункт и ввод', (tester) async {
-      final app = await _openApp(
-        tester,
-        initial: QuickCreationMode.dailyChoice,
-      );
+      final app = await _openApp(tester);
       await _openMenu(tester);
       if (byBack) {
         await tester.binding.handlePopRoute();
@@ -198,7 +185,7 @@ void main() {
         await tester.tapAt(const Offset(10, 10));
       }
       await tester.pumpAndSettle();
-      expect(app.mode, QuickCreationMode.dailyChoice);
+      expect(app.mode, QuickCreationMode.intention);
       expect(app.store.writes, isEmpty);
       app.expectOrigin(tester);
     });

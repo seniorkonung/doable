@@ -1,7 +1,6 @@
 import '../../daily_choice/application/daily_choice_details.dart';
 import '../../daily_choice/application/daily_choice_catalog.dart';
 import '../../daily_choice/application/daily_choice_day_statuses.dart';
-import '../../daily_choice/application/choice_path_continuations.dart';
 import '../../daily_choice/domain/daily_choice_id.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_details.dart';
@@ -24,21 +23,6 @@ abstract interface class GraphCommandRepository {
 
 abstract interface class PersonalGraphRepository
     implements GraphCommandRepository, TagReadContract, StatisticsReadContract {
-  /// Проверяет весь направленный черновик на одном снимке графа. Ноль шагов
-  /// допустим, но не подтверждаем. Для нижнего обхода начало — фиксированное
-  /// активное готовое действие, а текущее намерение — возможное основание
-  /// любой готовности. Все участники и связи должны оставаться активными.
-  /// Изменённый, архивный или разорванный путь даёт конфликт;
-  /// отсутствующее намерение — отдельный отказ. Снимок содержит ревизию,
-  /// подтверждаемость и порцию активных продолжений данного направления.
-  /// Порядок: «нужно», затем «можно»; внутри группы P1–P4 и порядок создания.
-  /// Смена ревизии курсора — конфликт с требованием начать чтение с новой
-  /// основы.
-  /// Ошибка чтения не заменяется пустым набором. SQL остаётся внутри модуля.
-  Future<ChoicePathContinuationResult> getChoicePathContinuations(
-    ChoicePathContinuationQuery query,
-  );
-
   /// Возвращает null в снимке, если выбор отсутствует на момент чтения.
   Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id);
 

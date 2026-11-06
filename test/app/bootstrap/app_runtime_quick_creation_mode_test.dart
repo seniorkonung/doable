@@ -14,6 +14,9 @@ import 'package:sqlite3/sqlite3.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../quick_creation/controlled_mode_io.dart';
 
+/// Ключ удалённого режима: он неизвестен приложению и читается как неизвестный.
+const _legacyKey = 'daily-choice';
+
 void main() {
   late Directory localData;
   late File modeFile;
@@ -70,12 +73,12 @@ void main() {
         quickCreationModeControllerProvider.notifier,
       );
       expect(
-        await controller.select(QuickCreationMode.dailyChoice),
+        await controller.select(QuickCreationMode.intention),
         isA<QuickCreationModeSaveFailed>(),
       );
       expect(
         ready.container.read(quickCreationModeControllerProvider),
-        QuickCreationMode.dailyChoice,
+        QuickCreationMode.intention,
       );
 
       directoryAvailable = true;
@@ -93,6 +96,23 @@ void main() {
         QuickCreationModeDiagnosticsStage.read,
         QuickCreationModeDiagnosticsStage.write,
       ]);
+    },
+  );
+
+  test(
+    'прежний ключ daily-choice не мешает запуску и даёт намерение',
+    () async {
+      await modeFile.parent.create();
+      await modeFile.writeAsString(_legacyKey);
+
+      final ready = await runtime(store()).bootstrap() as AppRuntimeReady;
+
+      expect(
+        ready.container.read(quickCreationModeControllerProvider),
+        QuickCreationMode.intention,
+      );
+      _expectReadFailure(diagnostics, DiagnosticsFailureCode.corruption);
+      expect(await modeFile.readAsString(), _legacyKey);
     },
   );
 
@@ -119,18 +139,18 @@ void main() {
     await graphOpening.started.future;
 
     graphOpening.release();
-    modeStore.completeRead(QuickCreationMode.dailyChoice);
+    modeStore.completeRead();
     final ready = await bootstrapping as AppRuntimeReady;
 
     expect(
       ready.container.read(quickCreationModeControllerProvider),
-      QuickCreationMode.dailyChoice,
+      QuickCreationMode.intention,
     );
     // Повторный запрос готового запуска сохраняет прочитанный режим.
     final repeated = await runtime.bootstrap() as AppRuntimeReady;
     expect(
       repeated.container.read(quickCreationModeControllerProvider),
-      QuickCreationMode.dailyChoice,
+      QuickCreationMode.intention,
     );
   });
 
@@ -160,12 +180,12 @@ void main() {
       });
 
       expect(await runtime.bootstrap(), isA<AppRuntimeRetryableFailure>());
-      modeStore.completeRead(QuickCreationMode.dailyChoice);
+      modeStore.completeRead();
       final ready = await runtime.bootstrap() as AppRuntimeReady;
 
       expect(
         ready.container.read(quickCreationModeControllerProvider),
-        QuickCreationMode.dailyChoice,
+        QuickCreationMode.intention,
       );
       await ready.container
           .read(quickCreationModeControllerProvider.notifier)
@@ -201,7 +221,7 @@ void main() {
     // Готовая база ещё не означает, что загружен режим или создан контейнер.
     await runtime.shutdown();
     expect(graphOpening.closeCalls, 1);
-    modeStore.completeRead(QuickCreationMode.intention);
+    modeStore.completeRead();
     await rejected;
 
     expect(repositoryCreations, 0);
@@ -229,7 +249,7 @@ void main() {
     // Пропускаем продолжение bootstrap до ожидания настройки после open().
     await Future<void>(() {});
     await runtime.shutdown();
-    modeStore.completeRead(QuickCreationMode.dailyChoice);
+    modeStore.completeRead();
 
     await rejected;
     expect(() => runtime.commandCoordinator, throwsStateError);
@@ -239,7 +259,8 @@ void main() {
     test('поздний ${fails ? 'отказ' : 'успех'} записи не использует '
         'освобождённый контейнер и не считается сохранённым заранее', () async {
       await modeFile.parent.create();
-      await modeFile.writeAsString(QuickCreationMode.dailyChoice.storageKey);
+      // Прежний ключ отличает нетронутый файл от записанного режима.
+      await modeFile.writeAsString(_legacyKey);
       final attempt = ModeWriteAttempt(
         holdAt: ModeWriteStep.rename,
         failAt: fails ? ModeWriteStep.rename : null,
@@ -262,13 +283,15 @@ void main() {
           () => ready.container.read(quickCreationModeControllerProvider),
           throwsStateError,
         );
+        expect(await modeFile.readAsString(), _legacyKey);
 
         final beforeRuntime = runtime(store());
         final before = await beforeRuntime.bootstrap() as AppRuntimeReady;
         expect(
           before.container.read(quickCreationModeControllerProvider),
-          QuickCreationMode.dailyChoice,
+          QuickCreationMode.intention,
         );
+        expect(await modeFile.readAsString(), _legacyKey);
         attempt.release.complete();
         expect(
           await saving,
@@ -278,14 +301,18 @@ void main() {
         );
         expect(
           before.container.read(quickCreationModeControllerProvider),
-          QuickCreationMode.dailyChoice,
+          QuickCreationMode.intention,
+        );
+        expect(
+          await modeFile.readAsString(),
+          fails ? _legacyKey : QuickCreationMode.intention.storageKey,
         );
         await beforeRuntime.shutdown();
 
         final after = await runtime(store()).bootstrap() as AppRuntimeReady;
         expect(
           after.container.read(quickCreationModeControllerProvider),
-          fails ? QuickCreationMode.dailyChoice : QuickCreationMode.intention,
+          QuickCreationMode.intention,
         );
       });
     });
@@ -323,8 +350,8 @@ final class _ControlledModeStore implements QuickCreationModeStore {
     return _reading.future;
   }
 
-  void completeRead([QuickCreationMode mode = QuickCreationMode.intention]) {
-    if (!_reading.isCompleted) _reading.complete(mode);
+  void completeRead() {
+    if (!_reading.isCompleted) _reading.complete(QuickCreationMode.intention);
   }
 
   @override

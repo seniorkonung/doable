@@ -12,14 +12,8 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/app/settings/settings_page.dart';
-import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
-import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
-import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
-import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
-import 'package:doable/src/daily_choice/presentation/path/choice_path_view_model.dart';
-import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/design_system/components/docked_footer.dart';
@@ -30,7 +24,6 @@ import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/intention/domain/intention.dart'
     show IntentionReadiness;
-import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/search/intention_search_bar.dart';
@@ -45,9 +38,6 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
-import '../../daily_choice/presentation/daily_choice_picker_launch_test_support.dart'
-    show TestDailyChoicePickerLaunch;
-import '../../intention/presentation/picker/intention_picker_test_support.dart';
 import '../../support/app_root_pages.dart';
 import '../../support/controlled_local_date.dart';
 import '../../support/graph_seed.dart';
@@ -142,49 +132,6 @@ void main() {
       }
     }
   });
-
-  // Выбор любого пункта сбрасывает историю одним путём.
-  const destination = AppDestination.dailyChoices;
-  testWidgets(
-    'выбор пункта со страницы участника закрывает поиск действия без команды',
-    (tester) async {
-      final router = await _start(tester);
-      await _select(tester, AppDestination.intentionGraph);
-      unawaited(
-        router.push(
-          DailyChoiceActionPickerRoute(launch: TestDailyChoicePickerLaunch()),
-        ),
-      );
-      final filter = find.byKey(const ValueKey('daily-choice-action-filter'));
-      await _until(tester, filter);
-      await tester.enterText(filter, 'Гулять');
-      final row = _summary(DailyChoiceActionPickerPage, 'Гулять');
-      await _until(tester, row);
-      await _open(tester, intentionPickerArrow(row), IntentionDetailsPage);
-      _expectAboveShell(
-        tester,
-        IntentionDetailsPage,
-        AppDestination.intentionGraph,
-      );
-
-      await _select(tester, destination);
-
-      _expectRootPage(tester, router, destination);
-      expect(find.byType(AlertDialog), findsNothing);
-      expect(
-        find.byType(DailyChoiceActionPickerPage, skipOffstage: false),
-        findsNothing,
-      );
-      expect(
-        find.byType(IntentionDetailsPage, skipOffstage: false),
-        findsNothing,
-      );
-      await tester.pump(const Duration(seconds: 1));
-      await tester.pumpAndSettle();
-      _expectRootPage(tester, router, destination);
-      expect(tester.takeException(), isNull);
-    },
-  );
 }
 
 /// Корневая страница каждого пункта.
@@ -204,14 +151,6 @@ final _outgoingNeedGroup = find.byKey(
 final _relationRow = find.byKey(
   ValueKey('intention-relations-row-${tagFixtureId(_relation)}'),
 );
-
-/// Продолжение пути по связи «Читать» → «Бегать».
-final _continuePath = find.byKey(
-  ValueKey('choice-path-continue-${tagFixtureId(_relation)}'),
-);
-
-IntentionId _intentionId(int number) =>
-    (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id;
 
 /// Пункты панели, включая панель под открытой страницей.
 final _destinations = appNavigationDestinations(skipOffstage: false);

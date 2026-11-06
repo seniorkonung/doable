@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
@@ -13,7 +12,6 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/list_state.dart';
@@ -292,7 +290,6 @@ void main() {
           ).evaluate().isEmpty,
         );
         await tester.pumpAndSettle();
-        expect(find.byType(DailyChoiceActionPickerPage), findsNothing);
         await _scrollToEnd(tester, page);
 
         final lastRow = _dailyChoiceRow(count);
@@ -363,7 +360,7 @@ void main() {
 
         faults.isFailing = false;
         await tester.tap(retry);
-        // Повтор догружает выдачу до конца, а не открывает поиск действия.
+        // Повтор догружает выдачу до конца.
         await _waitFor(
           tester,
           () => dailyChoiceCatalogPageFooter(
@@ -372,7 +369,6 @@ void main() {
           ).evaluate().isEmpty,
         );
         await tester.pumpAndSettle();
-        expect(find.byType(DailyChoiceActionPickerPage), findsNothing);
         await _scrollToEnd(tester, page);
 
         final lastRow = _dailyChoiceRow(count);
@@ -413,19 +409,11 @@ void main() {
             greaterThanOrEqualTo(message.bottom),
           );
           expect(create.hitTestable(), findsOneWidget);
-          if (destination == AppDestination.dailyChoices) {
-            await openDailyChoiceQuickCreation(
-              tester,
-              ChoicePathDraftDirection.bottomUp,
-              openedPage: find.byType(DailyChoiceActionPickerPage),
-            );
-          } else {
-            await openQuickCreation(
-              tester,
-              QuickCreationMode.intention,
-              openedPage: find.byType(IntentionEditorPage),
-            );
-          }
+          await openQuickCreation(
+            tester,
+            QuickCreationMode.intention,
+            openedPage: find.byType(IntentionEditorPage),
+          );
         }
         expect(tester.takeException(), isNull);
       });

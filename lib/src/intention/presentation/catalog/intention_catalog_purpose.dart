@@ -30,45 +30,10 @@ final class BrowseIntentionCatalog extends IntentionCatalogPurpose {
 
 /// Назначение поиска, который показывает экран выбора намерения.
 ///
-/// Вид выбираемого — действие или намерение — выводится разбором наследника,
-/// поэтому назначение каталога экрану выбора передать нельзя.
+/// Назначение каталога экрану выбора передать нельзя: оно разбирается по
+/// наследнику.
 sealed class IntentionPickerPurpose extends IntentionCatalogPurpose {
   const IntentionPickerPurpose();
-}
-
-/// Выбор существующего активного действия для дневного выбора.
-///
-/// Охват и готовность закреплены назначением: вызывающая сторона не может
-/// превратить этот список в выбор архивного или неготового намерения.
-final class SelectDailyChoiceAction extends IntentionPickerPurpose {
-  const SelectDailyChoiceAction({required this.session});
-
-  final IntentionSearchSession session;
-
-  @override
-  bool operator ==(Object other) =>
-      other is SelectDailyChoiceAction && identical(other.session, session);
-
-  @override
-  int get hashCode =>
-      Object.hash(SelectDailyChoiceAction, identityHashCode(session));
-}
-
-/// Выбор исходного намерения (основания) для создания дневного выбора.
-///
-/// Любое активное намерение допустимо как основание, независимо от готовности.
-final class SelectDailyChoiceSource extends IntentionPickerPurpose {
-  const SelectDailyChoiceSource({required this.session});
-
-  final IntentionSearchSession session;
-
-  @override
-  bool operator ==(Object other) =>
-      other is SelectDailyChoiceSource && identical(other.session, session);
-
-  @override
-  int get hashCode =>
-      Object.hash(SelectDailyChoiceSource, identityHashCode(session));
 }
 
 /// Выбор существующего активного намерения участником долговременной связи.

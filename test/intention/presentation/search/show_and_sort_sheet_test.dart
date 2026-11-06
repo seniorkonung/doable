@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:ui' show CheckedState, SemanticsRole, Tristate;
+import 'dart:ui' show CheckedState, SemanticsRole;
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/design_system/components/catalog_header.dart';
@@ -43,9 +43,7 @@ void main() {
       '${locale.languageCode}: выбор типа сразу меняет список, а количества учитывают поиск',
       (tester) async {
         final semantics = tester.ensureSemantics();
-        final purpose = SelectDailyChoiceSource(
-          session: IntentionSearchSession(),
-        );
+        final purpose = _participants();
         final h = await _open(tester, purpose, locale);
         final model = h.container.read(
           intentionCatalogViewModelProvider(purpose).notifier,
@@ -141,9 +139,7 @@ void main() {
     testWidgets(
       '${locale.languageCode}: открытое меню убирает прежние количества при новом поиске и после отказа',
       (tester) async {
-        final purpose = SelectDailyChoiceSource(
-          session: IntentionSearchSession(),
-        );
+        final purpose = _participants();
         final h = await _open(tester, purpose, locale);
         h.repository.complete(0, _page([testSummary(index: 1)]));
         await tester.pumpAndSettle();
@@ -334,160 +330,130 @@ void main() {
 
     for (final width in [320.0, 390.0]) {
       for (final textScale in [1.0, 2.0]) {
-        for (final pinned in [false, true]) {
-          testWidgets(
-            '${locale.languageCode}, $width, масштаб $textScale, закреплённый тип $pinned: вся панель и меню читаются целиком',
-            (tester) async {
-              final purpose = pinned
-                  ? SelectDailyChoiceAction(session: IntentionSearchSession())
-                  : SelectDailyChoiceSource(session: IntentionSearchSession());
-              final h = await _open(
+        testWidgets(
+          '${locale.languageCode}, $width, масштаб $textScale: вся панель и меню читаются целиком',
+          (tester) async {
+            final purpose = _participants();
+            final h = await _open(
+              tester,
+              purpose,
+              locale,
+              width: width,
+              textScale: textScale,
+            );
+            final model = h.container.read(
+              intentionCatalogViewModelProvider(purpose).notifier,
+            );
+            model.changeType(IntentionTypeChoice.intentions);
+            model.changeOrder(IntentionCatalogOrder.updatedAtDescending);
+            await tester.pump();
+            h.repository.complete(
+              h.repository.queries.length - 1,
+              _page(
+                [testSummary(index: 1, readiness: IntentionReadiness.notReady)],
+                all: 123,
+                actions: 122,
+              ),
+            );
+            await tester.pumpAndSettle();
+            await _show(tester, purpose);
+            await tester.pumpAndSettle();
+
+            final type = find.byType(SelectRow<IntentionTypeChoice>);
+            final sort = find.byType(SelectRow<IntentionCatalogSortField>);
+            final typeBounds = tester.getRect(type);
+            final sortBounds = tester.getRect(sort);
+            final screen = Rect.fromLTWH(0, 0, width, 844);
+            final selected = ru ? 'Только намерения' : 'Intentions only';
+            for (final (label, value, bounds) in [
+              (ru ? 'Тип' : 'Type', selected, typeBounds),
+              (
+                ru ? 'Сортировка' : 'Sort by',
+                ru ? 'Дата изменения' : 'Date changed',
+                sortBounds,
+              ),
+            ]) {
+              final caption = _option(label);
+              final chosen = _option(value);
+              _wholeText(tester, caption, bounds, textScale: textScale);
+              _wholeText(tester, chosen, bounds, textScale: textScale);
+              expect(
+                tester.getRect(caption).right,
+                lessThan(tester.getRect(chosen).left),
+              );
+              expect(screen.contains(bounds.topLeft), isTrue);
+              expect(screen.contains(bounds.bottomRight), isTrue);
+            }
+            final button = tester.getRect(find.byType(OrderButton));
+            expect(
+              tester
+                  .getRect(_option(ru ? 'Дата изменения' : 'Date changed'))
+                  .right,
+              lessThan(button.left),
+            );
+            expect(typeBounds.bottom, lessThanOrEqualTo(sortBounds.top));
+            if (textScale == 2 && width == 320) {
+              expect(sortBounds.height, greaterThan(52));
+            }
+            await _openTypes(tester, ru);
+            final typeMenu = tester.getRect(_menuPanel);
+            expect(typeMenu.right, typeBounds.right - 4);
+            expect(typeMenu.width, lessThanOrEqualTo(typeBounds.width - 8));
+            expect(screen.contains(typeMenu.topLeft), isTrue);
+            expect(screen.contains(typeMenu.bottomRight), isTrue);
+            for (final (label, count) in [
+              (ru ? 'Намерения и действия' : 'Intentions and actions', '123'),
+              (ru ? 'Только намерения' : 'Intentions only', '1'),
+              (ru ? 'Только действия' : 'Actions only', '122'),
+            ]) {
+              final item = _menuOption(label);
+              final bounds = tester.getRect(item);
+              final name = find.descendant(
+                of: item,
+                matching: find.text(label),
+              );
+              final number = find.descendant(
+                of: item,
+                matching: find.text(count),
+              );
+              _wholeText(tester, name, bounds, textScale: textScale);
+              _wholeText(tester, number, bounds, textScale: textScale);
+              expect(
+                tester.getRect(name).right,
+                lessThan(tester.getRect(number).left),
+              );
+            }
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            await _openSort(tester, ru);
+            final menu = tester.getRect(_menuPanel);
+            expect(menu.right, button.right);
+            expect(menu.width, lessThanOrEqualTo(sortBounds.width - 8));
+            expect(menu.bottom, closeTo(sortBounds.top - 4, 0.01));
+            expect(screen.contains(menu.topLeft), isTrue);
+            expect(screen.contains(menu.bottomRight), isTrue);
+            for (final label in [
+              ru ? 'Дата создания' : 'Date created',
+              ru ? 'Дата изменения' : 'Date changed',
+              ru ? 'Название' : 'Name',
+            ]) {
+              final item = _menuOption(label);
+              _wholeText(
                 tester,
-                purpose,
-                locale,
-                width: width,
+                find.descendant(of: item, matching: find.text(label)),
+                tester.getRect(item),
                 textScale: textScale,
               );
-              final model = h.container.read(
-                intentionCatalogViewModelProvider(purpose).notifier,
-              );
-              if (!pinned) model.changeType(IntentionTypeChoice.intentions);
-              model.changeOrder(IntentionCatalogOrder.updatedAtDescending);
-              await tester.pump();
-              h.repository.complete(
-                h.repository.queries.length - 1,
-                _page(
-                  [
-                    testSummary(
-                      index: 1,
-                      readiness: pinned
-                          ? IntentionReadiness.ready
-                          : IntentionReadiness.notReady,
-                    ),
-                  ],
-                  all: 123,
-                  actions: pinned ? 1 : 122,
-                ),
-              );
-              await tester.pumpAndSettle();
-              await _show(tester, purpose);
-              await tester.pumpAndSettle();
-
-              final type = find.byType(SelectRow<IntentionTypeChoice>);
-              final sort = find.byType(SelectRow<IntentionCatalogSortField>);
-              final typeBounds = tester.getRect(type);
-              final sortBounds = tester.getRect(sort);
-              final screen = Rect.fromLTWH(0, 0, width, 844);
-              final selected = pinned
-                  ? (ru ? 'Только действия' : 'Actions only')
-                  : (ru ? 'Только намерения' : 'Intentions only');
-              for (final (label, value, bounds) in [
-                (ru ? 'Тип' : 'Type', selected, typeBounds),
-                (
-                  ru ? 'Сортировка' : 'Sort by',
-                  ru ? 'Дата изменения' : 'Date changed',
-                  sortBounds,
-                ),
-              ]) {
-                final caption = _option(label);
-                final chosen = _option(value);
-                _wholeText(tester, caption, bounds, textScale: textScale);
-                _wholeText(tester, chosen, bounds, textScale: textScale);
-                expect(
-                  tester.getRect(caption).right,
-                  lessThan(tester.getRect(chosen).left),
-                );
-                expect(screen.contains(bounds.topLeft), isTrue);
-                expect(screen.contains(bounds.bottomRight), isTrue);
-              }
-              final button = tester.getRect(find.byType(OrderButton));
-              expect(
-                tester
-                    .getRect(_option(ru ? 'Дата изменения' : 'Date changed'))
-                    .right,
-                lessThan(button.left),
-              );
-              expect(typeBounds.bottom, lessThanOrEqualTo(sortBounds.top));
-              if (textScale == 2 && width == 320) {
-                expect(sortBounds.height, greaterThan(52));
-              }
-              if (pinned) {
-                final note = _option(
-                  ru ? 'Конечным в дневном выборе может быть только действие' : 'Only an action can be the final intention of a daily choice',
-                );
-                _wholeText(tester, note, typeBounds, textScale: textScale);
-                expect(
-                  tester.getRect(_option(selected)).bottom,
-                  lessThan(tester.getRect(note).top),
-                );
-                expect(tester.getRect(note).bottom, lessThan(sortBounds.top));
-              } else {
-                await _openTypes(tester, ru);
-                final menu = tester.getRect(_menuPanel);
-                expect(menu.right, typeBounds.right - 4);
-                expect(menu.width, lessThanOrEqualTo(typeBounds.width - 8));
-                expect(screen.contains(menu.topLeft), isTrue);
-                expect(screen.contains(menu.bottomRight), isTrue);
-                for (final (label, count) in [
-                  (
-                    ru ? 'Намерения и действия' : 'Intentions and actions',
-                    '123',
-                  ),
-                  (ru ? 'Только намерения' : 'Intentions only', '1'),
-                  (ru ? 'Только действия' : 'Actions only', '122'),
-                ]) {
-                  final item = _menuOption(label);
-                  final bounds = tester.getRect(item);
-                  final name = find.descendant(
-                    of: item,
-                    matching: find.text(label),
-                  );
-                  final number = find.descendant(
-                    of: item,
-                    matching: find.text(count),
-                  );
-                  _wholeText(tester, name, bounds, textScale: textScale);
-                  _wholeText(tester, number, bounds, textScale: textScale);
-                  expect(
-                    tester.getRect(name).right,
-                    lessThan(tester.getRect(number).left),
-                  );
-                }
-                await tester.binding.handlePopRoute();
-                await tester.pumpAndSettle();
-              }
-              await _openSort(tester, ru);
-              final menu = tester.getRect(_menuPanel);
-              expect(menu.right, button.right);
-              expect(menu.width, lessThanOrEqualTo(sortBounds.width - 8));
-              expect(menu.bottom, closeTo(sortBounds.top - 4, 0.01));
-              expect(screen.contains(menu.topLeft), isTrue);
-              expect(screen.contains(menu.bottomRight), isTrue);
-              for (final label in [
-                ru ? 'Дата создания' : 'Date created',
-                ru ? 'Дата изменения' : 'Date changed',
-                ru ? 'Название' : 'Name',
-              ]) {
-                final item = _menuOption(label);
-                _wholeText(
-                  tester,
-                  find.descendant(of: item, matching: find.text(label)),
-                  tester.getRect(item),
-                  textScale: textScale,
-                );
-              }
-            },
-          );
-        }
+            }
+          },
+        );
       }
     }
 
     testWidgets(
       '${locale.languageCode}: подпись типа без ограничения переносится в строке при двукратном масштабе',
       (tester) async {
-        final purpose = SelectDailyChoiceSource(
-          session: IntentionSearchSession(),
-        );
+        final purpose = _participants();
         await _open(tester, purpose, locale, width: 320, textScale: 2);
         await _show(tester, purpose);
 
@@ -511,9 +477,7 @@ void main() {
       '${locale.languageCode}: поле и направление меняются по последнему выбору до ответа новой порции',
       (tester) async {
         final semantics = tester.ensureSemantics();
-        final purpose = SelectDailyChoiceSource(
-          session: IntentionSearchSession(),
-        );
+        final purpose = _participants();
         final h = await _open(tester, purpose, locale);
         h.container
             .read(intentionCatalogViewModelProvider(purpose).notifier)
@@ -728,12 +692,10 @@ void main() {
     );
 
     testWidgets(
-      '${locale.languageCode}: тип действия закреплён, сортировка доступна и лист проходит проверки доступности',
+      '${locale.languageCode}: сортировка доступна, лист проходит проверки доступности, сброс возвращает начальный показ',
       (tester) async {
         final semantics = tester.ensureSemantics();
-        final purpose = SelectDailyChoiceAction(
-          session: IntentionSearchSession(),
-        );
+        final purpose = _participants();
         final h = await _open(
           tester,
           purpose,
@@ -747,34 +709,15 @@ void main() {
         h.repository.complete(0, _page(items));
         await tester.pumpAndSettle();
         await _show(tester, purpose);
-        final actions = ru ? 'Только действия' : 'Actions only';
-        final note = ru
-            ? 'Конечным в дневном выборе может быть только действие'
-            : 'Only an action can be the final intention of a daily choice';
-        _selectedType(tester, actions);
-        expect(_option(note), findsOneWidget);
-        final group = tester.getSemantics(
-          find.bySemanticsLabel(ru ? 'Тип' : 'Type'),
-        );
-        expect(group.flagsCollection.isEnabled, Tristate.isFalse);
-        expect(group.value, actions);
-        expect(group.hint, note);
-        expect(_option('1'), findsNothing);
-        await tester.tap(_option(actions));
-        await tester.pump();
-        expect(find.byType(MenuItemButton), findsNothing);
-        expect(
-          _option(ru ? 'Намерения и действия' : 'Intentions and actions'),
-          findsNothing,
-        );
-        expect(h.repository.queries, hasLength(1));
+        final all = ru ? 'Намерения и действия' : 'Intentions and actions';
+        _selectedType(tester, all);
         expect(_option(ru ? 'Сбросить' : 'Reset'), findsNothing);
 
         await _openSort(tester, ru);
         await tester.tap(_menuOption(ru ? 'Название' : 'Name'));
         await tester.pump();
         await tester.pump();
-        _selectedType(tester, actions);
+        _selectedType(tester, all);
         _direction(
           tester,
           ru,
@@ -790,7 +733,7 @@ void main() {
 
         await tester.tap(_option(ru ? 'Сбросить' : 'Reset'));
         await tester.pump();
-        _selectedType(tester, actions);
+        _selectedType(tester, all);
         expect(_option(ru ? 'Дата создания' : 'Date created'), findsOneWidget);
         _direction(
           tester,
@@ -802,7 +745,7 @@ void main() {
         expect(_option(ru ? 'Сбросить' : 'Reset'), findsNothing);
         expect(
           h.repository.queries.last.readinessFilter,
-          IntentionReadinessFilter.readyOnly,
+          IntentionReadinessFilter.all,
         );
         semantics.dispose();
       },
@@ -1295,3 +1238,11 @@ _open(
   await tester.pump();
   return (container: container, repository: repository);
 }
+
+SelectRelationParticipant _participants() => SelectRelationParticipant(
+  session: IntentionSearchSession(),
+  pairProbe: RelationPairProbe(
+    counterpartId: testSummary(index: 999).id,
+    candidateRole: RelationParticipantRole.related,
+  ),
+);

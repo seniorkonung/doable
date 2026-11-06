@@ -105,12 +105,12 @@ final class _IntentionSearchListState
       skipLoadingOnRefresh: false,
       data: (state) => switch (state) {
         IntentionCatalogDebouncing() => _status(
-          ListState.loading(text: kind.loading(l10n)),
+          ListState.loading(text: l10n.catalogLoading),
         ),
         IntentionCatalogInvalidFilter() => const <Widget>[],
         final IntentionCatalogLoaded loaded => [
           ..._createRow(l10n, loaded),
-          ..._loaded(l10n, kind, loaded),
+          ..._loaded(l10n, loaded),
         ],
         final IntentionCatalogEmpty empty => [
           ..._createRow(l10n, empty),
@@ -118,7 +118,7 @@ final class _IntentionSearchListState
         ],
         IntentionCatalogUnavailable() => _status(
           ListState.error(
-            message: kind.unavailable(l10n),
+            message: l10n.catalogUnavailable,
             retry: (
               label: l10n.commonRetry,
               onPressed: () => unawaited(_notifier.retry()),
@@ -126,14 +126,15 @@ final class _IntentionSearchListState
           ),
         ),
         IntentionCatalogCorruption() => _status(
-          ListState.error(message: kind.corruption(l10n)),
+          ListState.error(message: l10n.catalogCorruption),
         ),
         IntentionCatalogUnexpected() => _status(
-          ListState.error(message: kind.unexpected(l10n)),
+          ListState.error(message: l10n.catalogUnexpectedFailure),
         ),
       },
-      error: (_, _) => _status(ListState.error(message: kind.unexpected(l10n))),
-      loading: () => _status(ListState.loading(text: kind.loading(l10n))),
+      error: (_, _) =>
+          _status(ListState.error(message: l10n.catalogUnexpectedFailure)),
+      loading: () => _status(ListState.loading(text: l10n.catalogLoading)),
     );
     return CustomScrollView(
       key: PageStorageKey<String>('${kind.keyPrefix}-list'),
@@ -181,13 +182,9 @@ final class _IntentionSearchListState
     ];
   }
 
-  List<Widget> _loaded(
-    AppLocalizations l10n,
-    IntentionSearchKind kind,
-    IntentionCatalogLoaded loaded,
-  ) {
+  List<Widget> _loaded(AppLocalizations l10n, IntentionCatalogLoaded loaded) {
     final rows = loaded.items.length;
-    final continuation = _continuation(l10n, kind, loaded);
+    final continuation = _continuation(l10n, loaded);
     return [
       // Продолжение — последний элемент ленивого списка: кольцо подгрузки
       // строится, только когда конец выдачи подходит к экрану, иначе его
@@ -298,14 +295,13 @@ final class _IntentionSearchListState
 
   Widget? _continuation(
     AppLocalizations l10n,
-    IntentionSearchKind kind,
     IntentionCatalogLoaded results,
   ) => switch (results.continuation) {
     IntentionCatalogContinuationIdle() when results.nextCursor == null => null,
     IntentionCatalogContinuationIdle() ||
     IntentionCatalogContinuationLoading() => Padding(
       padding: const EdgeInsets.only(top: DoableMetrics.space4),
-      child: ListState.more(text: kind.loadingMore(l10n)),
+      child: ListState.more(text: l10n.intentionPickerLoadingMoreIntentions),
     ),
     IntentionCatalogContinuationUnavailable() => _continuationFailure(
       ListState.error(

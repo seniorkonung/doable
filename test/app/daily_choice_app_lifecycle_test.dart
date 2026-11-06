@@ -1,18 +1,15 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
@@ -48,7 +45,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
-import '../support/daily_choice_creation_controls.dart';
 import '../support/daily_choice_detail_fields_controls.dart';
 import '../support/daily_choice_details_controls.dart';
 
@@ -60,7 +56,6 @@ import '../support/daily_choice_durability_fixture.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
-import '../support/quick_creation.dart';
 
 part 'daily_choice_completion_lifecycle_scenarios.dart';
 
@@ -111,37 +106,17 @@ String _storedDate(LocalDatabaseHarness harness, int choiceNumber) {
   }
 }
 
-Set<String> _storedIds(LocalDatabaseHarness harness, String table) {
-  final database = sqlite.sqlite3.open(harness.databaseFile.path);
-  try {
-    return {
-      for (final row in database.select('SELECT id FROM $table'))
-        row['id'] as String,
-    };
-  } finally {
-    database.close();
-  }
-}
-
 final class _ChoiceSqlGate extends LocalDatabaseConnectionObserver {
   Completer<void>? _entered;
   Completer<void>? _released;
   bool _fail = false;
-  LocalDatabaseSqlOperation _operation = LocalDatabaseSqlOperation.update;
-  String _table = 'daily_choices';
 
   bool get hasEntered => _entered?.isCompleted ?? false;
 
-  void arm({
-    required bool fail,
-    LocalDatabaseSqlOperation operation = LocalDatabaseSqlOperation.update,
-    String table = 'daily_choices',
-  }) {
+  void arm({required bool fail}) {
     _entered = Completer<void>();
     _released = Completer<void>();
     _fail = fail;
-    _operation = operation;
-    _table = table;
   }
 
   void release() {
@@ -156,8 +131,8 @@ final class _ChoiceSqlGate extends LocalDatabaseConnectionObserver {
     if (entered == null ||
         released == null ||
         entered.isCompleted ||
-        statement.operation != _operation ||
-        !statement.statements.any((sql) => sql.contains(_table))) {
+        statement.operation != LocalDatabaseSqlOperation.update ||
+        !statement.statements.any((sql) => sql.contains('daily_choices'))) {
       return;
     }
     entered.complete();
@@ -173,161 +148,6 @@ final class _ChoiceSqlGate extends LocalDatabaseConnectionObserver {
 
 void main() {
   _completionLifecycleScenarios();
-
-  testWidgets(
-    'создание снизу вверх завершается после ухода, смены фокуса и повторного открытия',
-    (tester) async {
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
-      addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
-      tester.view.physicalSize = const Size(1200, 4000);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-
-      final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
-      final seeded = await harness.openReadyDatabase();
-      await seedDurabilityGraph(seeded);
-      expect(
-        await durabilityRepository(seeded).execute(durabilityCreate()),
-        isA<GraphCommandSucceeded>(),
-      );
-      await harness.closePersistenceObjectGraph();
-      final gate = _ChoiceSqlGate();
-      // Каталог открывается на дне прежнего дневного выбора, а новый выбор
-      // создаётся на другой день.
-      final localDate = ControlledLocalDate(durabilityChoiceDate);
-      final createdDate = CalendarDate.fromParts(2026, 9, 24);
-      final runtime = AppRuntime(
-        quickCreationModeStore: InMemoryQuickCreationModeStore(),
-        connectionFactory: () => observeConfiguredLocalDatabaseConnection(
-          openFileBackedLocalDatabase(harness.databaseFile),
-          gate,
-        ),
-        diagnosticsSink: InMemoryDiagnosticsSink(),
-        localDateSource: localDate.read,
-      );
-      addTearDown(() async {
-        gate.release();
-        await tester.pumpWidget(const SizedBox.shrink());
-        await runtime.shutdown();
-        await harness.dispose();
-      });
-      await tester.pumpWidget(MainApp(runtime: runtime));
-      await openDailyChoices(tester, tap: _tap);
-      final createdDayMark = dailyChoiceCatalogDayMark(createdDate);
-      await _until(
-        tester,
-        () =>
-            dailyChoiceCatalogDayMark(durabilityChoiceDate)
-                .evaluate()
-                .isNotEmpty,
-      );
-      expect(dailyChoiceCatalogDay(createdDate), findsOneWidget);
-      expect(createdDayMark, findsNothing);
-      await openDailyChoiceQuickCreation(
-        tester,
-        ChoicePathDraftDirection.bottomUp,
-        openedPage: find.byType(DailyChoiceActionPickerPage),
-        wait: (tester, finder) =>
-            _until(tester, () => finder.evaluate().isNotEmpty),
-      );
-      await _tap(tester, find.text('Намерение 3'));
-      await _tap(
-        tester,
-        find.byKey(ValueKey('choice-path-continue-${durabilityUuid(102)}')),
-      );
-      await _tap(
-        tester,
-        find.byKey(ValueKey('choice-path-continue-${durabilityUuid(101)}')),
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('choice-path-select-source')),
-      );
-      await _tap(
-        tester,
-        find.byKey(const ValueKey('choice-path-open-confirmation')),
-      );
-      await awaitDailyChoiceConfirmation(
-        tester,
-        waitFor: (tester, finder) =>
-            _until(tester, () => finder.evaluate().isNotEmpty),
-      );
-      await setDailyChoiceCreationDate(tester, createdDate);
-      gate.arm(
-        fail: false,
-        operation: LocalDatabaseSqlOperation.insert,
-        table: 'daily_choice_path_steps',
-      );
-      final submit = find.byKey(const ValueKey('daily-choice-submit'));
-      await tester.ensureVisible(submit);
-      await tester.tap(submit);
-      await tester.tap(submit);
-      await tester.pump();
-      await _until(tester, () => gate.hasEntered);
-      expect(_storedIds(harness, 'daily_choices'), {durabilityUuid(201)});
-
-      await tester.binding.handlePopRoute();
-      await tester.pump(const Duration(milliseconds: 350));
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      gate.release();
-      await _until(
-        tester,
-        () => _storedIds(harness, 'daily_choices').length == 2,
-      );
-      expect(_storedIds(harness, 'daily_choice_path_steps'), hasLength(4));
-      expect(
-        find.byKey(const ValueKey('graph-operation-message')),
-        findsNothing,
-      );
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      await _until(
-        tester,
-        () => find
-            .byKey(const ValueKey('graph-operation-message'))
-            .evaluate()
-            .isNotEmpty,
-      );
-      expect(find.textContaining('Дневной выбор создан'), findsWidgets);
-      await tester.pumpAndSettle();
-      final message = find.byKey(const ValueKey('graph-operation-message'));
-      ScaffoldMessenger.of(tester.element(message.first)).hideCurrentSnackBar();
-      await tester.pumpAndSettle();
-      expect(message, findsNothing);
-      // Уже существующая модель согласуется до возврата со страницы создания.
-      // Скрытая страница откладывает перестроение, поэтому значок проверяется
-      // после возврата, а здесь — её результат без создания нового провайдера.
-      final ready = await runtime.bootstrap() as AppRuntimeReady;
-      final marksProvider = openedDailyChoiceDayMarksProvider(ready.container);
-      await _until(tester, () {
-        expect(ready.container.exists(marksProvider), isTrue);
-        return ready.container
-                .read(marksProvider)
-                .dayStatuses
-                ?.statuses[createdDate] ==
-            DailyChoiceDayStatus.hasIncomplete;
-      });
-      expect(
-        find.byKey(const ValueKey('choice-path-creation-status')),
-        findsOneWidget,
-      );
-      expect(find.byKey(const ValueKey('daily-choice-submit')), findsNothing);
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(
-        dailyChoiceCatalogDayMark(createdDate, mark: DayMark.todo),
-        findsOneWidget,
-      );
-      // Новый выбор относится к другому дню: человек выбирает этот день.
-      await selectDailyChoiceCatalogDate(tester, createdDate, tap: _tap);
-      await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
-      await tester.pumpAndSettle();
-      expect(dailyChoiceDetailsField('Завтра'), findsOneWidget);
-      expect(_storedIds(harness, 'daily_choices'), hasLength(2));
-      await tester.pump(const Duration(seconds: 1));
-      expect(message, findsNothing);
-    },
-  );
 
   testWidgets(
     'уход и потеря фокуса сохраняют результат одной команды без частичной записи',
@@ -937,11 +757,6 @@ final class _ObservedRepository implements PersonalGraphRepository {
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
       _delegate.watchRelation(id);
-
-  @override
-  Future<ChoicePathContinuationResult> getChoicePathContinuations(
-    ChoicePathContinuationQuery query,
-  ) => _delegate.getChoicePathContinuations(query);
 
   @override
   Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>

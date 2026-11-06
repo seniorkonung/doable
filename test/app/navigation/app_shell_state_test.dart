@@ -9,7 +9,6 @@ import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
@@ -1484,11 +1483,6 @@ final class _ObservedRepository implements PersonalGraphRepository {
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
       _delegate.watchRelation(id);
-
-  @override
-  Future<ChoicePathContinuationResult> getChoicePathContinuations(
-    ChoicePathContinuationQuery query,
-  ) => _delegate.getChoicePathContinuations(query);
 
   @override
   Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>

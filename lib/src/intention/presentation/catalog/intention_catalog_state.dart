@@ -11,36 +11,6 @@ enum IntentionCatalogFilterValidationFailure {
 /// Тип намерения, которым поиск ограничивает выдачу.
 enum IntentionTypeChoice { all, intentions, actions }
 
-/// Доступность выбора типа намерения, которую задаёт назначение поиска.
-sealed class IntentionTypeAvailability {
-  const IntentionTypeAvailability();
-}
-
-/// Тип выбирается человеком; [selected] — выбранный тип.
-final class IntentionTypeOpen extends IntentionTypeAvailability {
-  const IntentionTypeOpen(this.selected);
-
-  final IntentionTypeChoice selected;
-
-  @override
-  bool operator ==(Object other) =>
-      other is IntentionTypeOpen && other.selected == selected;
-
-  @override
-  int get hashCode => Object.hash(IntentionTypeOpen, selected);
-}
-
-/// Назначение поиска закрепляет тип за действиями.
-final class IntentionTypePinnedToActions extends IntentionTypeAvailability {
-  const IntentionTypePinnedToActions();
-
-  @override
-  bool operator ==(Object other) => other is IntentionTypePinnedToActions;
-
-  @override
-  int get hashCode => (IntentionTypePinnedToActions).hashCode;
-}
-
 /// Доступность выбора охвата, которую задаёт назначение поиска.
 sealed class IntentionScopeAvailability {
   const IntentionScopeAvailability();
@@ -95,7 +65,7 @@ final class IntentionCatalogSelection {
   });
 
   final IntentionScopeAvailability scope;
-  final IntentionTypeAvailability type;
+  final IntentionTypeChoice type;
   final String titleFilterText;
   final IntentionTagFilter tagFilter;
   final IntentionCatalogOrder order;

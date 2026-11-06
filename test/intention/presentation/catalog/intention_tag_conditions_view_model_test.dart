@@ -7,6 +7,8 @@ import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -17,8 +19,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'catalog_test_support.dart';
 import '../../../support/tag_positions.dart';
 
-final _actionSearchPurpose = SelectDailyChoiceAction(
+final _participantSearchPurpose = SelectRelationParticipant(
   session: IntentionSearchSession(),
+  pairProbe: RelationPairProbe(
+    counterpartId: testSummary(index: 999).id,
+    candidateRole: RelationParticipantRole.related,
+  ),
 );
 
 const _present = IntentionTagRequirement.mustBePresent;
@@ -148,8 +154,8 @@ void main() {
   test('условия разных назначений поиска независимы', () {
     final h = _Harness();
     addTearDown(h.dispose);
-    final action = _actionSearchPurpose;
-    final conditions = intentionTagConditionsViewModelProvider(action);
+    final participant = _participantSearchPurpose;
+    final conditions = intentionTagConditionsViewModelProvider(participant);
     final subscription = h.container.listen(conditions, (_, _) {});
     addTearDown(subscription.close);
 
@@ -157,7 +163,7 @@ void main() {
     expect(h.container.read(conditions).conditions, isEmpty);
     expect(
       h.container
-          .read(intentionCatalogViewModelProvider(action).notifier)
+          .read(intentionCatalogViewModelProvider(participant).notifier)
           .selection
           .tagFilter,
       IntentionTagFilter.empty,
@@ -170,7 +176,7 @@ void main() {
     expect(h.appliedFilter, IntentionTagFilter(requiredTagIds: [_id(1)]));
     expect(
       h.container
-          .read(intentionCatalogViewModelProvider(action).notifier)
+          .read(intentionCatalogViewModelProvider(participant).notifier)
           .selection
           .tagFilter,
       IntentionTagFilter(excludedTagIds: [_id(2)]),

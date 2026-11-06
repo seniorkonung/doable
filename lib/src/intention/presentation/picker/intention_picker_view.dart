@@ -219,7 +219,6 @@ final class _IntentionPickerViewState
                   return switch (widget.rowBehavior) {
                     IntentionPickerSingle(:final onPick) => IntentionPickerRow(
                       key: key,
-                      purpose: widget.purpose,
                       summary: summary,
                       requiredTagIds: results.query.tagFilter.requiredTagIds,
                       onPick: () => onPick(snapshot),
@@ -233,7 +232,6 @@ final class _IntentionPickerViewState
                       occupant == null
                           ? IntentionPickerRow.checkable(
                               key: key,
-                              purpose: widget.purpose,
                               summary: summary,
                               requiredTagIds:
                                   results.query.tagFilter.requiredTagIds,
@@ -243,7 +241,6 @@ final class _IntentionPickerViewState
                             )
                           : IntentionPickerRow.occupied(
                               key: key,
-                              purpose: widget.purpose,
                               summary: summary,
                               reason: relationPairReasonName(
                                 l10n,

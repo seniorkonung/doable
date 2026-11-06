@@ -7,9 +7,6 @@ import 'package:doable/src/app/quick_creation/quick_creation_launcher.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
-import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -18,221 +15,46 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../daily_choice/presentation/daily_choice_picker_launch_test_support.dart'
-    show TestDailyChoicePickerLaunch;
 import '../../support/daily_choice_durability_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
-import '../../support/quick_creation.dart';
 
 part 'quick_creation_launcher_test_support.dart';
 
 void main() {
-  testWidgets(
-    'отмена листа не запускает поиск и разрешает повторное открытие',
-    (tester) async {
+  // Корневые пункты запускают одним путём: достаточно Главной и глубокой
+  // страницы, над которой лежит чужая история.
+  for (final origin in [_Origin.home, _Origin.deep]) {
+    testWidgets('Намерение над ${origin.label}: один поток сохраняет историю', (
+      tester,
+    ) async {
       final router = await _openApp(tester);
-      final source = await _source(tester, router, _Origin.deep);
+      final source = await _source(tester, router, origin);
       final history = _history(router);
+      final tabs = router.innerRouterOf<TabsRouter>(AppShellRoute.name)!;
+      final selected = tabs.activeIndex;
       final launcher = QuickCreationLauncher();
-      for (var attempt = 0; attempt < 2; attempt++) {
-        final running = launcher.launch(
+      var finished = false;
+      final running = launcher
+          .launch(sourceContext: source, mode: QuickCreationMode.intention)
+          .then((_) => finished = true);
+      unawaited(
+        launcher.launch(
           sourceContext: source,
-          mode: QuickCreationMode.dailyChoice,
-        );
-        await tester.pumpAndSettle();
-        expect(find.text('С чего начать'), findsOneWidget);
-        expect(_history(router), history);
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
-        await running;
-        expect(_history(router), history);
-        expect(router.hasPagelessTopRoute, isFalse);
-        expect(find.text('С чего начать'), findsNothing);
-      }
-    },
-  );
-
-  for (final (mode, direction) in [
-    (QuickCreationMode.intention, null),
-    for (final direction in ChoicePathDraftDirection.values)
-      (QuickCreationMode.dailyChoice, direction),
-  ]) {
-    // Корневые пункты запускают одним путём: достаточно Главной и глубокой
-    // страницы, над которой лежит чужая история.
-    for (final origin in [_Origin.home, _Origin.deep]) {
-      testWidgets(
-        '${_label(mode, direction)} над ${origin.label}: один поток сохраняет историю и ввод',
-        (tester) async {
-          final router = await _openApp(tester);
-          final source = await _source(tester, router, origin);
-          final history = _history(router);
-          final tabs = router.innerRouterOf<TabsRouter>(AppShellRoute.name)!;
-          final selected = tabs.activeIndex;
-          final launcher = QuickCreationLauncher();
-          var finished = false;
-          final running = launcher
-              .launch(sourceContext: source, mode: mode)
-              .then((_) => finished = true);
-          unawaited(launcher.launch(sourceContext: source, mode: mode));
-          await tester.pumpAndSettle();
-          if (direction != null) {
-            expect(finished, isFalse);
-            expect(find.text('С чего начать'), findsOneWidget);
-            expect(_history(router), history);
-            await _selectStart(tester, direction);
-            expect(router.hasPagelessTopRoute, isFalse);
-          }
-          expect(router.current.name, _firstRoute(mode, direction));
-          expect(_history(router).take(history.length), history);
-          expect(router.stackData, hasLength(history.length + 1));
-          expect(tabs.activeIndex, selected);
-          switch (mode) {
-            case QuickCreationMode.intention:
-              expect(finished, isTrue);
-              await tester.tap(_key('intention-editor-close'));
-            case QuickCreationMode.dailyChoice:
-              expect(finished, isFalse);
-              await _choose(tester, direction!);
-              expect(finished, isTrue);
-              final path = tester.widget<ChoicePathPage>(
-                find.byType(ChoicePathPage),
-              );
-              expect(path.direction, direction);
-              expect(
-                path.sourceIntentionId,
-                durabilityIntention(_candidate(direction)),
-              );
-              expect(_history(router).take(history.length), history);
-              expect(router.stackData, hasLength(history.length + 1));
-              await tester.tap(find.text('Отменить создание'));
-          }
-          await tester.pumpAndSettle();
-          await running;
-          expect(_history(router), history);
-          expect(tabs.activeIndex, selected);
-          if (origin == _Origin.deep) {
-            await router.maybePop();
-            await tester.pumpAndSettle();
-            expect(
-              _filterText(tester, ChoicePathDraftDirection.bottomUp),
-              _foreignFilter,
-            );
-          }
-          expect(tester.takeException(), isNull);
-        },
+          mode: QuickCreationMode.intention,
+        ),
       );
-    }
-  }
-
-  for (final direction in ChoicePathDraftDirection.values) {
-    const mode = QuickCreationMode.dailyChoice;
-    testWidgets(
-      '${_label(mode, direction)}: отмена поиска разрешает новый запуск',
-      (tester) async {
-        final router = await _openApp(tester);
-        final source = await _source(tester, router, _Origin.daily);
-        final history = _history(router);
-        final launcher = QuickCreationLauncher();
-        final first = launcher.launch(sourceContext: source, mode: mode);
-        await tester.pumpAndSettle();
-        await _selectStart(tester, direction);
-        await _cancelPicker(tester, direction);
-        await first;
-        expect(_history(router), history);
-        final next = launcher.launch(sourceContext: source, mode: mode);
-        await tester.pumpAndSettle();
-        await _selectStart(tester, direction);
-        await _choose(tester, direction);
-        await next;
-        expect(router.current.name, ChoicePathRoute.name);
-        await tester.tap(find.text('Отменить создание'));
-        await tester.pumpAndSettle();
-        expect(_history(router), history);
-      },
-    );
-
-    testWidgets(
-      '${_label(mode, direction)}: страницы запускают независимые поиски',
-      (tester) async {
-        final router = await _openApp(tester);
-        final source = await _source(tester, router, _Origin.home);
-        final first = QuickCreationLauncher().launch(
-          sourceContext: source,
-          mode: mode,
-        );
-        await tester.pumpAndSettle();
-        await _selectStart(tester, direction);
-        final firstPicker = router.current.matchId;
-        await tester.enterText(
-          _key('daily-choice-${_prefix(direction)}-filter'),
-          'Намерение 3',
-        );
-        unawaited(
-          router.push(
-            IntentionDetailsRoute(intentionId: durabilityIntention(3)),
-          ),
-        );
-        await tester.pumpAndSettle();
-        final nested = QuickCreationLauncher().launch(
-          sourceContext: tester.element(find.byType(IntentionDetailsPage)),
-          mode: mode,
-        );
-        await tester.pumpAndSettle();
-        await _selectStart(tester, direction);
-        expect(router.current.matchId, isNot(firstPicker));
-        expect(_filterText(tester, direction), isEmpty);
-        await _cancelPicker(tester, direction);
-        await nested;
-        await router.maybePop();
-        await tester.pumpAndSettle();
-        expect(router.current.matchId, firstPicker);
-        expect(_filterText(tester, direction), 'Намерение 3');
-        await _cancelPicker(tester, direction);
-        await first;
-        expect(router.stackData, hasLength(1));
-        expect(tester.takeException(), isNull);
-      },
-    );
-
-    for (final origin in [_Origin.home, _Origin.deep]) {
-      testWidgets(
-        '${_label(mode, direction)}: поздний ID после сброса ${origin.label} не открывает путь',
-        (tester) async {
-          final router = _DelayedPickerRouter();
-          await _openApp(tester, router: router);
-          final source = await _source(tester, router, origin);
-          router.holdNextPicker();
-          final first = QuickCreationLauncher().launch(
-            sourceContext: source,
-            mode: mode,
-          );
-          await tester.pumpAndSettle();
-          await _selectStart(tester, direction);
-          await _choose(tester, direction);
-          router.popUntilRoot();
-          final tabs = router.innerRouterOf<TabsRouter>(AppShellRoute.name)!;
-          tabs.setActiveIndex(2);
-          await tester.pumpAndSettle();
-          if (origin == _Origin.deep) {
-            unawaited(
-              router.push(
-                IntentionDetailsRoute(intentionId: durabilityIntention(2)),
-              ),
-            );
-            await tester.pumpAndSettle();
-          } else {
-            tabs.setActiveIndex(0);
-            await tester.pumpAndSettle();
-          }
-          final history = _history(router);
-          router.release();
-          await tester.pumpAndSettle();
-          await first;
-          expect(_history(router), history);
-          expect(find.byType(ChoicePathPage), findsNothing);
-          expect(tester.takeException(), isNull);
-        },
-      );
-    }
+      await tester.pumpAndSettle();
+      expect(router.current.name, IntentionEditorRoute.name);
+      expect(_history(router).take(history.length), history);
+      expect(router.stackData, hasLength(history.length + 1));
+      expect(tabs.activeIndex, selected);
+      expect(finished, isTrue);
+      await tester.tap(_key('intention-editor-close'));
+      await tester.pumpAndSettle();
+      await running;
+      expect(_history(router), history);
+      expect(tabs.activeIndex, selected);
+      expect(tester.takeException(), isNull);
+    });
   }
 }

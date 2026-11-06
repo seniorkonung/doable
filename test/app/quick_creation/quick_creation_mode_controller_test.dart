@@ -9,15 +9,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('Режим быстрого создания', () {
-    const storedModes = {
-      'intention': QuickCreationMode.intention,
-      'daily-choice': QuickCreationMode.dailyChoice,
-    };
-
-    test('каждый сохранённый ключ декодируется в свой режим', () {
-      for (final entry in storedModes.entries) {
-        expect(QuickCreationMode.fromStorageKey(entry.key), entry.value);
-      }
+    test('сохранённый ключ intention декодируется в режим намерения', () {
+      expect(
+        QuickCreationMode.fromStorageKey('intention'),
+        QuickCreationMode.intention,
+      );
     });
 
     test('неизвестные ключи, индексы и названия не становятся режимом', () {
@@ -28,6 +24,7 @@ void main() {
         '0',
         '3',
         'dailyChoice',
+        'daily-choice',
         'Новое намерение',
         'New intention',
         'INTENTION',
@@ -40,50 +37,16 @@ void main() {
   });
 
   group('Контроллер режима быстрого создания', () {
-    // Начальный режим не ветвит код, поэтому берём не начальный по умолчанию.
-    const initialMode = QuickCreationMode.dailyChoice;
-    test('использует явно переданный начальный режим $initialMode', () {
+    test('использует явно переданный начальный режим', () {
       final store = _ControlledModeStore();
-      final container = _container(store, initialMode: initialMode);
+      final container = _container(store);
 
-      expect(container.read(quickCreationModeControllerProvider), initialMode);
+      expect(
+        container.read(quickCreationModeControllerProvider),
+        QuickCreationMode.intention,
+      );
       expect(store.writes, isEmpty);
     });
-
-    test(
-      'выбор синхронно доступен всем наблюдателям до исхода записи',
-      () async {
-        final store = _ControlledModeStore();
-        final container = _container(store);
-        final firstObserver = <QuickCreationMode>[];
-        final secondObserver = <QuickCreationMode>[];
-        container.listen(
-          quickCreationModeControllerProvider,
-          (_, next) => firstObserver.add(next),
-        );
-        container.listen(
-          quickCreationModeControllerProvider,
-          (_, next) => secondObserver.add(next),
-        );
-
-        final saving = container
-            .read(quickCreationModeControllerProvider.notifier)
-            .select(QuickCreationMode.dailyChoice);
-
-        expect(
-          container.read(quickCreationModeControllerProvider),
-          QuickCreationMode.dailyChoice,
-        );
-        expect(firstObserver, [QuickCreationMode.dailyChoice]);
-        expect(secondObserver, [QuickCreationMode.dailyChoice]);
-        expect(_acceptedModes(store), [QuickCreationMode.dailyChoice]);
-
-        store.completeNext(const QuickCreationModeSaved());
-        expect(await saving, isA<QuickCreationModeSaved>());
-        expect(firstObserver, [QuickCreationMode.dailyChoice]);
-        expect(secondObserver, [QuickCreationMode.dailyChoice]);
-      },
-    );
 
     const failed = QuickCreationModeSaveFailed(
       DiagnosticsFailureCode.unavailable,
@@ -93,17 +56,17 @@ void main() {
     const firstOutcome = failed;
     const secondOutcome = failed;
     test('поздние исходы ${_outcomeName(firstOutcome)} → '
-        '${_outcomeName(secondOutcome)} не отменяют новый режим', () async {
+        '${_outcomeName(secondOutcome)} не меняют режим', () async {
       final store = _ControlledModeStore();
       final container = _container(store);
       final controller = container.read(
         quickCreationModeControllerProvider.notifier,
       );
-      final first = controller.select(QuickCreationMode.dailyChoice);
+      final first = controller.select(QuickCreationMode.intention);
       final second = controller.select(QuickCreationMode.intention);
 
       expect(_acceptedModes(store), [
-        QuickCreationMode.dailyChoice,
+        QuickCreationMode.intention,
         QuickCreationMode.intention,
       ]);
       expect(
@@ -127,46 +90,17 @@ void main() {
     });
 
     test(
-      'передаёт каждый выбор А → Б → А без ожидания или объединения',
-      () async {
-        final store = _ControlledModeStore();
-        final container = _container(store);
-        final controller = container.read(
-          quickCreationModeControllerProvider.notifier,
-        );
-
-        final first = controller.select(QuickCreationMode.dailyChoice);
-        final second = controller.select(QuickCreationMode.intention);
-        final third = controller.select(QuickCreationMode.dailyChoice);
-
-        expect(_acceptedModes(store), [
-          QuickCreationMode.dailyChoice,
-          QuickCreationMode.intention,
-          QuickCreationMode.dailyChoice,
-        ]);
-
-        store.completeNext(
-          const QuickCreationModeSaveFailed(DiagnosticsFailureCode.unavailable),
-        );
-        await first;
-        store.completeNext(const QuickCreationModeSaved());
-        await second;
-        expect(
-          container.read(quickCreationModeControllerProvider),
-          QuickCreationMode.dailyChoice,
-        );
-        store.completeNext(const QuickCreationModeSaved());
-        await third;
-      },
-    );
-
-    test(
       'повторный выбор текущего режима получает собственный исход',
       () async {
         final store = _ControlledModeStore();
         final container = _container(store);
         final controller = container.read(
           quickCreationModeControllerProvider.notifier,
+        );
+        final observed = <QuickCreationMode>[];
+        container.listen(
+          quickCreationModeControllerProvider,
+          (_, next) => observed.add(next),
         );
         final first = controller.select(QuickCreationMode.intention);
         final second = controller.select(QuickCreationMode.intention);
@@ -175,6 +109,8 @@ void main() {
           QuickCreationMode.intention,
           QuickCreationMode.intention,
         ]);
+        // Режим не менялся, поэтому наблюдатели не уведомляются.
+        expect(observed, isEmpty);
         store.completeNext(
           const QuickCreationModeSaveFailed(DiagnosticsFailureCode.unavailable),
         );
@@ -187,30 +123,6 @@ void main() {
         );
       },
     );
-
-    test('сохраняет общий режим без наблюдателей между страницами', () async {
-      final store = _ControlledModeStore();
-      final container = _container(store);
-      final subscription = container.listen(
-        quickCreationModeControllerProvider,
-        (_, _) {},
-      );
-      final controller = container.read(
-        quickCreationModeControllerProvider.notifier,
-      );
-      final saving = controller.select(QuickCreationMode.dailyChoice);
-
-      subscription.close();
-      await container.pump();
-      store.completeNext(const QuickCreationModeSaved());
-      await saving;
-      await container.pump();
-
-      expect(
-        container.read(quickCreationModeControllerProvider),
-        QuickCreationMode.dailyChoice,
-      );
-    });
 
     const outcome = failed;
     test('исход «${_outcomeName(outcome)}» после освобождения '

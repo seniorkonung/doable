@@ -14,16 +14,8 @@ enum _MatrixEntry {
   editIntention,
   creation,
   condition,
-  source,
-  action,
-  actionCandidate,
   assignTags,
   draftTags,
-  addChoice,
-  continuePath,
-  selectAction,
-  selectSource,
-  confirmPath,
   createRelation,
   outgoingRelations,
   incomingRelations;
@@ -31,30 +23,13 @@ enum _MatrixEntry {
   Finder get finder => switch (this) {
     _MatrixEntry.intention => intentionCatalogRow('Читать'),
     _MatrixEntry.editIntention => intentionHeadTitle,
-    _MatrixEntry.creation ||
-    _MatrixEntry.source ||
-    _MatrixEntry.action => quickCreationAction(),
+    _MatrixEntry.creation => quickCreationAction(),
     _MatrixEntry.condition => intentionCatalogTagFilterControl,
-    _MatrixEntry.actionCandidate => _summary(
-      DailyChoiceActionPickerPage,
-      'Бегать',
-    ),
     _MatrixEntry.assignTags => find.byKey(
       const ValueKey('tag-assignments-choose'),
     ),
     _MatrixEntry.draftTags => find.byKey(
       const ValueKey('intention-editor-choose-tags'),
-    ),
-    _MatrixEntry.addChoice => intentionChoicesAdd,
-    _MatrixEntry.continuePath => _continuePath,
-    _MatrixEntry.selectAction => find.byKey(
-      const ValueKey('choice-path-select-action'),
-    ),
-    _MatrixEntry.selectSource => find.byKey(
-      const ValueKey('choice-path-select-source'),
-    ),
-    _MatrixEntry.confirmPath => find.byKey(
-      const ValueKey('choice-path-open-confirmation'),
     ),
     _MatrixEntry.createRelation => find.byKey(
       const ValueKey('intention-relations-add'),
@@ -105,12 +80,12 @@ void _registerPageMatrixTests() {
     expect(find.byType(AppNavigationBar), findsOneWidget);
     expect(find.byType(DockedFooter), findsNothing);
     await openIntentionChoicesTab(tester, waitFor: _until, tap: _tap);
-    expect(intentionChoicesAdd, findsOneWidget);
-    await _tap(
-      tester,
-      find.byKey(const ValueKey('intention-choices-role-selected')),
+    final selectedRole = find.byKey(
+      const ValueKey('intention-choices-role-selected'),
     );
-    expect(intentionChoicesAdd, findsOneWidget);
+    expect(selectedRole, findsOneWidget);
+    await _tap(tester, selectedRole);
+    expect(selectedRole, findsOneWidget);
     await _tap(tester, find.text('Relations').first);
     await _tap(
       tester,
@@ -447,52 +422,10 @@ void _registerPageMatrixTests() {
       entries: [read, _MatrixEntry.editIntention],
     ),
     (
-      name: 'поиск действия',
-      page: DailyChoiceActionPickerPage,
-      panel: false,
-      entries: [_MatrixEntry.action],
-    ),
-    (
-      name: 'поиск основания',
-      page: DailyChoiceSourcePickerPage,
-      panel: false,
-      entries: [_MatrixEntry.source],
-    ),
-    (
       name: 'создание намерения',
       page: IntentionEditorPage,
       panel: false,
       entries: [_MatrixEntry.creation],
-    ),
-    (
-      name: 'путь от намерения',
-      page: ChoicePathPage,
-      panel: false,
-      entries: [read, _MatrixEntry.addChoice],
-    ),
-    (
-      name: 'подтверждение дневного выбора сверху вниз',
-      page: DailyChoiceCreationPage,
-      panel: false,
-      entries: [
-        read,
-        _MatrixEntry.addChoice,
-        _MatrixEntry.continuePath,
-        _MatrixEntry.selectAction,
-        _MatrixEntry.confirmPath,
-      ],
-    ),
-    (
-      name: 'подтверждение дневного выбора снизу вверх',
-      page: DailyChoiceCreationPage,
-      panel: false,
-      entries: [
-        _MatrixEntry.action,
-        _MatrixEntry.actionCandidate,
-        _MatrixEntry.continuePath,
-        _MatrixEntry.selectSource,
-        _MatrixEntry.confirmPath,
-      ],
     ),
     (
       name: 'поиск участника исходящей группы',
@@ -525,8 +458,6 @@ void _registerPageMatrixTests() {
           _MatrixEntry.intention ||
           _MatrixEntry.creation ||
           _MatrixEntry.condition => AppDestination.intentionGraph,
-          _MatrixEntry.source ||
-          _MatrixEntry.action => AppDestination.dailyChoices,
           _ => null,
         };
         if (root != null) {
@@ -541,28 +472,11 @@ void _registerPageMatrixTests() {
               openedPage: find.byType(IntentionEditorPage),
               wait: _until,
             );
-          case _MatrixEntry.source:
-            await openDailyChoiceQuickCreation(
-              tester,
-              ChoicePathDraftDirection.topDown,
-              openedPage: find.byType(DailyChoiceSourcePickerPage),
-              wait: _until,
-            );
-          case _MatrixEntry.action:
-            await openDailyChoiceQuickCreation(
-              tester,
-              ChoicePathDraftDirection.bottomUp,
-              openedPage: find.byType(DailyChoiceActionPickerPage),
-              wait: _until,
-            );
           default:
             if (entry == _MatrixEntry.createRelation ||
                 entry == _MatrixEntry.outgoingRelations ||
                 entry == _MatrixEntry.incomingRelations) {
               await _tap(tester, find.text('Relations').first);
-            }
-            if (entry == _MatrixEntry.addChoice) {
-              await openIntentionChoicesTab(tester, waitFor: _until, tap: _tap);
             }
             await _tap(tester, entry.finder);
         }
@@ -602,7 +516,5 @@ void _registerPageMatrixTests() {
 Type _pageForCatalogPurpose(IntentionCatalogPurpose purpose) =>
     switch (purpose) {
       BrowseIntentionCatalog() => IntentionCatalogPage,
-      SelectDailyChoiceAction() => DailyChoiceActionPickerPage,
-      SelectDailyChoiceSource() => DailyChoiceSourcePickerPage,
       SelectRelationParticipant() => RelationBatchPickerPage,
     };

@@ -4,22 +4,18 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
-import '../../daily_choice/presentation/daily_choice_creation_launcher.dart';
 import '../../shared/presentation/exclusive_operation.dart';
 import '../routing/app_router.gr.dart';
-import 'quick_creation_daily_choice_start_sheet.dart';
 import 'quick_creation_mode.dart';
 
 /// Общий вход в готовые потоки создания без изменения исходной истории.
 ///
 /// Каждый экземпляр панели владеет своим launcher. Контекст должен принадлежать
 /// текущей обычной странице, для оболочки — выбранной корневой вкладке.
-/// Повторный запуск отклоняется до открытия первой страницы; у дневного выбора
-/// блокировка охватывает лист выбора начала, поиск и открытие пути. Возврат Future
+/// Повторный запуск отклоняется до открытия первой страницы. Возврат Future
 /// означает окончание запуска, а не завершение создания или возврат из формы.
 final class QuickCreationLauncher {
   final _operation = ExclusiveOperation<void>();
-  final _dailyChoice = DailyChoiceCreationLauncher();
 
   Future<void> launch({
     required BuildContext sourceContext,
@@ -40,12 +36,6 @@ final class QuickCreationLauncher {
     switch (mode) {
       case QuickCreationMode.intention:
         await _openFirst(router, IntentionEditorRoute());
-      case QuickCreationMode.dailyChoice:
-        final direction = await showQuickCreationDailyChoiceStartSheet(context);
-        if (direction == null || !context.mounted) return;
-        // Результат листа приходит после pop; верхний маршрут уже обновлён:
-        // https://api.flutter.dev/flutter/widgets/NavigatorObserver/didChangeTop.html
-        await _dailyChoice.launch(sourceContext: context, direction: direction);
     }
   }
 

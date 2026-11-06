@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
-import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
@@ -45,11 +44,6 @@ final class ControlledRelationGraphRepository
   ) => throw UnsupportedError(
     'Чтение состояний дней не используется в этом тесте.',
   );
-
-  @override
-  Future<ChoicePathContinuationResult> getChoicePathContinuations(
-    ChoicePathContinuationQuery query,
-  ) => throw UnimplementedError();
 
   @override
   Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
