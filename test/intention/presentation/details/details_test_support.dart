@@ -135,7 +135,6 @@ final class ControlledDetailsRepository
 
   /// Запросы порций групп связей в порядке их поступления.
   final relationGroupQueries = <RelationGroupQuery>[];
-  final dailyChoiceGroupQueries = <DailyChoiceGroupQuery>[];
 
   /// Запросы порций действий намерения в порядке их поступления.
   final intentionActionsQueries = <IntentionActionsQuery>[];
@@ -179,8 +178,6 @@ final class ControlledDetailsRepository
   /// Ответ на запрос порции группы связей; по умолчанию группа пуста.
   RelationGroupPageResult Function(RelationGroupQuery query)?
   onRelationGroupPage;
-  RelationGroupPageResult Function(DailyChoiceGroupQuery query)?
-  onDailyChoiceGroupPage;
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -205,20 +202,6 @@ final class ControlledDetailsRepository
   Future<RelationGroupPageResult> getRelationGroupPage(
     RelationGroupPageQuery query,
   ) {
-    if (query is DailyChoiceGroupQuery) {
-      dailyChoiceGroupQueries.add(query);
-      return Future.value(
-        onDailyChoiceGroupPage?.call(query) ??
-            GraphResultSuccess(
-              DailyChoiceGroupFirstPage(
-                items: const [],
-                counts: testRelationCounts(),
-                nextCursor: null,
-                revision: const TestDetailsRevision(0),
-              ),
-            ),
-      );
-    }
     final relationQuery = query as RelationGroupQuery;
     relationGroupQueries.add(relationQuery);
     final result = onRelationGroupPage?.call(relationQuery);
@@ -414,8 +397,6 @@ RelationCounts testRelationCounts({
   int archivedNeedOutgoing = 0,
   int archivedCanIncoming = 0,
   int archivedCanOutgoing = 0,
-  int dailySource = 0,
-  int dailySelected = 0,
 }) => RelationCounts(
   activeNeedIncoming: activeNeedIncoming,
   activeNeedOutgoing: activeNeedOutgoing,
@@ -425,8 +406,6 @@ RelationCounts testRelationCounts({
   archivedNeedOutgoing: archivedNeedOutgoing,
   archivedCanIncoming: archivedCanIncoming,
   archivedCanOutgoing: archivedCanOutgoing,
-  dailySource: dailySource,
-  dailySelected: dailySelected,
 );
 
 Future<void> waitForDetailRequests(

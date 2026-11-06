@@ -15,8 +15,8 @@ void main() {
   test('создание публикует целый пакет одной ревизии', () {
     final choice = _choice(_source, _selected);
     final counts = <IntentionId, RelationCounts>{
-      _source: _counts(source: 1),
-      _selected: _counts(selected: 1),
+      _source: _counts(),
+      _selected: _counts(),
     };
     final permissions = <LongTermRelationId, LongTermRelationPermissions>{
       _relation: const LongTermRelationPermissions.referencedByDailyPath(),
@@ -37,8 +37,6 @@ void main() {
     expect(change.after!.id, choice.id);
     expect(change.releasedRelationIds, isEmpty);
     expect(change.occupiedRelationIds, {_relation});
-    expect(change.intentionCounts[_source]!.dailySource, 1);
-    expect(change.intentionCounts[_selected]!.dailySelected, 1);
     expect(change.relationPermissions[_relation]!.canDelete, isFalse);
   });
 
@@ -74,10 +72,7 @@ void main() {
       after: after,
       releasedRelationIds: const [],
       occupiedRelationIds: const [],
-      intentionCounts: {
-        _source: _counts(source: 1),
-        _selected: _counts(selected: 1),
-      },
+      intentionCounts: {_source: _counts(), _selected: _counts()},
       relationPermissions: const {},
     );
 
@@ -96,7 +91,7 @@ void main() {
         after: choice,
         releasedRelationIds: const [],
         occupiedRelationIds: [_relation],
-        intentionCounts: {_source: _counts(source: 1)},
+        intentionCounts: {_source: _counts()},
         relationPermissions: {
           _relation: const LongTermRelationPermissions.unknown(),
         },
@@ -110,10 +105,7 @@ void main() {
         after: choice,
         releasedRelationIds: const [],
         occupiedRelationIds: [_relation],
-        intentionCounts: {
-          _source: _counts(source: 1),
-          _selected: _counts(selected: 1),
-        },
+        intentionCounts: {_source: _counts(), _selected: _counts()},
         relationPermissions: const {},
       ),
       throwsA(
@@ -131,10 +123,7 @@ void main() {
         after: choice,
         releasedRelationIds: const [],
         occupiedRelationIds: [_relation],
-        intentionCounts: {
-          _source: _counts(source: 1),
-          _selected: _counts(selected: 1),
-        },
+        intentionCounts: {_source: _counts(), _selected: _counts()},
         relationPermissions: {
           _relation: const LongTermRelationPermissions.unknown(),
         },
@@ -153,10 +142,7 @@ void main() {
       after: choice,
       releasedRelationIds: const [],
       occupiedRelationIds: [_relation],
-      intentionCounts: {
-        _source: _counts(source: 1),
-        _selected: _counts(selected: 1),
-      },
+      intentionCounts: {_source: _counts(), _selected: _counts()},
       relationPermissions: {
         _relation: const LongTermRelationPermissions.referencedByDailyPath(),
       },
@@ -191,7 +177,7 @@ DailyChoice _choice(IntentionId source, IntentionId selected) => DailyChoice(
   isCompleted: false,
 );
 
-RelationCounts _counts({int source = 0, int selected = 0}) => RelationCounts(
+RelationCounts _counts() => RelationCounts(
   activeNeedIncoming: 0,
   activeNeedOutgoing: 0,
   activeCanIncoming: 0,
@@ -200,8 +186,6 @@ RelationCounts _counts({int source = 0, int selected = 0}) => RelationCounts(
   archivedNeedOutgoing: 0,
   archivedCanIncoming: 0,
   archivedCanOutgoing: 0,
-  dailySource: source,
-  dailySelected: selected,
 );
 
 final class _Outcome implements GraphCommandOutcome {

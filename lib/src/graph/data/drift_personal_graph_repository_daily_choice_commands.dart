@@ -134,12 +134,8 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
         final selectedBefore = countsBefore[command.selectedIntentionId]!;
         final sourceAfter = affectedCounts[command.sourceIntentionId]!;
         final selectedAfter = affectedCounts[command.selectedIntentionId]!;
-        if (sourceAfter.dailySource != sourceBefore.dailySource + 1 ||
-            sourceAfter.dailySelected != sourceBefore.dailySelected ||
-            selectedAfter.dailySelected != selectedBefore.dailySelected + 1 ||
-            selectedAfter.dailySource != selectedBefore.dailySource ||
-            sourceAfter.longTermTotal != sourceBefore.longTermTotal ||
-            selectedAfter.longTermTotal != selectedBefore.longTermTotal) {
+        if (sourceAfter.total != sourceBefore.total ||
+            selectedAfter.total != selectedBefore.total) {
           throw const StoredGraphCorruption();
         }
         final relationIds = command.path.steps
@@ -416,13 +412,7 @@ extension _DailyChoiceCommandExecution on DriftPersonalGraphRepository {
         for (final id in participants) {
           final previous = countsBefore[id]!;
           final current = counts[id]!;
-          if (current.dailySource !=
-                  previous.dailySource -
-                      (id == before.sourceIntentionId ? 1 : 0) ||
-              current.dailySelected !=
-                  previous.dailySelected -
-                      (id == before.selectedIntentionId ? 1 : 0) ||
-              current.longTermTotal != previous.longTermTotal) {
+          if (current.total != previous.total) {
             throw const StoredGraphCorruption();
           }
         }

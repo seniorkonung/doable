@@ -139,8 +139,6 @@ void main() {
     expect(change.after, isNull);
     expect(change.releasedRelationIds, {_relation(101), _relation(102)});
     expect(change.occupiedRelationIds, isEmpty);
-    expect(change.intentionCounts[_intention(1)]!.dailySource, 0);
-    expect(change.intentionCounts[_intention(3)]!.dailySelected, 0);
     expect(change.relationPermissions[_relation(101)]!.canDelete, isTrue);
     expect(change.relationPermissions[_relation(102)]!.canDelete, isTrue);
     expect((await read(id)).value, isNull);
@@ -171,8 +169,6 @@ void main() {
                 .single
             as DailyChoiceChange;
     expect((await read(retained)).value!.path, hasLength(2));
-    expect(change.intentionCounts[_intention(1)]!.dailySource, 1);
-    expect(change.intentionCounts[_intention(3)]!.dailySelected, 1);
     expect(change.relationPermissions[_relation(101)]!.canDelete, isFalse);
     expect(change.relationPermissions[_relation(102)]!.canDelete, isFalse);
     expect(raw.select('SELECT * FROM daily_choice_path_steps'), hasLength(2));

@@ -575,14 +575,6 @@
   "@detailsOptionDeleteRelationsFirst": {
     "description": "Причина выключенного удаления намерения с долговременными связями"
   },
-  "detailsOptionDeleteDailyChoicesFirst": "Delete its daily choices first",
-  "@detailsOptionDeleteDailyChoicesFirst": {
-    "description": "Причина выключенного удаления намерения с дневными выборами"
-  },
-  "detailsOptionDeleteRelationsAndDailyChoicesFirst": "Delete its relations and daily choices first",
-  "@detailsOptionDeleteRelationsAndDailyChoicesFirst": {
-    "description": "Причина выключенного удаления намерения со связями и дневными выборами"
-  },
   "detailsOptionWait": "Wait for the current change to finish",
   "@detailsOptionWait": {
     "description": "Причина недоступности пунктов параметров во время изменяющей операции"

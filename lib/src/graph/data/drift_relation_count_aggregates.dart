@@ -40,7 +40,7 @@ final class DriftRelationCountAggregates {
             for (final serialized in requested.keys)
               Variable<String>(serialized),
           ],
-          readsFrom: {_database.longTermRelations, _database.dailyChoices},
+          readsFrom: {_database.longTermRelations},
         )
         .get();
     final bySerializedId = <String, RelationCountAggregate>{
@@ -55,8 +55,6 @@ final class DriftRelationCountAggregates {
             archivedNeedOutgoing: row.read<int>('archived_need_outgoing'),
             archivedCanIncoming: row.read<int>('archived_can_incoming'),
             archivedCanOutgoing: row.read<int>('archived_can_outgoing'),
-            dailySource: row.read<int>('daily_source'),
-            dailySelected: row.read<int>('daily_selected'),
           ),
           hasIntegrityViolation: row.read<int>('has_integrity_violation') != 0,
         ),
@@ -185,22 +183,6 @@ String _aggregateSql(String requestedValues) =>
       MAX(integrity_violation) AS has_integrity_violation
     FROM neighboring
     GROUP BY owner_id
-  ),
-  daily_sources AS (
-    SELECT requested.owner_id, COUNT(*) AS daily_source
-    FROM requested
-    JOIN daily_choices AS choice
-      INDEXED BY daily_choices_source_date_creation_order
-      ON choice.source_intention_id = requested.owner_id
-    GROUP BY requested.owner_id
-  ),
-  daily_selected AS (
-    SELECT requested.owner_id, COUNT(*) AS daily_selected
-    FROM requested
-    JOIN daily_choices AS choice
-      INDEXED BY daily_choices_selected_date_creation_order
-      ON choice.selected_intention_id = requested.owner_id
-    GROUP BY requested.owner_id
   )
   SELECT
     requested.owner_id AS owner_id,
@@ -212,14 +194,10 @@ String _aggregateSql(String requestedValues) =>
     COALESCE(aggregated.archived_need_outgoing, 0) AS archived_need_outgoing,
     COALESCE(aggregated.archived_can_incoming, 0) AS archived_can_incoming,
     COALESCE(aggregated.archived_can_outgoing, 0) AS archived_can_outgoing,
-    COALESCE(daily_sources.daily_source, 0) AS daily_source,
-    COALESCE(daily_selected.daily_selected, 0) AS daily_selected,
     COALESCE(aggregated.has_integrity_violation, 0)
       AS has_integrity_violation
   FROM requested
   LEFT JOIN aggregated USING (owner_id)
-  LEFT JOIN daily_sources USING (owner_id)
-  LEFT JOIN daily_selected USING (owner_id)
   ORDER BY requested.owner_id
 ''';
 

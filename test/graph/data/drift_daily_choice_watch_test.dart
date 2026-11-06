@@ -12,8 +12,6 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
-import 'package:doable/src/intention/application/intention_details.dart';
-import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
@@ -237,59 +235,6 @@ void main() {
     await waitFor(3);
     expect(events.last.value!.path.last.relation.scope, RelationScope.archived);
     await subscription.cancel().timeout(const Duration(seconds: 2));
-  });
-
-  test('согласует счётчики прежнего и нового действия при удалении выбора и '
-      'создании нового', () async {
-    final oldAction = StreamIterator(repository.watchIntention(_intention(3)));
-    final newAction = StreamIterator(repository.watchIntention(_intention(4)));
-    addTearDown(oldAction.cancel);
-    addTearDown(newAction.cancel);
-    expect(await oldAction.moveNext(), isTrue);
-    expect(await newAction.moveNext(), isTrue);
-
-    GraphSnapshot<IntentionDetails?> snapshot(
-      Result<GraphSnapshot<IntentionDetails?>> result,
-    ) => (result as ResultSuccess<GraphSnapshot<IntentionDetails?>>).value;
-
-    final beforeOld = snapshot(oldAction.current);
-    final beforeNew = snapshot(newAction.current);
-    expect(beforeOld.value!.relationCounts.dailySelected, 0);
-    expect(beforeNew.value!.relationCounts.dailySelected, 0);
-
-    await create();
-    expect(await oldAction.moveNext(), isTrue);
-    final occupied = snapshot(oldAction.current);
-    expect(occupied.value!.relationCounts.dailySelected, 1);
-    expect(
-      occupied.revision.compareTo(beforeOld.revision),
-      GraphRevisionOrder.newer,
-    );
-
-    expect(
-      await repository.execute(DeleteDailyChoice(_choice(201))),
-      isA<GraphCommandSucceeded>(),
-    );
-    expect(await oldAction.moveNext(), isTrue);
-    final released = snapshot(oldAction.current);
-    expect(released.value!.relationCounts.dailySelected, 0);
-
-    expect(
-      await repository.execute(
-        CreateDailyChoice(
-          sourceIntentionId: _intention(1),
-          selectedIntentionId: _intention(4),
-          path: path([(103, 1, 4)]),
-          date: CalendarDate.fromParts(2026, 9, 23),
-          description: null,
-          isCompleted: false,
-        ),
-      ),
-      isA<GraphCommandSucceeded>(),
-    );
-    expect(await newAction.moveNext(), isTrue);
-    final selected = snapshot(newAction.current);
-    expect(selected.value!.relationCounts.dailySelected, 1);
   });
 
   test('поздний снимок помечен прежней ревизией перед удалением', () async {

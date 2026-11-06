@@ -159,19 +159,6 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
       'isContinuation': isContinuation,
       'requiresNewSnapshot': requiresNewSnapshot,
     },
-  DailyChoiceGroupPageReadDiagnosticsEvent(
-    :final pageSize,
-    :final isContinuation,
-    :final requiresNewSnapshot,
-  ) =>
-    {
-      'operation': 'dailyChoiceGroupPageRead',
-      'stage': 'read',
-      ..._encodeStatus(event.status),
-      'pageSize': pageSize,
-      'isContinuation': isContinuation,
-      'requiresNewSnapshot': requiresNewSnapshot,
-    },
   LongTermRelationDetailReadDiagnosticsEvent() => {
     'operation': 'longTermRelationDetailRead',
     ..._encodeStatus(event.status),

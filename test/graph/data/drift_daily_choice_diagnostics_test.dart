@@ -6,7 +6,6 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
-import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -36,43 +35,25 @@ void main() {
   tearDown(() => database.close());
 
   test(
-    'ошибки новых чтений сохраняют категорию без исходного исключения',
+    'ошибка нового чтения сохраняет категорию без исходного исключения',
     () async {
       expect(
         await repository.execute(durabilityCreate()),
         isA<GraphCommandSucceeded>(),
       );
 
-      for (final point in [
-        _FailurePoint.catalogRead,
-        _FailurePoint.groupRead,
-      ]) {
-        diagnostics.events.clear();
-        diagnostics.logs.clear();
-        probe.arm(point);
+      diagnostics.events.clear();
+      diagnostics.logs.clear();
+      probe.arm();
 
-        final category = switch (point) {
-          _FailurePoint.catalogRead =>
-            (await repository.getDailyChoiceCatalogPage(
-              DailyChoiceCatalogQuery(
-                date: durabilityChoiceDate,
-                isCompleted: true,
-              ),
-            ) as DailyChoiceCatalogPageError).failure.category,
-          _FailurePoint.groupRead => (await repository.getRelationGroupPage(
-            DailyChoiceGroupQuery(
-              intentionId: durabilityIntention(1),
-              role: DailyChoiceRelationRole.source,
-              pageSize: 50,
-            ),
-          ) as RelationGroupPageFailure).failure.category,
-        };
+      final category = (await repository.getDailyChoiceCatalogPage(
+        DailyChoiceCatalogQuery(date: durabilityChoiceDate, isCompleted: true),
+      ) as DailyChoiceCatalogPageError).failure.category;
 
-        expect(probe.didFail, isTrue);
-        expect(category, GraphFailureCategory.unexpected);
-        expect(_loggedFailureCodes(diagnostics.logs), ['unexpected']);
-        _expectSafeLogs(diagnostics.logs);
-      }
+      expect(probe.didFail, isTrue);
+      expect(category, GraphFailureCategory.unexpected);
+      expect(_loggedFailureCodes(diagnostics.logs), ['unexpected']);
+      _expectSafeLogs(diagnostics.logs);
     },
   );
 
@@ -189,14 +170,12 @@ final class _RecordingSink implements DiagnosticsSink {
   }
 }
 
-enum _FailurePoint { catalogRead, groupRead }
-
 final class _FailureProbe extends LocalDatabaseConnectionObserver {
-  _FailurePoint? _point;
+  bool _isArmed = false;
   bool didFail = false;
 
-  void arm(_FailurePoint point) {
-    _point = point;
+  void arm() {
+    _isArmed = true;
     didFail = false;
   }
 
@@ -206,13 +185,10 @@ final class _FailureProbe extends LocalDatabaseConnectionObserver {
       return;
     }
     final sql = statement.statements.single;
-    final targeted = switch (_point) {
-      _FailurePoint.catalogRead =>
+    final targeted =
+        _isArmed &&
         sql.contains('FROM daily_choices') &&
-            sql.contains('ORDER BY COALESCE(scheduled_minute, -1)'),
-      _FailurePoint.groupRead => sql.contains('FROM daily_choices INDEXED BY'),
-      null => false,
-    };
+        sql.contains('ORDER BY COALESCE(scheduled_minute, -1)');
     if (targeted) {
       didFail = true;
       throw StateError('Управляемый отказ: Секретный текст SQL.');

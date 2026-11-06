@@ -1346,18 +1346,6 @@ abstract class AppLocalizations {
   /// **'Delete its relations first'**
   String get detailsOptionDeleteRelationsFirst;
 
-  /// Причина выключенного удаления намерения с дневными выборами
-  ///
-  /// In en, this message translates to:
-  /// **'Delete its daily choices first'**
-  String get detailsOptionDeleteDailyChoicesFirst;
-
-  /// Причина выключенного удаления намерения со связями и дневными выборами
-  ///
-  /// In en, this message translates to:
-  /// **'Delete its relations and daily choices first'**
-  String get detailsOptionDeleteRelationsAndDailyChoicesFirst;
-
   /// Причина недоступности пунктов параметров во время изменяющей операции
   ///
   /// In en, this message translates to:

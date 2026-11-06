@@ -12,8 +12,6 @@ enum RelationCountGroup {
   archivedNeedOutgoing,
   archivedCanIncoming,
   archivedCanOutgoing,
-  dailySource,
-  dailySelected,
 }
 
 final class RelationCountsValidationException implements Exception {
@@ -36,8 +34,6 @@ final class RelationCounts {
     required int archivedNeedOutgoing,
     required int archivedCanIncoming,
     required int archivedCanOutgoing,
-    int dailySource = 0,
-    int dailySelected = 0,
   }) => RelationCounts._(
     activeNeedIncoming: _requireNonNegative(
       activeNeedIncoming,
@@ -71,14 +67,6 @@ final class RelationCounts {
       archivedCanOutgoing,
       RelationCountGroup.archivedCanOutgoing,
     ),
-    dailySource: _requireNonNegative(
-      dailySource,
-      RelationCountGroup.dailySource,
-    ),
-    dailySelected: _requireNonNegative(
-      dailySelected,
-      RelationCountGroup.dailySelected,
-    ),
   );
 
   const RelationCounts._({
@@ -90,8 +78,6 @@ final class RelationCounts {
     required this.archivedNeedOutgoing,
     required this.archivedCanIncoming,
     required this.archivedCanOutgoing,
-    required this.dailySource,
-    required this.dailySelected,
   });
 
   final int activeNeedIncoming;
@@ -102,8 +88,6 @@ final class RelationCounts {
   final int archivedNeedOutgoing;
   final int archivedCanIncoming;
   final int archivedCanOutgoing;
-  final int dailySource;
-  final int dailySelected;
 
   int get activeNeed =>
       _forType(scope: RelationScope.active, type: LongTermRelationType.need);
@@ -121,19 +105,11 @@ final class RelationCounts {
 
   int get archived => archivedNeed + archivedCan;
 
-  int get dailyTotal => dailySource + dailySelected;
-
-  int get longTermTotal => active + archived;
-
-  int get total => longTermTotal + dailyTotal;
+  int get total => active + archived;
 
   int forSelection(RelationGroup group) => switch (group) {
     LongTermRelationGroup(:final scope, :final type, :final direction) =>
       forGroup(scope: scope, type: type, direction: direction),
-    DailyChoiceRelationGroup(role: DailyChoiceRelationRole.source) =>
-      dailySource,
-    DailyChoiceRelationGroup(role: DailyChoiceRelationRole.selected) =>
-      dailySelected,
   };
 
   int forGroup({
@@ -222,9 +198,7 @@ final class RelationCounts {
       other.archivedNeedIncoming == archivedNeedIncoming &&
       other.archivedNeedOutgoing == archivedNeedOutgoing &&
       other.archivedCanIncoming == archivedCanIncoming &&
-      other.archivedCanOutgoing == archivedCanOutgoing &&
-      other.dailySource == dailySource &&
-      other.dailySelected == dailySelected;
+      other.archivedCanOutgoing == archivedCanOutgoing;
 
   @override
   int get hashCode => Object.hash(
@@ -236,8 +210,6 @@ final class RelationCounts {
     archivedNeedOutgoing,
     archivedCanIncoming,
     archivedCanOutgoing,
-    dailySource,
-    dailySelected,
   );
 }
 

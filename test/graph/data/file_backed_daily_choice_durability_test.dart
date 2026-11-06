@@ -4,10 +4,6 @@ import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
-import 'package:doable/src/graph/application/graph_revision.dart';
-import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
-import 'package:doable/src/intention/application/intention_details.dart';
-import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -99,7 +95,6 @@ void main() {
           .canDelete,
       isFalse,
     );
-    expect(await _sourceChoiceCount(repository), 2);
     await _expectIntegrity(database);
 
     for (final (command, expectedSchedule, expectedPriority) in [
@@ -194,13 +189,4 @@ Future<void> _expectIntegrity(AppDatabase database) async {
     ),
     1,
   );
-}
-
-Future<int> _sourceChoiceCount(DriftPersonalGraphRepository repository) async {
-  final result = await repository.watchIntention(durabilityIntention(1)).first;
-  return (result as ResultSuccess<GraphSnapshot<IntentionDetails?>>)
-      .value
-      .value!
-      .relationCounts
-      .dailySource;
 }

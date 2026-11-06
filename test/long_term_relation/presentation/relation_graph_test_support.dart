@@ -97,14 +97,12 @@ final class ControlledRelationGraphRepository
     final rows = switch (page) {
       RelationGroupFirstPage(:final items) ||
       RelationGroupContinuationPage(:final items) => items,
-      DailyChoiceGroupFirstPage() ||
-      DailyChoiceGroupContinuationPage() => <RelationGroupEntry>[],
     };
     final ownerId = pageQueries[index].intentionId;
     for (final row in rows) {
       _relationRows[row.relation.id] = (ownerId, row);
     }
-    if (page is RelationGroupFirstPage || page is DailyChoiceGroupFirstPage) {
+    if (page is RelationGroupFirstPage) {
       _latestRevision = page.revision;
     }
     complete(index, GraphResultSuccess(page));
@@ -471,8 +469,6 @@ RelationCounts testRelationCounts({
   int archivedNeedOutgoing = 0,
   int archivedCanIncoming = 0,
   int archivedCanOutgoing = 0,
-  int dailySource = 0,
-  int dailySelected = 0,
 }) => RelationCounts(
   activeNeedIncoming: activeNeedIncoming,
   activeNeedOutgoing: activeNeedOutgoing,
@@ -482,8 +478,6 @@ RelationCounts testRelationCounts({
   archivedNeedOutgoing: archivedNeedOutgoing,
   archivedCanIncoming: archivedCanIncoming,
   archivedCanOutgoing: archivedCanOutgoing,
-  dailySource: dailySource,
-  dailySelected: dailySelected,
 );
 
 /// Сводка, в которой заполнена только выбранная группа.

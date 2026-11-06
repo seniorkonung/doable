@@ -868,14 +868,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get detailsOptionDeleteRelationsFirst => 'Сначала удалите его связи';
 
   @override
-  String get detailsOptionDeleteDailyChoicesFirst =>
-      'Сначала удалите его дневные выборы';
-
-  @override
-  String get detailsOptionDeleteRelationsAndDailyChoicesFirst =>
-      'Сначала удалите его связи и дневные выборы';
-
-  @override
   String get detailsOptionWait => 'Дождитесь окончания текущего изменения';
 
   @override

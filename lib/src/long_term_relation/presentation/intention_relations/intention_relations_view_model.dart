@@ -304,9 +304,6 @@ final class IntentionRelationsViewModel extends _$IntentionRelationsViewModel {
                 nextCursor: page.nextCursor,
               ),
             ),
-          GraphResultSuccess() => const GraphResultFailure(
-            RelationGroupUnexpectedFailure(),
-          ),
           GraphResultFailure(:final failure) => GraphResultFailure(failure),
         },
   );

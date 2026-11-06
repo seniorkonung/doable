@@ -12,8 +12,8 @@ enum IntentionOption { edit, archive, restore, delete }
 ///
 /// Пока для намерения выполняется изменяющая операция, все пункты
 /// недоступны и просят дождаться её окончания. Исключение — удаление,
-/// которое блокируют связи или дневные выборы: окончание операции его не
-/// откроет, поэтому оно сохраняет свою причину.
+/// которое блокируют связи: окончание операции его не откроет, поэтому оно
+/// сохраняет свою причину.
 List<OptionsMenuItem<IntentionOption>> intentionOptions(
   AppLocalizations localizations,
   IntentionDetailsLoaded loaded,
@@ -42,7 +42,7 @@ List<OptionsMenuItem<IntentionOption>> intentionOptions(
           IntentionOption.restore,
           DoableIconData.unarchive,
           localizations.detailsRestoreFromArchiveAction,
-          counts.longTermTotal > 0
+          counts.total > 0
               ? localizations.detailsOptionRestoreWithRelations
               : localizations.detailsOptionRestoreAlone,
         )
@@ -67,16 +67,11 @@ List<OptionsMenuItem<IntentionOption>> intentionOptions(
           hint: stateHint,
         );
 
-  final blockedReason = switch ((
-    counts.longTermTotal > 0,
-    counts.dailyTotal > 0,
-  )) {
-    (true, true) =>
-      localizations.detailsOptionDeleteRelationsAndDailyChoicesFirst,
-    (true, false) => localizations.detailsOptionDeleteRelationsFirst,
-    (false, true) => localizations.detailsOptionDeleteDailyChoicesFirst,
-    (false, false) => busy ? wait : null,
-  };
+  final blockedReason = counts.total > 0
+      ? localizations.detailsOptionDeleteRelationsFirst
+      : busy
+      ? wait
+      : null;
   final delete = blockedReason == null
       ? OptionsMenuItem(
           value: IntentionOption.delete,

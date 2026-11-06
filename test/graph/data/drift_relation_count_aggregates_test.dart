@@ -202,11 +202,6 @@ void main() {
         _id(middle),
         _id(selected),
       ]);
-      expect(counts[_id(source)]!.counts.dailySource, 3);
-      expect(counts[_id(source)]!.counts.dailySelected, 0);
-      expect(counts[_id(middle)]!.counts.dailyTotal, 0);
-      expect(counts[_id(selected)]!.counts.dailySource, 0);
-      expect(counts[_id(selected)]!.counts.dailySelected, 3);
       expect(counts[_id(middle)]!.counts.total, 2);
 
       final permissions = await aggregates.readPermissions([

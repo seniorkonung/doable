@@ -863,14 +863,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailsOptionDeleteRelationsFirst => 'Delete its relations first';
 
   @override
-  String get detailsOptionDeleteDailyChoicesFirst =>
-      'Delete its daily choices first';
-
-  @override
-  String get detailsOptionDeleteRelationsAndDailyChoicesFirst =>
-      'Delete its relations and daily choices first';
-
-  @override
   String get detailsOptionWait => 'Wait for the current change to finish';
 
   @override

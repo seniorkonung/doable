@@ -169,8 +169,6 @@ void main() {
       change.revision.compareTo(confirmed.revision),
       GraphRevisionOrder.same,
     );
-    expect(change.intentionCounts[_intention(1)]!.dailySource, 1);
-    expect(change.intentionCounts[_intention(3)]!.dailySelected, 1);
     expect(change.relationPermissions[_relation(101)]!.canDelete, isFalse);
     expect(
       (before as DailyChoiceReadSuccess).value.revision.compareTo(

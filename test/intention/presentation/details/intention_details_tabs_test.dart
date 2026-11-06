@@ -164,7 +164,6 @@ void main() {
           activeNeedIncoming: 2,
           activeCanOutgoing: 3,
           archivedCanIncoming: 3,
-          dailySource: 7,
         ),
       );
       await tester.pumpAndSettle();

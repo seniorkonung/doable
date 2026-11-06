@@ -312,29 +312,6 @@ void main() {
     expectAssignments();
   });
 
-  test('удаление намерения повторно учитывает прямую дневную ссылку', () async {
-    seedRawGraph(raw, () {
-      raw.execute(
-        '''INSERT INTO daily_choices
-         (id, source_intention_id, selected_intention_id, choice_date, is_completed)
-         VALUES (?, ?, ?, '2026-09-23', 0)''',
-        [_uuid(201), _uuid(1), _uuid(3)],
-      );
-      raw.execute('DELETE FROM long_term_relations');
-    });
-
-    final result = await repository.execute(DeleteIntention(_intention(1)));
-
-    expect(result, isA<GraphCommandFailed>());
-    expect(
-      (result as GraphCommandFailed).failure,
-      isA<IntentionHasBlockingRelationsFailure>(),
-    );
-    expect(count('intentions'), 5);
-    expect(count('daily_choices'), 1);
-    expectAssignments();
-  });
-
   test('удаление выбора, создание нового и удаление дубликата снимают только '
       'последние ссылки', () async {
     addChoice(201);

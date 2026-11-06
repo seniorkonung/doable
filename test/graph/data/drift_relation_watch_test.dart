@@ -10,11 +10,9 @@ import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
-import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
@@ -155,25 +153,6 @@ void main() {
       LongTermRelationPermissionRestriction.referencedByDailyPath,
     );
     expect(snapshot.value!.permissions.canDelete, isFalse);
-
-    final sourceDetails = await repository.watchIntention(sourceId).first;
-    final selectedDetails = await repository.watchIntention(relatedId).first;
-    expect(
-      (sourceDetails as ResultSuccess<GraphSnapshot<IntentionDetails?>>)
-          .value
-          .value!
-          .relationCounts
-          .dailySource,
-      1,
-    );
-    expect(
-      (selectedDetails as ResultSuccess<GraphSnapshot<IntentionDetails?>>)
-          .value
-          .value!
-          .relationCounts
-          .dailySelected,
-      1,
-    );
 
     final updatedResult = await repository.execute(
       UpdateLongTermRelation(

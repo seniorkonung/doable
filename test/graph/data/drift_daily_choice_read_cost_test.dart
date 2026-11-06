@@ -12,7 +12,6 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
@@ -479,170 +478,87 @@ void main() {
     },
   );
 
-  test('каталог и дневная группа читают только выбранные порции и пересобирают загруженную часть', () async {
-    const firstPageSteps = _pathLength + _pageSize - 1;
-    final first =
-        (await fixture.repository.getDailyChoiceCatalogPage(
-              DailyChoiceCatalogQuery(
-                date: CalendarDate.fromParts(2026, 9, 24),
-                isCompleted: false,
-                pageSize: _pageSize,
-              ),
-            ) as DailyChoiceCatalogPageSuccess).value
-            as DailyChoiceCatalogFirstPage;
-    expect(first.totalCount, _catalogChoices + _otherGroupChoices);
-    expect(first.items.first.id, durabilityChoice(10400));
-    _expectBoundedPage(
-      fixture.trace,
-      pageSteps: firstPageSteps,
-      pageSize: _pageSize,
-    );
-
-    fixture.trace.clear();
-    final second = (await fixture.repository.getDailyChoiceCatalogPage(
-      DailyChoiceCatalogQuery(
-        date: CalendarDate.fromParts(2026, 9, 24),
-        isCompleted: false,
+  test(
+    'каталог читает только выбранные порции и пересобирает загруженную часть',
+    () async {
+      const firstPageSteps = _pathLength + _pageSize - 1;
+      final first =
+          (await fixture.repository.getDailyChoiceCatalogPage(
+                DailyChoiceCatalogQuery(
+                  date: CalendarDate.fromParts(2026, 9, 24),
+                  isCompleted: false,
+                  pageSize: _pageSize,
+                ),
+              ) as DailyChoiceCatalogPageSuccess).value
+              as DailyChoiceCatalogFirstPage;
+      expect(first.totalCount, _catalogChoices + _otherGroupChoices);
+      expect(first.items.first.id, durabilityChoice(10400));
+      _expectBoundedPage(
+        fixture.trace,
+        pageSteps: firstPageSteps,
         pageSize: _pageSize,
-        cursor: first.nextCursor,
-      ),
-    ) as DailyChoiceCatalogPageSuccess).value;
-    expect(second.items, hasLength(_pageSize));
-    _expectBoundedPage(
-      fixture.trace,
-      pageSteps: _pageSize,
-      pageSize: _pageSize,
-    );
+      );
 
-    fixture.trace.clear();
-    final source =
-        (await fixture.repository.getRelationGroupPage(
-              DailyChoiceGroupQuery(
-                intentionId: _intention(1),
-                role: DailyChoiceRelationRole.source,
-                pageSize: _pageSize,
-              ),
-            ) as RelationGroupPageSuccess).value
-            as DailyChoiceGroupFirstPage;
-    expect(source.counts.dailySource, _catalogChoices);
-    expect(source.counts.dailySelected, 0);
-    _expectBoundedPage(
-      fixture.trace,
-      pageSteps: firstPageSteps,
-      pageSize: _pageSize,
-    );
-
-    fixture.trace.clear();
-    final selected =
-        (await fixture.repository.getRelationGroupPage(
-              DailyChoiceGroupQuery(
-                intentionId: _intention(201),
-                role: DailyChoiceRelationRole.selected,
-                pageSize: _pageSize,
-              ),
-            ) as RelationGroupPageSuccess).value
-            as DailyChoiceGroupFirstPage;
-    expect(selected.counts.dailySelected, _otherGroupChoices);
-    _expectBoundedPage(
-      fixture.trace,
-      pageSteps: _pageSize,
-      pageSize: _pageSize,
-    );
-
-    fixture.trace.clear();
-    final sourceNext = (await fixture.repository.getRelationGroupPage(
-      DailyChoiceGroupQuery(
-        intentionId: _intention(1),
-        role: DailyChoiceRelationRole.source,
+      fixture.trace.clear();
+      final second = (await fixture.repository.getDailyChoiceCatalogPage(
+        DailyChoiceCatalogQuery(
+          date: CalendarDate.fromParts(2026, 9, 24),
+          isCompleted: false,
+          pageSize: _pageSize,
+          cursor: first.nextCursor,
+        ),
+      ) as DailyChoiceCatalogPageSuccess).value;
+      expect(second.items, hasLength(_pageSize));
+      _expectBoundedPage(
+        fixture.trace,
+        pageSteps: _pageSize,
         pageSize: _pageSize,
-        cursor: source.nextCursor,
-      ),
-    ) as RelationGroupPageSuccess).value;
-    expect(sourceNext, isA<DailyChoiceGroupContinuationPage>());
-    _expectBoundedPage(
-      fixture.trace,
-      pageSteps: _pageSize,
-      pageSize: _pageSize,
-    );
+      );
 
-    expect(
-      await fixture.repository.execute(
-        UpdateDailyChoiceFields(
-          choiceId: durabilityChoice(10399),
-          patch: DailyChoiceFieldsPatch(
-            date: DailyChoiceFieldSet(CalendarDate.fromParts(2027, 1, 1)),
+      expect(
+        await fixture.repository.execute(
+          UpdateDailyChoiceFields(
+            choiceId: durabilityChoice(10399),
+            patch: DailyChoiceFieldsPatch(
+              date: DailyChoiceFieldSet(CalendarDate.fromParts(2027, 1, 1)),
+            ),
           ),
         ),
-      ),
-      isA<GraphCommandSucceeded>(),
-    );
-    fixture.trace.clear();
-    final rebuilt =
-        (await fixture.repository.getDailyChoiceCatalogPage(
-              DailyChoiceCatalogQuery(
-                date: CalendarDate.fromParts(2026, 9, 24),
-                isCompleted: false,
-                pageSize: _pageSize,
-              ),
-            ) as DailyChoiceCatalogPageSuccess).value
-            as DailyChoiceCatalogFirstPage;
-    expect(rebuilt.items.first.id, durabilityChoice(10400));
-    _expectBoundedPage(
-      fixture.trace,
-      pageSteps: firstPageSteps,
-      pageSize: _pageSize,
-    );
-    fixture.trace.clear();
-    final rebuiltNext = (await fixture.repository.getDailyChoiceCatalogPage(
-      DailyChoiceCatalogQuery(
-        date: CalendarDate.fromParts(2026, 9, 24),
-        isCompleted: false,
-        pageSize: _pageSize,
-        cursor: rebuilt.nextCursor,
-      ),
-    ) as DailyChoiceCatalogPageSuccess).value;
-    expect(rebuiltNext.items, hasLength(_pageSize));
-    _expectBoundedPage(
-      fixture.trace,
-      pageSteps: _pageSize,
-      pageSize: _pageSize,
-    );
-    fixture.trace.clear();
-    final rebuiltGroup =
-        (await fixture.repository.getRelationGroupPage(
-              DailyChoiceGroupQuery(
-                intentionId: _intention(1),
-                role: DailyChoiceRelationRole.source,
-                pageSize: _pageSize,
-              ),
-            ) as RelationGroupPageSuccess).value
-            as DailyChoiceGroupFirstPage;
-    expect(rebuiltGroup.items.first.id, durabilityChoice(10399));
-    _expectBoundedPage(
-      fixture.trace,
-      pageSteps: firstPageSteps,
-      pageSize: _pageSize,
-    );
-    fixture.trace.clear();
-    expect(
-      ((await fixture.repository.getRelationGroupPage(
-                DailyChoiceGroupQuery(
-                  intentionId: _intention(1),
-                  role: DailyChoiceRelationRole.source,
+        isA<GraphCommandSucceeded>(),
+      );
+      fixture.trace.clear();
+      final rebuilt =
+          (await fixture.repository.getDailyChoiceCatalogPage(
+                DailyChoiceCatalogQuery(
+                  date: CalendarDate.fromParts(2026, 9, 24),
+                  isCompleted: false,
                   pageSize: _pageSize,
-                  cursor: rebuiltGroup.nextCursor,
                 ),
-              ) as RelationGroupPageSuccess).value
-              as DailyChoiceGroupContinuationPage)
-          .items,
-      hasLength(_pageSize),
-    );
-    _expectBoundedPage(
-      fixture.trace,
-      pageSteps: _pageSize,
-      pageSize: _pageSize,
-    );
-  });
+              ) as DailyChoiceCatalogPageSuccess).value
+              as DailyChoiceCatalogFirstPage;
+      expect(rebuilt.items.first.id, durabilityChoice(10400));
+      _expectBoundedPage(
+        fixture.trace,
+        pageSteps: firstPageSteps,
+        pageSize: _pageSize,
+      );
+      fixture.trace.clear();
+      final rebuiltNext = (await fixture.repository.getDailyChoiceCatalogPage(
+        DailyChoiceCatalogQuery(
+          date: CalendarDate.fromParts(2026, 9, 24),
+          isCompleted: false,
+          pageSize: _pageSize,
+          cursor: rebuilt.nextCursor,
+        ),
+      ) as DailyChoiceCatalogPageSuccess).value;
+      expect(rebuiltNext.items, hasLength(_pageSize));
+      _expectBoundedPage(
+        fixture.trace,
+        pageSteps: _pageSize,
+        pageSize: _pageSize,
+      );
+    },
+  );
 
   test('каталог одного дня читает только этот день порциями по 50', () async {
     // Сотни записей соседних дней созданы после записей выбранного дня.

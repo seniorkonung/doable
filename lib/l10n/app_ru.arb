@@ -287,8 +287,6 @@
   "detailsOptionRestoreAlone": "Новые пути снова смогут его использовать",
   "detailsOptionDeleteKeepsTags": "Его теги сохранятся",
   "detailsOptionDeleteRelationsFirst": "Сначала удалите его связи",
-  "detailsOptionDeleteDailyChoicesFirst": "Сначала удалите его дневные выборы",
-  "detailsOptionDeleteRelationsAndDailyChoicesFirst": "Сначала удалите его связи и дневные выборы",
   "detailsOptionWait": "Дождитесь окончания текущего изменения",
   "detailsDeleteDialogTitle": "Удалить намерение?",
   "detailsDeleteDialogTextBefore": "Намерение ",
