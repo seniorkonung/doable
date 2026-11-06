@@ -7,9 +7,11 @@ import 'dart:typed_data';
 import '../../action/application/action_command.dart';
 import '../../action/application/action_day.dart';
 import '../../action/application/action_day_statuses.dart';
+import '../../action/application/action_details.dart';
 import '../../action/application/action_result.dart';
 import '../../action/domain/action.dart';
 import '../../action/domain/action_id.dart';
+import '../../action/domain/action_path.dart';
 import '../../action/domain/action_schedule.dart';
 import '../../data/local/app_database.dart' as local;
 import '../../data/local/fts_query.dart';
@@ -112,6 +114,7 @@ part 'drift_personal_graph_repository_daily_choice_commands.dart';
 part 'drift_personal_graph_repository_action_commands.dart';
 part 'drift_personal_graph_repository_action_day.dart';
 part 'drift_personal_graph_repository_action_day_statuses.dart';
+part 'drift_personal_graph_repository_action_reads.dart';
 part 'drift_personal_graph_repository_relation_commands.dart';
 part 'drift_personal_graph_repository_relation_details.dart';
 part 'drift_personal_graph_repository_relation_groups.dart';
@@ -172,6 +175,7 @@ final class DriftPersonalGraphRepository
   final Map<IntentionId, Set<StreamController<void>>> _intentionWatchers = {};
   final Map<DailyChoiceId, Set<_DailyChoiceWatchRegistration>>
   _dailyChoiceWatchers = {};
+  final Map<ActionId, Set<_ActionWatchRegistration>> _actionWatchers = {};
   final Map<LongTermRelationId, Set<_RelationWatchRegistration>>
   _relationWatchers = {};
   var _mutationSequence = 0;
@@ -327,6 +331,9 @@ final class DriftPersonalGraphRepository
   Future<ActionDayStatusesReadResult> getActionDayStatuses(
     ActionDayStatusQuery query,
   ) => _readActionDayStatuses(query);
+
+  @override
+  Stream<ActionReadResult> watchAction(ActionId id) => _watchAction(id);
 
   @override
   Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
@@ -735,6 +742,7 @@ final class DriftPersonalGraphRepository
     _invalidateStatisticsRelationSnapshot(stableChanges);
     _notifyIntentionWatchersFor(stableChanges);
     _notifyDailyChoiceWatchersFor(stableChanges);
+    _notifyActionWatchersFor(stableChanges);
     _notifyRelationWatchersFor(stableChanges);
   }
 

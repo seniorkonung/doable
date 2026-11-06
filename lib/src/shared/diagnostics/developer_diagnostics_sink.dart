@@ -108,6 +108,11 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     'stage': 'read',
     ..._encodeStatus(event.status),
   },
+  ActionReadDiagnosticsEvent() => {
+    'operation': 'actionRead',
+    'stage': 'read',
+    ..._encodeStatus(event.status),
+  },
   BootstrapDiagnosticsEvent(:final schemaVersion) => {
     'operation': 'bootstrap',
     ..._encodeStatus(event.status),

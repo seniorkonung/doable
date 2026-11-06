@@ -149,6 +149,11 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
         registration.invalidations.add(null);
       }
     }
+    for (final registrations in List.of(_actionWatchers.values)) {
+      for (final registration in List.of(registrations)) {
+        registration.invalidations.add(null);
+      }
+    }
     for (final registrations in List.of(_relationWatchers.values)) {
       for (final registration in List.of(registrations)) {
         registration.invalidations.add(null);

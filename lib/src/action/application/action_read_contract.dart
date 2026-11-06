@@ -1,5 +1,7 @@
+import '../domain/action_id.dart';
 import 'action_day.dart';
 import 'action_day_statuses.dart';
+import 'action_details.dart';
 
 /// Чтения действий. Подмешивается в `PersonalGraphRepository`: отдельного
 /// репозитория действий нет (ADR-0009).
@@ -15,4 +17,10 @@ abstract interface class ActionReadContract {
   Future<ActionDayStatusesReadResult> getActionDayStatuses(
     ActionDayStatusQuery query,
   );
+
+  /// Наблюдает действие с сохранённым путём на текущих данных намерений и
+  /// связей. Перечитывает его при подтверждённом изменении самого действия и
+  /// намерений и связей последнего прочитанного пути. Успех со значением
+  /// `null` — действия нет.
+  Stream<ActionReadResult> watchAction(ActionId id);
 }
