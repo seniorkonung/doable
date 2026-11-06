@@ -56,16 +56,16 @@ final class IntentionStatisticsBreakdownsSliver extends StatelessWidget {
   Widget _loaded(BuildContext context, IntentionStatisticsLoaded read) {
     final texts = AppLocalizations.of(context);
     final breakdowns = read.breakdowns;
-    final contribution = read.section.selectedCounts.contribution;
+    final viewActions = read.section.selectedCounts.planned;
     Widget intentions(
       StatisticsBreakdown kind,
       IntentionStatisticsBreakdownState<StatisticsItem> breakdown,
     ) => _BreakdownSliver<StatisticsItem>(
       key: ValueKey(kind),
       title: switch (kind) {
-        StatisticsBreakdown.sourceIntentions =>
+        StatisticsBreakdown.rootIntentions =>
           texts.statisticsBreakdownSourceIntentions,
-        StatisticsBreakdown.selectedActions =>
+        StatisticsBreakdown.terminalIntentions =>
           texts.statisticsBreakdownSelectedActions,
         StatisticsBreakdown.relations => texts.statisticsBreakdownRelations,
       },
@@ -75,7 +75,7 @@ final class IntentionStatisticsBreakdownsSliver extends StatelessWidget {
       onRetry: () => onRetryLoadMore(kind),
       itemBuilder: (item) => _BreakdownRow(
         item: item,
-        contribution: contribution,
+        viewActions: viewActions,
         onPressed: onOpenIntention == null
             ? null
             : () => onOpenIntention!(item.id, kind),
@@ -87,8 +87,8 @@ final class IntentionStatisticsBreakdownsSliver extends StatelessWidget {
           SliverToBoxAdapter(
             child: StatisticsReadNotice(message: texts.statisticsEmpty),
           ),
-        if (breakdowns.sourceIntentions case final sources?)
-          intentions(StatisticsBreakdown.sourceIntentions, sources),
+        if (breakdowns.rootIntentions case final roots?)
+          intentions(StatisticsBreakdown.rootIntentions, roots),
         if (breakdowns.relations case final relations?)
           _BreakdownSliver<StatisticsRelationItem>(
             key: const ValueKey(StatisticsBreakdown.relations),
@@ -100,7 +100,7 @@ final class IntentionStatisticsBreakdownsSliver extends StatelessWidget {
             onRetry: () => onRetryLoadMore(StatisticsBreakdown.relations),
             itemBuilder: (relation) => _BreakdownRow(
               item: relation.relatedIntention,
-              contribution: contribution,
+              viewActions: viewActions,
               relationArchived: relation.scope == RelationScope.archived,
               onPressed: onOpenIntention == null
                   ? null
@@ -110,8 +110,8 @@ final class IntentionStatisticsBreakdownsSliver extends StatelessWidget {
                     ),
             ),
           ),
-        if (breakdowns.selectedActions case final actions?)
-          intentions(StatisticsBreakdown.selectedActions, actions),
+        if (breakdowns.terminalIntentions case final terminals?)
+          intentions(StatisticsBreakdown.terminalIntentions, terminals),
       ],
     );
   }
@@ -243,13 +243,16 @@ final class _BreakdownSliverState<T> extends State<_BreakdownSliver<T>> {
 final class _BreakdownRow extends StatelessWidget {
   const _BreakdownRow({
     required this.item,
-    required this.contribution,
+    required this.viewActions,
     required this.onPressed,
     this.relationArchived = false,
   });
 
   final StatisticsItem item;
-  final int contribution;
+
+  /// Число действий выбранного вида — знаменатель доли строки. Строка есть
+  /// только у вида с действиями, поэтому он положителен.
+  final int viewActions;
   final bool relationArchived;
   final VoidCallback? onPressed;
 
@@ -257,11 +260,9 @@ final class _BreakdownRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final texts = AppLocalizations.of(context);
     final archived = item.archiveState == IntentionArchiveState.archived;
-    final share = contribution == 0
-        ? null
-        : texts.statisticsBreakdownContributionShare(
-            item.counts.contribution / contribution,
-          );
+    final share = texts.statisticsBreakdownActionsShare(
+      item.counts.planned / viewActions,
+    );
     return Card(
       child: TextButton(
         onPressed: onPressed,
@@ -279,7 +280,7 @@ final class _BreakdownRow extends StatelessWidget {
               item.counts.contribution,
               item.counts.planned,
             ),
-            share ?? texts.statisticsBreakdownNoContributionShare,
+            share,
           ].join('\n'),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -294,7 +295,7 @@ final class _BreakdownRow extends StatelessWidget {
                   item.counts.planned,
                 ),
               ),
-              if (share != null) Text(share),
+              Text(share),
             ],
           ),
         ),

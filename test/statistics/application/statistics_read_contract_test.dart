@@ -38,32 +38,6 @@ void main() {
     },
   );
 
-  test('деление невыполненного отклоняет отрицательные числа', () {
-    for (final (missed, upcoming) in [(-1, 0), (0, -1)]) {
-      expect(
-        () => UncompletedSplit(missed: missed, upcoming: upcoming),
-        throwsA(isA<StatisticsDataValidationException>()),
-      );
-    }
-  });
-
-  test('сводка связывает пропущенное и предстоящее со всем невыполненным', () {
-    final counts = ContributionCounts(planned: 21, contribution: 4);
-    final summary = StatisticsPeriodSummary(
-      counts: counts,
-      uncompleted: UncompletedSplit(missed: 10, upcoming: 7),
-    );
-
-    expect(summary.counts.uncompleted, 17);
-    expect(
-      () => StatisticsPeriodSummary(
-        counts: counts,
-        uncompleted: UncompletedSplit(missed: 10, upcoming: 6),
-      ),
-      throwsA(isA<StatisticsDataValidationException>()),
-    );
-  });
-
   test('элемент отклоняет отсутствие запланированного вклада', () {
     expect(
       () => StatisticsItem(

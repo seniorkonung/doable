@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
+import 'package:doable/src/action/application/action_day_statuses.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -161,7 +161,7 @@ final class IntentionStatisticsReader implements PersonalGraphRepository {
     int marker = 1,
     int revision = 0,
     int epoch = 0,
-    UncompletedSplit? split,
+    StatisticsView defaultView = StatisticsView.throughRelations,
     int count = 1,
     int? total,
     int? relationsTotal,
@@ -171,11 +171,11 @@ final class IntentionStatisticsReader implements PersonalGraphRepository {
     StatisticsBreakdownCursor<StatisticsRelationItem>? relationsCursor,
   }) {
     final query = queries[index];
+    // Пустой вид запроса читатель заменяет заданным по умолчанию видом.
+    final view = query.view ?? defaultView;
     final counts = ContributionCounts(
       planned: empty ? 0 : total ?? count,
-      contribution: empty
-          ? 0
-          : (total ?? count) - (split?.missed ?? 0) - (split?.upcoming ?? 0),
+      contribution: empty ? 0 : total ?? count,
     );
     final items = empty
         ? <StatisticsItem>[]
@@ -187,26 +187,21 @@ final class IntentionStatisticsReader implements PersonalGraphRepository {
       totalItems: empty ? 0 : total ?? count,
       nextCursor: cursor,
     );
-    final uncompleted = split ?? UncompletedSplit(missed: 0, upcoming: 0);
-    final details = switch (query.view) {
-      StatisticsView.rootIntentions => IntentionStatisticsSourceDetails(
-        uncompleted: uncompleted,
-        selectedActions: intentions(actionsCursor),
+    final details = switch (view) {
+      StatisticsView.rootIntentions => IntentionStatisticsRootDetails(
+        terminalIntentions: intentions(actionsCursor),
       ),
       StatisticsView.intermediateIntentions =>
         IntentionStatisticsIntermediateDetails(
-          uncompleted: uncompleted,
-          sourceIntentions: intentions(sourcesCursor),
-          selectedActions: intentions(actionsCursor),
+          rootIntentions: intentions(sourcesCursor),
+          terminalIntentions: intentions(actionsCursor),
         ),
-      StatisticsView.terminalIntentions => IntentionStatisticsSelectedDetails(
-        uncompleted: uncompleted,
-        sourceIntentions: intentions(sourcesCursor),
+      StatisticsView.terminalIntentions => IntentionStatisticsTerminalDetails(
+        rootIntentions: intentions(sourcesCursor),
       ),
       StatisticsView.throughRelations =>
         IntentionStatisticsThroughRelationsDetails(
-          uncompleted: uncompleted,
-          explicitPathChoices: 0,
+          explicitPathActions: 0,
           relations: StatisticsBreakdownFirstPage(
             items: empty
                 ? <StatisticsRelationItem>[]
@@ -220,7 +215,7 @@ final class IntentionStatisticsReader implements PersonalGraphRepository {
             totalItems: empty ? 0 : relationsTotal ?? total ?? count,
             nextCursor: relationsCursor,
           ),
-          selectedActions: intentions(actionsCursor),
+          terminalIntentions: intentions(actionsCursor),
         ),
     };
     responses[index].complete(
@@ -229,21 +224,19 @@ final class IntentionStatisticsReader implements PersonalGraphRepository {
           query: query,
           revision: StatisticsTestRevision(revision, epoch),
           cards: IntentionStatisticsCards(
-            sourceIntentions:
-                empty && query.view != StatisticsView.rootIntentions
+            rootIntentions: empty && view != StatisticsView.rootIntentions
                 ? ContributionCounts(planned: 1, contribution: 1)
-                : query.view == StatisticsView.rootIntentions
+                : view == StatisticsView.rootIntentions
                 ? counts
                 : ContributionCounts(planned: 0, contribution: 0),
             intermediateIntentions:
-                query.view == StatisticsView.intermediateIntentions
+                view == StatisticsView.intermediateIntentions
                 ? counts
                 : ContributionCounts(planned: 0, contribution: 0),
-            selectedActions: query.view == StatisticsView.terminalIntentions
+            terminalIntentions: view == StatisticsView.terminalIntentions
                 ? counts
                 : ContributionCounts(planned: 0, contribution: 0),
-            throughRelations:
-                empty && query.view != StatisticsView.throughRelations
+            throughRelations: empty && view != StatisticsView.throughRelations
                 ? ContributionCounts(planned: 1, contribution: 1)
                 : counts,
           ),
@@ -257,7 +250,7 @@ final class IntentionStatisticsReader implements PersonalGraphRepository {
               period: period,
               statuses: empty
                   ? {}
-                  : {period.firstDate: DailyChoiceDayStatus.allCompleted},
+                  : {period.firstDate: ActionDayStatus.allCompleted},
             ),
             final StatisticsYear period => IntentionStatisticsYearCalendar(
               period: period,

@@ -54,7 +54,7 @@ void main() {
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
-        var date = CalendarDate.fromParts(2026, 10, 12);
+        final date = CalendarDate.fromParts(2026, 10, 12);
         final reader = IntentionStatisticsReader();
         final repository = ControlledDetailsRepository()
           ..onStatisticsSection = reader.getIntentionStatisticsSection;
@@ -124,13 +124,28 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        date = CalendarDate.fromParts(2026, 10, 13);
-        WidgetsBinding.instance.handleAppLifecycleStateChanged(
-          AppLifecycleState.paused,
+        final coordinator = ProviderScope.containerOf(
+          tester.element(find.byType(IntentionDetailsPage)),
+          listen: false,
+        ).read(graphCommandCoordinatorProvider.notifier);
+        final before = testDetailsIntention(index: 2);
+        final after = testDetailsIntention(
+          index: 2,
+          archiveState: IntentionArchiveState.archived,
         );
-        WidgetsBinding.instance.handleAppLifecycleStateChanged(
-          AppLifecycleState.resumed,
+        final accepted = coordinator.acceptExisting(
+          ArchiveIntention(before.id),
+          presentationTitle: before.title,
+        ) as IntentionCommandAccepted;
+        repository.completeCommand(
+          0,
+          testDetailsSavedResult(
+            after,
+            before: before,
+            revision: const StatisticsTestRevision(1),
+          ),
         );
+        await accepted.future;
         await tester.pumpAndSettle();
         expect(repository.statisticsQueries, hasLength(1));
         await tester.tap(find.text('Закрыть'));
@@ -142,7 +157,7 @@ void main() {
         _expectFullyVisible(tester, updating);
         await _placeInFreeArea(tester, card, position, notice: updating);
         expect(card.hitTestable(), findsOneWidget);
-        final summary = find.text(texts.statisticsMissed(0));
+        final summary = find.text(texts.statisticsPeriodCompleted(30, 30));
         await _placeInFreeArea(tester, summary, position, notice: updating);
         final calendar = period is StatisticsMonth
             ? find.descendant(of: find.byType(Table), matching: find.text('15'))
@@ -151,7 +166,7 @@ void main() {
 
         final breakdowns = [
           StatisticsBreakdown.relations,
-          StatisticsBreakdown.selectedActions,
+          StatisticsBreakdown.terminalIntentions,
         ];
         final breakdownOffsets = <double>[];
         for (final breakdown in breakdowns) {
@@ -230,9 +245,8 @@ void main() {
           repository.statisticsQueries.last.view,
           StatisticsView.throughRelations,
         );
-        expect(repository.statisticsQueries.last.localDate, date);
         _expectFullyVisible(tester, updating);
-        reader.section(2, count: 29);
+        reader.section(2, count: 29, revision: 1);
         await tester.pumpAndSettle();
         expect(updating, findsNothing);
         expect(failed, findsNothing);
@@ -245,9 +259,6 @@ void main() {
           position,
         );
 
-        date = CalendarDate.fromParts(2026, 10, 14);
-        await tester.pump(const Duration(hours: 1));
-        await tester.pumpAndSettle();
         final relations = find.text(texts.detailsRelationsTab).first;
         await tester.ensureVisible(relations);
         await tester.pumpAndSettle();
@@ -309,8 +320,7 @@ void main() {
         final query = repository.statisticsQueries.single;
         expect(query.intentionId, intention.id);
         expect(query.period, StatisticsMonth(2026, 10));
-        expect(query.view, StatisticsView.throughRelations);
-        expect(query.localDate, CalendarDate.fromParts(2026, 10, 12));
+        expect(query.view, isNull);
         expect(find.byType(TagAssignmentsSection), findsNothing);
         expect(statistics.hitTestable(), findsOneWidget);
         expect(find.textContaining('октябрь 2026'), findsOneWidget);
@@ -669,7 +679,7 @@ void main() {
   );
 
   testWidgets(
-    'полночь и возврат приложения обновляют только видимую статистику без смены условий',
+    'полночь и возврат приложения не запускают новое чтение статистики',
     (tester) async {
       var date = CalendarDate.fromParts(2026, 10, 12);
       final repository = ControlledDetailsRepository()
@@ -699,12 +709,7 @@ void main() {
       date = CalendarDate.fromParts(2026, 10, 13);
       await tester.pump(const Duration(hours: 1));
       await tester.pumpAndSettle();
-      expect(repository.statisticsQueries, hasLength(2));
-      expect(repository.statisticsQueries.last.localDate, date);
-      expect(
-        repository.statisticsQueries.last.period,
-        StatisticsMonth(2026, 10),
-      );
+      expect(repository.statisticsQueries, hasLength(1));
 
       unawaited(
         showDialog<void>(
@@ -728,19 +733,9 @@ void main() {
         AppLifecycleState.resumed,
       );
       await tester.pumpAndSettle();
-      expect(repository.statisticsQueries, hasLength(2));
       await tester.tap(find.text('Закрыть'));
       await tester.pumpAndSettle();
-      expect(repository.statisticsQueries, hasLength(3));
-      expect(repository.statisticsQueries.last.localDate, date);
-      expect(
-        repository.statisticsQueries.last.period,
-        StatisticsMonth(2026, 10),
-      );
-      expect(
-        repository.statisticsQueries.last.view,
-        StatisticsView.throughRelations,
-      );
+      expect(repository.statisticsQueries, hasLength(1));
     },
   );
 }
@@ -791,43 +786,38 @@ IntentionStatisticsSectionResult _emptySection(
     totalItems: 0,
     nextCursor: null,
   );
-  final split = UncompletedSplit(missed: 0, upcoming: 0);
   return IntentionStatisticsSectionSuccess(
     IntentionStatisticsSection(
       query: query,
       revision: TestDetailsRevision(revision),
       cards: IntentionStatisticsCards(
-        sourceIntentions: zero,
+        rootIntentions: zero,
         intermediateIntentions: zero,
-        selectedActions: zero,
+        terminalIntentions: zero,
         throughRelations: zero,
       ),
       periodCounts: zero,
-      details: switch (query.view) {
-        StatisticsView.rootIntentions => IntentionStatisticsSourceDetails(
-          uncompleted: split,
-          selectedActions: intentions,
+      details: switch (query.view ?? StatisticsView.throughRelations) {
+        StatisticsView.rootIntentions => IntentionStatisticsRootDetails(
+          terminalIntentions: intentions,
         ),
         StatisticsView.intermediateIntentions =>
           IntentionStatisticsIntermediateDetails(
-            uncompleted: split,
-            sourceIntentions: intentions,
-            selectedActions: intentions,
+            rootIntentions: intentions,
+            terminalIntentions: intentions,
           ),
-        StatisticsView.terminalIntentions => IntentionStatisticsSelectedDetails(
-          uncompleted: split,
-          sourceIntentions: intentions,
+        StatisticsView.terminalIntentions => IntentionStatisticsTerminalDetails(
+          rootIntentions: intentions,
         ),
         StatisticsView.throughRelations =>
           IntentionStatisticsThroughRelationsDetails(
-            uncompleted: split,
-            explicitPathChoices: 0,
+            explicitPathActions: 0,
             relations: StatisticsBreakdownFirstPage(
               items: const [],
               totalItems: 0,
               nextCursor: null,
             ),
-            selectedActions: intentions,
+            terminalIntentions: intentions,
           ),
       },
       calendar: switch (query.period) {

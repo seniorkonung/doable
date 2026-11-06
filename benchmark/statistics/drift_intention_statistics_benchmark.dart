@@ -211,7 +211,6 @@ void main() {
               intentionId: _intentionId(fixture.intention),
               period: period,
               view: view,
-              localDate: CalendarDate.fromParts(2026, 6, 15),
               pageSize: 100,
             );
             for (final state in _SectionState.values) {
@@ -534,27 +533,27 @@ StatisticsBreakdownContinuationPage<T> _continuation<T>(
 Map<StatisticsBreakdown, StatisticsBreakdownFirstPage<Object>> _firstPages(
   IntentionStatisticsViewDetails details,
 ) => switch (details) {
-  IntentionStatisticsSourceDetails(:final selectedActions) => {
-    StatisticsBreakdown.selectedActions: selectedActions,
+  IntentionStatisticsRootDetails(:final terminalIntentions) => {
+    StatisticsBreakdown.terminalIntentions: terminalIntentions,
   },
   IntentionStatisticsIntermediateDetails(
-    :final sourceIntentions,
-    :final selectedActions,
+    :final rootIntentions,
+    :final terminalIntentions,
   ) =>
     {
-      StatisticsBreakdown.sourceIntentions: sourceIntentions,
-      StatisticsBreakdown.selectedActions: selectedActions,
+      StatisticsBreakdown.rootIntentions: rootIntentions,
+      StatisticsBreakdown.terminalIntentions: terminalIntentions,
     },
-  IntentionStatisticsSelectedDetails(:final sourceIntentions) => {
-    StatisticsBreakdown.sourceIntentions: sourceIntentions,
+  IntentionStatisticsTerminalDetails(:final rootIntentions) => {
+    StatisticsBreakdown.rootIntentions: rootIntentions,
   },
   IntentionStatisticsThroughRelationsDetails(
     :final relations,
-    :final selectedActions,
+    :final terminalIntentions,
   ) =>
     {
       StatisticsBreakdown.relations: relations,
-      StatisticsBreakdown.selectedActions: selectedActions,
+      StatisticsBreakdown.terminalIntentions: terminalIntentions,
     },
 };
 
@@ -575,12 +574,10 @@ void _expectSection(
       (counts.planned, counts.contribution),
     );
   }
-  expect(section.details.uncompleted.missed, expected.uncompleted.missed);
-  expect(section.details.uncompleted.upcoming, expected.uncompleted.upcoming);
   if (section.details case IntentionStatisticsThroughRelationsDetails(
-    :final explicitPathChoices,
+    :final explicitPathActions,
   )) {
-    expect(explicitPathChoices, expected.explicitPathChoices);
+    expect(explicitPathActions, expected.explicitPathActions);
   }
   switch (section.calendar) {
     case IntentionStatisticsMonthCalendar(:final statuses):

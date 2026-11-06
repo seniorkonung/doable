@@ -165,24 +165,6 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String statisticsMissed(int count) {
-    final intl.NumberFormat countNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
-
-    return 'Пропущено: $countString';
-  }
-
-  @override
-  String statisticsUpcoming(int count) {
-    final intl.NumberFormat countNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
-
-    return 'Предстоит: $countString';
-  }
-
-  @override
   String statisticsContributionCounts(int contribution, int planned) {
     final intl.NumberFormat contributionNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
@@ -209,19 +191,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
     return 'Вклад: $contributionString. Запланированный вклад: $plannedString';
   }
-
-  @override
-  String statisticsContributionShare(num share) {
-    final intl.NumberFormat shareNumberFormat =
-        intl.NumberFormat.percentPattern(localeName);
-    final String shareString = shareNumberFormat.format(share);
-
-    return 'Доля вклада периода: $shareString';
-  }
-
-  @override
-  String get statisticsNoContributionShare =>
-      'Доля отсутствует: вклад периода равен нулю';
 
   @override
   String statisticsPeriodActionsShare(num share) {
@@ -303,7 +272,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get statisticsBreakdownRelations => 'По связям';
 
   @override
-  String statisticsExplicitPathChoices(int count, int planned) {
+  String statisticsExplicitPathActions(int count, int planned) {
     final intl.NumberFormat countNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
     final String countString = countNumberFormat.format(count);
@@ -311,21 +280,17 @@ class AppLocalizationsRu extends AppLocalizations {
         intl.NumberFormat.decimalPattern(localeName);
     final String plannedString = plannedNumberFormat.format(planned);
 
-    return 'Дневные выборы с намерением на сохранённом пути выбора: $countString из $plannedString';
+    return 'С этим намерением на сохранённом пути: $countString из $plannedString';
   }
 
   @override
-  String statisticsBreakdownContributionShare(num share) {
+  String statisticsBreakdownActionsShare(num share) {
     final intl.NumberFormat shareNumberFormat =
         intl.NumberFormat.percentPattern(localeName);
     final String shareString = shareNumberFormat.format(share);
 
-    return 'Доля вклада намерения в этом виде: $shareString';
+    return 'Доля действий вида: $shareString';
   }
-
-  @override
-  String get statisticsBreakdownNoContributionShare =>
-      'Доля отсутствует: вклад намерения в этом виде равен нулю';
 
   @override
   String get statisticsRefreshUnavailableShort => 'Нет обновления.';

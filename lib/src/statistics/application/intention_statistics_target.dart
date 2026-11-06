@@ -11,8 +11,8 @@ final class IntentionStatisticsTarget {
     required StatisticsBreakdown breakdown,
     required this.period,
   }) : view = switch (breakdown) {
-         StatisticsBreakdown.sourceIntentions => StatisticsView.rootIntentions,
-         StatisticsBreakdown.selectedActions =>
+         StatisticsBreakdown.rootIntentions => StatisticsView.rootIntentions,
+         StatisticsBreakdown.terminalIntentions =>
            StatisticsView.terminalIntentions,
          StatisticsBreakdown.relations => StatisticsView.throughRelations,
        };

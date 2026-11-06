@@ -1,7 +1,6 @@
 import '../../graph/application/graph_command_result.dart';
 import '../../graph/application/graph_revision.dart';
 import '../../intention/domain/intention_id.dart';
-import '../../shared/domain/calendar_date.dart';
 import 'contribution_counts.dart';
 import 'intention_statistics_breakdown.dart';
 import 'intention_statistics_calendar.dart';
@@ -28,134 +27,140 @@ typedef IntentionStatisticsBreakdownError<T> =
       StatisticsReadFailure
     >;
 
-/// Условия одного чтения раздела. Размер порции проверяется тем же
-/// контрактом, что у Главной. Каждая допустимая разбивка получает свою порцию.
+/// Условия одного чтения раздела. Размер порции проверяется теми же
+/// пределами, что у Главной. Каждая допустимая разбивка получает свою порцию.
 final class IntentionStatisticsQuery {
-  IntentionStatisticsQuery({
-    required this.intentionId,
+  factory IntentionStatisticsQuery({
+    required IntentionId intentionId,
     required StatisticsPeriod period,
-    required StatisticsView view,
-    required this.localDate,
+    required StatisticsView? view,
     required int pageSize,
-  }) : _statistics = StatisticsQuery(
-         period: period,
-         view: view,
-         pageSize: pageSize,
-       );
+  }) {
+    if (pageSize < StatisticsQuery.minPageSize ||
+        pageSize > StatisticsQuery.maxPageSize) {
+      throw const StatisticsQueryValidationException(
+        StatisticsQueryValidationFailure.pageSizeOutOfRange,
+      );
+    }
+    return IntentionStatisticsQuery._(intentionId, period, view, pageSize);
+  }
+
+  const IntentionStatisticsQuery._(
+    this.intentionId,
+    this.period,
+    this.view,
+    this.pageSize,
+  );
 
   final IntentionId intentionId;
-  final CalendarDate localDate;
-  final StatisticsQuery _statistics;
+  final StatisticsPeriod period;
 
-  StatisticsPeriod get period => _statistics.period;
-  StatisticsView get view => _statistics.view;
-  int get pageSize => _statistics.pageSize;
+  /// null поручает выбор вида чтению: роль в пути, в которой у намерения
+  /// за всё время больше всего действий, при равенстве — первая в порядке
+  /// видов; без них — «Через связи», если до намерения по активным связям
+  /// доходят действия, иначе «Корневые намерения».
+  final StatisticsView? view;
+  final int pageSize;
 }
 
 /// Четыре обязательные карточки; нулевой вклад не исключает карточку.
 final class IntentionStatisticsCards {
   const IntentionStatisticsCards({
-    required this.sourceIntentions,
+    required this.rootIntentions,
     required this.intermediateIntentions,
-    required this.selectedActions,
+    required this.terminalIntentions,
     required this.throughRelations,
   });
 
-  final ContributionCounts sourceIntentions;
+  final ContributionCounts rootIntentions;
   final ContributionCounts intermediateIntentions;
-  final ContributionCounts selectedActions;
+  final ContributionCounts terminalIntentions;
   final ContributionCounts throughRelations;
 
   ContributionCounts operator [](StatisticsView view) => switch (view) {
-    StatisticsView.rootIntentions => sourceIntentions,
+    StatisticsView.rootIntentions => rootIntentions,
     StatisticsView.intermediateIntentions => intermediateIntentions,
-    StatisticsView.terminalIntentions => selectedActions,
+    StatisticsView.terminalIntentions => terminalIntentions,
     StatisticsView.throughRelations => throughRelations,
   };
 }
 
-/// Сводка и первые порции выбранного вида. Варианты требуют все допустимые
-/// разбивки и не позволяют добавить неподдерживаемую. Число явных оснований
-/// присутствует только у [IntentionStatisticsThroughRelationsDetails].
+/// Первые порции выбранного вида. Варианты требуют все допустимые
+/// разбивки и не позволяют добавить неподдерживаемую. Число действий
+/// с намерением на пути есть только у
+/// [IntentionStatisticsThroughRelationsDetails].
 sealed class IntentionStatisticsViewDetails {
-  const IntentionStatisticsViewDetails({required this.uncompleted});
+  const IntentionStatisticsViewDetails();
 
   StatisticsView get view;
-  final UncompletedSplit uncompleted;
 
   List<StatisticsBreakdownFirstPage<Object>> get _pages;
 }
 
-final class IntentionStatisticsSourceDetails
+/// Действия, где намерение корневое, по их конечным намерениям.
+final class IntentionStatisticsRootDetails
     extends IntentionStatisticsViewDetails {
-  const IntentionStatisticsSourceDetails({
-    required super.uncompleted,
-    required this.selectedActions,
-  });
+  const IntentionStatisticsRootDetails({required this.terminalIntentions});
 
-  final StatisticsBreakdownFirstPage<StatisticsItem> selectedActions;
+  final StatisticsBreakdownFirstPage<StatisticsItem> terminalIntentions;
 
   @override
   StatisticsView get view => StatisticsView.rootIntentions;
 
   @override
-  List<StatisticsBreakdownFirstPage<Object>> get _pages => [selectedActions];
+  List<StatisticsBreakdownFirstPage<Object>> get _pages => [terminalIntentions];
 }
 
 final class IntentionStatisticsIntermediateDetails
     extends IntentionStatisticsViewDetails {
   const IntentionStatisticsIntermediateDetails({
-    required super.uncompleted,
-    required this.sourceIntentions,
-    required this.selectedActions,
+    required this.rootIntentions,
+    required this.terminalIntentions,
   });
 
-  final StatisticsBreakdownFirstPage<StatisticsItem> sourceIntentions;
-  final StatisticsBreakdownFirstPage<StatisticsItem> selectedActions;
+  final StatisticsBreakdownFirstPage<StatisticsItem> rootIntentions;
+  final StatisticsBreakdownFirstPage<StatisticsItem> terminalIntentions;
 
   @override
   StatisticsView get view => StatisticsView.intermediateIntentions;
 
   @override
   List<StatisticsBreakdownFirstPage<Object>> get _pages => [
-    sourceIntentions,
-    selectedActions,
+    rootIntentions,
+    terminalIntentions,
   ];
 }
 
-final class IntentionStatisticsSelectedDetails
+/// Действия, где намерение конечное, по их корневым намерениям.
+final class IntentionStatisticsTerminalDetails
     extends IntentionStatisticsViewDetails {
-  const IntentionStatisticsSelectedDetails({
-    required super.uncompleted,
-    required this.sourceIntentions,
-  });
+  const IntentionStatisticsTerminalDetails({required this.rootIntentions});
 
-  final StatisticsBreakdownFirstPage<StatisticsItem> sourceIntentions;
+  final StatisticsBreakdownFirstPage<StatisticsItem> rootIntentions;
 
   @override
   StatisticsView get view => StatisticsView.terminalIntentions;
 
   @override
-  List<StatisticsBreakdownFirstPage<Object>> get _pages => [sourceIntentions];
+  List<StatisticsBreakdownFirstPage<Object>> get _pages => [rootIntentions];
 }
 
 final class IntentionStatisticsThroughRelationsDetails
     extends IntentionStatisticsViewDetails {
   IntentionStatisticsThroughRelationsDetails({
-    required super.uncompleted,
-    required this.explicitPathChoices,
+    required this.explicitPathActions,
     required this.relations,
-    required this.selectedActions,
+    required this.terminalIntentions,
   }) {
-    if (explicitPathChoices < 0) {
+    if (explicitPathActions < 0) {
       throw const StatisticsDataValidationException();
     }
   }
 
-  /// Сколько запланированных выборов содержат намерение на сохранённом пути.
-  final int explicitPathChoices;
+  /// Сколько действий вида содержат намерение на сохранённом пути.
+  final int explicitPathActions;
   final StatisticsBreakdownFirstPage<StatisticsRelationItem> relations;
-  final StatisticsBreakdownFirstPage<StatisticsItem> selectedActions;
+  final StatisticsBreakdownFirstPage<StatisticsItem> terminalIntentions;
 
   @override
   StatisticsView get view => StatisticsView.throughRelations;
@@ -163,7 +168,7 @@ final class IntentionStatisticsThroughRelationsDetails
   @override
   List<StatisticsBreakdownFirstPage<Object>> get _pages => [
     relations,
-    selectedActions,
+    terminalIntentions,
   ];
 }
 
@@ -185,17 +190,17 @@ final class IntentionStatisticsSection {
     required this.details,
     required this.calendar,
   }) {
-    if (details.view != query.view || calendar.period != query.period) {
+    if ((query.view != null && details.view != query.view) ||
+        calendar.period != query.period) {
       throw const StatisticsDataValidationException();
     }
-    if (details.uncompleted.missed + details.uncompleted.upcoming !=
-        selectedCounts.uncompleted) {
+    if (selectedCounts.planned > periodCounts.planned) {
       throw const StatisticsDataValidationException();
     }
     if (details case IntentionStatisticsThroughRelationsDetails(
-      :final explicitPathChoices,
+      :final explicitPathActions,
     )) {
-      if (explicitPathChoices > selectedCounts.planned) {
+      if (explicitPathActions > selectedCounts.planned) {
         throw const StatisticsDataValidationException();
       }
     }
@@ -208,13 +213,16 @@ final class IntentionStatisticsSection {
   final GraphRevision revision;
   final IntentionStatisticsCards cards;
 
-  /// Все выборы периода, каждый один раз. Знаменатель доли сводки раздела —
-  /// [ContributionCounts.contribution] этих мер; при нуле доли нет.
+  /// Все действия периода, каждое один раз. Знаменатель доли сводки
+  /// раздела — [ContributionCounts.planned] этих мер; при нуле доли нет.
   final ContributionCounts periodCounts;
   final IntentionStatisticsViewDetails details;
   final IntentionStatisticsCalendar calendar;
 
-  /// Меры сводки берутся из выбранной карточки, а вклад служит знаменателем
-  /// долей всех её разбивок. При нуле доли не показываются.
-  ContributionCounts get selectedCounts => cards[query.view];
+  /// Заданный запросом вид либо выбранный чтением, если запрос его не задал.
+  StatisticsView get view => details.view;
+
+  /// Меры сводки берутся из выбранной карточки, а запланированный вклад
+  /// служит знаменателем долей всех её разбивок.
+  ContributionCounts get selectedCounts => cards[view];
 }

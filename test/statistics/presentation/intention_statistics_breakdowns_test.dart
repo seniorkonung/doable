@@ -18,7 +18,7 @@ import 'intention_statistics_test_support.dart';
 
 void main() {
   testWidgets(
-    'три связи получают по 50%, архивы различимы, строка открывается клавиатурой',
+    'три связи получают по 50% действий вида, архивы различимы, строка открывается клавиатурой',
     (tester) async {
       final opened = <(IntentionId, StatisticsBreakdown)>[];
       await _pump(
@@ -30,7 +30,7 @@ void main() {
       expect(find.text(texts.statisticsBreakdownRelations), findsOneWidget);
       expect(find.text(texts.statisticsTotalItems(3)), findsOneWidget);
       expect(
-        find.text(texts.statisticsBreakdownContributionShare(.5)),
+        find.text(texts.statisticsBreakdownActionsShare(.5)),
         findsNWidgets(3),
       );
       expect(find.text('1 из 1'), findsNWidgets(3));
@@ -70,21 +70,16 @@ void main() {
       await tester.tap(find.text('Действие'));
       expect(opened.last, (
         statisticsId(1000),
-        StatisticsBreakdown.selectedActions,
+        StatisticsBreakdown.terminalIntentions,
       ));
     },
   );
 
-  testWidgets('нулевой вклад намерения скрывает доли даже при вкладе периода', (
-    tester,
-  ) async {
+  testWidgets('нулевой вклад не скрывает долю действий в виде', (tester) async {
     await _pump(tester, _state(zero: true));
-    expect(find.textContaining('%'), findsNothing);
     expect(
-      find.bySemanticsLabel(
-        RegExp(_texts(tester).statisticsBreakdownNoContributionShare),
-      ),
-      findsWidgets,
+      find.text(_texts(tester).statisticsBreakdownActionsShare(.5)),
+      findsNWidgets(3),
     );
     expect(find.text('0 из 1'), findsNWidgets(3));
   });
@@ -97,9 +92,9 @@ void main() {
       final texts = _texts(tester);
       for (final kind in StatisticsBreakdown.values) {
         final title = switch (kind) {
-          StatisticsBreakdown.sourceIntentions =>
+          StatisticsBreakdown.rootIntentions =>
             texts.statisticsBreakdownSourceIntentions,
-          StatisticsBreakdown.selectedActions =>
+          StatisticsBreakdown.terminalIntentions =>
             texts.statisticsBreakdownSelectedActions,
           StatisticsBreakdown.relations => texts.statisticsBreakdownRelations,
         };
@@ -228,9 +223,8 @@ void main() {
       updates.value = initial.withRead(
         loading.copyWith(
           breakdowns: loading.breakdowns.copyWith(
-            selectedActions: loading.breakdowns.selectedActions!.withPageStatus(
-              const IntentionStatisticsPageLoading(),
-            ),
+            terminalIntentions: loading.breakdowns.terminalIntentions!
+                .withPageStatus(const IntentionStatisticsPageLoading()),
           ),
         ),
       );
@@ -244,11 +238,12 @@ void main() {
       updates.value = initial.withRead(
         beforeFailure.copyWith(
           breakdowns: beforeFailure.breakdowns.copyWith(
-            selectedActions: loaded.breakdowns.selectedActions!.withPageStatus(
-              const IntentionStatisticsPageFailure(
-                StatisticsReadCorruptionFailure(),
-              ),
-            ),
+            terminalIntentions: loaded.breakdowns.terminalIntentions!
+                .withPageStatus(
+                  const IntentionStatisticsPageFailure(
+                    StatisticsReadCorruptionFailure(),
+                  ),
+                ),
           ),
         ),
       );
@@ -273,11 +268,12 @@ void main() {
                 nextCursor: null,
               ),
             ),
-            selectedActions: loaded.breakdowns.selectedActions!.withPageStatus(
-              const IntentionStatisticsPageFailure(
-                StatisticsReadCorruptionFailure(),
-              ),
-            ),
+            terminalIntentions: loaded.breakdowns.terminalIntentions!
+                .withPageStatus(
+                  const IntentionStatisticsPageFailure(
+                    StatisticsReadCorruptionFailure(),
+                  ),
+                ),
           ),
         ),
       );
@@ -292,7 +288,8 @@ void main() {
       expect(
         visible.any(
           (event) =>
-              event.$1 == StatisticsBreakdown.selectedActions && event.$2 >= 70,
+              event.$1 == StatisticsBreakdown.terminalIntentions &&
+              event.$2 >= 70,
         ),
         isTrue,
       );
@@ -323,7 +320,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(events, isNotEmpty);
     expect(
-      events.every((event) => event.$1 == StatisticsBreakdown.selectedActions),
+      events.every(
+        (event) => event.$1 == StatisticsBreakdown.terminalIntentions,
+      ),
       isTrue,
     );
   });
@@ -415,24 +414,22 @@ IntentionStatisticsState _state({
             : 1,
         nextCursor: paginate ? StatisticsTestCursor<StatisticsItem>() : null,
       );
-  final split = UncompletedSplit(missed: zero ? planned : 0, upcoming: 0);
   final section = IntentionStatisticsSection(
     query: IntentionStatisticsQuery(
       intentionId: statisticsId(1),
       period: period,
       view: view,
-      localDate: statisticsToday,
       pageSize: 100,
     ),
     revision: const StatisticsTestRevision(0),
     cards: IntentionStatisticsCards(
-      sourceIntentions: view == StatisticsView.rootIntentions
+      rootIntentions: view == StatisticsView.rootIntentions
           ? counts
           : ContributionCounts(planned: 0, contribution: 0),
       intermediateIntentions: view == StatisticsView.intermediateIntentions
           ? counts
           : ContributionCounts(planned: 0, contribution: 0),
-      selectedActions: view == StatisticsView.terminalIntentions
+      terminalIntentions: view == StatisticsView.terminalIntentions
           ? counts
           : ContributionCounts(planned: 0, contribution: 0),
       throughRelations: counts,
@@ -442,24 +439,20 @@ IntentionStatisticsState _state({
       contribution: planned + 10,
     ),
     details: switch (view) {
-      StatisticsView.rootIntentions => IntentionStatisticsSourceDetails(
-        uncompleted: split,
-        selectedActions: intentions(),
+      StatisticsView.rootIntentions => IntentionStatisticsRootDetails(
+        terminalIntentions: intentions(),
       ),
       StatisticsView.intermediateIntentions =>
         IntentionStatisticsIntermediateDetails(
-          uncompleted: split,
-          sourceIntentions: intentions(),
-          selectedActions: intentions(),
+          rootIntentions: intentions(),
+          terminalIntentions: intentions(),
         ),
-      StatisticsView.terminalIntentions => IntentionStatisticsSelectedDetails(
-        uncompleted: split,
-        sourceIntentions: intentions(),
+      StatisticsView.terminalIntentions => IntentionStatisticsTerminalDetails(
+        rootIntentions: intentions(),
       ),
       StatisticsView.throughRelations =>
         IntentionStatisticsThroughRelationsDetails(
-          uncompleted: split,
-          explicitPathChoices: planned,
+          explicitPathActions: planned,
           relations: StatisticsBreakdownFirstPage(
             items: List.generate(
               empty ? 0 : length,
@@ -490,7 +483,7 @@ IntentionStatisticsState _state({
                 ? StatisticsTestCursor<StatisticsRelationItem>()
                 : null,
           ),
-          selectedActions: intentions(),
+          terminalIntentions: intentions(),
         ),
     },
     calendar: IntentionStatisticsMonthCalendar(period: period, statuses: {}),

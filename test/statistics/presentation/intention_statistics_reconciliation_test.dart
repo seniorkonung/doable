@@ -1,6 +1,5 @@
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
-import 'package:doable/src/statistics/application/contribution_counts.dart';
 import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
 import 'package:doable/src/statistics/application/intention_statistics_target.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
@@ -19,8 +18,8 @@ void main() {
     page.model.selectView(StatisticsView.intermediateIntentions);
     page.model.setLocalDate(CalendarDate.fromParts(2026, 10, 13));
     await h.change(1);
-    await page.model.loadMore(StatisticsBreakdown.selectedActions);
-    await page.model.retryLoadMore(StatisticsBreakdown.selectedActions);
+    await page.model.loadMore(StatisticsBreakdown.terminalIntentions);
+    await page.model.retryLoadMore(StatisticsBreakdown.terminalIntentions);
     await page.model.retry();
     await page.model.retryRefresh();
     expect(h.reader.queries, isEmpty);
@@ -30,10 +29,6 @@ void main() {
     expect(h.reader.queries, hasLength(1));
     expect(h.reader.queries.single.period, StatisticsYear(2025));
     expect(h.reader.queries.single.view, StatisticsView.intermediateIntentions);
-    expect(
-      h.reader.queries.single.localDate,
-      CalendarDate.fromParts(2026, 10, 13),
-    );
     h.reader.section(0, revision: 1);
     await pumpEventQueue();
     expect(page.state.read, isA<IntentionStatisticsData>());
@@ -55,14 +50,17 @@ void main() {
     await h.change(2);
     h.reader.section(3, revision: 2, marker: 22);
     await pumpEventQueue();
-    await page.model.loadMoreIfNeeded(StatisticsBreakdown.selectedActions, 0);
+    await page.model.loadMoreIfNeeded(
+      StatisticsBreakdown.terminalIntentions,
+      0,
+    );
     expect(h.reader.continuations, isEmpty);
     expect(
-      page.loaded.breakdowns.selectedActions!.items.single.id,
+      page.loaded.breakdowns.terminalIntentions!.items.single.id,
       statisticsId(1),
     );
     expect(
-      top.loaded.breakdowns.selectedActions!.items.single.id,
+      top.loaded.breakdowns.terminalIntentions!.items.single.id,
       statisticsId(22),
     );
     top.model.setVisible(false);
@@ -72,7 +70,7 @@ void main() {
     h.reader.section(4, revision: 2, marker: 22);
     await pumpEventQueue();
     expect(
-      page.loaded.breakdowns.selectedActions!.items.single.id,
+      page.loaded.breakdowns.terminalIntentions!.items.single.id,
       statisticsId(22),
     );
     page.model.setVisible(false);
@@ -111,7 +109,7 @@ void main() {
         await pumpEventQueue();
         expect(page.loaded.section.selectedCounts.planned, 300);
         expect(
-          page.loaded.breakdowns.selectedActions!.items.first.id,
+          page.loaded.breakdowns.terminalIntentions!.items.first.id,
           statisticsId(100),
         );
         _moreFirst(h, 4, view, revision: 1, cursor: true);
@@ -128,7 +126,7 @@ void main() {
         );
         await pumpEventQueue();
         expect(page.loaded.section.selectedCounts.planned, 300);
-        await page.model.loadMore(StatisticsBreakdown.selectedActions);
+        await page.model.loadMore(StatisticsBreakdown.terminalIntentions);
         expect(h.reader.continuations, hasLength(8));
         h.reader.more(
           7,
@@ -137,10 +135,13 @@ void main() {
         );
         await pumpEventQueue();
         expect(page.loaded.section.selectedCounts.planned, 350);
-        expect(page.loaded.breakdowns.selectedActions!.items, hasLength(300));
+        expect(
+          page.loaded.breakdowns.terminalIntentions!.items,
+          hasLength(300),
+        );
         expect(_firstLength(page, view), 300);
         expect(
-          page.loaded.breakdowns.selectedActions!.items.first.id,
+          page.loaded.breakdowns.terminalIntentions!.items.first.id,
           statisticsId(600),
         );
         expect(
@@ -186,14 +187,14 @@ void main() {
       await pumpEventQueue();
       expect(page.loaded.section.selectedCounts.planned, 300);
       expect(
-        page.loaded.breakdowns.selectedActions!.items.first.id,
+        page.loaded.breakdowns.terminalIntentions!.items.first.id,
         statisticsId(100),
       );
       expect(h.reader.queries, hasLength(3));
       h.reader.section(2, revision: 2, marker: 22);
       await pumpEventQueue();
       expect(
-        page.loaded.breakdowns.selectedActions!.items.single.id,
+        page.loaded.breakdowns.terminalIntentions!.items.single.id,
         statisticsId(22),
       );
       expect(
@@ -229,7 +230,7 @@ void main() {
       await h.change(2);
       expect(h.reader.continuations, hasLength(5));
       expect(h.reader.queries, hasLength(2));
-      expect(page.loaded.breakdowns.selectedActions!.items, hasLength(300));
+      expect(page.loaded.breakdowns.terminalIntentions!.items, hasLength(300));
       page.model.setVisible(true);
       h.reader.section(2, revision: 2, marker: 22);
       await pumpEventQueue();
@@ -266,12 +267,15 @@ void main() {
         await pumpEventQueue();
         expect(page.loaded.section.selectedCounts.planned, 300);
         expect(_firstLength(page, StatisticsView.throughRelations), 300);
-        expect(page.loaded.breakdowns.selectedActions!.items, hasLength(300));
+        expect(
+          page.loaded.breakdowns.terminalIntentions!.items,
+          hasLength(300),
+        );
         final status =
             page.loaded.refreshStatus as IntentionStatisticsRefreshFailure;
         expect(status.failure, failure);
         expect(status.canRetry, failure is StatisticsReadUnavailableFailure);
-        await page.model.loadMore(StatisticsBreakdown.selectedActions);
+        await page.model.loadMore(StatisticsBreakdown.terminalIntentions);
         expect(h.reader.continuations, hasLength(5));
         page.model.setVisible(false);
         await page.model.retryRefresh();
@@ -294,32 +298,21 @@ void main() {
   }
 
   test(
-    'местная дата обновляет невыполненное без смены периодов и вида',
+    'смена местной даты не запускает новое чтение и не меняет выбор',
     () async {
       final h = IntentionStatisticsHarness();
       addTearDown(h.dispose);
       final page = h.open();
-      h.reader.section(
-        0,
-        total: 2,
-        split: UncompletedSplit(missed: 0, upcoming: 1),
-      );
+      h.reader.section(0, total: 2);
       await pumpEventQueue();
-      page.model.setVisible(false);
       final tomorrow = CalendarDate.fromParts(2026, 10, 13);
       page.model.setLocalDate(tomorrow);
+      page.model.setVisible(false);
       page.model.setLocalDate(tomorrow);
-      expect(h.reader.queries, hasLength(1));
       page.model.setVisible(true);
-      expect(h.reader.queries.last.localDate, tomorrow);
-      expect(page.loaded.section.details.uncompleted.upcoming, 1);
-      h.reader.section(
-        1,
-        total: 2,
-        split: UncompletedSplit(missed: 1, upcoming: 0),
-      );
       await pumpEventQueue();
-      expect(page.loaded.section.details.uncompleted.missed, 1);
+      expect(h.reader.queries, hasLength(1));
+      expect(page.state.selection.localDate, tomorrow);
       expect(page.state.selection.period, StatisticsMonth(2026, 10));
       expect(page.state.selection.year, StatisticsYear(2026));
       expect(page.state.selection.view, StatisticsView.throughRelations);
@@ -350,7 +343,7 @@ void main() {
           h.reader.section(1, marker: 2);
           await pumpEventQueue();
           expect(
-            page.loaded.breakdowns.selectedActions!.items.single.id,
+            page.loaded.breakdowns.terminalIntentions!.items.single.id,
             statisticsId(2),
           );
         } else if (stop == 'освобождение') {
@@ -373,14 +366,14 @@ void main() {
         actionsCursor: StatisticsTestCursor<StatisticsItem>(),
       );
       await pumpEventQueue();
-      final more = page.model.loadMore(StatisticsBreakdown.selectedActions);
+      final more = page.model.loadMore(StatisticsBreakdown.terminalIntentions);
       h.reader.failMore<StatisticsItem>(0, const StatisticsSnapshotExpired());
       await pumpEventQueue();
       expect(page.loaded.refreshStatus, isA<IntentionStatisticsRefreshing>());
       h.reader.section(1, marker: 9);
       await more;
       expect(
-        page.loaded.breakdowns.selectedActions!.items.single.id,
+        page.loaded.breakdowns.terminalIntentions!.items.single.id,
         statisticsId(9),
       );
       expect(page.loaded.refreshStatus, isA<IntentionStatisticsRefreshIdle>());
@@ -399,22 +392,22 @@ void main() {
     );
     await pumpEventQueue();
     final relations = page.model.loadMore(StatisticsBreakdown.relations);
-    final actions = page.model.loadMore(StatisticsBreakdown.selectedActions);
+    final actions = page.model.loadMore(StatisticsBreakdown.terminalIntentions);
     page.model.setVisible(false);
     h.reader.more(0, [statisticsRelation(2)]);
     h.reader.more(1, [statisticsItem(2)]);
     await Future.wait([relations, actions]);
-    expect(page.loaded.breakdowns.selectedActions!.items, hasLength(1));
+    expect(page.loaded.breakdowns.terminalIntentions!.items, hasLength(1));
     page.model.setVisible(true);
     expect(h.reader.queries, hasLength(1));
     final nextRelations = page.model.loadMore(StatisticsBreakdown.relations);
     final nextActions = page.model.loadMore(
-      StatisticsBreakdown.selectedActions,
+      StatisticsBreakdown.terminalIntentions,
     );
     h.reader.more(2, [statisticsRelation(2)]);
     h.reader.more(3, [statisticsItem(2)]);
     await Future.wait([nextRelations, nextActions]);
-    expect(page.loaded.breakdowns.selectedActions!.items, hasLength(2));
+    expect(page.loaded.breakdowns.terminalIntentions!.items, hasLength(2));
     expect(page.loaded.breakdowns.relations!.items, hasLength(2));
   });
 
@@ -438,7 +431,7 @@ void main() {
       h.reader.section(1, revision: 2, marker: 2);
       await pumpEventQueue();
       expect(
-        page.loaded.breakdowns.selectedActions!.items.single.id,
+        page.loaded.breakdowns.terminalIntentions!.items.single.id,
         statisticsId(2),
       );
     },
@@ -455,7 +448,7 @@ void main() {
       h.reader.section(1, marker: 9);
       await pumpEventQueue();
       expect(
-        page.loaded.breakdowns.selectedActions!.items.single.id,
+        page.loaded.breakdowns.terminalIntentions!.items.single.id,
         statisticsId(9),
       );
     },
@@ -473,11 +466,11 @@ void main() {
         actionsCursor: StatisticsTestCursor<StatisticsItem>(),
       );
       await pumpEventQueue();
-      final more = page.model.loadMore(StatisticsBreakdown.selectedActions);
+      final more = page.model.loadMore(StatisticsBreakdown.terminalIntentions);
       h.reader.more(0, [statisticsItem(2)], revision: 1);
       await pumpEventQueue();
       expect(
-        page.loaded.breakdowns.selectedActions!.items.single.id,
+        page.loaded.breakdowns.terminalIntentions!.items.single.id,
         statisticsId(1),
       );
       h.reader.section(1, revision: 1, marker: 11);
@@ -486,7 +479,7 @@ void main() {
       h.reader.section(2, revision: 1, marker: 12);
       await pumpEventQueue();
       expect(
-        page.loaded.breakdowns.selectedActions!.items.single.id,
+        page.loaded.breakdowns.terminalIntentions!.items.single.id,
         statisticsId(11),
       );
       h.reader.section(3, revision: 2, marker: 22);
@@ -495,13 +488,13 @@ void main() {
       h.reader.section(4, revision: 3, marker: 33);
       await pumpEventQueue();
       expect(
-        page.loaded.breakdowns.selectedActions!.items.single.id,
+        page.loaded.breakdowns.terminalIntentions!.items.single.id,
         statisticsId(22),
       );
       h.reader.section(5, revision: 0, epoch: 1, marker: 44);
       await pumpEventQueue();
       expect(
-        page.loaded.breakdowns.selectedActions!.items.single.id,
+        page.loaded.breakdowns.terminalIntentions!.items.single.id,
         statisticsId(44),
       );
     },
@@ -573,7 +566,9 @@ void main() {
       );
       await pumpEventQueue();
       final relations = page.model.loadMore(StatisticsBreakdown.relations);
-      final actions = page.model.loadMore(StatisticsBreakdown.selectedActions);
+      final actions = page.model.loadMore(
+        StatisticsBreakdown.terminalIntentions,
+      );
       await h.change(1);
       h.reader.fail(1, const StatisticsReadUnavailableFailure());
       await pumpEventQueue();
@@ -592,10 +587,10 @@ void main() {
         isA<IntentionStatisticsPageIdle>(),
       );
       expect(
-        page.loaded.breakdowns.selectedActions!.pageStatus,
+        page.loaded.breakdowns.terminalIntentions!.pageStatus,
         isA<IntentionStatisticsPageIdle>(),
       );
-      expect(page.loaded.breakdowns.selectedActions!.items, hasLength(1));
+      expect(page.loaded.breakdowns.terminalIntentions!.items, hasLength(1));
       expect(h.reader.queries, hasLength(2));
     },
   );
@@ -617,14 +612,14 @@ Future<void> _loadBoth(
   await pumpEventQueue();
   final breakdown = view == StatisticsView.throughRelations
       ? StatisticsBreakdown.relations
-      : StatisticsBreakdown.sourceIntentions;
+      : StatisticsBreakdown.rootIntentions;
   for (var i = 0; i < 2; i++) {
     final load = page.model.loadMore(breakdown);
     _moreFirst(h, i, view, cursor: i == 0);
     await load;
   }
   for (var i = 0; i < 2; i++) {
-    final load = page.model.loadMore(StatisticsBreakdown.selectedActions);
+    final load = page.model.loadMore(StatisticsBreakdown.terminalIntentions);
     h.reader.more(
       2 + i,
       List.generate(100, (j) => statisticsItem(101 + i * 100 + j)),
@@ -661,4 +656,4 @@ void _moreFirst(
 int _firstLength(IntentionStatisticsTestPage page, StatisticsView view) =>
     view == StatisticsView.throughRelations
     ? page.loaded.breakdowns.relations!.items.length
-    : page.loaded.breakdowns.sourceIntentions!.items.length;
+    : page.loaded.breakdowns.rootIntentions!.items.length;

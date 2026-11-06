@@ -1,7 +1,7 @@
 import 'dart:ui' show SemanticsAction, Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
+import 'package:doable/src/action/application/action_day_statuses.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/statistics/application/contribution_counts.dart';
 import 'package:doable/src/statistics/application/intention_statistics_calendar.dart';
@@ -159,8 +159,8 @@ void main() {
 IntentionStatisticsMonthCalendar _month() => IntentionStatisticsMonthCalendar(
   period: StatisticsMonth(2026, 10),
   statuses: {
-    CalendarDate.fromParts(2026, 10, 5): DailyChoiceDayStatus.allCompleted,
-    CalendarDate.fromParts(2026, 10, 7): DailyChoiceDayStatus.hasIncomplete,
+    CalendarDate.fromParts(2026, 10, 5): ActionDayStatus.allCompleted,
+    CalendarDate.fromParts(2026, 10, 7): ActionDayStatus.hasIncomplete,
   },
 );
 

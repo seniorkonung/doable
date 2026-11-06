@@ -335,10 +335,10 @@ final class IntentionFixtureReference {
       }
       for (final kind in view.breakdowns) {
         final keys = switch (kind) {
-          StatisticsBreakdown.sourceIntentions => [
+          StatisticsBreakdown.rootIntentions => [
             ContributionStatisticsFixture.id(choice.source),
           ],
-          StatisticsBreakdown.selectedActions => [
+          StatisticsBreakdown.terminalIntentions => [
             ContributionStatisticsFixture.id(choice.selected),
           ],
           StatisticsBreakdown.relations => path.outgoingRelations,
@@ -372,7 +372,7 @@ final class IntentionFixtureReference {
         for (final entry in dayCounts.entries) entry.key: entry.value.value,
       },
       uncompleted: (missed: missed, upcoming: upcoming),
-      explicitPathChoices: explicit,
+      explicitPathActions: explicit,
     );
   }
 }
@@ -384,14 +384,14 @@ final class IntentionFixtureSection {
     required this.breakdowns,
     required this.days,
     required this.uncompleted,
-    required this.explicitPathChoices,
+    required this.explicitPathActions,
   });
   final FixtureCounts periodCounts;
   final Map<StatisticsView, FixtureCounts> cards;
   final Map<StatisticsBreakdown, List<FixtureBreakdownRow>> breakdowns;
   final Map<String, FixtureCounts> days;
   final ({int missed, int upcoming}) uncompleted;
-  final int explicitPathChoices;
+  final int explicitPathActions;
 }
 
 final class _SavedRelation {

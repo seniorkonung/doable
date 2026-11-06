@@ -1,6 +1,6 @@
 part of 'contribution_reachability.dart';
 
-/// Положение рассматриваемого намерения в простом сохранённом пути.
+/// Положение рассматриваемого намерения в сохранённом пути действия.
 sealed class IntentionContributionPathPosition {
   const IntentionContributionPathPosition();
 }
@@ -9,51 +9,59 @@ final class ContributionOutsidePath extends IntentionContributionPathPosition {
   const ContributionOutsidePath();
 }
 
-final class ContributionSelectedOnPath
+/// Намерение — последнее звено пути; [isRoot] означает путь из него одного.
+/// Такое действие засчитано намерению без связи.
+final class ContributionTerminalOnPath
     extends IntentionContributionPathPosition {
-  const ContributionSelectedOnPath();
+  const ContributionTerminalOnPath({required this.isRoot});
+
+  final bool isRoot;
 }
 
-/// Намерение исходное при отсутствии предшественника, иначе промежуточное.
-/// Следующая связь сохраняет явное основание независимо от архивирования.
-final class ContributionBeforeSelectedAction
+/// Намерение — корневое при [isRoot], иначе промежуточное звено пути.
+/// [followingRelationId] — его связь со следующим намерением пути, в том
+/// числе архивированная; null, если такой связи больше нет.
+final class ContributionBeforeTerminal
     extends IntentionContributionPathPosition {
-  const ContributionBeforeSelectedAction({
-    this.predecessorId,
-    required this.followingRelationId,
+  const ContributionBeforeTerminal({
+    required this.isRoot,
+    this.followingRelationId,
   });
 
-  final IntentionId? predecessorId;
-  final LongTermRelationId followingRelationId;
+  final bool isRoot;
+  final LongTermRelationId? followingRelationId;
 }
 
 /// Группа для одного намерения и периода без пользовательского содержимого.
 ///
-/// Подготовка объединяет только выборы с одинаковыми опорным набором,
-/// положением намерения, выбранным действием и календарной частью. Опорные —
-/// выбранное действие и исходные намерения архивированных шагов. Вес включает
-/// каждый самостоятельный выбор; деление невыполненного уже учитывает местную
-/// дату. Группа непустая, а положение согласовано с рассматриваемым намерением.
+/// Подготовка объединяет только действия с одинаковыми опорным набором,
+/// положением намерения, конечным намерением и календарной частью. Опорные —
+/// существующие намерения пути; намерение, за которым в пути идёт другое,
+/// не рассматриваемое, по активной связи их пары, может быть опущено.
+/// Вес включает каждое самостоятельное действие. Группа непустая, а
+/// положение согласовано с рассматриваемым намерением.
 ///
+/// [terminalIntentionId] — существующее конечное намерение пути, если оно не
+/// рассматриваемое намерение; иначе null.
 /// [CalendarPart] — ключ дня месяца либо месяца года: вычисление сохраняет
 /// тип ключа потребителя, не преобразует даты и не определяет период заново.
 /// Списки копируются; остальные значения неизменяемы и принадлежат снимку.
 final class IntentionContributionGroup<CalendarPart extends Object> {
   IntentionContributionGroup({
     required List<IntentionId> seeds,
-    required this.selectedActionId,
+    required this.terminalIntentionId,
     required this.calendarPart,
     required this.pathPosition,
-    required this.summary,
+    required this.counts,
   }) : assert(seeds.isNotEmpty),
-       assert(summary.counts.planned > 0),
+       assert(counts.planned > 0),
        seeds = List.unmodifiable(seeds);
 
   final List<IntentionId> seeds;
-  final IntentionId selectedActionId;
+  final IntentionId? terminalIntentionId;
   final CalendarPart calendarPart;
   final IntentionContributionPathPosition pathPosition;
-  final StatisticsPeriodSummary summary;
+  final ContributionCounts counts;
 }
 
 typedef ContributionOutgoingRelation = ({
@@ -68,30 +76,31 @@ typedef ContributionRelationEntry = ({
 
 /// Неизменяемые количества для сборки раздела и порций адаптером.
 /// Разбивки содержат только положительный запланированный вклад и упорядочены
-/// по убыванию вклада, запланированного вклада и собственного идентификатора.
+/// по убыванию запланированного вклада, вклада и собственного идентификатора.
 /// Отсутствующая календарная часть имеет нулевые количества.
 final class IntentionContributionResult<CalendarPart extends Object> {
   IntentionContributionResult._({
-    required this.summary,
-    required this.explicitPathChoices,
+    required this.counts,
+    required this.explicitPathActions,
     required Map<CalendarPart, ContributionCounts> calendarCounts,
-    required List<ContributionReachabilityEntry> selectedActions,
+    required List<ContributionReachabilityEntry> terminalIntentions,
     required List<ContributionRelationEntry> relations,
   }) : calendarCounts = Map.unmodifiable(calendarCounts),
-       selectedActions = List.unmodifiable(selectedActions),
+       terminalIntentions = List.unmodifiable(terminalIntentions),
        relations = List.unmodifiable(relations);
 
-  final StatisticsPeriodSummary summary;
-  final int explicitPathChoices;
+  final ContributionCounts counts;
+  final int explicitPathActions;
   final Map<CalendarPart, ContributionCounts> calendarCounts;
-  final List<ContributionReachabilityEntry> selectedActions;
+  final List<ContributionReachabilityEntry> terminalIntentions;
   final List<ContributionRelationEntry> relations;
 }
 
-/// Чистый синхронный подсчёт вида «Весь вклад» для фонового изолята адаптера.
+/// Чистый синхронный подсчёт вида «Через связи» для фонового изолята адаптера.
 /// [activeOutgoingRelations] содержит все активные исходящие связи намерения
-/// из того же снимка, что [graph]. Архивированные явные связи приходят в группах.
-/// SQLite, названия, ревизии и порционирование остаются у вызывающего адаптера.
+/// из того же снимка, что [graph]. Связи, следующие за намерением в путях,
+/// приходят в группах. SQLite, названия, ревизии и порционирование остаются
+/// у вызывающего адаптера.
 IntentionContributionResult<CalendarPart>
 computeIntentionContribution<CalendarPart extends Object>({
   required ContributionRelationGraph graph,
@@ -101,29 +110,27 @@ computeIntentionContribution<CalendarPart extends Object>({
 }) {
   final reachable = _descendants(graph, intentionId);
   final calendar = <CalendarPart, _ContributionTotal>{};
-  final actions = <IntentionId, _ContributionTotal>{};
+  final terminals = <IntentionId, _ContributionTotal>{};
   final included = <IntentionContributionGroup<CalendarPart>>[];
   final total = _ContributionTotal();
-  var missed = 0;
-  var upcoming = 0;
   var explicit = 0;
   for (final group in groups) {
     if (!group.seeds.any(reachable.contains)) continue;
-    final counts = group.summary.counts;
+    final counts = group.counts;
     total.add(counts);
-    missed += group.summary.uncompleted.missed;
-    upcoming += group.summary.uncompleted.upcoming;
     (calendar[group.calendarPart] ??= _ContributionTotal()).add(counts);
-    (actions[group.selectedActionId] ??= _ContributionTotal()).add(counts);
+    if (group.terminalIntentionId case final terminal?) {
+      (terminals[terminal] ??= _ContributionTotal()).add(counts);
+    }
     if (group.pathPosition is! ContributionOutsidePath) {
       explicit += counts.planned;
     }
-    if (group.selectedActionId != intentionId) included.add(group);
+    if (group.pathPosition is! ContributionTerminalOnPath) included.add(group);
   }
 
-  final selectedActions =
+  final terminalIntentions =
       <ContributionReachabilityEntry>[
-        for (final entry in actions.entries)
+        for (final entry in terminals.entries)
           (intentionId: entry.key, counts: entry.value.counts),
       ]..sort((a, b) {
         final byCounts = _compareContributionCounts(a.counts, b.counts);
@@ -132,15 +139,12 @@ computeIntentionContribution<CalendarPart extends Object>({
             : b.intentionId.compareTo(a.intentionId);
       });
   return IntentionContributionResult._(
-    summary: StatisticsPeriodSummary(
-      counts: total.counts,
-      uncompleted: UncompletedSplit(missed: missed, upcoming: upcoming),
-    ),
-    explicitPathChoices: explicit,
+    counts: total.counts,
+    explicitPathActions: explicit,
     calendarCounts: {
       for (final entry in calendar.entries) entry.key: entry.value.counts,
     },
-    selectedActions: selectedActions,
+    terminalIntentions: terminalIntentions,
     relations: _relationContributions(
       graph,
       intentionId,
@@ -172,6 +176,9 @@ Set<IntentionId> _descendants(
   return reachable;
 }
 
+/// Действие относится к связи, следующей за намерением в его пути, и к
+/// активной исходящей связи, связанное намерение которой достигает опорного
+/// намерения без прохода через рассматриваемое.
 List<ContributionRelationEntry> _relationContributions<T extends Object>(
   ContributionRelationGraph graph,
   IntentionId intentionId,
@@ -179,24 +186,21 @@ List<ContributionRelationEntry> _relationContributions<T extends Object>(
   List<ContributionOutgoingRelation> outgoing,
 ) {
   if (groups.isEmpty) return const [];
-  final refined = [
+  // Опорные намерения без рассматриваемого. Пропуск звена перед ним при
+  // подготовке не допускается, поэтому оставшиеся опорные сохраняют
+  // достижимость в обход рассматриваемого намерения.
+  final seeds = [
     for (final group in groups)
-      ContributionSeedGroup(
-        seeds: {
-          for (final seed in group.seeds)
-            if (seed != intentionId) seed,
-          if (group.pathPosition case ContributionBeforeSelectedAction(
-            predecessorId: final predecessor?,
-          ))
-            predecessor,
-        }.toList(),
-        counts: group.summary.counts,
-      ),
+      [
+        for (final seed in group.seeds)
+          if (seed != intentionId) seed,
+      ],
   ];
+  final weights = [for (final group in groups) group.counts];
   // Исключение происходит до сжатия: прежние компоненты могут распасться.
   final components = _condense(
     graph,
-    refined,
+    seeds.expand((group) => group),
     excludedIntentionId: intentionId,
   );
   final componentCount = components.childOffsets.length - 1;
@@ -208,14 +212,14 @@ List<ContributionRelationEntry> _relationContributions<T extends Object>(
     final relationMasks = <LongTermRelationId, int>{};
     for (var group = first; group < end; group++) {
       final bit = 1 << (group - first);
-      for (final seed in refined[group].seeds) {
+      for (final seed in seeds[group]) {
         masks[components.byNode[components.indexById[seed]!]] |= bit;
       }
-      if (groups[group].pathPosition case ContributionBeforeSelectedAction(
-        :final followingRelationId,
+      if (groups[group].pathPosition case ContributionBeforeTerminal(
+        followingRelationId: final following?,
       )) {
         relationMasks.update(
-          followingRelationId,
+          following,
           (mask) => mask | bit,
           ifAbsent: () => bit,
         );
@@ -241,8 +245,8 @@ List<ContributionRelationEntry> _relationContributions<T extends Object>(
         ifAbsent: () => mask,
       );
     }
-    final plannedSums = _byteSums(refined, first, contribution: false);
-    final contributionSums = _byteSums(refined, first, contribution: true);
+    final plannedSums = _byteSums(weights, first, contribution: false);
+    final contributionSums = _byteSums(weights, first, contribution: true);
     for (final entry in relationMasks.entries) {
       final total = totals[entry.key] ??= _ContributionTotal();
       for (var byte = 0; byte < 8; byte++) {
@@ -275,6 +279,6 @@ final class _ContributionTotal {
 }
 
 int _compareContributionCounts(ContributionCounts a, ContributionCounts b) {
-  final byContribution = b.contribution.compareTo(a.contribution);
-  return byContribution != 0 ? byContribution : b.planned.compareTo(a.planned);
+  final byPlanned = b.planned.compareTo(a.planned);
+  return byPlanned != 0 ? byPlanned : b.contribution.compareTo(a.contribution);
 }

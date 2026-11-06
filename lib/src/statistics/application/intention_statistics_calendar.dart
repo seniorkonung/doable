@@ -1,9 +1,9 @@
-import '../../daily_choice/application/daily_choice_day_statuses.dart';
+import '../../action/application/action_day_statuses.dart';
 import '../../shared/domain/calendar_date.dart';
 import 'contribution_counts.dart';
 import 'statistics_period.dart';
 
-/// Календарное представление только выборов выбранного вида намерения.
+/// Календарное представление только действий выбранного вида намерения.
 sealed class IntentionStatisticsCalendar {
   const IntentionStatisticsCalendar();
 
@@ -14,7 +14,7 @@ final class IntentionStatisticsMonthCalendar
     extends IntentionStatisticsCalendar {
   IntentionStatisticsMonthCalendar({
     required this.period,
-    required Map<CalendarDate, DailyChoiceDayStatus> statuses,
+    required Map<CalendarDate, ActionDayStatus> statuses,
   }) : statuses = Map.unmodifiable(statuses) {
     if (this.statuses.keys.any((date) => !period.contains(date))) {
       throw const StatisticsDataValidationException();
@@ -24,8 +24,8 @@ final class IntentionStatisticsMonthCalendar
   @override
   final StatisticsMonth period;
 
-  /// Отсутствие даты означает отсутствие засчитанных выборов этого дня.
-  final Map<CalendarDate, DailyChoiceDayStatus> statuses;
+  /// Отсутствие даты означает отсутствие действий вида в этот день.
+  final Map<CalendarDate, ActionDayStatus> statuses;
 }
 
 final class IntentionStatisticsYearCalendar
@@ -42,6 +42,7 @@ final class IntentionStatisticsYearCalendar
   @override
   final StatisticsYear period;
 
-  /// Ровно 12 месяцев от января (индекс 0) до декабря, включая нулевые.
+  /// Ровно 12 месяцев от января (индекс 0) до декабря, включая нулевые:
+  /// действия вида и выполненные из них.
   final List<ContributionCounts> months;
 }

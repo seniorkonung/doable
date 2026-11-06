@@ -175,15 +175,15 @@ final class _Cards extends StatelessWidget {
                   : constraints.maxWidth,
               child: MergeSemantics(
                 child: Semantics(
-                  selected: section.query.view == view,
+                  selected: section.view == view,
                   inMutuallyExclusiveGroup: true,
                   child: OutlinedButton(
                     onPressed: () => onViewSelected(view),
                     style: OutlinedButton.styleFrom(
-                      backgroundColor: section.query.view == view
+                      backgroundColor: section.view == view
                           ? colors.secondaryContainer
                           : null,
-                      foregroundColor: section.query.view == view
+                      foregroundColor: section.view == view
                           ? colors.onSecondaryContainer
                           : null,
                       padding: const EdgeInsets.all(12),
@@ -199,13 +199,12 @@ final class _Cards extends StatelessWidget {
                             section.cards[view].planned,
                           ),
                         ),
-                        if (section.query.view == view)
-                          _shareLabel(texts, section),
+                        if (section.view == view) ?_shareLabel(texts, section),
                       ].join('. '),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (section.query.view == view)
+                          if (section.view == view)
                             const Icon(Icons.check, size: 18),
                           Text(
                             _viewLabel(texts, view),
@@ -238,36 +237,30 @@ final class _Summary extends StatelessWidget {
   Widget build(BuildContext context) {
     final texts = AppLocalizations.of(context);
     final counts = section.selectedCounts;
+    final share = _shareLabel(texts, section);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Semantics(
           excludeSemantics: true,
-          label: [
-            texts.statisticsContributionCountsSemantics(
-              counts.contribution,
-              counts.planned,
-            ),
-            if (section.periodCounts.contribution == 0)
-              texts.statisticsNoContributionShare,
-          ].join('. '),
+          label: texts.statisticsContributionCountsSemantics(
+            counts.contribution,
+            counts.planned,
+          ),
           child: Text(
-            texts.statisticsContributionCounts(
+            texts.statisticsPeriodCompleted(
               counts.contribution,
               counts.planned,
             ),
           ),
         ),
-        if (section.periodCounts.contribution > 0)
-          Text(_shareLabel(texts, section)),
-        Text(texts.statisticsMissed(section.details.uncompleted.missed)),
-        Text(texts.statisticsUpcoming(section.details.uncompleted.upcoming)),
+        if (share != null) Text(share),
         if (section.details case IntentionStatisticsThroughRelationsDetails(
-          :final explicitPathChoices,
+          :final explicitPathActions,
         ))
           Text(
-            texts.statisticsExplicitPathChoices(
-              explicitPathChoices,
+            texts.statisticsExplicitPathActions(
+              explicitPathActions,
               counts.planned,
             ),
           ),
@@ -276,13 +269,15 @@ final class _Summary extends StatelessWidget {
   }
 }
 
-String _shareLabel(
+/// Доля действий вида среди всех действий периода; без действий периода
+/// доли нет.
+String? _shareLabel(
   AppLocalizations texts,
   IntentionStatisticsSection section,
-) => section.periodCounts.contribution == 0
-    ? texts.statisticsNoContributionShare
-    : texts.statisticsContributionShare(
-        section.selectedCounts.contribution / section.periodCounts.contribution,
+) => section.periodCounts.planned == 0
+    ? null
+    : texts.statisticsPeriodActionsShare(
+        section.selectedCounts.planned / section.periodCounts.planned,
       );
 
 String _viewLabel(AppLocalizations texts, StatisticsView view) =>

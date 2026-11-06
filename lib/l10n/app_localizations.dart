@@ -296,18 +296,6 @@ abstract class AppLocalizations {
   /// **'{completed} of {planned} completed'**
   String statisticsPeriodCompleted(int completed, int planned);
 
-  /// Число невыполненных выборов раньше текущей местной даты
-  ///
-  /// In en, this message translates to:
-  /// **'Missed: {count}'**
-  String statisticsMissed(int count);
-
-  /// Число невыполненных выборов текущей местной даты и позже
-  ///
-  /// In en, this message translates to:
-  /// **'Upcoming: {count}'**
-  String statisticsUpcoming(int count);
-
   /// Компактный видимый вклад элемента из запланированного
   ///
   /// In en, this message translates to:
@@ -320,19 +308,7 @@ abstract class AppLocalizations {
   /// **'Contribution: {contribution}. Planned contribution: {planned}'**
   String statisticsContributionCountsSemantics(int contribution, int planned);
 
-  /// Видимая и доступная доля вклада элемента; отношение к вкладу периода передаётся без умножения на 100
-  ///
-  /// In en, this message translates to:
-  /// **'Share of the period’s contribution: {share}'**
-  String statisticsContributionShare(num share);
-
-  /// Доступное объяснение отсутствия доли при нулевом вкладе периода; видимая доля в этом случае не показывается
-  ///
-  /// In en, this message translates to:
-  /// **'No share: the period’s contribution is zero'**
-  String get statisticsNoContributionShare;
-
-  /// Видимая и доступная доля элемента Главной: его запланированный вклад, делённый на число действий периода, без умножения на 100
+  /// Видимая и доступная доля элемента Главной или вида раздела намерения: запланированный вклад, делённый на число действий периода, без умножения на 100
   ///
   /// In en, this message translates to:
   /// **'Share of the period’s actions: {share}'**
@@ -452,23 +428,17 @@ abstract class AppLocalizations {
   /// **'By relations'**
   String get statisticsBreakdownRelations;
 
-  /// Число запланированных выборов вида «Весь вклад», в сохранённом пути которых есть намерение; учитываются выполненные и невыполненные выборы
+  /// Сколько действий вида «Через связи» содержат намерение на сохранённом пути, из всех действий этого вида; учитываются выполненные и невыполненные
   ///
   /// In en, this message translates to:
-  /// **'Daily choices with this intention on the saved selection path: {count} of {planned}'**
-  String statisticsExplicitPathChoices(int count, int planned);
+  /// **'With this intention on the saved path: {count} of {planned}'**
+  String statisticsExplicitPathActions(int count, int planned);
 
-  /// Доля строки разбивки относительно вклада намерения в выбранном виде, а не всего периода; отношение передаётся без умножения на 100
+  /// Доля строки разбивки: её запланированный вклад, делённый на число действий выбранного вида намерения, без умножения на 100
   ///
   /// In en, this message translates to:
-  /// **'Share of this intention’s contribution in this view: {share}'**
-  String statisticsBreakdownContributionShare(num share);
-
-  /// Доступное объяснение отсутствия доли строки разбивки при нулевом вкладе намерения в выбранном виде
-  ///
-  /// In en, this message translates to:
-  /// **'No share: this intention’s contribution in this view is zero'**
-  String get statisticsBreakdownNoContributionShare;
+  /// **'Share of this view’s actions: {share}'**
+  String statisticsBreakdownActionsShare(num share);
 
   /// Краткий статус неудачного обновления рядом с прежними строками; допускает повтор
   ///
@@ -518,7 +488,7 @@ abstract class AppLocalizations {
   /// **'{month}. {counts}'**
   String statisticsMonthBarSemantics(DateTime month, String counts);
 
-  /// Доступная подпись карточки вида: локализованные вид, период и обе меры; выбранное состояние передаётся свойством Semantics.selected. Доля выбранного вида использует statisticsContributionShare или statisticsNoContributionShare; название намерения не переводится, архивная отметка использует detailsArchived
+  /// Доступная подпись карточки вида: локализованные вид, период и обе меры; выбранное состояние передаётся свойством Semantics.selected. Доля выбранного вида использует statisticsPeriodActionsShare; название намерения не переводится, архивная отметка использует detailsArchived
   ///
   /// In en, this message translates to:
   /// **'{view}. {period}. {counts}'**

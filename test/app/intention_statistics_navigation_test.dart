@@ -142,12 +142,12 @@ void main() {
       final originalProvider = app.sectionProvider(tester);
       for (final (breakdown, rowId, view) in [
         (
-          StatisticsBreakdown.sourceIntentions,
+          StatisticsBreakdown.rootIntentions,
           1010,
           StatisticsView.rootIntentions,
         ),
         (
-          StatisticsBreakdown.selectedActions,
+          StatisticsBreakdown.terminalIntentions,
           2010,
           StatisticsView.terminalIntentions,
         ),
@@ -174,10 +174,10 @@ void main() {
         final before = app.container.read(originalProvider);
         final data = before.read as IntentionStatisticsLoaded;
         expect(switch (breakdown) {
-          StatisticsBreakdown.sourceIntentions =>
-            data.breakdowns.sourceIntentions!.items.length,
-          StatisticsBreakdown.selectedActions =>
-            data.breakdowns.selectedActions!.items.length,
+          StatisticsBreakdown.rootIntentions =>
+            data.breakdowns.rootIntentions!.items.length,
+          StatisticsBreakdown.terminalIntentions =>
+            data.breakdowns.terminalIntentions!.items.length,
           StatisticsBreakdown.relations =>
             data.breakdowns.relations!.items.length,
         }, 120);
@@ -188,10 +188,10 @@ void main() {
         expect(retained.selection.view, before.selection.view);
         final parts = (retained.read as IntentionStatisticsLoaded).breakdowns;
         expect(switch (breakdown) {
-          StatisticsBreakdown.sourceIntentions =>
-            parts.sourceIntentions!.items.length,
-          StatisticsBreakdown.selectedActions =>
-            parts.selectedActions!.items.length,
+          StatisticsBreakdown.rootIntentions =>
+            parts.rootIntentions!.items.length,
+          StatisticsBreakdown.terminalIntentions =>
+            parts.terminalIntentions!.items.length,
           StatisticsBreakdown.relations => parts.relations!.items.length,
         }, 120);
         await _scrollTo(tester, row, find.byType(IntentionDetailsPage));
@@ -207,11 +207,11 @@ void main() {
         final after = app.container.read(originalProvider);
         expect(after.selection, same(before.selection));
         final restored = (after.read as IntentionStatisticsLoaded).breakdowns;
+        expect(restored.rootIntentions, same(data.breakdowns.rootIntentions));
         expect(
-          restored.sourceIntentions,
-          same(data.breakdowns.sourceIntentions),
+          restored.terminalIntentions,
+          same(data.breakdowns.terminalIntentions),
         );
-        expect(restored.selectedActions, same(data.breakdowns.selectedActions));
         expect(restored.relations, same(data.breakdowns.relations));
         expect(
           _scroll(tester, find.byType(IntentionDetailsPage)).position.pixels,
@@ -239,7 +239,7 @@ void main() {
       );
       final first = app.sectionProvider(tester);
       final action = find.descendant(
-        of: find.byKey(const ValueKey(StatisticsBreakdown.selectedActions)),
+        of: find.byKey(const ValueKey(StatisticsBreakdown.terminalIntentions)),
         matching: find.text('Намерение 2120'),
       );
       await _scrollTo(tester, action, find.byType(IntentionDetailsPage));

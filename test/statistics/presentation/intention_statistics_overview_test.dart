@@ -1,7 +1,7 @@
 import 'dart:ui' show Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
+import 'package:doable/src/action/application/action_day_statuses.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/statistics/application/contribution_counts.dart';
@@ -21,7 +21,7 @@ import 'intention_statistics_test_support.dart';
 
 void main() {
   testWidgets(
-    'четыре карточки показывают меры по порядку, сводка — долю и явные основания',
+    'четыре карточки показывают меры по порядку, сводка — выполнено, долю и явные основания',
     (tester) async {
       await _pump(tester, _overview());
       final texts = AppLocalizations.of(
@@ -48,12 +48,14 @@ void main() {
       ]);
       expect(find.text('3 из 7'), findsOneWidget);
       expect(find.text('0 из 0'), findsNWidgets(2));
-      expect(find.text('3 из 8'), findsNWidgets(2));
-      expect(find.text(texts.statisticsContributionShare(.75)), findsOneWidget);
-      expect(find.text(texts.statisticsMissed(2)), findsOneWidget);
-      expect(find.text(texts.statisticsUpcoming(3)), findsOneWidget);
+      expect(find.text('3 из 8'), findsOneWidget);
+      expect(find.text(texts.statisticsPeriodCompleted(3, 8)), findsOneWidget);
       expect(
-        find.text(texts.statisticsExplicitPathChoices(7, 8)),
+        find.text(texts.statisticsPeriodActionsShare(8 / 21)),
+        findsOneWidget,
+      );
+      expect(
+        find.text(texts.statisticsExplicitPathActions(7, 8)),
         findsOneWidget,
       );
       expect(nodes.map((node) => node.flagsCollection.isSelected), [
@@ -69,21 +71,20 @@ void main() {
     },
   );
 
-  testWidgets(
-    'нулевой вклад периода не показывает процент и объясняется диктору',
-    (tester) async {
-      await _pump(tester, _overview(zero: true));
-      final texts = AppLocalizations.of(
-        tester.element(find.byType(IntentionStatisticsOverview)),
-      );
-      expect(find.textContaining('%'), findsNothing);
-      expect(
-        find.bySemanticsLabel(RegExp(texts.statisticsNoContributionShare)),
-        findsWidgets,
-      );
-      expect(find.text('0 из 8'), findsNWidgets(2));
-    },
-  );
+  testWidgets('нулевой вклад не скрывает долю действий периода', (
+    tester,
+  ) async {
+    await _pump(tester, _overview(zero: true));
+    final texts = AppLocalizations.of(
+      tester.element(find.byType(IntentionStatisticsOverview)),
+    );
+    expect(
+      find.text(texts.statisticsPeriodActionsShare(8 / 21)),
+      findsOneWidget,
+    );
+    expect(find.text(texts.statisticsPeriodCompleted(0, 8)), findsOneWidget);
+    expect(find.text('0 из 8'), findsOneWidget);
+  });
 
   testWidgets(
     'клавиатура переключает режим, период и вид через события модели',
@@ -199,23 +200,21 @@ Widget _overview({bool zero = false}) {
       intentionId: statisticsId(1),
       period: period,
       view: StatisticsView.throughRelations,
-      localDate: statisticsToday,
       pageSize: 100,
     ),
     revision: const StatisticsTestRevision(0),
     cards: IntentionStatisticsCards(
-      sourceIntentions: ContributionCounts(
+      rootIntentions: ContributionCounts(
         planned: 7,
         contribution: zero ? 0 : 3,
       ),
       intermediateIntentions: ContributionCounts(planned: 0, contribution: 0),
-      selectedActions: ContributionCounts(planned: 0, contribution: 0),
+      terminalIntentions: ContributionCounts(planned: 0, contribution: 0),
       throughRelations: counts,
     ),
     periodCounts: ContributionCounts(planned: 21, contribution: zero ? 0 : 4),
     details: IntentionStatisticsThroughRelationsDetails(
-      uncompleted: UncompletedSplit(missed: 2, upcoming: zero ? 6 : 3),
-      explicitPathChoices: 7,
+      explicitPathActions: 7,
       relations: StatisticsBreakdownFirstPage(
         items: [
           StatisticsRelationItem(
@@ -227,7 +226,7 @@ Widget _overview({bool zero = false}) {
         totalItems: 1,
         nextCursor: null,
       ),
-      selectedActions: StatisticsBreakdownFirstPage(
+      terminalIntentions: StatisticsBreakdownFirstPage(
         items: [action],
         totalItems: 1,
         nextCursor: null,
@@ -236,12 +235,11 @@ Widget _overview({bool zero = false}) {
     calendar: IntentionStatisticsMonthCalendar(
       period: period,
       statuses: {
-        CalendarDate.fromParts(2026, 10, 7): DailyChoiceDayStatus.hasIncomplete,
-        CalendarDate.fromParts(2026, 10, 12):
-            DailyChoiceDayStatus.hasIncomplete,
+        CalendarDate.fromParts(2026, 10, 7): ActionDayStatus.hasIncomplete,
+        CalendarDate.fromParts(2026, 10, 12): ActionDayStatus.hasIncomplete,
         CalendarDate.fromParts(2026, 10, 15): zero
-            ? DailyChoiceDayStatus.hasIncomplete
-            : DailyChoiceDayStatus.allCompleted,
+            ? ActionDayStatus.hasIncomplete
+            : ActionDayStatus.allCompleted,
       },
     ),
   );
