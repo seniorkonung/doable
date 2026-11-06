@@ -1,4 +1,4 @@
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/action/domain/action_id.dart';
 import 'package:doable/src/graph_format/graph_format_records.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
@@ -14,12 +14,15 @@ const graphLogProfileEntities = 1000000;
 
 /// Граф из [entities] сущностей формата данных графа в одних и тех же
 /// пропорциях при любом размере: на тысячу сущностей — тег, 200 намерений,
-/// 200 назначений тегов, 300 долговременных связей и 299 дневных выборов с
-/// путями из 1–5 шагов.
+/// 200 назначений тегов, 300 долговременных связей, 294 действия с путями из
+/// 1–5 звеньев, два надгробия намерений и три надгробия пар. Действия идут по
+/// [actionsPerDay] в день.
 ///
 /// Последнее намерение — узел каскада: его [hubRelations] активных связей
 /// входят в число связей графа, а остальные связи соединяют прочие
-/// намерения полосами, первая из которых — цепочка путей дневных выборов.
+/// намерения полосами, первая из которых — цепочка путей действий. Три
+/// последних действия каждой тысячи ведут путь через удалённое: к удалённому
+/// конечному намерению, от удалённого корневого и по удалённой связи.
 final class GraphLogFixture {
   GraphLogFixture(this.entities, {this.hubRelations = 0})
     : _scale = entities ~/ 1000 {
@@ -31,6 +34,9 @@ final class GraphLogFixture {
     }
   }
 
+  /// Наибольшее число действий одного дня.
+  static const actionsPerDay = 60;
+
   final int entities;
   final int hubRelations;
   final int _scale;
@@ -39,24 +45,29 @@ final class GraphLogFixture {
   int get intentions => 200 * _scale;
   int get tagAssignments => intentions;
   int get longTermRelations => 300 * _scale;
-  int get dailyChoices => 299 * _scale;
+  int get deletedIntentions => 2 * _scale;
+  int get deletedRelationPairs => 3 * _scale;
+  int get actions => 294 * _scale;
 
   /// Количества записей файла формата, который описывает граф.
   GraphRecordCounts get counts => GraphRecordCounts(
     tags: tags,
     intentions: intentions,
-    deletedIntentions: 0,
+    deletedIntentions: deletedIntentions,
     tagAssignments: tagAssignments,
     longTermRelations: longTermRelations,
-    deletedRelationPairs: 0,
-    actions: 0,
-    dailyChoices: dailyChoices,
+    deletedRelationPairs: deletedRelationPairs,
+    actions: actions,
+    dailyChoices: 0,
   );
 
   /// Намерения полос: все, кроме узла каскада.
   int get _laneIntentions => intentions - 1;
 
   int get _laneRelations => longTermRelations - hubRelations;
+
+  /// Действия с путями только из существующих намерений и связей.
+  int get connectedActions => actions - 3 * _scale;
 
   IntentionId intentionId(int index) =>
       (IntentionId.decode(_id(2, index)) as IntentionIdDecodingSuccess).id;
@@ -66,8 +77,12 @@ final class GraphLogFixture {
   TagId tagId(int index) =>
       (TagId.decode(_id(1, index)) as TagIdDecodingSuccess).id;
 
-  DailyChoiceId dailyChoiceId(int index) =>
-      (DailyChoiceId.decode(_id(4, index)) as DailyChoiceIdDecodingSuccess).id;
+  /// Действие с номером [index]; у действия с номером 5k + 4 путь из пяти
+  /// звеньев по существующим связям.
+  ActionId actionId(int index) {
+    if (index >= connectedActions) throw RangeError.value(index, 'index');
+    return (ActionId.decode(_id(4, index)) as ActionIdDecodingSuccess).id;
+  }
 
   String intentionTitle(int index) => index % 7 == 0
       ? 'Намерение $index — подробное название с целью и контекстом'
@@ -77,6 +92,27 @@ final class GraphLogFixture {
       ? 'Зачем: шаг $index большой цели.\n'
             'Как понять, что готово: результат проверен и записан.'
       : null;
+
+  /// Номера намерений пути действия [action]: удалённые намерения имеют
+  /// номера от [intentions], которых нет у существующих.
+  List<int> _path(int action) {
+    final source = action * 13 % _laneIntentions;
+    if (action < connectedActions) {
+      return [
+        for (var offset = 0; offset <= action % 5 + 1; offset++)
+          (source + offset) % _laneIntentions,
+      ];
+    }
+    final special = action - connectedActions;
+    final deleted = intentions + 2 * (special ~/ 3);
+    // Полосы соединяют намерения со сдвигом не больше двух, поэтому у пары
+    // со сдвигом пять связи нет.
+    return switch (special % 3) {
+      0 => [source, (source + 1) % _laneIntentions, deleted],
+      1 => [deleted + 1, source, (source + 1) % _laneIntentions],
+      _ => [source, (source + 5) % _laneIntentions],
+    };
+  }
 
   /// Вставляет граф в пустую базу [database] одной транзакцией при
   /// выключенном захвате фактов, как замена графа: лог остаётся на позиции 0.
@@ -94,12 +130,17 @@ final class GraphLogFixture {
         (id, source_intention_id, related_intention_id, type, priority,
          description, is_archived, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)'''),
-      database.prepare('''INSERT INTO daily_choices
-        (id, source_intention_id, selected_intention_id, choice_date,
-         description, is_completed, scheduled_minute, priority)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)'''),
-      database.prepare('''INSERT INTO daily_choice_path_steps
-        (id, daily_choice_id, long_term_relation_id, previous_step_id)
+      database.prepare(
+        'INSERT INTO deleted_intentions (intention_id, title) VALUES (?, ?)',
+      ),
+      database.prepare('''INSERT INTO deleted_relation_pairs
+        (source_intention_id, related_intention_id, type) VALUES (?, ?, ?)'''),
+      database.prepare('''INSERT INTO actions
+        (id, title, description, date, scheduled_hour, priority, is_completed,
+         created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'''),
+      database.prepare('''INSERT INTO action_path_items
+        (action_id, position, intention_id, previous_intention_id)
         VALUES (?, ?, ?, ?)'''),
     ];
     final [
@@ -107,8 +148,10 @@ final class GraphLogFixture {
       insertIntention,
       insertAssignment,
       insertRelation,
-      insertChoice,
-      insertStep,
+      insertDeletedIntention,
+      insertDeletedPair,
+      insertAction,
+      insertItem,
     ] = statements;
     try {
       seedRawGraph(database, () {
@@ -146,37 +189,51 @@ final class GraphLogFixture {
             lane == 2 && relation % 20 == 19 ? 1 : 0,
           ]);
         }
-        final firstDay = DateTime.utc(2021);
-        var step = 0;
-        for (var choice = 0; choice < dailyChoices; choice++) {
-          final source = choice * 13 % _laneIntentions;
-          final length = choice % 5 + 1;
-          final day = firstDay.add(Duration(days: choice ~/ 150));
-          insertChoice.execute([
-            _id(4, choice),
+        // Надгробия вставляются до путей, которые на них ссылаются.
+        for (var action = connectedActions; action < actions; action++) {
+          final path = _path(action);
+          final (source, related) = (action - connectedActions) % 3 == 0
+              ? (path[1], path[2])
+              : (path[0], path[1]);
+          for (final deleted in path.where((index) => index >= intentions)) {
+            insertDeletedIntention.execute([
+              _id(2, deleted),
+              'Удалённое намерение $deleted',
+            ]);
+          }
+          insertDeletedPair.execute([
             _id(2, source),
-            _id(2, (source + length) % _laneIntentions),
+            _id(2, related),
+            action.isEven ? 'need' : 'can',
+          ]);
+        }
+        final firstDay = DateTime.utc(2021);
+        for (var action = 0; action < actions; action++) {
+          final day = firstDay.add(Duration(days: action ~/ actionsPerDay));
+          final timestamp = createdAt + action * Duration.microsecondsPerSecond;
+          insertAction.execute([
+            _id(4, action),
+            'Действие $action',
+            action % 10 == 0 ? 'Действие $action: что сделать сегодня' : null,
             CalendarDate.fromParts(
               day.year,
               day.month,
               day.day,
             ).toCanonicalString(),
-            choice % 10 == 0 ? 'Выбор $choice: что сделать сегодня' : null,
-            choice % 2,
-            choice % 3 == 0 ? null : choice * 37 % 1440,
-            choice % 4 + 1,
+            action % 3 == 0 ? null : action * 7 % 24,
+            action % 4 + 1,
+            action % 2,
+            timestamp,
+            timestamp,
           ]);
-          String? previous;
-          for (var offset = 0; offset < length; offset++) {
-            final stepId = _id(5, step++);
-            // Связь первой полосы с номером n ведёт от намерения n к n + 1.
-            insertStep.execute([
-              stepId,
-              _id(4, choice),
-              _id(3, (source + offset) % _laneIntentions),
-              previous,
+          final path = _path(action);
+          for (var position = 0; position < path.length; position++) {
+            insertItem.execute([
+              _id(4, action),
+              position,
+              _id(2, path[position]),
+              position == 0 ? null : _id(2, path[position - 1]),
             ]);
-            previous = stepId;
           }
         }
       });

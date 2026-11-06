@@ -346,9 +346,11 @@ _Operation _importInIsolate(
 Future<int> _graphRecords(AppDatabase database) async {
   final row = await database.customSelect('''SELECT
     (SELECT count(*) FROM tags) + (SELECT count(*) FROM intentions) +
+    (SELECT count(*) FROM deleted_intentions) +
     (SELECT count(*) FROM tag_assignments) +
     (SELECT count(*) FROM long_term_relations) +
-    (SELECT count(*) FROM daily_choices) AS records''').getSingle();
+    (SELECT count(*) FROM deleted_relation_pairs) +
+    (SELECT count(*) FROM actions) AS records''').getSingle();
   return row.read<int>('records');
 }
 

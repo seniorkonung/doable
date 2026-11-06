@@ -34,19 +34,27 @@ final class IntentionStatisticsFixture {
     final relation = database.prepare('''INSERT INTO long_term_relations
       (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at)
       VALUES (?, ?, ?, 'need', 2, 0, 0)''');
-    final choice = database.prepare('''INSERT INTO daily_choices
-      (id, source_intention_id, selected_intention_id, choice_date, is_completed)
-      VALUES (?, ?, ?, ?, ?)''');
-    final step = database.prepare('''INSERT INTO daily_choice_path_steps
-      (id, daily_choice_id, long_term_relation_id, previous_step_id)
+    final deletedIntention = database.prepare(
+      'INSERT INTO deleted_intentions (intention_id, title) VALUES (?, ?)',
+    );
+    final deletedPair = database.prepare(
+      '''INSERT INTO deleted_relation_pairs
+      (source_intention_id, related_intention_id, type) VALUES (?, ?, 'need')''',
+    );
+    final action = database.prepare('''INSERT INTO actions
+      (id, title, date, priority, is_completed, created_at, updated_at)
+      VALUES (?, ?, ?, 4, ?, 0, 0)''');
+    final item = database.prepare('''INSERT INTO action_path_items
+      (action_id, position, intention_id, previous_intention_id)
       VALUES (?, ?, ?, ?)''');
+    String id(int number) => ContributionStatisticsFixture.id(number);
+    // Часть путей начинается или заканчивается удалённым намерением.
+    int? deletedRoot(int index) => index % 50 == 33 ? 61001 + index : null;
+    int? deletedTail(int index) => index % 50 == 17 ? 60001 + index : null;
     try {
       seedRawGraph(database, () {
         for (var node = 1; node <= 50000; node++) {
-          intention.execute([
-            ContributionStatisticsFixture.id(node),
-            'Намерение $node',
-          ]);
+          intention.execute([id(node), 'Намерение $node']);
         }
         for (var number = 0; number < 150000; number++) {
           final band = number ~/ 50000;
@@ -57,13 +65,19 @@ final class IntentionStatisticsFixture {
             999 => (1000, 1),
             _ => (source, (source + band) % 50000 + 1),
           };
-          relation.execute([
-            ContributionStatisticsFixture.id(100000 + number),
-            ContributionStatisticsFixture.id(from),
-            ContributionStatisticsFixture.id(to),
-          ]);
+          relation.execute([id(100000 + number), id(from), id(to)]);
         }
-        var choiceNumber = 0, stepNumber = 0;
+        for (var index = 0; index < 500; index++) {
+          if (deletedRoot(index) case final root?) {
+            deletedIntention.execute([id(root), 'Удалённое $root']);
+            deletedPair.execute([id(root), id(20001 + index)]);
+          }
+          if (deletedTail(index) case final tail?) {
+            deletedIntention.execute([id(tail), 'Удалённое $tail']);
+            deletedPair.execute([id(30001 + index), id(tail)]);
+          }
+        }
+        var actionNumber = 0;
         for (
           var day = DateTime.utc(2025);
           day.year <= 2027;
@@ -74,63 +88,56 @@ final class IntentionStatisticsFixture {
             day.month,
             day.day,
           ).toCanonicalString();
-          for (var slot = 0; slot < 100; slot++) {
-            final index = (choiceNumber ~/ 6) % 500;
-            final incoming = 50000 + index;
-            final outgoing = 50500 + index;
-            final relations = switch ((choiceNumber ~/ 2) % 3) {
-              0 => [incoming, outgoing],
-              1 => [outgoing],
-              _ => [incoming],
+          for (var slot = 0; slot < statisticsActionsPerDay; slot++) {
+            final index = (actionNumber ~/ 6) % 500;
+            final incoming = 20001 + index;
+            final outgoing = 30001 + index;
+            final path = switch ((actionNumber ~/ 2) % 3) {
+              0 => [incoming, target, outgoing],
+              1 => [target, outgoing],
+              _ => [incoming, target],
             };
-            final source = relations.first == incoming ? 20001 + index : target;
-            final selected = relations.last == outgoing
-                ? 30001 + index
-                : target;
-            final choiceId = ContributionStatisticsFixture.id(
-              300000 + choiceNumber,
-            );
-            choice.execute([
-              choiceId,
-              ContributionStatisticsFixture.id(source),
-              ContributionStatisticsFixture.id(selected),
-              date,
-              slot < 50 ? 1 : 0,
-            ]);
-            String? previous;
-            for (final link in relations) {
-              final stepId = ContributionStatisticsFixture.id(
-                1000000 + stepNumber++,
-              );
-              step.execute([
-                stepId,
-                choiceId,
-                ContributionStatisticsFixture.id(100000 + link),
-                previous,
-              ]);
-              previous = stepId;
+            if (path.first == incoming) {
+              if (deletedRoot(index) case final root?) path.insert(0, root);
             }
-            choiceNumber++;
+            if (path.last == outgoing) {
+              if (deletedTail(index) case final tail?) path.add(tail);
+            }
+            final actionId = id(300000 + actionNumber);
+            action.execute([
+              actionId,
+              'Действие $actionNumber',
+              date,
+              slot < statisticsActionsPerDay ~/ 2 ? 1 : 0,
+            ]);
+            for (var position = 0; position < path.length; position++) {
+              item.execute([
+                actionId,
+                position,
+                id(path[position]),
+                position == 0 ? null : id(path[position - 1]),
+              ]);
+            }
+            actionNumber++;
           }
         }
         database.execute(
           '''UPDATE long_term_relations SET is_archived = 1
           WHERE source_intention_id >= ? OR related_intention_id >= ?''',
-          [
-            ContributionStatisticsFixture.id(45001),
-            ContributionStatisticsFixture.id(45001),
-          ],
+          [id(45001), id(45001)],
         );
         database.execute(
           'UPDATE intentions SET is_archived = 1 WHERE id >= ?',
-          [ContributionStatisticsFixture.id(45001)],
+          [id(45001)],
         );
       });
     } finally {
       intention.close();
       relation.close();
-      choice.close();
-      step.close();
+      deletedIntention.close();
+      deletedPair.close();
+      action.close();
+      item.close();
     }
   }
 
@@ -152,7 +159,7 @@ final class IntentionStatisticsFixture {
     IntentionStatisticsProfile.manyBreakdowns => target,
   };
 
-  /// Эталон читает сохранённые шаги и обходит исходный граф, минуя X.
+  /// Эталон читает сохранённые пути и обходит исходный граф, минуя X.
   /// Он не использует опорные группы и сжатие компонент производственного кода.
   IntentionFixtureReference reference(
     sqlite.Database database,
@@ -172,8 +179,9 @@ final class IntentionFixtureReference {
 
   final StatisticsPeriod _period;
   final int _target;
-  final _choices = <_SavedChoice>[];
-  final _relations = <String, _SavedRelation>{};
+  final _actions = <_SavedAction>[];
+  final _relations = <(int, int), _SavedRelation>{};
+  final _deleted = <int>{};
   final _children = <int, List<int>>{};
   final _parents = <int, List<int>>{};
   final _outgoing = <_SavedRelation>[];
@@ -192,23 +200,25 @@ final class IntentionFixtureReference {
         _number(row['related_intention_id']),
         row['is_archived'] == 1,
       );
-      _relations[relation.id] = relation;
+      _relations[(relation.source, relation.target)] = relation;
       if (!relation.archived) {
         (_children[relation.source] ??= []).add(relation.target);
         (_parents[relation.target] ??= []).add(relation.source);
         if (relation.source == _target) _outgoing.add(relation);
       }
     }
-    _reachableFromTarget = _walk(_children, [_target]);
-    _SavedChoice? current;
     for (final row in database.select(
-      '''SELECT c.id, c.choice_date,
-        c.source_intention_id, c.selected_intention_id, c.is_completed,
-        s.long_term_relation_id
-        FROM daily_choices c JOIN daily_choice_path_steps s
-          ON s.daily_choice_id = c.id
-        WHERE c.choice_date BETWEEN ? AND ?
-        ORDER BY c.id, s.id''',
+      'SELECT intention_id FROM deleted_intentions',
+    )) {
+      _deleted.add(_number(row['intention_id']));
+    }
+    _reachableFromTarget = _walk(_children, [_target]);
+    _SavedAction? current;
+    for (final row in database.select(
+      '''SELECT a.id, a.date, a.is_completed, p.intention_id
+        FROM actions a JOIN action_path_items p ON p.action_id = a.id
+        WHERE a.date BETWEEN ? AND ?
+        ORDER BY a.id, p.position''',
       [
         _period.firstDate.toCanonicalString(),
         _period.lastDate.toCanonicalString(),
@@ -216,16 +226,14 @@ final class IntentionFixtureReference {
     )) {
       final id = row['id'] as String;
       if (current?.id != id) {
-        current = _SavedChoice(
+        current = _SavedAction(
           id,
-          row['choice_date'] as String,
-          _number(row['source_intention_id']),
-          _number(row['selected_intention_id']),
+          row['date'] as String,
           row['is_completed'] == 1,
         );
-        _choices.add(current);
+        _actions.add(current);
       }
-      current!.relations.add(_relations[row['long_term_relation_id']]!);
+      current!.path.add(_number(row['intention_id']));
     }
   }
 
@@ -244,23 +252,24 @@ final class IntentionFixtureReference {
     return seen;
   }
 
-  _Attribution _attribution(_SavedChoice choice) {
-    final key = choice.relations.map((relation) => relation.id).join('/');
-    return _reachability.putIfAbsent(key, () {
-      final path = [choice.source, ...choice.relations.map((r) => r.target)];
-      final withoutTarget = _walk(_parents, path, excluded: _target);
+  _Attribution _attribution(_SavedAction action) {
+    final path = action.path;
+    return _reachability.putIfAbsent(path.join('/'), () {
+      final existing = path.where((node) => !_deleted.contains(node));
+      final withoutTarget = _walk(_parents, existing, excluded: _target);
       final explicit = path.contains(_target);
-      final savedOutgoing = <String>{};
-      for (var index = 0; index < path.length - 1; index++) {
-        if (path[index] == _target) {
-          savedOutgoing.add(choice.relations[index].id);
-        }
-      }
+      // Связь, следующая за намерением в пути, — текущая связь пары звена,
+      // в том числе архивированная; у разорванного звена её нет.
+      final savedOutgoing = <String>{
+        for (var index = 0; index < path.length - 1; index++)
+          if (path[index] == _target)
+            if (_relations[(_target, path[index + 1])] case final relation?)
+              relation.id,
+      };
       return _Attribution(
-        path,
         explicit,
-        explicit || path.any(_reachableFromTarget.contains),
-        choice.selected == _target
+        explicit || existing.any(_reachableFromTarget.contains),
+        path.last == _target
             ? <String>{}
             : {
                 ...savedOutgoing,
@@ -274,26 +283,26 @@ final class IntentionFixtureReference {
   Map<String, Object> get distribution {
     final lengths = <int, int>{};
     final paths = <String, int>{};
-    var archivedSteps = 0;
-    for (final choice in _choices) {
-      lengths.update(
-        choice.relations.length,
-        (count) => count + 1,
-        ifAbsent: () => 1,
-      );
-      final path = choice.relations.map((relation) => relation.id).join('/');
-      paths.update(path, (count) => count + 1, ifAbsent: () => 1);
-      archivedSteps += choice.relations
-          .where((relation) => relation.archived)
-          .length;
+    var archivedLinks = 0, deletedItems = 0;
+    for (final action in _actions) {
+      final path = action.path;
+      lengths.update(path.length, (count) => count + 1, ifAbsent: () => 1);
+      paths.update(path.join('/'), (count) => count + 1, ifAbsent: () => 1);
+      for (var index = 1; index < path.length; index++) {
+        if (_relations[(path[index - 1], path[index])]?.archived ?? false) {
+          archivedLinks++;
+        }
+      }
+      deletedItems += path.where(_deleted.contains).length;
     }
     return {
-      'lengths': {
+      'pathLengths': {
         for (final entry in lengths.entries) '${entry.key}': entry.value,
       },
-      'distinctChains': paths.length,
+      'distinctPaths': paths.length,
       'maximumRepeats': paths.values.reduce((a, b) => a > b ? a : b),
-      'archivedPeriodSteps': archivedSteps,
+      'archivedPeriodLinks': archivedLinks,
+      'deletedPeriodPathItems': deletedItems,
     };
   }
 
@@ -305,46 +314,38 @@ final class IntentionFixtureReference {
       for (final kind in view.breakdowns) kind: <String, _MutableCounts>{},
     };
     final dayCounts = <String, _MutableCounts>{};
-    var periodPlanned = 0, periodContribution = 0;
-    var missed = 0, upcoming = 0, explicit = 0;
-    for (final choice in _choices) {
-      final path = _attribution(choice);
+    var periodPlanned = 0, periodContribution = 0, explicit = 0;
+    for (final action in _actions) {
+      final path = action.path;
+      final attribution = _attribution(action);
       periodPlanned++;
-      if (choice.completed) periodContribution++;
+      if (action.completed) periodContribution++;
       final credited = {
-        StatisticsView.rootIntentions: choice.source == _target,
-        StatisticsView.intermediateIntentions: path.path
-            .skip(1)
-            .take(path.path.length - 2)
+        StatisticsView.rootIntentions: path.first == _target,
+        StatisticsView.intermediateIntentions: path
+            .sublist(1, path.length - 1)
             .contains(_target),
-        StatisticsView.terminalIntentions: choice.selected == _target,
-        StatisticsView.throughRelations: path.through,
+        StatisticsView.terminalIntentions: path.last == _target,
+        StatisticsView.throughRelations: attribution.through,
       };
       for (final kind in StatisticsView.values) {
-        if (credited[kind]!) cards[kind]!.add(choice.completed);
+        if (credited[kind]!) cards[kind]!.add(action.completed);
       }
       if (!credited[view]!) continue;
-      if (path.explicit) explicit++;
-      (dayCounts[choice.date] ??= _MutableCounts()).add(choice.completed);
-      if (!choice.completed) {
-        if (choice.date.compareTo('2026-06-15') < 0) {
-          missed++;
-        } else {
-          upcoming++;
-        }
-      }
+      if (attribution.explicit) explicit++;
+      (dayCounts[action.date] ??= _MutableCounts()).add(action.completed);
+      // Разбивки не содержат само намерение и удалённые намерения.
+      String? other(int node) => node == _target || _deleted.contains(node)
+          ? null
+          : ContributionStatisticsFixture.id(node);
       for (final kind in view.breakdowns) {
         final keys = switch (kind) {
-          StatisticsBreakdown.rootIntentions => [
-            ContributionStatisticsFixture.id(choice.source),
-          ],
-          StatisticsBreakdown.terminalIntentions => [
-            ContributionStatisticsFixture.id(choice.selected),
-          ],
-          StatisticsBreakdown.relations => path.outgoingRelations,
+          StatisticsBreakdown.rootIntentions => [?other(path.first)],
+          StatisticsBreakdown.terminalIntentions => [?other(path.last)],
+          StatisticsBreakdown.relations => attribution.outgoingRelations,
         };
         for (final key in keys) {
-          (rows[kind]![key] ??= _MutableCounts()).add(choice.completed);
+          (rows[kind]![key] ??= _MutableCounts()).add(action.completed);
         }
       }
     }
@@ -362,16 +363,15 @@ final class IntentionFixtureReference {
                     contribution: entry.value.contribution,
                   ),
               ]..sort((a, b) {
-                final contribution = b.contribution.compareTo(a.contribution);
-                if (contribution != 0) return contribution;
                 final planned = b.planned.compareTo(a.planned);
-                return planned != 0 ? planned : b.id.compareTo(a.id);
+                if (planned != 0) return planned;
+                final contribution = b.contribution.compareTo(a.contribution);
+                return contribution != 0 ? contribution : b.id.compareTo(a.id);
               }),
       },
       days: {
         for (final entry in dayCounts.entries) entry.key: entry.value.value,
       },
-      uncompleted: (missed: missed, upcoming: upcoming),
       explicitPathActions: explicit,
     );
   }
@@ -383,14 +383,12 @@ final class IntentionFixtureSection {
     required this.cards,
     required this.breakdowns,
     required this.days,
-    required this.uncompleted,
     required this.explicitPathActions,
   });
   final FixtureCounts periodCounts;
   final Map<StatisticsView, FixtureCounts> cards;
   final Map<StatisticsBreakdown, List<FixtureBreakdownRow>> breakdowns;
   final Map<String, FixtureCounts> days;
-  final ({int missed, int upcoming}) uncompleted;
   final int explicitPathActions;
 }
 
@@ -402,24 +400,17 @@ final class _SavedRelation {
   final bool archived;
 }
 
-final class _SavedChoice {
-  _SavedChoice(this.id, this.date, this.source, this.selected, this.completed);
+/// Путь — номера намерений от корневого к конечному.
+final class _SavedAction {
+  _SavedAction(this.id, this.date, this.completed);
   final String id;
   final String date;
-  final int source;
-  final int selected;
   final bool completed;
-  final relations = <_SavedRelation>[];
+  final path = <int>[];
 }
 
 final class _Attribution {
-  const _Attribution(
-    this.path,
-    this.explicit,
-    this.through,
-    this.outgoingRelations,
-  );
-  final List<int> path;
+  const _Attribution(this.explicit, this.through, this.outgoingRelations);
   final bool explicit;
   final bool through;
   final Set<String> outgoingRelations;
