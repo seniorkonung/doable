@@ -65,8 +65,8 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../intention/presentation/catalog/catalog_test_support.dart'
     as catalog_support;
+import '../../support/controlled_local_date.dart';
 import '../../support/daily_choice_durability_fixture.dart';
-import '../../support/daily_choice_local_date.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/intention_type_counts.dart';
@@ -305,7 +305,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           personalGraphRepositoryProvider.overrideWithValue(repository),
-          ControlledDailyChoiceLocalDate(durabilityChoiceDate).override,
+          ControlledLocalDate(durabilityChoiceDate).override,
         ],
         retry: (retryCount, error) => null,
       );

@@ -4,14 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../design_system/components/date_grid.dart';
 import '../../../design_system/components/sheet.dart';
+import '../../../shared/domain/calendar_date.dart';
+import '../../../shared/presentation/local_day/local_date_provider.dart';
+import '../../../shared/presentation/local_day/local_day_observer.dart';
 import '../../application/daily_choice_day_statuses.dart';
-import '../../domain/calendar_date.dart';
 import '../catalog/daily_choice_calendar_day_marks_view_model.dart';
 import '../catalog/daily_choice_calendar_labels.dart';
 import '../catalog/daily_choice_calendar_viewport.dart';
 import '../catalog/daily_choice_catalog_instance.dart';
-import '../catalog/daily_choice_local_date_provider.dart';
-import '../catalog/daily_choice_local_day_observer.dart';
 
 /// Показывает лист даты дневного выбора с месяцем [current].
 ///
@@ -46,7 +46,7 @@ final class _DailyChoiceDateSheetState
 
   /// Лист может остаться открытым после местной полуночи, и тогда прежний день
   /// был бы неверно назван сегодняшним.
-  late final DailyChoiceLocalDayObserver _localDay;
+  late final LocalDayObserver _localDay;
 
   /// Первое число показанного месяца.
   late CalendarDate _month;
@@ -60,8 +60,8 @@ final class _DailyChoiceDateSheetState
       widget.current.month,
       1,
     );
-    _localDay = DailyChoiceLocalDayObserver(
-      readLocalDay: ref.read(dailyChoiceLocalDateSourceProvider),
+    _localDay = LocalDayObserver(
+      readLocalDay: ref.read(localDateSourceProvider),
       onTodayChanged: () => setState(() {}),
     );
   }

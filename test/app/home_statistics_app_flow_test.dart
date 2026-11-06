@@ -8,7 +8,6 @@ import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart' hide LongTermRelation;
 import 'package:doable/src/data/local/bootstrap/local_data_bootstrap.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -22,14 +21,15 @@ import 'package:doable/src/long_term_relation/application/intention_relation_gro
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
+import '../support/controlled_local_date.dart';
 import '../support/daily_choice_durability_fixture.dart';
-import '../support/daily_choice_local_date.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
@@ -435,7 +435,7 @@ void main() {
   testWidgets(
     'полночь и возврат приложения обновляют границу невыполненного только при показе',
     (tester) async {
-      final clock = ControlledDailyChoiceLocalDate(
+      final clock = ControlledLocalDate(
         _today,
         untilNextDate: const Duration(seconds: 2),
       );
@@ -828,7 +828,7 @@ final class _App {
 
 Future<_App> _start(
   WidgetTester tester, {
-  ControlledDailyChoiceLocalDate? clock,
+  ControlledLocalDate? clock,
   LocalDataConnectionFactory connectionFactory = openInMemoryLocalDatabase,
   bool seed = true,
   Future<void> Function(AppDatabase)? seedMore,
@@ -847,8 +847,7 @@ Future<_App> _start(
     connectionFactory: connectionFactory,
     diagnosticsSink: diagnostics,
     quickCreationModeStore: InMemoryQuickCreationModeStore(),
-    dailyChoiceLocalDateSource:
-        (clock ?? ControlledDailyChoiceLocalDate(_today)).read,
+    localDateSource: (clock ?? ControlledLocalDate(_today)).read,
     repositoryFactory: (opened) {
       database = opened;
       return DriftPersonalGraphRepository(

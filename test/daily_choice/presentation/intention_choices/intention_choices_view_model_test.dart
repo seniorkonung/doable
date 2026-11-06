@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/intention_choices/intention_choices_state.dart';
@@ -14,6 +13,7 @@ import 'package:doable/src/intention/presentation/details/intention_page_target.
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/presentation/relation_group_paging_policy.dart';
 import 'package:doable/src/long_term_relation/presentation/relation_list_reconciliation.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 

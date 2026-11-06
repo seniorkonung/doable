@@ -6,9 +6,7 @@ import 'dart:async';
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show
@@ -32,12 +30,14 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-import '../../support/daily_choice_local_date.dart';
+import '../../support/controlled_local_date.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
 import '../../support/statistics_read_contract_test_fallback.dart';
@@ -60,9 +60,7 @@ void main() {
 
         final ready = await runtime.bootstrap() as AppRuntimeReady;
         final before = DateTime.now();
-        final reading = ready.container.read(
-          dailyChoiceLocalDateSourceProvider,
-        )();
+        final reading = ready.container.read(localDateSourceProvider)();
         final after = DateTime.now();
 
         // Допускаем полночь между двумя показаниями часов теста.
@@ -71,7 +69,7 @@ void main() {
     );
 
     test('передаёт каталогу подставленный источник даты, который показывает новый день', () async {
-      final localDate = ControlledDailyChoiceLocalDate(
+      final localDate = ControlledLocalDate(
         CalendarDate.fromParts(2026, 10, 5),
       );
       final runtime = AppRuntime(
@@ -79,18 +77,18 @@ void main() {
         connectionFactory: openInMemoryLocalDatabase,
         diagnosticsSink: InMemoryDiagnosticsSink(),
         repositoryFactory: (_) => _ControlledPersonalGraphRepository(),
-        dailyChoiceLocalDateSource: localDate.read,
+        localDateSource: localDate.read,
       );
       addTearDown(runtime.shutdown);
 
       final ready = await runtime.bootstrap() as AppRuntimeReady;
-      final source = ready.container.read(dailyChoiceLocalDateSourceProvider);
+      final source = ready.container.read(localDateSourceProvider);
 
       expect(source().date, CalendarDate.fromParts(2026, 10, 5));
 
       localDate.today = CalendarDate.fromParts(2026, 10, 6);
       expect(
-        ready.container.read(dailyChoiceLocalDateSourceProvider)().date,
+        ready.container.read(localDateSourceProvider)().date,
         CalendarDate.fromParts(2026, 10, 6),
       );
     });

@@ -19,7 +19,6 @@ import 'package:doable/src/daily_choice/application/choice_path_draft.dart'
     as _i19;
 import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart'
     as _i24;
-import 'package:doable/src/daily_choice/domain/calendar_date.dart' as _i25;
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart'
     as _i3;
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart'
@@ -53,6 +52,7 @@ import 'package:doable/src/long_term_relation/application/intention_relation_gro
     as _i28;
 import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart'
     as _i15;
+import 'package:doable/src/shared/domain/calendar_date.dart' as _i25;
 import 'package:flutter/foundation.dart' as _i27;
 import 'package:flutter/material.dart' as _i20;
 import 'package:flutter/widgets.dart' as _i22;

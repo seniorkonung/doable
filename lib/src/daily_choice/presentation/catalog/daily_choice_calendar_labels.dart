@@ -3,8 +3,8 @@ import 'package:intl/intl.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../design_system/components/day_mark.dart';
+import '../../../shared/domain/calendar_date.dart';
 import '../../application/daily_choice_day_statuses.dart';
-import '../../domain/calendar_date.dart';
 
 // Подписи календаря, общие для календаря каталога и листа даты: обе сетки
 // называют месяц, дни недели и дни одинаково.

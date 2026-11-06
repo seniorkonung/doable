@@ -6,7 +6,6 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/settings/settings_page.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart' hide GraphBackups, Tag;
 import 'package:doable/src/data_transfer/application/document_access.dart';
 import 'package:doable/src/data_transfer/application/graph_composition.dart';
@@ -28,6 +27,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
@@ -39,7 +39,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/app_flow_wait.dart' as app_flow;
-import '../../support/daily_choice_local_date.dart';
+import '../../support/controlled_local_date.dart';
 import '../../support/file_document_access.dart';
 import '../../support/graph_import_files.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
@@ -320,9 +320,7 @@ void main() {
   testWidgets('после возвращения приложения в активное состояние с другой '
       'местной датой строка «Резервные копии» без новых копий называет '
       'вчерашней сегодняшнюю копию', (tester) async {
-    final localDate = ControlledDailyChoiceLocalDate(
-      CalendarDate.fromParts(2026, 10, 18),
-    );
+    final localDate = ControlledLocalDate(CalendarDate.fromParts(2026, 10, 18));
     final app = await _DataSectionApp.open(
       tester,
       localDate: localDate,
@@ -792,7 +790,7 @@ final class _DataSectionApp {
     String language = 'ru',
     Stream<GraphCompositionRead>? composition,
     Stream<GraphBackupsRead>? backups,
-    ControlledDailyChoiceLocalDate? localDate,
+    ControlledLocalDate? localDate,
   }) async {
     final database = AppDatabase(openInMemoryLocalDatabase());
     await database.open();

@@ -1,6 +1,6 @@
 import '../../intention/domain/intention_id.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
-import 'calendar_date.dart';
+import '../../shared/domain/calendar_date.dart';
 import 'choice_path_step_id.dart';
 import 'daily_choice_description.dart';
 import 'daily_choice_id.dart';

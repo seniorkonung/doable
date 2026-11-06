@@ -3,12 +3,12 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../domain/calendar_date.dart';
 
-part 'daily_choice_local_date_provider.g.dart';
+part 'local_date_provider.g.dart';
 
-/// Показание местных часов устройства для каталога дневных выборов: текущая
-/// местная календарная дата и время до начала следующей.
-final class DailyChoiceLocalDay {
-  DailyChoiceLocalDay({required this.date, required this.untilNextDate}) {
+/// Показание местных часов устройства: текущая местная календарная дата и
+/// время до начала следующей.
+final class LocalDay {
+  LocalDay({required this.date, required this.untilNextDate}) {
     if (untilNextDate <= Duration.zero) {
       throw ArgumentError.value(
         untilNextDate,
@@ -26,7 +26,7 @@ final class DailyChoiceLocalDay {
   final Duration untilNextDate;
 }
 
-/// Источник показаний местных часов устройства для каталога дневных выборов.
+/// Источник показаний местных часов устройства.
 ///
 /// Каждый вызов заново читает часы, поэтому один и тот же источник отдаёт
 /// новый день после местной полуночи. Дата и время до следующей даты берутся
@@ -34,20 +34,20 @@ final class DailyChoiceLocalDay {
 /// потребитель: получение источника из Riverpod часы не читает и не фиксирует
 /// день запуска приложения.
 ///
-/// Показание служит только интерфейсу каталога: начальному выбору дня и
-/// обозначению сегодняшнего дня. Порядок подтверждённых изменений по-прежнему
+/// Показание служит только интерфейсу: начальному выбору дня и обозначению
+/// сегодняшнего дня. Порядок подтверждённых изменений по-прежнему
 /// определяет ревизия графа (ADR-0006). Календарный компонент часы не
 /// получает: потребитель передаёт ему уже прочитанную дату (ADR-0017).
-typedef DailyChoiceLocalDateSource = DailyChoiceLocalDay Function();
+typedef LocalDateSource = LocalDay Function();
 
 /// Повторное чтение часов, когда начало следующей местной даты не удалось
 /// определить по её полуночи.
 const localDateRecheckDelay = Duration(minutes: 1);
 
 /// Производственный источник: местные дата и время устройства в момент вызова.
-DailyChoiceLocalDay readDeviceLocalDay() {
+LocalDay readDeviceLocalDay() {
   final now = DateTime.now();
-  return DailyChoiceLocalDay(
+  return LocalDay(
     date: CalendarDate.fromParts(now.year, now.month, now.day),
     // Полночь следующей даты строится по правилам местного часового пояса:
     // сутки с переводом часов длятся 23 или 25 часов, а не фиксированные 24.
@@ -71,12 +71,11 @@ Duration untilLocalDateStart(DateTime now, DateTime nextDateStart) {
   return remaining > Duration.zero ? remaining : localDateRecheckDelay;
 }
 
-/// Источник местного сегодня каталога; по умолчанию — часы устройства.
+/// Источник местного сегодня; по умолчанию — часы устройства.
 ///
 /// Зависимостью владеет композиция приложения: `AppRuntime` предоставляет
 /// контейнеру переданный при создании источник или [readDeviceLocalDay].
 /// Проверки подставляют управляемые часы через `AppRuntime` или
-/// переопределение провайдера до первого открытия каталога.
+/// переопределение провайдера до первого чтения часов.
 @Riverpod(keepAlive: true)
-DailyChoiceLocalDateSource dailyChoiceLocalDateSource(Ref ref) =>
-    readDeviceLocalDay;
+LocalDateSource localDateSource(Ref ref) => readDeviceLocalDay;

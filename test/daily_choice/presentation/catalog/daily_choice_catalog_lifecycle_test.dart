@@ -6,14 +6,12 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart'
     hide DailyChoiceCatalogPage;
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -22,6 +20,8 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
@@ -152,7 +152,7 @@ void main() {
   });
 
   // Расчёт промежутка до местной полуночи на обоих переходах проверяет
-  // `untilLocalDateStart` в daily_choice_local_date_provider_test.dart; здесь
+  // `untilLocalDateStart` в local_date_provider_test.dart; здесь
   // проверено, что страница ждёт именно этот промежуток, а не 24 часа.
   testWidgets('при переводе часов на летнее время сутки длятся 23 часа, и '
       'сегодняшний день сменяется в их местную полночь', (tester) async {
@@ -355,8 +355,7 @@ final class _LocalClock {
   int get readCount => _readCount;
 
   /// Override источника местного сегодня каталога этими часами.
-  Override get override =>
-      dailyChoiceLocalDateSourceProvider.overrideWithValue(_read);
+  Override get override => localDateSourceProvider.overrideWithValue(_read);
 
   /// Продвигает часы устройства на [duration], пока процесс приостановлен и
   /// его таймеры не выполняются.
@@ -370,18 +369,18 @@ final class _LocalClock {
   /// каталогом.
   Duration get untilNextDate => _reading().untilNextDate;
 
-  DailyChoiceLocalDay _read() {
+  LocalDay _read() {
     _readCount += 1;
     return _reading();
   }
 
-  DailyChoiceLocalDay _reading() {
+  LocalDay _reading() {
     final now = _now;
     final local = now.add(_offsetAt(now));
     final nextDateStart = _instantOf(
       DateTime.utc(local.year, local.month, local.day + 1),
     );
-    return DailyChoiceLocalDay(
+    return LocalDay(
       date: date(local.year, local.month, local.day),
       untilNextDate: nextDateStart.difference(now),
     );

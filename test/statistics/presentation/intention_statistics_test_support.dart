@@ -1,8 +1,6 @@
 import 'dart:async';
 
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -13,6 +11,8 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:doable/src/statistics/application/contribution_counts.dart';
 import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
 import 'package:doable/src/statistics/application/intention_statistics_calendar.dart';
@@ -40,8 +40,8 @@ final class IntentionStatisticsHarness {
     container = ProviderContainer(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(reader),
-        dailyChoiceLocalDateSourceProvider.overrideWithValue(
-          () => DailyChoiceLocalDay(
+        localDateSourceProvider.overrideWithValue(
+          () => LocalDay(
             date: statisticsToday,
             untilNextDate: const Duration(hours: 12),
           ),

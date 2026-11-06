@@ -7,11 +7,11 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../design_system/components/detail_row.dart';
 import '../../../design_system/components/priority_picker.dart';
 import '../../../design_system/doable_icon.dart';
-import '../../domain/calendar_date.dart';
+import '../../../shared/domain/calendar_date.dart';
+import '../../../shared/presentation/local_day/local_date_provider.dart';
+import '../../../shared/presentation/local_day/local_day_observer.dart';
 import '../../domain/daily_choice_priority.dart';
 import '../../domain/daily_choice_schedule.dart';
-import '../catalog/daily_choice_local_date_provider.dart';
-import '../catalog/daily_choice_local_day_observer.dart';
 import 'daily_choice_date_sheet.dart';
 import 'daily_choice_field_labels.dart';
 import 'daily_choice_time_sheet.dart';
@@ -56,13 +56,13 @@ final class _DailyChoiceDetailFieldsState
 
   /// Блок может оставаться на экране после местной полуночи, и тогда «Сегодня»
   /// в поле даты стало бы неверным.
-  late final DailyChoiceLocalDayObserver _localDay;
+  late final LocalDayObserver _localDay;
 
   @override
   void initState() {
     super.initState();
-    _localDay = DailyChoiceLocalDayObserver(
-      readLocalDay: ref.read(dailyChoiceLocalDateSourceProvider),
+    _localDay = LocalDayObserver(
+      readLocalDay: ref.read(localDateSourceProvider),
       onTodayChanged: () => setState(() {}),
     );
   }

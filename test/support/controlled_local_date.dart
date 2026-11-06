@@ -1,14 +1,14 @@
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:flutter_riverpod/misc.dart';
 
-/// Управляемое локальное сегодня для проверок каталога дневных выборов.
+/// Управляемое локальное сегодня для проверок интерфейса.
 ///
-/// Проверка задаёт [today] до первого открытия каталога и меняет его, когда
+/// Проверка задаёт [today] до первого чтения часов и меняет его, когда
 /// нужно наступление другого дня, без ожидания настоящих суток. Источник
 /// [read] подставляется в `AppRuntime` или через [override] в Riverpod.
-final class ControlledDailyChoiceLocalDate {
-  ControlledDailyChoiceLocalDate(
+final class ControlledLocalDate {
+  ControlledLocalDate(
     this.today, {
     this.untilNextDate = const Duration(hours: 12),
   });
@@ -27,13 +27,12 @@ final class ControlledDailyChoiceLocalDate {
 
   /// Источник локального сегодня: при каждом вызове возвращает текущие
   /// значения [today] и [untilNextDate].
-  DailyChoiceLocalDay read() {
+  LocalDay read() {
     _readCount += 1;
-    return DailyChoiceLocalDay(date: today, untilNextDate: untilNextDate);
+    return LocalDay(date: today, untilNextDate: untilNextDate);
   }
 
   /// Подстановка [read] вместо часов устройства в `ProviderScope` или
   /// `ProviderContainer`.
-  Override get override =>
-      dailyChoiceLocalDateSourceProvider.overrideWithValue(read);
+  Override get override => localDateSourceProvider.overrideWithValue(read);
 }

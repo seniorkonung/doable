@@ -9,14 +9,12 @@ import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_detail_fields.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_sheet.dart';
 import 'package:doable/src/design_system/components/badge.dart';
@@ -49,13 +47,15 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/controlled_local_date.dart';
 import '../../../support/daily_choice_detail_fields_controls.dart';
-import '../../../support/daily_choice_local_date.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
@@ -1437,7 +1437,7 @@ final class _Harness {
   const _Harness(this.repository, this.localDate);
 
   final _Repository repository;
-  final ControlledDailyChoiceLocalDate localDate;
+  final ControlledLocalDate localDate;
 }
 
 /// Открывает панель над страницей; выбор приходит из [_Repository.emit].
@@ -1448,14 +1448,12 @@ Future<_Harness> _openSheet(
 }) async {
   final repository = _Repository();
   addTearDown(repository.dispose);
-  final localDate = ControlledDailyChoiceLocalDate(
-    CalendarDate.fromParts(2026, 10, 8),
-  );
+  final localDate = ControlledLocalDate(CalendarDate.fromParts(2026, 10, 8));
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         personalGraphRepositoryProvider.overrideWith((ref) => repository),
-        dailyChoiceLocalDateSourceProvider.overrideWithValue(localDate.read),
+        localDateSourceProvider.overrideWithValue(localDate.read),
       ],
       child: OrdinaryPageTestApp(
         locale: locale,

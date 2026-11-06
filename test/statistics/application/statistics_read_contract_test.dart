@@ -1,7 +1,7 @@
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/statistics/application/contribution_counts.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';

@@ -4,9 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../design_system/components/scroll_top_button.dart';
+import '../../../shared/presentation/local_day/local_date_provider.dart';
 import 'daily_choice_catalog_body.dart';
 import 'daily_choice_catalog_instance.dart';
-import 'daily_choice_local_date_provider.dart';
 
 @RoutePage()
 final class DailyChoiceCatalogPage extends ConsumerStatefulWidget {
@@ -26,7 +26,7 @@ final class _DailyChoiceCatalogPageState
   void initState() {
     super.initState();
     _instance = DailyChoiceCatalogInstance(
-      initialDate: ref.read(dailyChoiceLocalDateSourceProvider)().date,
+      initialDate: ref.read(localDateSourceProvider)().date,
     );
   }
 

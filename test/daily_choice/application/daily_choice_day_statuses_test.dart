@@ -1,5 +1,5 @@
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,5 +1,5 @@
-import '../../daily_choice/domain/calendar_date.dart';
 import '../../graph/application/graph_revision.dart';
+import '../../shared/domain/calendar_date.dart';
 import '../application/contribution_counts.dart';
 import '../application/statistics_period.dart';
 import '../application/statistics_read_contract.dart';

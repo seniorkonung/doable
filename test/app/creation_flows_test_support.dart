@@ -275,8 +275,7 @@ Future<_App> _start(
       personalGraphRepositoryProvider.overrideWithValue(
         durabilityRepository(database!),
       ),
-      ControlledDailyChoiceLocalDate(CalendarDate.fromParts(2026, 10, 8))
-          .override,
+      ControlledLocalDate(CalendarDate.fromParts(2026, 10, 8)).override,
     ],
   );
   final router = AppRouter();

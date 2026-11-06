@@ -1,4 +1,4 @@
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:flutter_test/flutter_test.dart';
 

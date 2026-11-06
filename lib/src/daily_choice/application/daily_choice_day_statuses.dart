@@ -1,6 +1,6 @@
 import '../../graph/application/graph_command_result.dart';
 import '../../graph/application/graph_revision.dart';
-import '../domain/calendar_date.dart';
+import '../../shared/domain/calendar_date.dart';
 
 enum DailyChoiceDayStatusQueryValidationFailure { reversedRange, rangeTooLong }
 

@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
-import '../../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import '../../../design_system/components/confirm_dialog.dart';
 import '../../../design_system/components/list_state.dart';
 import '../../../design_system/components/notice.dart';
@@ -22,6 +21,7 @@ import '../../../design_system/doable_type.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../../intention/domain/intention.dart';
+import '../../../shared/presentation/local_day/local_date_provider.dart';
 import '../../../shared/presentation/timestamp_dates_line.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../domain/long_term_relation.dart';
@@ -668,10 +668,7 @@ final class _LoadedRelation extends ConsumerWidget {
                   createdAt: relation.createdAt.value,
                   updatedAt: relation.updatedAt.value,
                   // Строка называет год по дню показа панели.
-                  currentYear: ref
-                      .watch(dailyChoiceLocalDateSourceProvider)()
-                      .date
-                      .year,
+                  currentYear: ref.watch(localDateSourceProvider)().date.year,
                 ),
                 ?operationStatus,
               ],

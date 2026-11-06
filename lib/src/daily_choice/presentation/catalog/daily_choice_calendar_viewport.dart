@@ -1,4 +1,4 @@
-import '../../domain/calendar_date.dart';
+import '../../../shared/domain/calendar_date.dart';
 
 /// Представление встроенного календаря каталога.
 enum DailyChoiceCalendarMode {

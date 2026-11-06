@@ -4,7 +4,6 @@ import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
@@ -28,12 +27,13 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_per
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../../support/daily_choice_local_date.dart';
+import '../../../support/controlled_local_date.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/intention_title_order_key.dart';
 
@@ -401,7 +401,7 @@ final class _Harness {
   final DailyChoiceCatalogInstance instance;
   DailyChoiceCatalogViewModelProvider get provider =>
       dailyChoiceCatalogViewModelProvider(instance);
-  final localDate = ControlledDailyChoiceLocalDate(_today);
+  final localDate = ControlledLocalDate(_today);
   late final ProviderContainer container;
   late final ProviderSubscription<DailyChoiceCatalogState> subscription;
   DailyChoiceCatalogViewModel get model => container.read(provider.notifier);

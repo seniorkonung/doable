@@ -1,14 +1,14 @@
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('источник локальной даты каталога', () {
+  group('источник локальной даты', () {
     test('по умолчанию читает местную дату устройства при каждом вызове', () {
       final container = ProviderContainer();
       addTearDown(container.dispose);
-      final source = container.read(dailyChoiceLocalDateSourceProvider);
+      final source = container.read(localDateSourceProvider);
 
       final before = DateTime.now();
       final date = source().date;
@@ -79,14 +79,11 @@ void main() {
     test('показание не допускает неположительного времени до следующей '
         'даты', () {
       expect(
-        () => DailyChoiceLocalDay(
-          date: _date(2026, 10, 5),
-          untilNextDate: Duration.zero,
-        ),
+        () => LocalDay(date: _date(2026, 10, 5), untilNextDate: Duration.zero),
         throwsArgumentError,
       );
       expect(
-        () => DailyChoiceLocalDay(
+        () => LocalDay(
           date: _date(2026, 10, 5),
           untilNextDate: const Duration(microseconds: -1),
         ),

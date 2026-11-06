@@ -1,8 +1,8 @@
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
+import '../../../shared/domain/calendar_date.dart';
 import '../../application/daily_choice_catalog.dart';
 import '../../application/daily_choice_result.dart';
-import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice_id.dart';
 import 'daily_choice_catalog_snapshot_assembly.dart';
 

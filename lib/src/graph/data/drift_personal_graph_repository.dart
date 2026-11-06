@@ -16,7 +16,6 @@ import '../../daily_choice/application/daily_choice_command.dart';
 import '../../daily_choice/application/daily_choice_day_statuses.dart';
 import '../../daily_choice/application/daily_choice_id_generator.dart';
 import '../../daily_choice/application/daily_choice_result.dart';
-import '../../daily_choice/domain/calendar_date.dart';
 import '../../daily_choice/domain/choice_path_step_id.dart';
 import '../../daily_choice/domain/daily_choice.dart';
 import '../../daily_choice/domain/daily_choice_id.dart';
@@ -64,6 +63,7 @@ import '../../long_term_relation/domain/long_term_relation.dart'
 import '../../long_term_relation/domain/long_term_relation_description.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../shared/diagnostics/diagnostics_sink.dart';
+import '../../shared/domain/calendar_date.dart';
 import '../../shared/domain/text_preview.dart';
 import '../../statistics/application/contribution_counts.dart';
 import '../../statistics/application/intention_statistics_breakdown.dart';

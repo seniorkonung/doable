@@ -1,4 +1,3 @@
-import '../../daily_choice/domain/calendar_date.dart';
 import '../../daily_choice/domain/choice_path_step_id.dart';
 import '../../daily_choice/domain/daily_choice.dart';
 import '../../daily_choice/domain/daily_choice_description.dart';
@@ -11,6 +10,7 @@ import '../../intention/domain/intention_text.dart';
 import '../../long_term_relation/domain/long_term_relation.dart';
 import '../../long_term_relation/domain/long_term_relation_description.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
+import '../../shared/domain/calendar_date.dart';
 import '../../tag/domain/tag.dart';
 import '../../tag/domain/tag_assignment.dart';
 import '../../tag/domain/tag_color.dart';

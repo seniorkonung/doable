@@ -3,7 +3,6 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_detail_fields.dart';
 import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
 import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
@@ -21,6 +20,7 @@ import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_tabs.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -30,8 +30,8 @@ import '../support/daily_choice_detail_fields_controls.dart';
 import '../support/daily_choice_details_controls.dart';
 
 import '../support/app_root_pages.dart';
+import '../support/controlled_local_date.dart';
 import '../support/daily_choice_durability_fixture.dart';
-import '../support/daily_choice_local_date.dart';
 import '../support/daily_choice_catalog_controls.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
@@ -297,7 +297,7 @@ Future<void> _startWithPanelChoice(WidgetTester tester) async {
     quickCreationModeStore: InMemoryQuickCreationModeStore(),
     connectionFactory: () => openFileBackedLocalDatabase(harness.databaseFile),
     diagnosticsSink: InMemoryDiagnosticsSink(),
-    dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(_todayDate).read,
+    localDateSource: ControlledLocalDate(_todayDate).read,
   );
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());
@@ -413,13 +413,13 @@ void main() {
       await seedDurabilityGraph(seeded);
       await harness.closePersistenceObjectGraph();
       // Каждый запуск открывает каталог на дне создаваемых записей.
-      final localDate = ControlledDailyChoiceLocalDate(_formChoiceDate);
+      final localDate = ControlledLocalDate(_formChoiceDate);
       AppRuntime start() => AppRuntime(
         quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
-        dailyChoiceLocalDateSource: localDate.read,
+        localDateSource: localDate.read,
       );
       var runtime = start();
       addTearDown(() async {
@@ -634,8 +634,7 @@ void main() {
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
-        dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(_todayDate)
-            .read,
+        localDateSource: ControlledLocalDate(_todayDate).read,
       );
       addTearDown(() async {
         await tester.pumpWidget(const SizedBox.shrink());

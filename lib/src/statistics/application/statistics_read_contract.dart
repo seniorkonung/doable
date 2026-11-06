@@ -1,9 +1,9 @@
-import '../../daily_choice/domain/calendar_date.dart';
 import '../../graph/application/graph_command_result.dart';
 import '../../graph/application/graph_revision.dart';
 import '../../intention/domain/intention.dart';
 import '../../intention/domain/intention_id.dart';
 import '../../intention/domain/intention_text.dart';
+import '../../shared/domain/calendar_date.dart';
 import 'contribution_counts.dart';
 import 'intention_statistics_breakdown.dart';
 import 'intention_statistics_read_contract.dart';

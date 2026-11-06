@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../design_system/components/month_grid_day.dart';
 import '../../../design_system/components/week_strip_day.dart';
+import '../../../shared/domain/calendar_date.dart';
 import '../../application/daily_choice_day_statuses.dart';
-import '../../domain/calendar_date.dart';
 import 'daily_choice_calendar_labels.dart';
 import 'daily_choice_calendar_viewport.dart';
 

@@ -1,4 +1,4 @@
-import '../../daily_choice/domain/calendar_date.dart';
+import '../../shared/domain/calendar_date.dart';
 import '../application/intention_statistics_breakdown.dart';
 import '../application/intention_statistics_read_contract.dart';
 import '../application/intention_statistics_target.dart';

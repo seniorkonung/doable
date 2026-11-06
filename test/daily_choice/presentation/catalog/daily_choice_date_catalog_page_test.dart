@@ -7,7 +7,6 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
@@ -20,13 +19,14 @@ import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/graph/presentation/operation_failure_presentation.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/controlled_local_date.dart';
 import '../../../support/daily_choice_details_controls.dart';
-import '../../../support/daily_choice_local_date.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import 'daily_choice_calendar_test_support.dart';
 import '../../../support/daily_choice_catalog_controls.dart';
@@ -46,7 +46,7 @@ void main() {
         final router = await _start(
           tester,
           repository,
-          ControlledDailyChoiceLocalDate(selected),
+          ControlledLocalDate(selected),
         );
         if (onDate) {
           await _pushDate(tester, router, selected);
@@ -108,7 +108,7 @@ void main() {
         final router = await _start(
           tester,
           repository,
-          ControlledDailyChoiceLocalDate(selected),
+          ControlledLocalDate(selected),
         );
         if (closePage) {
           await _pushDate(tester, router, selected);
@@ -175,11 +175,7 @@ void main() {
         addTearDown(tester.view.reset);
         final repository = CatalogPageRepository();
         final selected = date(2026, 10, 7);
-        await _start(
-          tester,
-          repository,
-          ControlledDailyChoiceLocalDate(selected),
-        );
+        await _start(tester, repository, ControlledLocalDate(selected));
         await openDailyChoices(tester);
         repository.completeFirst(0, [
           catalogPageItem(1, date: selected),
@@ -252,7 +248,7 @@ void main() {
         final router = await _start(
           tester,
           repository,
-          ControlledDailyChoiceLocalDate(selected),
+          ControlledLocalDate(selected),
         );
         if (changeDate) {
           await _pushDate(tester, router, selected);
@@ -317,11 +313,7 @@ void main() {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       final repository = CatalogPageRepository();
       final selected = date(2026, 10, 7);
-      await _start(
-        tester,
-        repository,
-        ControlledDailyChoiceLocalDate(selected),
-      );
+      await _start(tester, repository, ControlledLocalDate(selected));
       await openDailyChoices(tester);
       final item = catalogPageItem(1, date: selected);
       repository.completeFirst(0, [item], total: 1);
@@ -450,7 +442,7 @@ void main() {
       final router = await _start(
         tester,
         repository,
-        ControlledDailyChoiceLocalDate(today),
+        ControlledLocalDate(today),
       );
       await openDailyChoices(tester);
       repository.completeFirst(0, [catalogPageItem(1, date: today)], total: 1);
@@ -580,7 +572,7 @@ void main() {
       tester,
     ) async {
       final repository = CatalogPageRepository();
-      final clock = ControlledDailyChoiceLocalDate(date(2026, 10, 6));
+      final clock = ControlledLocalDate(date(2026, 10, 6));
       final router = await _start(tester, repository, clock, locale: locale);
       final selected = date(2026, 10, 7);
 
@@ -659,7 +651,7 @@ void main() {
     final router = await _start(
       tester,
       repository,
-      ControlledDailyChoiceLocalDate(date(2026, 10, 12)),
+      ControlledLocalDate(date(2026, 10, 12)),
     );
     await _pushDate(tester, router, selected);
     repository.completeFirst(
@@ -748,11 +740,7 @@ void main() {
     final repository = CatalogPageRepository();
     final today = date(2026, 10, 12);
     final selected = date(2026, 10, 7);
-    final router = await _start(
-      tester,
-      repository,
-      ControlledDailyChoiceLocalDate(today),
-    );
+    final router = await _start(tester, repository, ControlledLocalDate(today));
     await openDailyChoices(tester);
     repository.completeFirst(0, [catalogPageItem(1, date: today)], total: 1);
     repository.completeDayStatuses(0, {});
@@ -845,7 +833,7 @@ Future<void> _dismissCompletionMessage(WidgetTester tester) async {
 Future<AppRouter> _start(
   WidgetTester tester,
   CatalogPageRepository repository,
-  ControlledDailyChoiceLocalDate clock, {
+  ControlledLocalDate clock, {
   Locale locale = const Locale('ru'),
 }) async {
   final router = AppRouter();

@@ -2,8 +2,6 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/design_system/components/priority_picker.dart';
 import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
@@ -17,6 +15,8 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_pro
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_sheet.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1679,8 +1679,8 @@ Future<ControlledRelationDetailsRepository> _openSheet(
   final container = ProviderContainer(
     overrides: [
       personalGraphRepositoryProvider.overrideWithValue(repository),
-      dailyChoiceLocalDateSourceProvider.overrideWithValue(
-        () => DailyChoiceLocalDay(
+      localDateSourceProvider.overrideWithValue(
+        () => LocalDay(
           date: CalendarDate.fromParts(2026, 11, 2),
           untilNextDate: const Duration(hours: 1),
         ),

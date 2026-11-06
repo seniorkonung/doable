@@ -9,9 +9,6 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../app/navigation/ordinary_page_scaffold.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../daily_choice/application/choice_path_draft.dart';
-import '../../../daily_choice/domain/calendar_date.dart';
-import '../../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
-import '../../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
 import '../../../daily_choice/presentation/details/daily_choice_sheet.dart';
 import '../../../daily_choice/presentation/intention_choices/intention_choices_sliver.dart';
 import '../../../daily_choice/presentation/intention_choices/intention_choices_state.dart';
@@ -28,6 +25,9 @@ import '../../../design_system/components/top_bar.dart';
 import '../../../design_system/doable_icon.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../shared/domain/calendar_date.dart';
+import '../../../shared/presentation/local_day/local_date_provider.dart';
+import '../../../shared/presentation/local_day/local_day_observer.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
 import '../edit/intention_edit_page.dart';
@@ -72,7 +72,7 @@ final class _IntentionDetailsPageState
   double? _headExtent;
   var _headMeasurementScheduled = false;
   late IntentionPageInstance _pageInstance;
-  late final DailyChoiceLocalDayObserver _localDay;
+  late final LocalDayObserver _localDay;
   var _routeIsCurrent = false;
   late IntentionDetailsTab _selectedTab;
   ProviderSubscription<IntentionRelationsState>? _relationsSubscription;
@@ -96,8 +96,8 @@ final class _IntentionDetailsPageState
     super.initState();
     _startPageInstance();
     _scrollController.addListener(_syncHeadHidden);
-    _localDay = DailyChoiceLocalDayObserver(
-      readLocalDay: ref.read(dailyChoiceLocalDateSourceProvider),
+    _localDay = LocalDayObserver(
+      readLocalDay: ref.read(localDateSourceProvider),
       onTodayChanged: () {
         ref.read(_statisticsProvider.notifier).setLocalDate(_localDay.today);
         // Строка дат «Обзора» называет год по сегодняшнему дню.

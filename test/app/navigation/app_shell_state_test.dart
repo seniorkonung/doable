@@ -12,7 +12,6 @@ import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.da
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart'
@@ -45,6 +44,7 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_id_
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
 import 'package:doable/src/statistics/application/intention_statistics_read_contract.dart';
@@ -61,9 +61,9 @@ import '../../support/daily_choice_detail_fields_controls.dart';
 import '../../support/daily_choice_details_controls.dart';
 
 import '../../support/app_root_pages.dart';
+import '../../support/controlled_local_date.dart';
 import '../../support/daily_choice_catalog_controls.dart';
 import '../../support/daily_choice_catalog_provider.dart';
-import '../../support/daily_choice_local_date.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
@@ -940,8 +940,7 @@ Future<_App> _start(WidgetTester tester, {CalendarDate? today}) async {
       faults,
     ),
     diagnosticsSink: diagnostics,
-    dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(today ?? _today)
-        .read,
+    localDateSource: ControlledLocalDate(today ?? _today).read,
     repositoryFactory: (database) => repository = _ObservedRepository(
       DriftPersonalGraphRepository(
         database,

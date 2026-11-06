@@ -1,7 +1,7 @@
 import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/application/graph_revision.dart';
+import '../../../shared/domain/calendar_date.dart';
 import '../../application/daily_choice_catalog.dart';
-import '../../domain/calendar_date.dart';
 
 /// Загруженная часть секции и её полная сводка на ревизии общей пары.
 final class DailyChoiceCatalogSectionSnapshot {

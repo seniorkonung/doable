@@ -3,10 +3,9 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 
 import '../../domain/calendar_date.dart';
-import 'daily_choice_local_date_provider.dart';
+import 'local_date_provider.dart';
 
-/// Следит за местным сегодня, которое каталог дневных выборов обозначает в
-/// календаре.
+/// Следит за местным сегодня, которое интерфейс обозначает в календаре.
 ///
 /// Читает часы при создании, при каждом возвращении приложения в активное
 /// состояние и в начале следующей местной даты. Держит один таймер до начала
@@ -16,19 +15,16 @@ import 'daily_choice_local_date_provider.dart';
 /// обозначение.
 ///
 /// О смене сегодняшнего дня сообщает [onTodayChanged]; выбранную дату,
-/// просмотр календаря и выдачу каталога наблюдатель не трогает. После
+/// просмотр календаря и выдачу данных наблюдатель не трогает. После
 /// [dispose] часы не читаются и вызовов нет.
-final class DailyChoiceLocalDayObserver with WidgetsBindingObserver {
-  DailyChoiceLocalDayObserver({
-    required this.readLocalDay,
-    required this.onTodayChanged,
-  }) {
+final class LocalDayObserver with WidgetsBindingObserver {
+  LocalDayObserver({required this.readLocalDay, required this.onTodayChanged}) {
     _today = _readAndSchedule();
     WidgetsBinding.instance.addObserver(this);
   }
 
   /// Часы, которые наблюдатель читает.
-  final DailyChoiceLocalDateSource readLocalDay;
+  final LocalDateSource readLocalDay;
 
   /// Вызывается, когда очередное чтение часов дало другую местную дату.
   final VoidCallback onTodayChanged;

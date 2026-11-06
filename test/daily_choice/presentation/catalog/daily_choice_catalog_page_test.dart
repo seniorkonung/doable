@@ -12,7 +12,6 @@ import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
@@ -32,6 +31,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 
 import 'dart:ui' show Tristate;
 
@@ -42,8 +42,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 
 import '../../../support/app_root_pages.dart';
+import '../../../support/controlled_local_date.dart';
 import '../../../support/daily_choice_details_controls.dart';
-import '../../../support/daily_choice_local_date.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import 'daily_choice_calendar_test_support.dart';
 import 'daily_choice_catalog_page_test_support.dart';
@@ -1551,7 +1551,7 @@ Future<AppRouter> _open(
       overrides: [
         inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
-        ControlledDailyChoiceLocalDate(today ?? _today).override,
+        ControlledLocalDate(today ?? _today).override,
       ],
       retry: (count, error) => null,
       child: MaterialApp.router(

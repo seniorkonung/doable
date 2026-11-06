@@ -1,6 +1,6 @@
 import '../../graph/application/graph_command_result.dart';
 import '../../intention/domain/intention_id.dart';
-import '../domain/calendar_date.dart';
+import '../../shared/domain/calendar_date.dart';
 import '../domain/daily_choice_description.dart';
 import '../domain/daily_choice_id.dart';
 import '../domain/daily_choice_priority.dart';

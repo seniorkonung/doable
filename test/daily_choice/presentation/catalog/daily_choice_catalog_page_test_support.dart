@@ -9,7 +9,6 @@ import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
@@ -30,6 +29,7 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
@@ -41,7 +41,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
-import '../../../support/daily_choice_local_date.dart';
+import '../../../support/controlled_local_date.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/tag_positions.dart';
@@ -76,7 +76,7 @@ Future<AppRouter> pumpCatalogPage(
       overrides: [
         inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
-        ControlledDailyChoiceLocalDate(today).override,
+        ControlledLocalDate(today).override,
       ],
       retry: (count, error) => null,
       child: MaterialApp.router(

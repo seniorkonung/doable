@@ -3,7 +3,7 @@ import 'dart:ui' show SemanticsRole;
 import 'package:flutter/material.dart';
 
 import '../../../l10n/app_localizations.dart';
-import '../../daily_choice/domain/calendar_date.dart';
+import '../../shared/domain/calendar_date.dart';
 import '../application/intention_statistics_read_contract.dart';
 import '../application/statistics_period.dart';
 import '../application/statistics_read_contract.dart';

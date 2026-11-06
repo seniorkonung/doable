@@ -2,19 +2,19 @@ import 'dart:ui' show Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_date_sheet.dart';
 import 'package:doable/src/design_system/components/date_grid.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../../support/daily_choice_local_date.dart';
+import '../../../support/controlled_local_date.dart';
 
 void main() {
   testWidgets('лист называется датой дневного выбора, показывает месяц '
@@ -221,7 +221,7 @@ Future<_App> _pump(
         personalGraphRepositoryProvider.overrideWith(
           (ref) => _Repository(marks, readFails: marksReadFails),
         ),
-        ControlledDailyChoiceLocalDate(_date(2026, 10, 5)).override,
+        ControlledLocalDate(_date(2026, 10, 5)).override,
       ],
       child: MaterialApp(
         locale: const Locale('ru'),

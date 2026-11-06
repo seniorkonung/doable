@@ -40,9 +40,9 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../support/daily_choice_details_controls.dart';
 
 import '../support/app_root_pages.dart';
+import '../support/controlled_local_date.dart';
 import '../support/daily_choice_catalog_controls.dart';
 import '../support/daily_choice_durability_fixture.dart';
-import '../support/daily_choice_local_date.dart';
 import '../support/graph_seed.dart';
 import '../support/intention_catalog_controls.dart';
 import '../support/quick_creation.dart';
@@ -1050,7 +1050,7 @@ void main() {
         );
         await storage.closePersistenceObjectGraph();
       });
-      final localDate = ControlledDailyChoiceLocalDate(durabilityChoiceDate);
+      final localDate = ControlledLocalDate(durabilityChoiceDate);
       late sqlite.Database raw;
       final runtime = AppRuntime(
         quickCreationModeStore: InMemoryQuickCreationModeStore(),
@@ -1059,7 +1059,7 @@ void main() {
           setup: (database) => raw = database,
         ),
         diagnosticsSink: InMemoryDiagnosticsSink(),
-        dailyChoiceLocalDateSource: localDate.read,
+        localDateSource: localDate.read,
       );
       addTearDown(() async {
         await tester.pumpWidget(const SizedBox.shrink());

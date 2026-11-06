@@ -15,7 +15,6 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.d
 import 'package:doable/src/app/quick_creation/quick_creation_mode_store.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_daily_choice_start_sheet.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
@@ -23,6 +22,7 @@ import 'package:doable/src/intention/presentation/editor/intention_editor_page.d
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/design_system/components/option_row.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

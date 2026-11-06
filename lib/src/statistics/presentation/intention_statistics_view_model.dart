@@ -2,14 +2,14 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../daily_choice/domain/calendar_date.dart';
-import '../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import '../../graph/application/graph_command_coordinator.dart';
 import '../../graph/application/graph_command_result.dart';
 import '../../graph/application/graph_revision.dart';
 import '../../graph/application/personal_graph_repository_provider.dart';
 import '../../intention/domain/intention_id.dart';
 import '../../intention/presentation/details/intention_page_target.dart';
+import '../../shared/domain/calendar_date.dart';
+import '../../shared/presentation/local_day/local_date_provider.dart';
 import '../application/intention_statistics_breakdown.dart';
 import '../application/intention_statistics_read_contract.dart';
 import '../application/intention_statistics_target.dart';
@@ -41,7 +41,7 @@ final class IntentionStatisticsViewModel
   }) {
     _reader = ref.watch(personalGraphRepositoryProvider);
     final selection = IntentionStatisticsSelection.initial(
-      ref.read(dailyChoiceLocalDateSourceProvider)().date,
+      ref.read(localDateSourceProvider)().date,
       target,
     );
     ++_generation;

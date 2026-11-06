@@ -1,7 +1,7 @@
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/graph_format/graph_format_records.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 

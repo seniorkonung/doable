@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../daily_choice/application/daily_choice_day_statuses.dart';
-import '../../daily_choice/domain/calendar_date.dart';
+import '../../shared/domain/calendar_date.dart';
 import '../application/contribution_counts.dart';
 import '../application/intention_statistics_calendar.dart';
 

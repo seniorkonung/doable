@@ -1,8 +1,8 @@
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('дата дневного выбора', () {
+  group('календарная дата', () {
     test('сохраняет календарные части и каноническую запись', () {
       final earliest = CalendarDate.fromParts(1, 1, 1);
       final latest = CalendarDate.fromParts(9999, 12, 31);

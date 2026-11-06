@@ -4,7 +4,6 @@ import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_id_generator.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day_marks_view_model.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_instance.dart';
@@ -24,15 +23,16 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/controlled_local_date.dart';
 import '../../../support/daily_choice_catalog_controls.dart';
 import '../../../support/daily_choice_detail_fields_controls.dart';
 import '../../../support/daily_choice_details_controls.dart';
 import '../../../support/daily_choice_durability_fixture.dart';
-import '../../../support/daily_choice_local_date.dart';
 import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
@@ -90,7 +90,7 @@ void main() {
         overrides: [
           inMemoryQuickCreationModeOverride,
           personalGraphRepositoryProvider.overrideWith((ref) => repository),
-          ControlledDailyChoiceLocalDate(sourceDay).override,
+          ControlledLocalDate(sourceDay).override,
         ],
       );
       addTearDown(container.dispose);
@@ -374,7 +374,7 @@ void main() {
         overrides: [
           inMemoryQuickCreationModeOverride,
           personalGraphRepositoryProvider.overrideWith((ref) => repository),
-          ControlledDailyChoiceLocalDate(day).override,
+          ControlledLocalDate(day).override,
         ],
       );
       addTearDown(container.dispose);

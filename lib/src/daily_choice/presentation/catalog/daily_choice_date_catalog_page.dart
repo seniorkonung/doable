@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/navigation/ordinary_page_scaffold.dart';
 import '../../../design_system/components/scroll_top_button.dart';
-import '../../domain/calendar_date.dart';
+import '../../../shared/domain/calendar_date.dart';
 import 'daily_choice_catalog_body.dart';
 import 'daily_choice_catalog_instance.dart';
 

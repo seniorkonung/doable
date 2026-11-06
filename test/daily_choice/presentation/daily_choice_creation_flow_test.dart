@@ -6,7 +6,6 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
@@ -25,6 +24,7 @@ import 'package:doable/src/intention/presentation/details/intention_details_tabs
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:drift/drift.dart' show Variable;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -37,8 +37,8 @@ import '../../support/daily_choice_detail_fields_controls.dart';
 import '../../support/daily_choice_details_controls.dart';
 
 import '../../support/app_root_pages.dart';
+import '../../support/controlled_local_date.dart';
 import '../../support/daily_choice_catalog_controls.dart';
-import '../../support/daily_choice_local_date.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
@@ -322,8 +322,7 @@ void main() {
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
-        dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(catalogToday)
-            .read,
+        localDateSource: ControlledLocalDate(catalogToday).read,
       );
       addTearDown(() async {
         await tester.pumpWidget(const SizedBox.shrink());
@@ -510,7 +509,7 @@ void main() {
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
-        dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(
+        localDateSource: ControlledLocalDate(
           CalendarDate.fromParts(2030, 9, 24),
         ).read,
       );
@@ -773,7 +772,7 @@ void main() {
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
-        dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(
+        localDateSource: ControlledLocalDate(
           CalendarDate.fromParts(2026, 9, 25),
         ).read,
       );

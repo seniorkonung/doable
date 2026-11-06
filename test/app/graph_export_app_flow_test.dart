@@ -8,7 +8,6 @@ import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show AppDatabase, openFileBackedLocalDatabase;
@@ -26,13 +25,14 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_root_pages.dart';
+import '../support/controlled_local_date.dart';
 import '../support/daily_choice_catalog_controls.dart';
 import '../support/daily_choice_durability_fixture.dart';
-import '../support/daily_choice_local_date.dart';
 import '../support/file_document_access.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
@@ -176,7 +176,7 @@ final class _ExportApp {
       diagnosticsSink: InMemoryDiagnosticsSink(),
       quickCreationModeStore: InMemoryQuickCreationModeStore(),
       graphFilesFactory: files.create,
-      dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(_today).read,
+      localDateSource: ControlledLocalDate(_today).read,
     );
     addTearDown(() async {
       held?.release();

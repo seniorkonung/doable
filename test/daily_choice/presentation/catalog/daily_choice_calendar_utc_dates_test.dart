@@ -10,7 +10,7 @@ const _calendarFilePrefix = 'daily_choice_calendar';
 
 /// Предметная дата, части которой компонент переводит в технические даты
 /// библиотеки и обратно.
-const _calendarDatePath = 'lib/src/daily_choice/domain/calendar_date.dart';
+const _calendarDatePath = 'lib/src/shared/domain/calendar_date.dart';
 
 // Календарный компонент передаёт библиотеке технические даты в UTC и читает из
 // них только календарные части. Дата в местном времени процесса сдвигает день

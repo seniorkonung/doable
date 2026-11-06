@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../design_system/doable_priority.dart';
-import '../../domain/calendar_date.dart';
+import '../../../shared/domain/calendar_date.dart';
 import '../../domain/daily_choice_priority.dart';
 import '../../domain/daily_choice_schedule.dart';
 

@@ -14,7 +14,6 @@ library;
 import 'dart:ui' show Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart';
@@ -24,6 +23,7 @@ import 'package:doable/src/design_system/components/choice_row.dart';
 import 'package:doable/src/design_system/components/day_heading.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
 import 'package:doable/src/design_system/components/notice.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';

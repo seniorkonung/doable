@@ -34,13 +34,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/controlled_local_date.dart';
 import '../../support/daily_choice_durability_fixture.dart';
-import '../../support/daily_choice_local_date.dart';
 
 /// Локальное сегодня потребителей пакетов: день дневного выбора фикстуры.
 /// Подставляется в контейнер до первого открытия каталога дневных выборов.
 Override packageConsumersLocalDate() =>
-    ControlledDailyChoiceLocalDate(durabilityChoiceDate).override;
+    ControlledLocalDate(durabilityChoiceDate).override;
 
 /// Номер объекта фикстуры по его UUID.
 int _label(String uuid) => int.parse(uuid.split('-').last, radix: 16);

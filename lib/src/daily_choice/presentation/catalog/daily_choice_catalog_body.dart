@@ -20,8 +20,10 @@ import '../../../design_system/doable_metrics.dart';
 import '../../../design_system/doable_priority.dart';
 import '../../../design_system/doable_type.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
+import '../../../shared/domain/calendar_date.dart';
+import '../../../shared/presentation/local_day/local_date_provider.dart';
+import '../../../shared/presentation/local_day/local_day_observer.dart';
 import '../../application/daily_choice_catalog.dart';
-import '../../domain/calendar_date.dart';
 import '../../domain/daily_choice_id.dart';
 import '../../domain/daily_choice_priority.dart';
 import '../../domain/daily_choice_schedule.dart';
@@ -34,8 +36,6 @@ import 'daily_choice_calendar_viewport.dart';
 import 'daily_choice_catalog_instance.dart';
 import 'daily_choice_catalog_state.dart';
 import 'daily_choice_catalog_view_model.dart';
-import 'daily_choice_local_date_provider.dart';
-import 'daily_choice_local_day_observer.dart';
 
 /// Строит каркас страницы вокруг [body] и кнопки возврата к началу.
 ///
@@ -107,7 +107,7 @@ final class _DailyChoiceCatalogBodyState
   /// активное состояние и наступлении следующей местной даты. Новый день
   /// только перестраивает календарь и заголовок: выбранная дата, просмотр,
   /// секции и выдача остаются прежними.
-  late final DailyChoiceLocalDayObserver _localDay;
+  late final LocalDayObserver _localDay;
 
   @override
   void initState() {
@@ -116,8 +116,8 @@ final class _DailyChoiceCatalogBodyState
       focusedDate: widget.instance.initialDate,
       mode: DailyChoiceCalendarMode.week,
     );
-    _localDay = DailyChoiceLocalDayObserver(
-      readLocalDay: ref.read(dailyChoiceLocalDateSourceProvider),
+    _localDay = LocalDayObserver(
+      readLocalDay: ref.read(localDateSourceProvider),
       onTodayChanged: () => setState(() {}),
     );
   }

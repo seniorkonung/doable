@@ -7,12 +7,12 @@ import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
@@ -380,7 +380,7 @@ Future<_App> _start(WidgetTester tester) async {
     connectionFactory: openInMemoryLocalDatabase,
     diagnosticsSink: InMemoryDiagnosticsSink(),
     quickCreationModeStore: InMemoryQuickCreationModeStore(),
-    dailyChoiceLocalDateSource: () => DailyChoiceLocalDay(
+    localDateSource: () => LocalDay(
       date: CalendarDate.fromParts(2026, 10, 12),
       untilNextDate: const Duration(hours: 12),
     ),

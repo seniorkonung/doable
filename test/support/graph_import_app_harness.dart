@@ -7,8 +7,6 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/settings/settings_page.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openFileBackedLocalDatabase;
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -17,6 +15,8 @@ import 'package:doable/src/graph_backups/graph_backup_registry.dart';
 import 'package:doable/src/graph_backups/graph_backups_provider.dart';
 import 'package:doable/src/graph_format/graph_format_codec.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -120,7 +120,7 @@ final class ImportAppHarness {
       diagnosticsSink: diagnostics,
       quickCreationModeStore: _modes,
       graphFilesFactory: _files.create,
-      dailyChoiceLocalDateSource: () => DailyChoiceLocalDay(
+      localDateSource: () => LocalDay(
         date: CalendarDate.fromParts(now.year, now.month, now.day),
         untilNextDate: const Duration(hours: 12),
       ),

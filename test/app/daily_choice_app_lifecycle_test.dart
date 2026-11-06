@@ -11,7 +11,6 @@ import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.da
 import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
@@ -36,6 +35,7 @@ import 'package:doable/src/long_term_relation/application/long_term_relation_id_
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
 import 'package:doable/src/statistics/application/intention_statistics_read_contract.dart';
@@ -53,10 +53,10 @@ import '../support/daily_choice_detail_fields_controls.dart';
 import '../support/daily_choice_details_controls.dart';
 
 import '../support/app_root_pages.dart';
+import '../support/controlled_local_date.dart';
 import '../support/daily_choice_catalog_controls.dart';
 import '../support/daily_choice_catalog_provider.dart';
 import '../support/daily_choice_durability_fixture.dart';
-import '../support/daily_choice_local_date.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
@@ -195,7 +195,7 @@ void main() {
       final gate = _ChoiceSqlGate();
       // Каталог открывается на дне прежнего дневного выбора, а новый выбор
       // создаётся на другой день.
-      final localDate = ControlledDailyChoiceLocalDate(durabilityChoiceDate);
+      final localDate = ControlledLocalDate(durabilityChoiceDate);
       final createdDate = CalendarDate.fromParts(2026, 9, 24);
       final runtime = AppRuntime(
         quickCreationModeStore: InMemoryQuickCreationModeStore(),
@@ -204,7 +204,7 @@ void main() {
           gate,
         ),
         diagnosticsSink: InMemoryDiagnosticsSink(),
-        dailyChoiceLocalDateSource: localDate.read,
+        localDateSource: localDate.read,
       );
       addTearDown(() async {
         gate.release();
@@ -356,7 +356,7 @@ void main() {
 
       final gate = _ChoiceSqlGate();
       // Каталог открывается на дне изменяемых дневных выборов.
-      final localDate = ControlledDailyChoiceLocalDate(durabilityChoiceDate);
+      final localDate = ControlledLocalDate(durabilityChoiceDate);
       final runtime = AppRuntime(
         quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () => observeConfiguredLocalDatabaseConnection(
@@ -364,7 +364,7 @@ void main() {
           gate,
         ),
         diagnosticsSink: InMemoryDiagnosticsSink(),
-        dailyChoiceLocalDateSource: localDate.read,
+        localDateSource: localDate.read,
       );
       addTearDown(() async {
         gate.release();
@@ -552,14 +552,14 @@ void main() {
       });
       expect(stored['таблица daily_choice_path_steps'], hasLength(5));
 
-      final localDate = ControlledDailyChoiceLocalDate(_firstToday);
+      final localDate = ControlledLocalDate(_firstToday);
       late _ObservedRepository graph;
       AppRuntime start() => AppRuntime(
         quickCreationModeStore: InMemoryQuickCreationModeStore(),
         connectionFactory: () =>
             openFileBackedLocalDatabase(harness.databaseFile),
         diagnosticsSink: InMemoryDiagnosticsSink(),
-        dailyChoiceLocalDateSource: localDate.read,
+        localDateSource: localDate.read,
         repositoryFactory: (database) => graph = _ObservedRepository(
           DriftPersonalGraphRepository(
             database,

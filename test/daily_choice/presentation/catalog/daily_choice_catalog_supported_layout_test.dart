@@ -4,7 +4,6 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/design_system/components/calendar_handle.dart';
 import 'package:doable/src/design_system/components/day_heading.dart';
@@ -13,6 +12,7 @@ import 'package:doable/src/design_system/components/notice.dart';
 import 'package:doable/src/design_system/components/period_picker.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -20,7 +20,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/app_root_pages.dart';
-import '../../../support/daily_choice_local_date.dart';
+import '../../../support/controlled_local_date.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import 'daily_choice_calendar_test_support.dart';
 import 'daily_choice_catalog_page_test_support.dart';
@@ -97,7 +97,7 @@ Future<void> _open(
       overrides: [
         inMemoryQuickCreationModeOverride,
         personalGraphRepositoryProvider.overrideWithValue(repository),
-        ControlledDailyChoiceLocalDate(selected).override,
+        ControlledLocalDate(selected).override,
       ],
       retry: (count, error) => null,
       child: MaterialApp.router(

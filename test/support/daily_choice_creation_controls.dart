@@ -5,9 +5,9 @@
 /// показывает общий блок полей, поэтому шаги идут через шаги этого блока.
 library;
 
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_detail_fields.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'app_root_pages.dart';

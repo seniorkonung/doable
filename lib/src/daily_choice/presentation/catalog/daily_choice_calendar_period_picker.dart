@@ -7,7 +7,7 @@ import 'package:intl/intl.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../design_system/components/calendar_header.dart';
 import '../../../design_system/components/period_picker.dart';
-import '../../domain/calendar_date.dart';
+import '../../../shared/domain/calendar_date.dart';
 import 'daily_choice_calendar_paging.dart';
 
 /// Открытый выбор периода: шапка и сетка заменяют дни календаря.

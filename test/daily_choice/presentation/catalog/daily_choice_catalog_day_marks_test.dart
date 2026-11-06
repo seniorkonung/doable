@@ -1,5 +1,4 @@
 import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_day.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart';
@@ -7,6 +6,7 @@ import 'package:doable/src/design_system/components/calendar_handle.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
 import 'package:doable/src/design_system/components/notice.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

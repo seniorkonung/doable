@@ -13,7 +13,6 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/app/settings/settings_page.dart';
 import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
@@ -40,6 +39,7 @@ import 'package:doable/src/intention/presentation/details/intention_options.dart
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -49,7 +49,7 @@ import '../../daily_choice/presentation/daily_choice_picker_launch_test_support.
     show TestDailyChoicePickerLaunch;
 import '../../intention/presentation/picker/intention_picker_test_support.dart';
 import '../../support/app_root_pages.dart';
-import '../../support/daily_choice_local_date.dart';
+import '../../support/controlled_local_date.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/intention_catalog_controls.dart';
@@ -347,8 +347,7 @@ Future<AppRouter> _start(
     connectionFactory: () =>
         openInMemoryLocalDatabase(setup: (database) => raw = database),
     diagnosticsSink: InMemoryDiagnosticsSink(),
-    dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(_choiceDate)
-        .read,
+    localDateSource: ControlledLocalDate(_choiceDate).read,
     graphFilesFactory: graphFiles?.create,
   );
   addTearDown(() async {

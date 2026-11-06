@@ -14,7 +14,6 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/app/settings/settings_page.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
@@ -28,6 +27,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:doable/src/statistics/presentation/home_statistics_state.dart';
@@ -39,8 +39,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/app_root_pages.dart';
+import '../../support/controlled_local_date.dart';
 import '../../support/daily_choice_catalog_controls.dart';
-import '../../support/daily_choice_local_date.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
@@ -150,7 +150,7 @@ final class _App {
 
   final ProviderContainer container;
   final TemporaryGraphFiles files;
-  final ControlledDailyChoiceLocalDate localDate;
+  final ControlledLocalDate localDate;
 
   AppRouter get router => container.read(appRouterProvider);
 }
@@ -165,14 +165,14 @@ Future<_App> _start(WidgetTester tester) async {
   addTearDown(tester.view.reset);
   late sqlite.Database raw;
   final files = TemporaryGraphFiles();
-  final localDate = ControlledDailyChoiceLocalDate(_today);
+  final localDate = ControlledLocalDate(_today);
   final runtime = AppRuntime(
     connectionFactory: () =>
         openInMemoryLocalDatabase(setup: (database) => raw = database),
     diagnosticsSink: InMemoryDiagnosticsSink(),
     quickCreationModeStore: InMemoryQuickCreationModeStore(),
     graphFilesFactory: files.create,
-    dailyChoiceLocalDateSource: localDate.read,
+    localDateSource: localDate.read,
   );
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());

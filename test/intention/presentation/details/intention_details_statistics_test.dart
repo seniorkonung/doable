@@ -4,8 +4,6 @@ import 'dart:ui' show SemanticsAction, Tristate;
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/design_system/components/tabs.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -16,6 +14,8 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_tabs.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:doable/src/statistics/application/contribution_counts.dart';
 import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
 import 'package:doable/src/statistics/application/intention_statistics_calendar.dart';
@@ -63,8 +63,8 @@ void main() {
           ProviderScope(
             overrides: [
               personalGraphRepositoryProvider.overrideWithValue(repository),
-              dailyChoiceLocalDateSourceProvider.overrideWithValue(
-                () => DailyChoiceLocalDay(
+              localDateSourceProvider.overrideWithValue(
+                () => LocalDay(
                   date: date,
                   untilNextDate: const Duration(hours: 1),
                 ),
@@ -270,8 +270,8 @@ void main() {
           ProviderScope(
             overrides: [
               personalGraphRepositoryProvider.overrideWithValue(repository),
-              dailyChoiceLocalDateSourceProvider.overrideWithValue(
-                () => DailyChoiceLocalDay(
+              localDateSourceProvider.overrideWithValue(
+                () => LocalDay(
                   date: CalendarDate.fromParts(2026, 10, 12),
                   untilNextDate: const Duration(hours: 12),
                 ),
@@ -332,8 +332,8 @@ void main() {
         ProviderScope(
           overrides: [
             personalGraphRepositoryProvider.overrideWithValue(repository),
-            dailyChoiceLocalDateSourceProvider.overrideWithValue(
-              () => DailyChoiceLocalDay(
+            localDateSourceProvider.overrideWithValue(
+              () => LocalDay(
                 date: CalendarDate.fromParts(2026, 10, 12),
                 untilNextDate: const Duration(hours: 12),
               ),
@@ -547,8 +547,8 @@ void main() {
         overrides: [
           inMemoryQuickCreationModeOverride,
           personalGraphRepositoryProvider.overrideWithValue(repository),
-          dailyChoiceLocalDateSourceProvider.overrideWithValue(
-            () => DailyChoiceLocalDay(
+          localDateSourceProvider.overrideWithValue(
+            () => LocalDay(
               date: CalendarDate.fromParts(2026, 10, 12),
               untilNextDate: const Duration(hours: 12),
             ),
@@ -679,11 +679,9 @@ void main() {
         ProviderScope(
           overrides: [
             personalGraphRepositoryProvider.overrideWithValue(repository),
-            dailyChoiceLocalDateSourceProvider.overrideWithValue(
-              () => DailyChoiceLocalDay(
-                date: date,
-                untilNextDate: const Duration(hours: 1),
-              ),
+            localDateSourceProvider.overrideWithValue(
+              () =>
+                  LocalDay(date: date, untilNextDate: const Duration(hours: 1)),
             ),
           ],
           child: OrdinaryPageTestApp(

@@ -11,7 +11,6 @@ import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/filter_button.dart';
 import 'package:doable/src/design_system/components/picker_row.dart';
@@ -32,16 +31,17 @@ import 'package:doable/src/intention/presentation/picker/intention_picker_row.da
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/controlled_local_date.dart';
 import '../support/daily_choice_catalog_provider.dart';
 import '../support/daily_choice_catalog_controls.dart';
 import '../support/daily_choice_creation_controls.dart';
 import '../support/daily_choice_durability_fixture.dart';
-import '../support/daily_choice_local_date.dart';
 import '../support/graph_seed.dart';
 import '../support/intention_catalog_controls.dart';
 import '../support/intention_creation_origin.dart';

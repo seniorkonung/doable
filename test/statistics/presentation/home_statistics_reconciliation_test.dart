@@ -1,7 +1,5 @@
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -9,6 +7,8 @@ import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:doable/src/statistics/application/contribution_counts.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
@@ -528,11 +528,9 @@ final class _Harness {
     container = ProviderContainer(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(reader),
-        dailyChoiceLocalDateSourceProvider.overrideWithValue(
-          () => DailyChoiceLocalDay(
-            date: _today,
-            untilNextDate: const Duration(hours: 12),
-          ),
+        localDateSourceProvider.overrideWithValue(
+          () =>
+              LocalDay(date: _today, untilNextDate: const Duration(hours: 12)),
         ),
       ],
     );

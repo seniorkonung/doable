@@ -1,5 +1,5 @@
 import '../../daily_choice/application/daily_choice_day_statuses.dart';
-import '../../daily_choice/domain/calendar_date.dart';
+import '../../shared/domain/calendar_date.dart';
 import 'contribution_counts.dart';
 import 'statistics_period.dart';
 

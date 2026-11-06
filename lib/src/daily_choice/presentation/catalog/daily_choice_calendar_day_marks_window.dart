@@ -1,5 +1,5 @@
+import '../../../shared/domain/calendar_date.dart';
 import '../../application/daily_choice_day_statuses.dart';
-import '../../domain/calendar_date.dart';
 
 /// Окно отметок вокруг месяца [focusedDate], общее для недели и месяца.
 /// Покрывает шестинедельные сетки предыдущего, текущего и следующего

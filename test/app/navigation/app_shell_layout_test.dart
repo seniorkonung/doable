@@ -12,7 +12,6 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
 import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
@@ -26,6 +25,7 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -34,8 +34,8 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/daily_choice_details_controls.dart';
 
 import '../../support/app_root_pages.dart';
+import '../../support/controlled_local_date.dart';
 import '../../support/daily_choice_catalog_controls.dart';
-import '../../support/daily_choice_local_date.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/intention_catalog_controls.dart';
@@ -617,7 +617,7 @@ Future<_App> _start(
       };
     },
     diagnosticsSink: InMemoryDiagnosticsSink(),
-    dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(_today).read,
+    localDateSource: ControlledLocalDate(_today).read,
   );
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());

@@ -2,14 +2,12 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
 import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/daily_choice/presentation/details/daily_choice_sheet.dart';
 import 'package:doable/src/design_system/components/choice_head.dart';
 import 'package:doable/src/design_system/components/choice_path.dart' as ui;
@@ -24,13 +22,15 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../../support/daily_choice_local_date.dart';
+import '../../../support/controlled_local_date.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 
@@ -523,14 +523,12 @@ Future<void> _expectTabsReachable(WidgetTester tester) async {
 Future<void> _openSheet(WidgetTester tester, DailyChoiceDetails details) async {
   final repository = _Repository(details);
   addTearDown(repository.dispose);
-  final localDate = ControlledDailyChoiceLocalDate(
-    CalendarDate.fromParts(2026, 10, 8),
-  );
+  final localDate = ControlledLocalDate(CalendarDate.fromParts(2026, 10, 8));
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         personalGraphRepositoryProvider.overrideWith((ref) => repository),
-        dailyChoiceLocalDateSourceProvider.overrideWithValue(localDate.read),
+        localDateSourceProvider.overrideWithValue(localDate.read),
       ],
       child: OrdinaryPageTestApp(
         locale: const Locale('ru'),

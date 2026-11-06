@@ -28,9 +28,7 @@ void _completionLifecycleScenarios() {
           gate,
         ),
         diagnosticsSink: InMemoryDiagnosticsSink(),
-        dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(
-          durabilityChoiceDate,
-        ).read,
+        localDateSource: ControlledLocalDate(durabilityChoiceDate).read,
         repositoryFactory: (database) =>
             graph = _ObservedRepository(durabilityRepository(database)),
       );
