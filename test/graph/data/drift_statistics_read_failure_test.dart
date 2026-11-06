@@ -245,7 +245,9 @@ final class _FailureProbe extends LocalDatabaseConnectionObserver {
   void beforeStatement(LocalDatabaseSqlStatement statement) {
     if (statement.operation != LocalDatabaseSqlOperation.select) return;
     final sql = statement.statements.single;
-    final stage = sql.contains('FROM intentions')
+    // Существование намерений проверяют и запросы исходных данных, поэтому
+    // этап названий узнаётся по своим столбцам.
+    final stage = sql.contains('SELECT id, title, is_archived FROM intentions')
         ? StatisticsReadDiagnosticsStage.titles
         : sql.contains('creation_sequence >')
         ? StatisticsReadDiagnosticsStage.relationSnapshot

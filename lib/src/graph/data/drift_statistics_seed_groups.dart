@@ -31,29 +31,44 @@ extension DriftStatisticsSeedGroupsReading on DriftPersonalGraphRepository {
           // Опорные намерения действия — существующие намерения его пути.
           // Намерение, за которым в пути идёт следующее по активной связи их
           // пары, опускается: всё, от чего достижимо оно, достижимо и через
-          // следующее, а само оно достигает следующего этой связью. Активная
-          // связь существует только между существующими намерениями.
-          // Уникальность намерения в пути и группировка по id сохраняют
-          // самостоятельный вес полных дубликатов. ORDER BY внутри агрегата
-          // даёт равным наборам одинаковый ключ:
+          // следующее, а само оно достигает следующего этой связью. Поэтому
+          // опорные — предыдущие намерения звеньев без активной связи и
+          // конечное намерение. Звено читается из одной строки пути, а
+          // конечное — одним поиском на действие, без поиска следующей
+          // позиции для каждой строки. Активная связь существует только
+          // между существующими намерениями, и проверка существования нужна
+          // лишь оставшимся. Уникальность намерения в пути и группировка по
+          // id сохраняют самостоятельный вес полных дубликатов. ORDER BY
+          // внутри агрегата даёт равным наборам одинаковый ключ:
           // https://www.sqlite.org/lang_aggfunc.html#group_concat
           final rows = await _database
               .customSelect(
                 '''WITH seed_rows AS (
-                 SELECT a.id AS action_id, p.intention_id AS seed_id,
+                 SELECT a.id AS action_id, p.previous_intention_id AS seed_id,
                         a.is_completed
                  FROM actions a INDEXED BY actions_date_completion_schedule_order
                  JOIN action_path_items p ON p.action_id = a.id
-                 JOIN intentions i ON i.id = p.intention_id
-                 WHERE a.date BETWEEN ? AND ? AND NOT EXISTS (
-                   SELECT 1 FROM action_path_items n
-                   JOIN long_term_relations r
-                     ON r.source_intention_id = p.intention_id
-                    AND r.related_intention_id = n.intention_id
-                   WHERE n.action_id = p.action_id
-                     AND n.position = p.position + 1
-                     AND r.is_archived = 0
+                 WHERE a.date BETWEEN ?1 AND ?2
+                   AND p.previous_intention_id IS NOT NULL
+                   AND NOT EXISTS (
+                     SELECT 1 FROM long_term_relations r
+                     WHERE r.source_intention_id = p.previous_intention_id
+                       AND r.related_intention_id = p.intention_id
+                       AND r.is_archived = 0
+                   )
+                   AND EXISTS (
+                     SELECT 1 FROM intentions i
+                     WHERE i.id = p.previous_intention_id
+                   )
+                 UNION ALL
+                 SELECT a.id, i.id, a.is_completed
+                 FROM actions a INDEXED BY actions_date_completion_schedule_order
+                 JOIN intentions i ON i.id = (
+                   SELECT t.intention_id FROM action_path_items t
+                   WHERE t.action_id = a.id
+                   ORDER BY t.position DESC LIMIT 1
                  )
+                 WHERE a.date BETWEEN ?1 AND ?2
                ), action_groups AS (
                  SELECT group_concat(seed_id ORDER BY seed_id) AS seed_key,
                         MAX(is_completed) AS is_completed
