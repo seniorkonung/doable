@@ -380,10 +380,11 @@
     - Раздел Purpose канонической `openspec/specs/app-navigation/spec.md` описывает итоговое поведение по спекам изменения: постоянный доступ к Главной, экрану дня «Действия» и каталогу намерений, названия и подсказки пунктов, входы в экран дня и каталог намерений и лист нового действия над обычной страницей, без каталога дневных выборов и точек входа в каталоги. Раздел Purpose канонической `openspec/specs/contribution-statistics/spec.md` говорит, во что складываются действия за месяц или год. Требования этих спек не меняются: их обновляет синхронизация спек изменения.
   - **Проверка:**
     - `grep -rniE 'daily.?choice|дневн' lib test benchmark` ничего не находит.
+    - `grep -rniE 'daily.?choice|дневн' docs/adr` находит только поля Originating change, имена изменений и имена файлов в ссылках, обоснование принятой ADR-0001, записи ADR-0055–ADR-0060 и части ADR-0022, ADR-0026, ADR-0051 и ADR-0054, которые они заменяют, вместе со строками индекса об этих частях.
     - `awk '/^## Purpose/,/^## Requirements/' openspec/specs/app-navigation/spec.md openspec/specs/contribution-statistics/spec.md | grep -niE 'дневн|точки входа'` ничего не находит.
     - `mise exec --no-deps -- flutter test test/tag`.
   - **Зависимости:** 1.29.
-  - **Предполагаемые файлы:** `lib/l10n/app_ru.arb`, `app_en.arb`, ADR `docs/adr/` с номерами 0017, 0024, 0028, 0031, 0032, 0033, 0034, 0041, 0049, 0050, 0052 и 0053, `docs/adr/README.md`, `openspec/specs/app-navigation/spec.md`, `openspec/specs/contribution-statistics/spec.md`.
+  - **Предполагаемые файлы:** `lib/l10n/app_ru.arb`, `app_en.arb`, ADR `docs/adr/` с номерами 0017, 0024, 0025, 0028, 0031, 0032, 0033, 0034, 0035, 0041, 0047, 0049, 0050, 0052 и 0053, `docs/adr/README.md`, `openspec/specs/app-navigation/spec.md`, `openspec/specs/contribution-statistics/spec.md`.
   - **Размер:** M по логике: файлов больше нормы, но меняются только формулировки.
 
 - [ ] 1.31 Фаза 1 готова: приложение проходит полные проверки на действиях
