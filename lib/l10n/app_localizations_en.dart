@@ -2785,8 +2785,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pathNextIntention => 'Next intention';
 
   @override
-  String pathCandidateLabel(String title, String priority) {
-    return 'Add intention “$title”, priority $priority';
+  String pathCandidateNeedLabel(String source, String title, String priority) {
+    return 'To $source, need $title. Priority $priority';
+  }
+
+  @override
+  String pathCandidateCanLabel(String source, String title, String priority) {
+    return 'To $source, can use $title. Priority $priority';
   }
 
   @override
@@ -2798,6 +2803,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pathAdd => 'Add';
+
+  @override
+  String pathAddNeedLabel(String source) {
+    return 'Add to Needs of $source';
+  }
+
+  @override
+  String pathAddCanLabel(String source) {
+    return 'Add to Can use of $source';
+  }
 
   @override
   String get pathLoading => 'Loading the path…';

@@ -180,6 +180,8 @@ final class _PathPageState extends ConsumerState<PathPage> {
     final steps = segment == null
         ? const <PathBuilderStep>[]
         : _steps(l10n, segment, appended);
+    final lastTitle = steps.lastOrNull?.name ?? '';
+    final half = candidates?.half ?? LongTermRelationType.need;
     return PathBuilder(
       steps: steps,
       priority: actionDesignPriority(widget.actionPriority),
@@ -233,7 +235,10 @@ final class _PathPageState extends ConsumerState<PathPage> {
                 : (title: l10n.pathCanEmptyTitle, text: l10n.pathCanEmptyText)
           : null,
       addText: l10n.pathAdd,
-      addLabel: l10n.pathAdd,
+      addLabel: switch (half) {
+        LongTermRelationType.need => l10n.pathAddNeedLabel(lastTitle),
+        LongTermRelationType.can => l10n.pathAddCanLabel(lastTitle),
+      },
       onAdd: () {
         if (segment == null) return;
         _addRelations(
@@ -243,7 +248,7 @@ final class _PathPageState extends ConsumerState<PathPage> {
                   id: appended.relation.relatedIntentionId,
                   title: appended.title,
                 ),
-          candidates?.half ?? LongTermRelationType.need,
+          half,
         );
       },
       children: [
@@ -256,14 +261,22 @@ final class _PathPageState extends ConsumerState<PathPage> {
                   ? l10n.pathCandidateNew
                   : null,
               label: [
-                l10n.pathCandidateLabel(
-                  candidate.title,
-                  l10n.actionPriorityOption(
+                switch (half) {
+                  LongTermRelationType.need => l10n.pathCandidateNeedLabel(
+                    lastTitle,
+                    candidate.title,
                     actionPriorityName(
                       _designPriority(candidate.relation.priority),
                     ),
                   ),
-                ),
+                  LongTermRelationType.can => l10n.pathCandidateCanLabel(
+                    lastTitle,
+                    candidate.title,
+                    actionPriorityName(
+                      _designPriority(candidate.relation.priority),
+                    ),
+                  ),
+                },
                 if (_isFresh(path, candidate)) l10n.pathCandidateNew,
               ].join('. '),
               openLabel: l10n.intentionPickerOpenIntentionPage(candidate.title),

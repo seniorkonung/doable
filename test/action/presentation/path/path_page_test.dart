@@ -440,6 +440,49 @@ void main() {
     },
   );
 
+  testWidgets(
+    'доступные имена кандидатов и добавления называют последнюю причину и половину',
+    (tester) async {
+      seedRawGraph(raw, () {
+        seedRelation(raw, seedUuid(103), seedUuid(2), seedUuid(4));
+        raw.execute(
+          'UPDATE long_term_relations SET priority = 1 WHERE id = ?',
+          [seedUuid(103)],
+        );
+      });
+      final semantics = tester.ensureSemantics();
+      await openPathScreen(
+        tester,
+        router: router,
+        repository: repository,
+        purpose: NewActionPathPurpose(_path([1, 2])),
+      );
+      expect(
+        find.bySemanticsLabel(
+          'Чтобы «Много ходить», нужно «Высыпаться». Приоритет P1',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel('Добавить в «Нужно» намерения «Много ходить»'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Можно').last);
+      await settlePathScreen(tester);
+      expect(
+        find.bySemanticsLabel(
+          'Чтобы «Много ходить», можно использовать «Покупать обувь». Приоритет P2',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel('Добавить в «Можно» намерения «Много ходить»'),
+        findsOneWidget,
+      );
+      semantics.dispose();
+    },
+  );
+
   testWidgets('стрелка кандидата открывает намерение без изменения пути', (
     tester,
   ) async {

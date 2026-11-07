@@ -2817,8 +2817,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get pathNextIntention => 'Следующее намерение';
 
   @override
-  String pathCandidateLabel(String title, String priority) {
-    return 'Добавить намерение «$title», приоритет $priority';
+  String pathCandidateNeedLabel(String source, String title, String priority) {
+    return 'Чтобы «$source», нужно «$title». Приоритет $priority';
+  }
+
+  @override
+  String pathCandidateCanLabel(String source, String title, String priority) {
+    return 'Чтобы «$source», можно использовать «$title». Приоритет $priority';
   }
 
   @override
@@ -2830,6 +2835,16 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get pathAdd => 'Добавить';
+
+  @override
+  String pathAddNeedLabel(String source) {
+    return 'Добавить в «Нужно» намерения «$source»';
+  }
+
+  @override
+  String pathAddCanLabel(String source) {
+    return 'Добавить в «Можно» намерения «$source»';
+  }
 
   @override
   String get pathLoading => 'Загружаем путь…';

@@ -4313,11 +4313,17 @@ abstract class AppLocalizations {
   /// **'Next intention'**
   String get pathNextIntention;
 
-  /// Доступное название кандидата пути
+  /// Доступное имя кандидата связи «Нужно»
   ///
   /// In en, this message translates to:
-  /// **'Add intention “{title}”, priority {priority}'**
-  String pathCandidateLabel(String title, String priority);
+  /// **'To {source}, need {title}. Priority {priority}'**
+  String pathCandidateNeedLabel(String source, String title, String priority);
+
+  /// Доступное имя кандидата связи «Можно»
+  ///
+  /// In en, this message translates to:
+  /// **'To {source}, can use {title}. Priority {priority}'**
+  String pathCandidateCanLabel(String source, String title, String priority);
 
   /// Текст блока кандидатов пути
   ///
@@ -4336,6 +4342,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add'**
   String get pathAdd;
+
+  /// Доступное имя добавления в половину «Нужно»
+  ///
+  /// In en, this message translates to:
+  /// **'Add to Needs of {source}'**
+  String pathAddNeedLabel(String source);
+
+  /// Доступное имя добавления в половину «Можно»
+  ///
+  /// In en, this message translates to:
+  /// **'Add to Can use of {source}'**
+  String pathAddCanLabel(String source);
 
   /// Текст экрана пути
   ///
