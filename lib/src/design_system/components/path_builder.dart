@@ -77,7 +77,6 @@ final class PathBuilder extends StatelessWidget {
     required this.addText,
     required this.addLabel,
     required this.onAdd,
-    this.showEndSlot = false,
     this.emptyHalf,
     this.children = const [],
     super.key,
@@ -96,7 +95,6 @@ final class PathBuilder extends StatelessWidget {
   final String addText;
   final String addLabel;
   final VoidCallback onAdd;
-  final bool showEndSlot;
   final ({String title, String text})? emptyHalf;
   final List<Widget> children;
 
@@ -262,32 +260,6 @@ final class PathBuilder extends StatelessWidget {
               ),
             ),
           ],
-          if (showEndSlot)
-            SizedBox(
-              height: 40,
-              child: Row(
-                children: [
-                  const SizedBox(width: 12),
-                  rail(
-                    glyph: PathGlyph(
-                      shape: PathGlyphShape.ring,
-                      outline: PathGlyphOutline.dashed,
-                      size: 14,
-                      color: colors.grip,
-                    ),
-                    above: RelationStrokeKind.can(colors.grip),
-                    below: RelationStrokeKind.can(colors.grip),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      slotText,
-                      style: DoableType.field.copyWith(color: colors.muted),
-                    ),
-                  ),
-                ],
-              ),
-            ),
         ],
         PathAction(
           name: actionName,
