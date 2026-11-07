@@ -1,5 +1,5 @@
-/// Изменения полей, вкладка пути и удаление открытой панели действия так, как
-/// их делает человек в приложении.
+/// Изменения полей, вкладка пути, вход в изменение пути и удаление открытой
+/// панели действия так, как их делает человек в приложении.
 ///
 /// Панель открывает сценарий; шаги называют намерение человека и не знают,
 /// какими листами и кнопками панель его выполняет. Исход записи шаги не ждут,
@@ -113,6 +113,12 @@ Future<void> startActionPanelDeletion(
   await _chooseOption(tester, tap, l10n.actionOptionDelete);
   await tap(tester, find.text(l10n.actionDeleteDialogAction));
 }
+
+/// Открывает экран «Изменить путь» пунктом меню «Действие».
+Future<void> openActionPanelPathEdit(
+  WidgetTester tester, {
+  RootPageTap tap = tapWhenFound,
+}) => _chooseOption(tester, tap, _l10n(tester).actionOptionEditPath);
 
 /// Показывает вкладку сохранённого пути.
 Future<void> showActionPanelPath(

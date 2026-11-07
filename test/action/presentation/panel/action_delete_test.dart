@@ -15,8 +15,8 @@ void main() {
     );
   });
 
-  testWidgets('меню «Действие» предлагает «Удалить действие» с пояснением, что '
-      'намерения и связи остаются', (tester) async {
+  testWidgets('меню «Действие» содержит три пункта по порядку, а изменение '
+      'пути и удаление поясняются', (tester) async {
     final semantics = tester.ensureSemantics();
     final repository = await openActionPanel(tester);
     repository.emit(actionDetailsFixture());
@@ -26,17 +26,20 @@ void main() {
     await tester.pumpAndSettle();
 
     final menu = find.byType(Sheet).last;
-    expect(
-      find.descendant(of: menu, matching: find.text('Удалить действие')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: menu,
-        matching: find.text('Намерения и связи останутся'),
-      ),
-      findsOneWidget,
-    );
+    Finder item(String text) =>
+        find.descendant(of: menu, matching: find.text(text));
+    final names = [
+      'Изменить название и описание',
+      'Изменить путь',
+      'Удалить действие',
+    ];
+    for (final name in names) {
+      expect(item(name), findsOneWidget, reason: name);
+    }
+    final tops = [for (final name in names) tester.getTopLeft(item(name)).dy];
+    expect(tops, orderedEquals([...tops]..sort()));
+    expect(item('Намерения, ради которых делается действие'), findsOneWidget);
+    expect(item('Намерения и связи останутся'), findsOneWidget);
     semantics.dispose();
   });
 

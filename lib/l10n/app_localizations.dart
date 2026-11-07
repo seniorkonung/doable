@@ -3169,6 +3169,18 @@ abstract class AppLocalizations {
   /// **'Edit the name and description'**
   String get actionOptionEditText;
 
+  /// Пункт меню «Действие», открывающий экран «Изменить путь»
+  ///
+  /// In en, this message translates to:
+  /// **'Edit the path'**
+  String get actionOptionEditPath;
+
+  /// Пояснение пункта изменения пути действия
+  ///
+  /// In en, this message translates to:
+  /// **'Intentions the action is done for'**
+  String get actionOptionEditPathHint;
+
   /// Опасный пункт меню «Действие», открывающий подтверждение удаления
   ///
   /// In en, this message translates to:

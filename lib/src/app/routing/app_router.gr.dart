@@ -11,13 +11,13 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
 import 'package:auto_route/auto_route.dart' as _i15;
-import 'package:doable/src/action/domain/action_path.dart' as _i20;
 import 'package:doable/src/action/domain/action_priority.dart' as _i21;
 import 'package:doable/src/action/presentation/day/action_day_date_page.dart'
     as _i1;
 import 'package:doable/src/action/presentation/day/action_day_root_page.dart'
     as _i2;
 import 'package:doable/src/action/presentation/path/path_page.dart' as _i11;
+import 'package:doable/src/action/presentation/path/path_state.dart' as _i20;
 import 'package:doable/src/action/presentation/path_start/path_start_picker_page.dart'
     as _i12;
 import 'package:doable/src/app/home/home_page.dart' as _i4;
@@ -343,8 +343,7 @@ class IntentionEditorRouteArgs {
 /// [_i11.PathPage]
 class PathRoute extends _i15.PageRouteInfo<PathRouteArgs> {
   PathRoute({
-    required _i12.PathStartFlow flow,
-    required _i20.ActionPath? originalPath,
+    required _i20.PathPurpose purpose,
     required String actionTitle,
     required _i21.ActionPriority actionPriority,
     _i17.Key? key,
@@ -352,8 +351,7 @@ class PathRoute extends _i15.PageRouteInfo<PathRouteArgs> {
   }) : super(
          PathRoute.name,
          args: PathRouteArgs(
-           flow: flow,
-           originalPath: originalPath,
+           purpose: purpose,
            actionTitle: actionTitle,
            actionPriority: actionPriority,
            key: key,
@@ -368,8 +366,7 @@ class PathRoute extends _i15.PageRouteInfo<PathRouteArgs> {
     builder: (data) {
       final args = data.argsAs<PathRouteArgs>();
       return _i11.PathPage(
-        flow: args.flow,
-        originalPath: args.originalPath,
+        purpose: args.purpose,
         actionTitle: args.actionTitle,
         actionPriority: args.actionPriority,
         key: args.key,
@@ -380,16 +377,13 @@ class PathRoute extends _i15.PageRouteInfo<PathRouteArgs> {
 
 class PathRouteArgs {
   const PathRouteArgs({
-    required this.flow,
-    required this.originalPath,
+    required this.purpose,
     required this.actionTitle,
     required this.actionPriority,
     this.key,
   });
 
-  final _i12.PathStartFlow flow;
-
-  final _i20.ActionPath? originalPath;
+  final _i20.PathPurpose purpose;
 
   final String actionTitle;
 
@@ -399,15 +393,14 @@ class PathRouteArgs {
 
   @override
   String toString() {
-    return 'PathRouteArgs{flow: $flow, originalPath: $originalPath, actionTitle: $actionTitle, actionPriority: $actionPriority, key: $key}';
+    return 'PathRouteArgs{purpose: $purpose, actionTitle: $actionTitle, actionPriority: $actionPriority, key: $key}';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! PathRouteArgs) return false;
-    return flow == other.flow &&
-        originalPath == other.originalPath &&
+    return purpose == other.purpose &&
         actionTitle == other.actionTitle &&
         actionPriority == other.actionPriority &&
         key == other.key;
@@ -415,8 +408,7 @@ class PathRouteArgs {
 
   @override
   int get hashCode =>
-      flow.hashCode ^
-      originalPath.hashCode ^
+      purpose.hashCode ^
       actionTitle.hashCode ^
       actionPriority.hashCode ^
       key.hashCode;

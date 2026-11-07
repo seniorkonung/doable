@@ -2062,6 +2062,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get actionOptionEditText => 'Изменить название и описание';
 
   @override
+  String get actionOptionEditPath => 'Изменить путь';
+
+  @override
+  String get actionOptionEditPathHint =>
+      'Намерения, ради которых делается действие';
+
+  @override
   String get actionOptionDelete => 'Удалить действие';
 
   @override

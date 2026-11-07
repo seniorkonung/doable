@@ -1,4 +1,6 @@
+import 'package:doable/src/action/application/action_details.dart';
 import 'package:doable/src/action/domain/action_path.dart';
+import 'package:doable/src/action/presentation/path/path_state.dart';
 import 'package:doable/src/action/presentation/path_start/path_start_picker_page.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
@@ -83,6 +85,37 @@ void main() {
     await database.close();
   });
 
+  /// Сохранённое действие с путём [intentions] после изменений графа
+  /// [change] — так экран открывает панель.
+  Future<ExistingActionPathPurpose> savedPath(
+    WidgetTester tester,
+    List<int> intentions, {
+    void Function()? change,
+  }) async {
+    seedRawGraph(raw, () {
+      seedAction(
+        raw,
+        id: seedUuid(201),
+        path: [for (final number in intentions) seedUuid(number)],
+      );
+      change?.call();
+    });
+    final read = await tester.runAsync(
+      () => repository.watchAction(seedActionId(201)).first,
+    );
+    return ExistingActionPathPurpose((read! as ActionReadSuccess).value.value!);
+  }
+
+  /// Путь действия в хранилище.
+  List<String> storedPath() => [
+    for (final row in raw.select(
+      'SELECT intention_id FROM action_path_items WHERE action_id = ? '
+      'ORDER BY position',
+      [seedUuid(201)],
+    ))
+      row['intention_id'] as String,
+  ];
+
   testWidgets(
     'пустой путь предлагает выбрать причину, а «Назад» сразу возвращает',
     (tester) async {
@@ -115,8 +148,7 @@ void main() {
         tester,
         router: router,
         repository: repository,
-        originalPath: _path([1, 2, 3]),
-        flow: PathStartFlow.editPath,
+        purpose: await savedPath(tester, [1, 2, 3]),
         actionTitle: 'Силовая тренировка',
       );
 
@@ -145,7 +177,7 @@ void main() {
         tester,
         router: router,
         repository: repository,
-        originalPath: _path([1, 2, 3]),
+        purpose: NewActionPathPurpose(_path([1, 2, 3])),
       );
 
       // Конечное намерение — простой текст.
@@ -180,7 +212,7 @@ void main() {
         tester,
         router: router,
         repository: repository,
-        originalPath: _path([1, 2]),
+        purpose: NewActionPathPurpose(_path([1, 2])),
       );
 
       await tester.tap(find.text('Быть здоровым'));
@@ -220,7 +252,7 @@ void main() {
         tester,
         router: router,
         repository: repository,
-        originalPath: _path([1, 2, 3]),
+        purpose: NewActionPathPurpose(_path([1, 2, 3])),
       );
       await tester.tap(find.text('Много ходить'));
       await settlePathScreen(tester);
@@ -239,7 +271,7 @@ void main() {
         tester,
         router: router,
         repository: repository,
-        originalPath: _path([1, 2]),
+        purpose: NewActionPathPurpose(_path([1, 2])),
       );
       expect(find.text('Покупать обувь'), findsOneWidget);
       expect(find.text('0'), findsOneWidget);
@@ -267,7 +299,7 @@ void main() {
       tester,
       router: router,
       repository: repository,
-      originalPath: _path([1]),
+      purpose: NewActionPathPurpose(_path([1])),
     );
     await tester.tap(
       find.byTooltip('Открыть страницу намерения «Много ходить»'),
@@ -293,7 +325,7 @@ void main() {
       tester,
       router: router,
       repository: repository,
-      originalPath: _path([1]),
+      purpose: NewActionPathPurpose(_path([1])),
     );
     expect(find.text('52'), findsOneWidget);
     expect(find.text('Кандидат 60'), findsNothing);
@@ -312,7 +344,7 @@ void main() {
         tester,
         router: router,
         repository: repository,
-        originalPath: _path([1, 2]),
+        purpose: NewActionPathPurpose(_path([1, 2])),
       );
       readFailure.failure = sqlite.SqliteException(
         extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
@@ -353,7 +385,7 @@ void main() {
         tester,
         router: router,
         repository: repository,
-        originalPath: _path([1, 2, 3]),
+        purpose: NewActionPathPurpose(_path([1, 2, 3])),
       );
       await tester.tap(find.text('Можно').last);
       await settlePathScreen(tester);
@@ -374,7 +406,7 @@ void main() {
         tester,
         router: router,
         repository: repository,
-        originalPath: _path([1]),
+        purpose: NewActionPathPurpose(_path([1])),
       );
       readFailure.failure = sqlite.SqliteException(
         extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
@@ -404,7 +436,7 @@ void main() {
       tester,
       router: router,
       repository: repository,
-      originalPath: _path([1, 2]),
+      purpose: NewActionPathPurpose(_path([1, 2])),
     );
 
     await tester.tap(
@@ -427,7 +459,7 @@ void main() {
       tester,
       router: router,
       repository: repository,
-      originalPath: _path([1, 2]),
+      purpose: NewActionPathPurpose(_path([1, 2])),
     );
 
     await tester.tap(find.text('Нужно').first);
@@ -442,7 +474,7 @@ void main() {
         tester,
         router: router,
         repository: repository,
-        originalPath: _path([1, 2]),
+        purpose: NewActionPathPurpose(_path([1, 2])),
       );
       await tester.tap(find.text('Быть здоровым'));
       await tester.pumpAndSettle();
@@ -478,7 +510,7 @@ void main() {
       tester,
       router: router,
       repository: repository,
-      originalPath: _path([1]),
+      purpose: NewActionPathPurpose(_path([1])),
     );
 
     expect(
@@ -492,5 +524,146 @@ void main() {
     await tester.tap(find.text('Повторить'));
     await settlePathScreen(tester);
     expect(find.text('Быть здоровым'), findsOneWidget);
+  });
+
+  testWidgets(
+    '«Сохранить» заменяет путь действия и закрывает экран с новым путём',
+    (tester) async {
+      final result = await openPathScreen(
+        tester,
+        router: router,
+        repository: repository,
+        purpose: await savedPath(tester, [1, 2]),
+      );
+      await tester.tap(find.text('Покупать обувь'));
+      await settlePathScreen(tester);
+
+      await tester.tap(pathSave);
+      await settlePathScreen(tester);
+      expect(pathScreen, findsNothing);
+      expect((await result)!.intentions, _path([1, 2, 3]).intentions);
+      expect(storedPath(), [seedUuid(1), seedUuid(2), seedUuid(3)]);
+    },
+  );
+
+  testWidgets(
+    'отказ замены остаётся на экране с тем же путём, а путь действия прежний',
+    (tester) async {
+      await openPathScreen(
+        tester,
+        router: router,
+        repository: repository,
+        purpose: await savedPath(tester, [1, 2, 3]),
+      );
+      await tester.tap(find.text('Много ходить'));
+      await settlePathScreen(tester);
+      // Связь архивирована, пока экран открыт.
+      seedRawGraph(
+        raw,
+        () => raw.execute(
+          'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
+          [seedUuid(101)],
+        ),
+      );
+
+      await tester.tap(pathSave);
+      await settlePathScreen(tester);
+      expect(pathScreen, findsOneWidget);
+      expect(
+        find.text(
+          'Путь больше не совпадает с графом. Проверьте путь и попробуйте снова.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Быть здоровым'), findsOneWidget);
+      expect(find.text('Много ходить'), findsOneWidget);
+      expect(storedPath(), [seedUuid(1), seedUuid(2), seedUuid(3)]);
+    },
+  );
+
+  testWidgets(
+    'путь с разрывом открывается с первого целого участка, и его можно '
+    'сохранить сразу',
+    (tester) async {
+      final result = await openPathScreen(
+        tester,
+        router: router,
+        repository: repository,
+        purpose: await savedPath(
+          tester,
+          [1, 2, 3],
+          change: () => raw.execute(
+            'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
+            [seedUuid(102)],
+          ),
+        ),
+      );
+
+      expect(find.text('Много ходить'), findsOneWidget);
+      expect(find.text('Покупать обувь'), findsNothing);
+      expect(isPathSaveEnabled(tester), isTrue);
+      expect(storedPath(), [seedUuid(1), seedUuid(2), seedUuid(3)]);
+
+      await tapPathBack(tester);
+      expect(find.text('Отменить изменения?'), findsOneWidget);
+      await tester.tap(find.text('Отменить'));
+      await tester.pumpAndSettle();
+      expect(await result, isNull);
+      expect(storedPath(), [seedUuid(1), seedUuid(2), seedUuid(3)]);
+    },
+  );
+
+  testWidgets(
+    'архивный корень сдвигает корень участка на следующее намерение',
+    (tester) async {
+      await openPathScreen(
+        tester,
+        router: router,
+        repository: repository,
+        purpose: await savedPath(
+          tester,
+          [1, 2, 3],
+          change: () {
+            raw.execute(
+              'UPDATE long_term_relations SET is_archived = 1 '
+              'WHERE id = ?',
+              [seedUuid(101)],
+            );
+            raw.execute('UPDATE intentions SET is_archived = 1 WHERE id = ?', [
+              seedUuid(1),
+            ]);
+          },
+        ),
+      );
+
+      expect(find.text('Быть здоровым'), findsNothing);
+      expect(find.text('Много ходить'), findsOneWidget);
+      expect(find.text('Покупать обувь'), findsOneWidget);
+      expect(isPathSaveEnabled(tester), isTrue);
+    },
+  );
+
+  testWidgets('без актуальных намерений путь на экране пуст', (tester) async {
+    await openPathScreen(
+      tester,
+      router: router,
+      repository: repository,
+      purpose: await savedPath(
+        tester,
+        [1, 2],
+        change: () {
+          raw.execute('UPDATE long_term_relations SET is_archived = 1');
+          raw.execute(
+            'UPDATE intentions SET is_archived = 1 WHERE id IN '
+            '(?, ?)',
+            [seedUuid(1), seedUuid(2)],
+          );
+        },
+      ),
+    );
+
+    expect(find.text('Выберите причину'), findsOneWidget);
+    expect(find.text('Быть здоровым'), findsNothing);
+    expect(isPathSaveEnabled(tester), isFalse);
   });
 }

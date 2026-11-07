@@ -2037,6 +2037,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get actionOptionEditText => 'Edit the name and description';
 
   @override
+  String get actionOptionEditPath => 'Edit the path';
+
+  @override
+  String get actionOptionEditPathHint => 'Intentions the action is done for';
+
+  @override
   String get actionOptionDelete => 'Delete the action';
 
   @override

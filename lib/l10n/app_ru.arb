@@ -602,6 +602,8 @@
   "actionCalendarDayHasIncomplete": "Есть невыполненное действие",
   "actionPanelOptionsLabel": "Параметры действия",
   "actionOptionEditText": "Изменить название и описание",
+  "actionOptionEditPath": "Изменить путь",
+  "actionOptionEditPathHint": "Намерения, ради которых делается действие",
   "actionOptionDelete": "Удалить действие",
   "actionOptionDeleteHint": "Намерения и связи останутся",
   "actionDeleteDialogTitle": "Удалить действие?",

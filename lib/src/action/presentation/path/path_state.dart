@@ -1,15 +1,83 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../long_term_relation/domain/long_term_relation.dart';
+import '../../application/action_details.dart';
+import '../../application/action_result.dart';
 import '../../application/path_candidates.dart';
+import '../../domain/action_id.dart';
 import '../../domain/action_path.dart';
+import 'path_segment.dart';
 
 /// Ключ одной экранной сессии пути. Его создаёт и держит экран, поэтому
 /// повторное открытие получает новую сессию.
 final class PathSessionKey {
   // Не const: ключи различаются идентичностью.
   PathSessionKey();
+}
+
+/// Откуда открыт экран пути: от этого зависят путь при открытии и то, что
+/// делает «Сохранить».
+sealed class PathPurpose {
+  const PathPurpose();
+
+  /// Исходный путь; `null`, пока путь нового действия не выбран.
+  ActionPath? get original;
+
+  /// Путь, с которым экран открывается; `null` — путь на экране пуст.
+  ActionPath? get start;
+}
+
+/// Путь листа нового действия: «Сохранить» возвращает его в лист.
+final class NewActionPathPurpose extends PathPurpose {
+  const NewActionPathPurpose(this.original);
+
+  @override
+  final ActionPath? original;
+
+  @override
+  ActionPath? get start => original;
+}
+
+/// Сохранённый путь действия: «Сохранить» сам заменяет его. Путь с разрывом
+/// открывается с первого целого участка.
+final class ExistingActionPathPurpose extends PathPurpose {
+  ExistingActionPathPurpose(ActionDetails details)
+    : actionId = details.action.id,
+      original = details.action.path,
+      start = firstWholeSegment(details.path);
+
+  final ActionId actionId;
+
+  @override
+  final ActionPath original;
+
+  @override
+  final ActionPath? start;
+}
+
+/// Замена сохранённого пути с экрана «Изменить путь».
+sealed class PathSaving {
+  const PathSaving();
+}
+
+final class PathSavingIdle extends PathSaving {
+  const PathSavingIdle();
+}
+
+/// Принятая замена выполняется: путь на экране не меняется, а уход не
+/// спрашивает об отмене.
+final class PathSavingRunning extends PathSaving {
+  const PathSavingRunning();
+}
+
+/// Отказ замены остаётся на экране до следующего сохранения.
+final class PathSavingFailed extends PathSaving {
+  const PathSavingFailed(this.failure, {this.presentation});
+
+  final ActionCommandFailure failure;
+  final GraphInitiatorPresentationClaim? presentation;
 }
 
 /// Решение сессии о запросе ухода, единое для «Назад» и системного «назад».
@@ -75,31 +143,39 @@ final class FailedPathDraft extends PathDraft {
 }
 
 final class PathState {
-  PathState({
-    required ActionPath? original,
-    required this.draft,
-    this.candidates,
-  }) : original = original?.intentions ?? const [];
+  PathState({required ActionPath? original, required this.draft})
+    : original = original?.intentions ?? const [],
+      candidates = null,
+      saving = const PathSavingIdle();
 
-  const PathState._(this.original, this.draft, this.candidates);
+  const PathState._(this.original, this.draft, this.candidates, this.saving);
 
   /// Исходный путь, с которым открыт экран; пустой, пока путь не выбран.
   final List<IntentionId> original;
   final PathDraft draft;
   final CandidateState? candidates;
+  final PathSaving saving;
 
   /// Пути сравниваются по последовательности намерений.
   bool get isChanged => !listEquals(draft.intentions, original);
 
-  /// Сохраняется только путь, который показан на экране.
-  bool get canSave => isChanged && draft is LoadedPathDraft;
+  /// Сохраняется только путь, который показан на экране, и не повторно, пока
+  /// принятая замена выполняется.
+  bool get canSave =>
+      isChanged && draft is LoadedPathDraft && saving is! PathSavingRunning;
 
+  /// Уход во время принятой замены её не отменяет, поэтому не спрашивает.
   PathCloseDecision get closeDecision =>
-      isChanged ? PathCloseDecision.askDiscard : PathCloseDecision.close;
+      isChanged && saving is! PathSavingRunning
+      ? PathCloseDecision.askDiscard
+      : PathCloseDecision.close;
 
-  PathState withDraft(PathDraft value) => PathState._(original, value, null);
+  PathState withDraft(PathDraft value) =>
+      PathState._(original, value, null, saving);
   PathState withCandidates(CandidateState value) =>
-      PathState._(original, draft, value);
+      PathState._(original, draft, value, saving);
+  PathState withSaving(PathSaving value) =>
+      PathState._(original, draft, candidates, value);
 }
 
 final class CandidateState {

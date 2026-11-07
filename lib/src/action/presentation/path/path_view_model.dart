@@ -2,33 +2,51 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/application/personal_graph_repository.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../long_term_relation/domain/long_term_relation.dart';
+import '../../application/action_command.dart';
+import '../../application/action_result.dart';
 import '../../application/path_candidates.dart';
+import '../../domain/action_id.dart';
 import '../../domain/action_path.dart';
 import 'path_state.dart';
 
 part 'path_view_model.g.dart';
 
 /// Сессия построения пути и порционного чтения его продолжений.
+///
+/// Для существующего действия сессия сама заменяет его путь. Замена
+/// завершается и после ухода с экрана: тогда её отказ предъявляет общая
+/// поверхность результатов, а успех виден в данных без сообщения.
 @riverpod
 final class PathViewModel extends _$PathViewModel {
   late PersonalGraphRepository _repository;
+  late GraphCommandCoordinator _coordinator;
   // Поздние ответы прежнего пути или половины не меняют текущий экран.
   var _generation = 0;
 
+  /// Замена, право предъявить отказ которой ещё у экрана.
+  ActionOperationToken? _replacement;
+
   @override
-  PathState build(PathSessionKey sessionKey, ActionPath? original) {
+  PathState build(PathSessionKey sessionKey, PathPurpose purpose) {
     _repository = ref.watch(personalGraphRepositoryProvider);
-    if (original == null) {
-      return PathState(original: null, draft: const EmptyPathDraft());
+    _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
+    ref.onDispose(_releaseReplacement);
+    final start = purpose.start;
+    if (start == null) {
+      return PathState(
+        original: purpose.original,
+        draft: const EmptyPathDraft(),
+      );
     }
-    final draft = LoadingPathDraft(original.intentions);
+    final draft = LoadingPathDraft(start.intentions);
     unawaited(Future.microtask(() => _read(draft.intentions)));
-    return PathState(original: original, draft: draft);
+    return PathState(original: purpose.original, draft: draft);
   }
 
   void selectRoot(IntentionId root) {
@@ -152,9 +170,67 @@ final class PathViewModel extends _$PathViewModel {
     }
   }
 
-  ActionPath? save() =>
-      state.canSave ? ActionPath(state.draft.intentions) : null;
+  /// Возвращает сохранённый путь, после которого экран закрывается: для
+  /// нового действия — сразу, для существующего — после подтверждённой
+  /// замены. Отказ замены и уход до её исхода возвращают `null`.
+  Future<ActionPath?> save() async {
+    if (!state.canSave) return null;
+    final path = ActionPath(state.draft.intentions);
+    return switch (purpose) {
+      NewActionPathPurpose() => path,
+      ExistingActionPathPurpose(:final actionId) => _replace(actionId, path),
+    };
+  }
+
   PathCloseDecision requestClose() => state.closeDecision;
+
+  Future<ActionPath?> _replace(ActionId actionId, ActionPath path) async {
+    _releaseReplacement();
+    switch (_coordinator.acceptActionPathUpdate(
+      SetActionPath(actionId: actionId, path: path),
+    )) {
+      case ActionCommandAccepted(:final token, :final future):
+        _replacement = token;
+        state = state.withSaving(const PathSavingRunning());
+        final completion = await future;
+        if (!ref.mounted) return null;
+        switch (completion.result) {
+          case GraphResultSuccess(value: ActionPathUpdated()):
+            _replacement = null;
+            return path;
+          case GraphResultFailure(:final failure):
+            state = state.withSaving(
+              PathSavingFailed(
+                failure,
+                presentation: _coordinator.claimInitiatorFailure(token),
+              ),
+            );
+          case GraphResultSuccess():
+            state = state.withSaving(
+              const PathSavingFailed(ActionUnexpectedFailure()),
+            );
+        }
+      // Действие ещё меняет другая принятая операция, например замена с
+      // экрана, с которого ушли до её исхода.
+      case ActionCommandAlreadyRunning():
+        state = state.withSaving(
+          const PathSavingFailed(ActionConflictFailure()),
+        );
+      case GraphCommandCoordinatorDraining():
+        state = state.withSaving(
+          const PathSavingFailed(ActionUnexpectedFailure()),
+        );
+    }
+    return null;
+  }
+
+  /// Неподтверждённый отказ прежней замены переходит общей поверхности.
+  void _releaseReplacement() {
+    if (_replacement case final token?) {
+      _coordinator.releaseInitiatorPresentation(token);
+    }
+    _replacement = null;
+  }
 
   Future<void> _read(
     List<IntentionId> ids, {

@@ -8,6 +8,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../design_system/components/confirm_dialog.dart';
 import '../../../design_system/components/list_state.dart';
+import '../../../design_system/components/notice.dart';
 import '../../../design_system/components/path_builder.dart';
 import '../../../design_system/components/step_option.dart';
 import '../../../design_system/components/tabs.dart';
@@ -16,10 +17,12 @@ import '../../../design_system/doable_metrics.dart';
 import '../../../design_system/doable_priority.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../long_term_relation/domain/long_term_relation.dart';
+import '../../../graph/presentation/operation_failure_presentation.dart';
 import '../../../long_term_relation/presentation/details/relation_details_sheet.dart';
 import '../../application/path_candidates.dart';
 import '../../domain/action_path.dart';
 import '../../domain/action_priority.dart';
+import '../action_command_failure_message.dart';
 import '../panel/action_field_labels.dart';
 import '../path_start/path_start_picker_page.dart';
 import 'path_state.dart';
@@ -31,21 +34,22 @@ import 'path_view_model.dart';
 /// сокращение нажатием на промежуточное намерение граф не меняют.
 /// «Сохранить» возвращает путь вызывающему, а уход без сохранения — `null`.
 /// Изменённый путь закрывается только после ответа «Отменить».
+///
+/// Путь существующего действия «Сохранить» заменяет сама и закрывает экран
+/// только после подтверждённой замены; отказ остаётся на экране. Пока замена
+/// выполняется, путь на экране не меняется, а уход закрывает экран без
+/// вопроса и без результата (ADR-0059).
 @RoutePage()
 final class PathPage extends ConsumerStatefulWidget {
   const PathPage({
-    required this.flow,
-    required this.originalPath,
+    required this.purpose,
     required this.actionTitle,
     required this.actionPriority,
     super.key,
   });
 
   /// Откуда открыт экран: лист нового действия или панель действия.
-  final PathStartFlow flow;
-
-  /// Исходный путь; `null`, пока путь нового действия не выбран.
-  final ActionPath? originalPath;
+  final PathPurpose purpose;
 
   /// Название действия, как оно стоит в листе или на панели.
   final String actionTitle;
@@ -59,7 +63,12 @@ final class _PathPageState extends ConsumerState<PathPage> {
   final _sessionKey = PathSessionKey();
 
   PathViewModelProvider get _provider =>
-      pathViewModelProvider(_sessionKey, widget.originalPath);
+      pathViewModelProvider(_sessionKey, widget.purpose);
+
+  PathStartFlow get _flow => switch (widget.purpose) {
+    NewActionPathPurpose() => PathStartFlow.newAction,
+    ExistingActionPathPurpose() => PathStartFlow.editPath,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -74,14 +83,14 @@ final class _PathPageState extends ConsumerState<PathPage> {
       child: Scaffold(
         appBar: TopBar.withButton(
           context,
-          title: switch (widget.flow) {
+          title: switch (_flow) {
             PathStartFlow.newAction => l10n.pathTitle,
             PathStartFlow.editPath => l10n.pathEditTitle,
           },
           backLabel: MaterialLocalizations.of(context).backButtonTooltip,
           onBack: () => unawaited(context.router.maybePop()),
           buttonLabel: l10n.pathSave,
-          onButtonPressed: path.canSave ? _save : null,
+          onButtonPressed: path.canSave ? () => unawaited(_save()) : null,
         ),
         body: SafeArea(
           top: false,
@@ -100,33 +109,59 @@ final class _PathPageState extends ConsumerState<PathPage> {
                 DoableMetrics.space5,
                 DoableMetrics.space5,
               ),
-              child: switch (path.draft) {
-                LoadingPathDraft() => ListState.loading(text: l10n.pathLoading),
-                final FailedPathDraft failed => ListState.error(
-                  message: _failureMessage(l10n, failed.failure),
-                  retry: failed.canRetry
-                      ? (
-                          label: l10n.commonRetry,
-                          onPressed: () => unawaited(model.retry()),
-                        )
-                      : null,
+              // Пока замена выполняется, путь на экране не меняется и поверх
+              // экрана ничего не открывается: успех закрывает именно его.
+              child: IgnorePointer(
+                ignoring: path.saving is PathSavingRunning,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (path.saving case final PathSavingFailed failed) ...[
+                      Notice.content(
+                        message: OperationFailurePresentation(
+                          claim: failed.presentation,
+                          message: actionCommandFailureMessage(
+                            l10n,
+                            failed.failure,
+                          ),
+                          inheritsColor: true,
+                        ),
+                      ),
+                      const SizedBox(height: DoableMetrics.space3),
+                    ],
+                    _draft(l10n, model, path),
+                  ],
                 ),
-                EmptyPathDraft() => _builder(l10n, model, const [], null, null),
-                final LoadedPathDraft loaded => _builder(
-                  l10n,
-                  model,
-                  loaded.intentions,
-                  loaded.segment,
-                  path.candidates,
-                  appended: loaded.appended,
-                ),
-              },
+              ),
             ),
           ),
         ),
       ),
     );
   }
+
+  Widget _draft(AppLocalizations l10n, PathViewModel model, PathState path) =>
+      switch (path.draft) {
+        LoadingPathDraft() => ListState.loading(text: l10n.pathLoading),
+        final FailedPathDraft failed => ListState.error(
+          message: _failureMessage(l10n, failed.failure),
+          retry: failed.canRetry
+              ? (
+                  label: l10n.commonRetry,
+                  onPressed: () => unawaited(model.retry()),
+                )
+              : null,
+        ),
+        EmptyPathDraft() => _builder(l10n, model, const [], null, null),
+        final LoadedPathDraft loaded => _builder(
+          l10n,
+          model,
+          loaded.intentions,
+          loaded.segment,
+          path.candidates,
+          appended: loaded.appended,
+        ),
+      };
 
   Widget _builder(
     AppLocalizations l10n,
@@ -336,16 +371,17 @@ final class _PathPageState extends ConsumerState<PathPage> {
   /// без выбора путь не меняет.
   Future<void> _chooseRoot(IntentionId? currentRoot) async {
     final root = await context.router.push<IntentionId>(
-      PathStartPickerRoute(flow: widget.flow, currentRoot: currentRoot),
+      PathStartPickerRoute(flow: _flow, currentRoot: currentRoot),
     );
     if (mounted && root != null) {
       ref.read(_provider.notifier).selectRoot(root);
     }
   }
 
-  void _save() {
-    final saved = ref.read(_provider.notifier).save();
-    if (saved != null) context.router.pop(saved);
+  /// Экран, с которого ушли до исхода замены, ничего не закрывает.
+  Future<void> _save() async {
+    final saved = await ref.read(_provider.notifier).save();
+    if (saved != null && mounted) context.router.pop(saved);
   }
 
   Future<void> _askDiscard() async {

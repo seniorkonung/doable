@@ -8,33 +8,30 @@ part of 'path_view_model.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Экранная сессия пути по ключу экрана.
+/// Сессия построения пути и порционного чтения его продолжений.
 ///
-/// Путь на экране показывается по целому начальному участку, прочитанному
-/// по последовательности намерений: участок короче последовательности
-/// становится путём на экране. Смена корня и сокращение меняют только путь
-/// на экране; граф остаётся прежним.
+/// Для существующего действия сессия сама заменяет его путь. Замена
+/// завершается и после ухода с экрана: тогда её отказ предъявляет общая
+/// поверхность результатов, а успех виден в данных без сообщения.
 
 @ProviderFor(PathViewModel)
 final pathViewModelProvider = PathViewModelFamily._();
 
-/// Экранная сессия пути по ключу экрана.
+/// Сессия построения пути и порционного чтения его продолжений.
 ///
-/// Путь на экране показывается по целому начальному участку, прочитанному
-/// по последовательности намерений: участок короче последовательности
-/// становится путём на экране. Смена корня и сокращение меняют только путь
-/// на экране; граф остаётся прежним.
+/// Для существующего действия сессия сама заменяет его путь. Замена
+/// завершается и после ухода с экрана: тогда её отказ предъявляет общая
+/// поверхность результатов, а успех виден в данных без сообщения.
 final class PathViewModelProvider
     extends $NotifierProvider<PathViewModel, PathState> {
-  /// Экранная сессия пути по ключу экрана.
+  /// Сессия построения пути и порционного чтения его продолжений.
   ///
-  /// Путь на экране показывается по целому начальному участку, прочитанному
-  /// по последовательности намерений: участок короче последовательности
-  /// становится путём на экране. Смена корня и сокращение меняют только путь
-  /// на экране; граф остаётся прежним.
+  /// Для существующего действия сессия сама заменяет его путь. Замена
+  /// завершается и после ухода с экрана: тогда её отказ предъявляет общая
+  /// поверхность результатов, а успех виден в данных без сообщения.
   PathViewModelProvider._({
     required PathViewModelFamily super.from,
-    required (PathSessionKey, ActionPath?) super.argument,
+    required (PathSessionKey, PathPurpose) super.argument,
   }) : super(
          retry: null,
          name: r'pathViewModelProvider',
@@ -76,14 +73,13 @@ final class PathViewModelProvider
   }
 }
 
-String _$pathViewModelHash() => r'f4aa0cfdce5757ba8bb3a8a0819ea4cfe893226b';
+String _$pathViewModelHash() => r'8d14189ec1a978fca22ec1cbd406840e9ac52b28';
 
-/// Экранная сессия пути по ключу экрана.
+/// Сессия построения пути и порционного чтения его продолжений.
 ///
-/// Путь на экране показывается по целому начальному участку, прочитанному
-/// по последовательности намерений: участок короче последовательности
-/// становится путём на экране. Смена корня и сокращение меняют только путь
-/// на экране; граф остаётся прежним.
+/// Для существующего действия сессия сама заменяет его путь. Замена
+/// завершается и после ухода с экрана: тогда её отказ предъявляет общая
+/// поверхность результатов, а успех виден в данных без сообщения.
 
 final class PathViewModelFamily extends $Family
     with
@@ -92,7 +88,7 @@ final class PathViewModelFamily extends $Family
           PathState,
           PathState,
           PathState,
-          (PathSessionKey, ActionPath?)
+          (PathSessionKey, PathPurpose)
         > {
   PathViewModelFamily._()
     : super(
@@ -103,33 +99,31 @@ final class PathViewModelFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// Экранная сессия пути по ключу экрана.
+  /// Сессия построения пути и порционного чтения его продолжений.
   ///
-  /// Путь на экране показывается по целому начальному участку, прочитанному
-  /// по последовательности намерений: участок короче последовательности
-  /// становится путём на экране. Смена корня и сокращение меняют только путь
-  /// на экране; граф остаётся прежним.
+  /// Для существующего действия сессия сама заменяет его путь. Замена
+  /// завершается и после ухода с экрана: тогда её отказ предъявляет общая
+  /// поверхность результатов, а успех виден в данных без сообщения.
 
-  PathViewModelProvider call(PathSessionKey sessionKey, ActionPath? original) =>
-      PathViewModelProvider._(argument: (sessionKey, original), from: this);
+  PathViewModelProvider call(PathSessionKey sessionKey, PathPurpose purpose) =>
+      PathViewModelProvider._(argument: (sessionKey, purpose), from: this);
 
   @override
   String toString() => r'pathViewModelProvider';
 }
 
-/// Экранная сессия пути по ключу экрана.
+/// Сессия построения пути и порционного чтения его продолжений.
 ///
-/// Путь на экране показывается по целому начальному участку, прочитанному
-/// по последовательности намерений: участок короче последовательности
-/// становится путём на экране. Смена корня и сокращение меняют только путь
-/// на экране; граф остаётся прежним.
+/// Для существующего действия сессия сама заменяет его путь. Замена
+/// завершается и после ухода с экрана: тогда её отказ предъявляет общая
+/// поверхность результатов, а успех виден в данных без сообщения.
 
 abstract class _$PathViewModel extends $Notifier<PathState> {
-  late final _$args = ref.$arg as (PathSessionKey, ActionPath?);
+  late final _$args = ref.$arg as (PathSessionKey, PathPurpose);
   PathSessionKey get sessionKey => _$args.$1;
-  ActionPath? get original => _$args.$2;
+  PathPurpose get purpose => _$args.$2;
 
-  PathState build(PathSessionKey sessionKey, ActionPath? original);
+  PathState build(PathSessionKey sessionKey, PathPurpose purpose);
   @$mustCallSuper
   @override
   WhenComplete runBuild() {

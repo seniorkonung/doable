@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart' hide Action, TextField;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../app/routing/app_router.gr.dart';
 import '../../../design_system/components/action_head.dart';
 import '../../../design_system/components/confirm_dialog.dart';
 import '../../../design_system/components/half_pinned_sliver.dart';
@@ -31,7 +33,9 @@ import '../../application/action_details.dart';
 import '../../application/action_result.dart';
 import '../../domain/action.dart';
 import '../../domain/action_id.dart';
+import '../../domain/action_path.dart';
 import '../action_command_failure_message.dart';
+import '../path/path_state.dart';
 import 'action_delete_confirmation.dart';
 import 'action_field_labels.dart';
 import 'action_panel_fields.dart';
@@ -64,6 +68,10 @@ import 'action_text_editor.dart';
 /// подписка показала записанные значения. Закрытое изменение возвращает
 /// вкладку, с которой оно начато. Уход с правками спрашивает подтверждение.
 ///
+/// Путь меняется на экране «Изменить путь» поверх панели. Замена,
+/// подтверждённая на открытом экране, возвращает панель на вкладку «Путь», а
+/// результат замены после ухода с экрана панель видит только в данных.
+///
 /// Удаление спрашивает подтверждение. Подтверждённое закрывает панель с
 /// прежним содержимым, а отказ остаётся в открытой панели.
 Future<void> showActionPanel(BuildContext context, ActionId actionId) =>
@@ -73,7 +81,7 @@ Future<void> showActionPanel(BuildContext context, ActionId actionId) =>
       builder: (_, sheet) => ActionPanel(sheet, actionId: actionId),
     );
 
-enum _ActionOption { editText, delete }
+enum _ActionOption { editText, editPath, delete }
 
 /// Содержимое панели действия; показывает его [showActionPanel].
 final class ActionPanel extends ConsumerStatefulWidget {
@@ -179,6 +187,12 @@ final class _ActionPanelState extends ConsumerState<ActionPanel> {
             name: localizations.actionOptionEditText,
           ),
           OptionsMenuItem(
+            value: _ActionOption.editPath,
+            icon: DoableIconData.relation,
+            name: localizations.actionOptionEditPath,
+            hint: localizations.actionOptionEditPathHint,
+          ),
+          OptionsMenuItem(
             value: _ActionOption.delete,
             icon: DoableIconData.delete,
             name: localizations.actionOptionDelete,
@@ -194,6 +208,18 @@ final class _ActionPanelState extends ConsumerState<ActionPanel> {
     switch (option) {
       case _ActionOption.editText:
         _openEdit(state.details.action, ActionTextField.title);
+      case _ActionOption.editPath:
+        final action = state.details.action;
+        final saved = await context.router.push<ActionPath>(
+          PathRoute(
+            purpose: ExistingActionPathPurpose(state.details),
+            actionTitle: action.title.value,
+            actionPriority: action.priority,
+          ),
+        );
+        if (saved != null && mounted) {
+          setState(() => _tab = ActionPanelTab.path);
+        }
       case _ActionOption.delete:
         final confirmed = await confirmActionDeletion(
           context,

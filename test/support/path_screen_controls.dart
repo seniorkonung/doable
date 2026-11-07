@@ -5,7 +5,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/action/domain/action_path.dart';
 import 'package:doable/src/action/domain/action_priority.dart';
 import 'package:doable/src/action/presentation/path/path_page.dart';
-import 'package:doable/src/action/presentation/path_start/path_start_picker_page.dart';
+import 'package:doable/src/action/presentation/path/path_state.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/design_system/components/button.dart';
@@ -38,8 +38,7 @@ Future<Future<ActionPath?>> openPathScreen(
   WidgetTester tester, {
   required AppRouter router,
   required PersonalGraphRepository repository,
-  ActionPath? originalPath,
-  PathStartFlow flow = PathStartFlow.newAction,
+  PathPurpose purpose = const NewActionPathPurpose(null),
   String actionTitle = '',
 }) async {
   await tester.pumpWidget(
@@ -60,8 +59,7 @@ Future<Future<ActionPath?>> openPathScreen(
   await tester.pumpAndSettle();
   final result = router.push<ActionPath>(
     PathRoute(
-      flow: flow,
-      originalPath: originalPath,
+      purpose: purpose,
       actionTitle: actionTitle,
       actionPriority: ActionPriority.p4,
     ),
