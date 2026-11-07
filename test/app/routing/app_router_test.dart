@@ -409,7 +409,6 @@ RelationGroupEntry _row({
     id: relatedId,
     title: relatedTitle,
     archiveState: IntentionArchiveState.active,
-    readiness: IntentionReadiness.notReady,
   ),
 );
 

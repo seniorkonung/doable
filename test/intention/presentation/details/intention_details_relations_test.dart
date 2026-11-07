@@ -41,9 +41,9 @@ void main() {
       IntentionRelationGroup.needs,
     ),
     (
-      'Действие открывает группу «Нужно для»',
+      'Готовность не меняет выбор первой группы',
       IntentionReadiness.ready,
-      IntentionRelationGroup.neededFor,
+      IntentionRelationGroup.needs,
     ),
   ]) {
     _testWidgets(scenario, (tester) async {
@@ -172,7 +172,7 @@ void main() {
   _testWidgets('Стрелка открывает соседа на той же группе', (tester) async {
     final graph = _Graph();
     final owner = graph.addIntention(1, 'Быть здоровым');
-    // Действие без цели открылось бы на группе «Нужно для».
+    // Без заданной группы сосед открыл бы входящую группу «Нужно для».
     final neighbor = graph.addIntention(
       2,
       'Наращивать силу',
@@ -182,7 +182,7 @@ void main() {
     await _openPage(tester, graph, owner);
     await _chooseTab(tester, 'Relations');
 
-    await _walk(tester, 'Open the action page: Наращивать силу');
+    await _walk(tester, 'Open the intention page: Наращивать силу');
 
     final page = tester.widget<IntentionDetailsPage>(
       find.byType(IntentionDetailsPage),
@@ -270,7 +270,7 @@ void main() {
     graph.addRelation(before, index: 1, direction: RelationDirection.incoming);
     await _openPage(tester, graph, before);
     await _chooseTab(tester, 'Relations');
-    _expectSelectedGroup(tester, IntentionRelationGroup.needs);
+    _expectSelectedGroup(tester, IntentionRelationGroup.neededFor);
 
     await _chooseTab(tester, 'Overview');
     await tester.tap(
@@ -307,10 +307,10 @@ void main() {
     );
 
     await _chooseTab(tester, 'Relations');
-    _expectSelectedGroup(tester, IntentionRelationGroup.needs);
+    _expectSelectedGroup(tester, IntentionRelationGroup.neededFor);
     final query = graph.repository.relationGroupQueries.last;
     expect(query.type, LongTermRelationType.need);
-    expect(query.direction, RelationDirection.outgoing);
+    expect(query.direction, RelationDirection.incoming);
   });
 
   _testWidgets('нажатие на строку открывает панель связи над страницей, и '
@@ -412,7 +412,6 @@ final class _Graph {
       scope: scope,
       neighborId: neighbor?.id,
       neighborTitle: neighbor?.title,
-      neighborReadiness: neighbor?.readiness ?? IntentionReadiness.notReady,
     );
     _relations.add(row.relation);
     return row;
@@ -512,7 +511,6 @@ final class _Graph {
         id: neighborId,
         title: neighbor?.title ?? 'Сосед',
         archiveState: IntentionArchiveState.active,
-        readiness: neighbor?.readiness ?? IntentionReadiness.notReady,
       ),
     );
   }

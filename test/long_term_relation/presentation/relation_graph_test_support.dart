@@ -287,7 +287,6 @@ RelationGroupEntry testGroupRow({
           neighborTitle ??
           (isOutgoing ? 'Связанное $index' : 'Исходное $index'),
       archiveState: IntentionArchiveState.active,
-      readiness: IntentionReadiness.notReady,
     ),
   );
 }

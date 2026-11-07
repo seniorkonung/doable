@@ -1022,12 +1022,6 @@ abstract class AppLocalizations {
   /// **'Open the intention page: {title}'**
   String detailsRelationsWalkIntention(String title);
 
-  /// Доступное название стрелки строки связи, когда сосед — действие
-  ///
-  /// In en, this message translates to:
-  /// **'Open the action page: {title}'**
-  String detailsRelationsWalkAction(String title);
-
   /// Подсказка о смысле группы «Нужно» под плитками вкладки «Связи»
   ///
   /// In en, this message translates to:
@@ -1093,12 +1087,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add what this intention cannot do without.'**
   String get detailsRelationsEmptyNeedsIntentionText;
-
-  /// Текст пустой группы «Нужно» у действия
-  ///
-  /// In en, this message translates to:
-  /// **'An action can stand alone. Add what it needs if it has steps of its own.'**
-  String get detailsRelationsEmptyNeedsActionText;
 
   /// Заголовок пустой группы «Можно использовать»
   ///

@@ -537,7 +537,6 @@ final class _GroupRow extends StatelessWidget {
     final archived = relation.scope == RelationScope.archived;
     final neighborArchived =
         neighbor.archiveState == IntentionArchiveState.archived;
-    final isAction = neighbor.readiness == IntentionReadiness.ready;
     final note = item.descriptionPreview?.text;
     return RelationRow(
       kind: switch (relation.type) {
@@ -556,7 +555,6 @@ final class _GroupRow extends StatelessWidget {
       },
       name: neighbor.title,
       note: note,
-      action: isAction,
       archived: archived,
       intentionArchived: neighborArchived,
       semanticLabel: [
@@ -576,9 +574,7 @@ final class _GroupRow extends StatelessWidget {
           l10n.detailsRelationsNeighborArchived(neighbor.title),
         ?note,
       ].join('. '),
-      walkLabel: isAction
-          ? l10n.detailsRelationsWalkAction(neighbor.title)
-          : l10n.detailsRelationsWalkIntention(neighbor.title),
+      walkLabel: l10n.detailsRelationsWalkIntention(neighbor.title),
       onOpen: onOpen,
       onWalk: onWalk,
     );
@@ -637,11 +633,7 @@ final class _EmptyGroupNotice extends StatelessWidget {
       (IntentionArchiveState.archived, _) =>
         l10n.detailsRelationsEmptyArchivedText,
       (IntentionArchiveState.active, IntentionRelationGroup.needs) =>
-        switch (owner.readiness) {
-          IntentionReadiness.notReady =>
-            l10n.detailsRelationsEmptyNeedsIntentionText,
-          IntentionReadiness.ready => l10n.detailsRelationsEmptyNeedsActionText,
-        },
+        l10n.detailsRelationsEmptyNeedsIntentionText,
       (IntentionArchiveState.active, IntentionRelationGroup.canUse) =>
         l10n.detailsRelationsEmptyCanUseText,
       (IntentionArchiveState.active, IntentionRelationGroup.neededFor) =>

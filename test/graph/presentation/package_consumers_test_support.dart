@@ -519,7 +519,6 @@ Object _relationEntry(RelationGroupEntry item) => (
   item.neighbor.id,
   item.neighbor.title,
   item.neighbor.archiveState,
-  item.neighbor.readiness,
   item.descriptionPreview?.text,
 );
 

@@ -29,33 +29,47 @@ import 'package:flutter_test/flutter_test.dart';
 import '../relation_graph_test_support.dart';
 
 void main() {
-  for (final (readiness, expected) in [
-    (IntentionReadiness.notReady, IntentionRelationGroup.needs),
-    (IntentionReadiness.ready, IntentionRelationGroup.neededFor),
+  for (final (scenario, counts, expected) in [
+    ('без связей', testRelationCounts(), IntentionRelationGroup.needs),
+    (
+      'первую активную прежде архивной',
+      testRelationCounts(archivedNeedOutgoing: 1, activeCanIncoming: 1),
+      IntentionRelationGroup.canBeUsedFor,
+    ),
+    (
+      'первую активную в порядке групп',
+      testRelationCounts(activeCanOutgoing: 1, activeNeedIncoming: 1),
+      IntentionRelationGroup.canUse,
+    ),
+    (
+      'входящую при пустых исходящих',
+      testRelationCounts(activeNeedIncoming: 1),
+      IntentionRelationGroup.neededFor,
+    ),
+    (
+      'первую архивную при отсутствии активных',
+      testRelationCounts(archivedCanOutgoing: 1, archivedNeedIncoming: 1),
+      IntentionRelationGroup.canUse,
+    ),
   ]) {
-    test('без группы в цели ${readiness.name} открывает первую порцию '
-        'группы ${expected.name}', () async {
+    test('без группы в цели выбирает $scenario', () async {
       final repository = ControlledRelationGraphRepository();
-      final harness = await _RelationsHarness.open(
-        repository,
-        readiness: readiness,
-      );
+      final harness = await _RelationsHarness.open(repository, counts: counts);
       addTearDown(harness.dispose);
 
-      expect(harness.state, isA<IntentionRelationsInitialLoad>());
       expect(harness.state.group, expected);
       expect(harness.pageInstance.relations?.group, expected);
-      expect(harness.pageInstance.relations?.expandedArchives, isEmpty);
       expect(repository.requestCount, 1);
       _expectFirstPageOf(repository.queryAt(0), expected);
     });
   }
 
-  test('группа цели открывается вместо группы по готовности', () async {
+  test('группа цели имеет приоритет над сводкой', () async {
     final repository = ControlledRelationGraphRepository();
     final harness = await _RelationsHarness.open(
       repository,
       target: const RelationsTarget(IntentionRelationGroup.canBeUsedFor),
+      counts: testRelationCounts(activeNeedOutgoing: 1),
     );
     addTearDown(harness.dispose);
 
@@ -68,7 +82,7 @@ void main() {
   });
 
   test(
-    'новая модель экземпляра сохраняет группу после смены готовности',
+    'новая модель экземпляра сохраняет группу после изменения связей',
     () async {
       final repository = ControlledRelationGraphRepository();
       final harness = await _RelationsHarness.open(repository);
@@ -78,7 +92,7 @@ void main() {
       await harness.release();
       repository.emitIntention(
         _intention(harness.intentionId, IntentionReadiness.ready),
-        counts: testRelationCounts(),
+        counts: testRelationCounts(activeCanIncoming: 1),
         revision: const TestGraphRevision(2),
       );
       await pumpEventQueue();
@@ -1068,7 +1082,6 @@ RelationGroupEntry _entryForRelation(
         : relation.sourceIntentionId,
     title: 'Намерение',
     archiveState: IntentionArchiveState.active,
-    readiness: IntentionReadiness.notReady,
   ),
 );
 
@@ -1113,6 +1126,7 @@ final class _RelationsHarness {
     IntentionReadiness readiness = IntentionReadiness.notReady,
     IntentionArchiveState archiveState = IntentionArchiveState.active,
     int pageSize = 50,
+    RelationCounts? counts,
     bool retain = true,
   }) async {
     final harness = _RelationsHarness._(
@@ -1137,7 +1151,7 @@ final class _RelationsHarness {
     );
     repository.emitIntention(
       _intention(harness.intentionId, readiness, archiveState: archiveState),
-      counts: testRelationCounts(),
+      counts: counts ?? testRelationCounts(),
       revision: const TestGraphRevision(1),
     );
     await pumpEventQueue();

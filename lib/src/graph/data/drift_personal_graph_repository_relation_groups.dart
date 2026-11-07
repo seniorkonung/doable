@@ -231,7 +231,6 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
           id: intention.id,
           title: intention.title,
           archiveState: intention.archiveState,
-          readiness: intention.readiness,
         ),
     };
     return List.unmodifiable([

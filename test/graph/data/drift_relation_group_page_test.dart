@@ -216,11 +216,6 @@ void main() {
           'Сосед без описания $base',
           'Сосед с длинным описанием $base',
         ]);
-        expect(entries.map((entry) => entry.neighbor.readiness), [
-          IntentionReadiness.ready,
-          IntentionReadiness.notReady,
-          IntentionReadiness.notReady,
-        ]);
         expect(
           entries.map((entry) => entry.neighbor.archiveState),
           everyElement(IntentionArchiveState.active),

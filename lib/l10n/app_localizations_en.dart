@@ -665,11 +665,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String detailsRelationsWalkAction(String title) {
-    return 'Open the action page: $title';
-  }
-
-  @override
   String get detailsRelationsNeedsHint =>
       'To get there, you need each of these.';
 
@@ -707,10 +702,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get detailsRelationsEmptyNeedsIntentionText =>
       'Add what this intention cannot do without.';
-
-  @override
-  String get detailsRelationsEmptyNeedsActionText =>
-      'An action can stand alone. Add what it needs if it has steps of its own.';
 
   @override
   String get detailsRelationsEmptyCanUseTitle => 'Nothing to use yet';

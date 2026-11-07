@@ -177,7 +177,6 @@ void main() {
           id: neighborId,
           title: 'Сделать силовую тренировку',
           archiveState: IntentionArchiveState.active,
-          readiness: IntentionReadiness.ready,
         ),
         descriptionPreview: TextPreview.fromText(description),
       );
@@ -207,7 +206,7 @@ void main() {
       expect(row.label, l10n.detailsRelationsRowNeed('P1'));
       expect(row.name, 'Сделать силовую тренировку');
       expect(row.note, note);
-      expect(row.action, isTrue);
+      expect(row.action, isFalse);
       expect(row.archived, isFalse);
       expect(row.intentionArchived, isFalse);
       expect(find.text(l10n.detailsRelationsRowNeed('P1')), findsOneWidget);
@@ -223,7 +222,7 @@ void main() {
         note,
       ].join('. ');
       expect(row.semanticLabel, rowLabel);
-      final walkLabel = l10n.detailsRelationsWalkAction(
+      final walkLabel = l10n.detailsRelationsWalkIntention(
         'Сделать силовую тренировку',
       );
       expect(row.walkLabel, walkLabel);
@@ -263,7 +262,6 @@ void main() {
           id: base.neighbor.id,
           title: base.neighbor.title,
           archiveState: IntentionArchiveState.archived,
-          readiness: IntentionReadiness.notReady,
         ),
       );
       harness.repository.completePage(
@@ -588,8 +586,8 @@ void main() {
       }
     });
 
-    testWidgets('[${locale.languageCode}] пустая группа «Нужно» действия '
-        'напоминает, что действие может обходиться без других', (tester) async {
+    testWidgets('[${locale.languageCode}] пустая группа «Нужно» намерения '
+        'показывает общий текст независимо от готовности', (tester) async {
       final harness = await _Harness.pump(
         tester,
         locale: locale,
@@ -601,7 +599,7 @@ void main() {
 
       final empty = tester.widget<EmptyState>(find.byType(EmptyState));
       expect(empty.title, l10n.detailsRelationsEmptyNeedsTitle);
-      expect(empty.text, l10n.detailsRelationsEmptyNeedsActionText);
+      expect(empty.text, l10n.detailsRelationsEmptyNeedsIntentionText);
       expect(empty.pretty, isTrue);
     });
 

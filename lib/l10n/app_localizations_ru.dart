@@ -667,11 +667,6 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String detailsRelationsWalkAction(String title) {
-    return 'Открыть страницу действия: $title';
-  }
-
-  @override
   String get detailsRelationsNeedsHint =>
       'Чтобы достичь этого, нужно всё перечисленное.';
 
@@ -710,10 +705,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get detailsRelationsEmptyNeedsIntentionText =>
       'Добавьте то, без чего этому намерению не обойтись.';
-
-  @override
-  String get detailsRelationsEmptyNeedsActionText =>
-      'Действие может обходиться без других. Добавьте то, что ему нужно, если у него есть свои шаги.';
 
   @override
   String get detailsRelationsEmptyCanUseTitle => 'Пока нечего использовать';

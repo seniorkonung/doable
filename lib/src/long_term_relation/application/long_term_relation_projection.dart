@@ -35,25 +35,21 @@ final class RelationNeighbor {
     required IntentionId id,
     required String title,
     required IntentionArchiveState archiveState,
-    required IntentionReadiness readiness,
   }) => RelationNeighbor._(
     id: id,
     title: IntentionText.normalizeTitle(title),
     archiveState: archiveState,
-    readiness: readiness,
   );
 
   const RelationNeighbor._({
     required this.id,
     required this.title,
     required this.archiveState,
-    required this.readiness,
   });
 
   final IntentionId id;
   final String title;
   final IntentionArchiveState archiveState;
-  final IntentionReadiness readiness;
 }
 
 enum LongTermRelationProjectionValidationFailure { participantMismatch }

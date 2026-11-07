@@ -435,7 +435,6 @@ RelationGroupEntry testDetailsRelationRow({
   RelationScope scope = RelationScope.active,
   IntentionId? neighborId,
   String? neighborTitle,
-  IntentionReadiness neighborReadiness = IntentionReadiness.notReady,
 }) {
   neighborId ??= testDetailsIntentionId(900 + index);
   final isOutgoing = direction == RelationDirection.outgoing;
@@ -457,7 +456,6 @@ RelationGroupEntry testDetailsRelationRow({
           neighborTitle ??
           (isOutgoing ? 'Связанное $index' : 'Исходное $index'),
       archiveState: IntentionArchiveState.active,
-      readiness: neighborReadiness,
     ),
   );
 }

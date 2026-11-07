@@ -53,7 +53,6 @@ void main() {
             id: _intentionId('00000000-0000-4000-8000-000000000003'),
             title: 'Другое намерение',
             archiveState: IntentionArchiveState.active,
-            readiness: IntentionReadiness.notReady,
           ),
         ),
         throwsA(isA<LongTermRelationProjectionValidationException>()),
