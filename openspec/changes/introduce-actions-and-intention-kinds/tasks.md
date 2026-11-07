@@ -819,3 +819,15 @@
   - **Зависимости:** 2.1–2.18.
   - **Предполагаемые файлы:** нет, только проверка.
   - **Размер:** XS.
+
+- [ ] 2.20 Полные проверки проекта проходят после расширения команд действия и меню режима
+  - **Критерии приёмки:**
+    - В помощнике `action` файлов `test/app/home_statistics_app_flow_test.dart` и `test/app/intention_statistics_app_flow_test.dart` `switch (command)` исчерпывающе перечисляет варианты запечатанного `ActionCommand`: `CreateAction` вызывает `coordinator.acceptActionCreation(ActionCreationFormKey(), command)`, `SetActionPath` — `coordinator.acceptActionPathUpdate(command)`, `UpdateActionFields` и `DeleteAction` — прежние методы. Ветви `_ =>`, скрывающей будущие варианты, нет.
+    - В `test/app/quick_creation/quick_creation_accessibility_test.dart` строка режима («New action» / «Новое действие» и названия других режимов) и её `OptionRow` ищутся только внутри листа меню режима (`find.descendant` от `find.byType(BottomSheet)`), поэтому кнопка пустого дня экрана дня под меню не даёт второго совпадения. Проверки видимости в области прокрутки, `didExceedMaxLines` и `hitTestable` остаются прежними.
+    - Код `lib/` и поведение приложения не меняются; ожидания остальных тестов не ослабляются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/home_statistics_app_flow_test.dart test/app/intention_statistics_app_flow_test.dart test/app/quick_creation/quick_creation_accessibility_test.dart`.
+    - `mise run check` и `mise run codegen-check` — без ошибок; результаты обеих команд записаны в отчёт задачи.
+  - **Зависимости:** 2.1, 2.2, 2.14, 2.15.
+  - **Предполагаемые файлы:** меняются `test/app/home_statistics_app_flow_test.dart`, `test/app/intention_statistics_app_flow_test.dart`, `test/app/quick_creation/quick_creation_accessibility_test.dart`.
+  - **Размер:** XS.
