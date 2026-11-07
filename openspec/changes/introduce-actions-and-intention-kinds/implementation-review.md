@@ -3,9 +3,9 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** Changes needed
+**Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Задачи 2.20–2.30 в целом реализованы, как требуют их критерии, и `mise run check` на `b8c45c8b` проходит. Одна находка. F2: после задачи 2.26 полезную нагрузку `RelationBatchAdded.relations` никто не читает, а успех добавления разбирается в двух местах. Перегенерацию `.g.dart` провайдеров экрана пути и поиска участника, без которой `mise run codegen-check` падает, теперь ведёт задача 2.31 фазы 2. Сохранение подтверждённых чисел половин при повторе после отказа чтения пути и структурную гарантию данных переключателя черновика в загрузке и после отказа ведёт задача 2.32 фазы 2. Принятых остаточных рисков нет.
+**Summary:** Задачи 2.20–2.30 в целом реализованы, как требуют их критерии, и `mise run check` на `b8c45c8b` проходит. Неустранённых находок нет. Перегенерацию `.g.dart` провайдеров экрана пути и поиска участника, без которой `mise run codegen-check` падает, теперь ведёт задача 2.31 фазы 2. Сохранение подтверждённых чисел половин при повторе после отказа чтения пути и структурную гарантию данных переключателя черновика в загрузке и после отказа ведёт задача 2.32 фазы 2. Удаление полезной нагрузки `RelationBatchAdded.relations` без потребителя и единый разбор исхода добавления связей в модели поиска участника ведёт задача 2.33 фазы 2. Принятых остаточных рисков нет.
 
 ## Review target
 
@@ -80,14 +80,7 @@
 
 ## Findings
 
-### F2 · Low — Связи в `RelationBatchAdded` никто не читает, а успех добавления разбирается дважды
-
-- **Evidence:** Коммит `d3a82d8e` перенёс доставку исхода якорю пути из `ref.listen` страницы (`RelationBatchAdded(:final relations)`) в future, который возвращает `RelationBatchViewModel.submit()` (`lib/src/long_term_relation/presentation/batch_picker/relation_batch_view_model.dart:99-131`, `relation_batch_picker_page.dart:62-71`). На `b8c45c8b` поле `RelationBatchAdded.relations` (`relation_batch_state.dart:38-42`, «Связи пачки в порядке отметок») не читает ни один файл `lib/` и `test/`: страница проверяет только тип операции (`relation_batch_picker_page.dart:84-85`, `:190`, `:196`). При этом `_finish` (строки 145-157) продолжает собирать для него связи из `LongTermRelationsAdded`, а `submit()` разбирает тот же результат завершения второй раз своим `switch`.
-- **Evidence revisions:** ["b8c45c8b16c52494e1ebf9e447c6bae70bfac98a"]
-- **Impact:** Полезная нагрузка без потребителя и два разбора одного исхода команды. Читатель вынужден выяснять, какой из каналов — источник истины для якоря пути, а при изменении результата `AddLongTermRelations` править оба разбора. Это нарушает правило proven necessity.
-- **Required outcome:** Исход подтверждённого добавления разбирается в одном месте. Состояние поиска не хранит данных, которые никто не читает. Поведение якоря пути (задача 2.26) и других якорей не меняется.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/long_term_relation/presentation/batch_picker/relation_batch_state.dart", "lib/src/long_term_relation/presentation/batch_picker/relation_batch_view_model.dart"]
+No unresolved findings remain in the implementation review.
 
 ## Review coverage
 

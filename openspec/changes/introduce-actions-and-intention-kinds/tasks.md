@@ -993,3 +993,18 @@
   - **Зависимости:** 2.25, 2.31.
   - **Предполагаемые файлы:** меняются `lib/src/action/presentation/path/path_state.dart`, `path_view_model.dart`, `path_view_model.g.dart`, `path_page.dart`, `test/action/presentation/path/path_view_model_test.dart`.
   - **Размер:** S.
+
+- [ ] 2.33 Исход подтверждённого добавления связей разбирается в одном месте, а `RelationBatchAdded` не несёт данных без потребителя
+  - **Критерии приёмки:**
+    - `RelationBatchAdded` в `lib/src/long_term_relation/presentation/batch_picker/relation_batch_state.dart` — маркер подтверждённого добавления без поля `relations`; doc-комментарий описывает только подтверждённое добавление и закрытие поиска.
+    - Результат завершения принятой команды `AddLongTermRelations` (`LongTermRelationsAdded` и прочие исходы) разбирается в `relation_batch_view_model.dart` один раз: `submit()` и `_finish` не повторяют сопоставление результата. Конкретная форма выбирается по месту.
+    - Future, возвращаемый `submit()`, по-прежнему завершается связями подтверждённого добавления в порядке отметок, в том числе когда пользователь ушёл с поиска до исхода записи; отказ, непринятая команда и уже идущая команда завершают его `null`, как прежде.
+    - Поведение поиска участника не меняется: для якоря пути (задача 2.26) и других якорей, правило `canPop`, закрытие поиска через `removeRoute`, надпись «Добавляем…», предъявление отказа и успеха после ухода; поиск участника остаётся общим модулем (ADR-0049).
+    - `relation_batch_view_model.g.dart` перегенерирован по изменённому исходнику провайдера, и на голове ветки `mise run codegen-check` проходит.
+    - Существующие тесты задачи 2.26 и поиска участника проходят без ослабления ожиданий.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/batch_picker test/action/presentation/path test/app/action_path_app_flow_test.dart`.
+    - `mise run codegen-check`.
+  - **Зависимости:** 2.26, 2.31.
+  - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/batch_picker/relation_batch_state.dart`, `relation_batch_view_model.dart`, `relation_batch_view_model.g.dart`, при необходимости `relation_batch_picker_page.dart`.
+  - **Размер:** XS.
