@@ -789,6 +789,7 @@ void main() {
                   ? _Recovery.correctable
                   : _Recovery.resubmittable,
             IntentionUnavailableFailure() => _Recovery.retryable,
+            IntentionMissingIncomingRelationFailure() ||
             IntentionNotFoundFailure() ||
             IntentionConflictFailure() ||
             IntentionHasBlockingRelationsFailure() ||

@@ -966,6 +966,10 @@
   "@graphOperationCreate": {
     "description": "Вид операции создания намерения в сообщении оболочки"
   },
+  "graphOperationChangeKind": "Change kind",
+  "@graphOperationChangeKind": {
+    "description": "Вид операции изменения вида намерения в сообщении оболочки"
+  },
   "graphOperationUpdate": "Edit",
   "@graphOperationUpdate": {
     "description": "Вид операции изменения намерения в сообщении оболочки"

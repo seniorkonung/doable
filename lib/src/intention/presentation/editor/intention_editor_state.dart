@@ -457,6 +457,7 @@ final class IntentionEditorState {
       // Отсутствующие теги ушли из набора вместе с отказом; его объяснение
       // остаётся до правки набора.
       IntentionCreationTagsMissingFailure() => edit is _DraftTagSetEdit,
+      IntentionMissingIncomingRelationFailure() ||
       IntentionNotFoundFailure() ||
       IntentionConflictFailure() ||
       IntentionHasBlockingRelationsFailure() ||

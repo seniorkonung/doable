@@ -1198,6 +1198,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationCreate => 'Create';
 
   @override
+  String get graphOperationChangeKind => 'Change kind';
+
+  @override
   String get graphOperationUpdate => 'Edit';
 
   @override

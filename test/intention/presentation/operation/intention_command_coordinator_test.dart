@@ -344,7 +344,7 @@ void main() {
 
         final first = _acceptExisting(
           coordinator,
-          EnableIntentionReadiness(firstId),
+          ChangeIntentionKind(firstId, IntentionKind.supporting),
         );
         final repeated = _acceptExisting(
           coordinator,
@@ -359,7 +359,7 @@ void main() {
         expect(repeated, isA<IntentionCommandAlreadyRunning>());
         expect(independent, isA<IntentionCommandAccepted>());
         expect(repository.commands, [
-          isA<EnableIntentionReadiness>(),
+          isA<ChangeIntentionKind>(),
           isA<EnableIntentionReadiness>(),
         ]);
 
@@ -369,7 +369,7 @@ void main() {
         );
         final firstCompletion =
             await (first as IntentionCommandAccepted).future;
-        expect(firstCompletion.kind, IntentionCommandKind.enableReadiness);
+        expect(firstCompletion.kind, IntentionCommandKind.changeKind);
         expect(
           firstCompletion.result,
           isA<ResultFailure<IntentionCommandSuccess>>(),
@@ -603,6 +603,10 @@ void main() {
     );
 
     for (final (name, command) in [
+      (
+        'изменение вида',
+        (IntentionId id) => ChangeIntentionKind(id, IntentionKind.supporting),
+      ),
       ('включение готовности', EnableIntentionReadiness.new),
       ('выключение готовности', DisableIntentionReadiness.new),
       ('архивирование', ArchiveIntention.new),

@@ -35,6 +35,11 @@ sealed class IntentionValidationFailure extends IntentionFailure {
   IntentionFailureCode get code => IntentionFailureCode.validation;
 }
 
+final class IntentionMissingIncomingRelationFailure
+    extends IntentionValidationFailure {
+  const IntentionMissingIncomingRelationFailure();
+}
+
 final class IntentionGenericValidationFailure
     extends IntentionValidationFailure {
   const IntentionGenericValidationFailure();

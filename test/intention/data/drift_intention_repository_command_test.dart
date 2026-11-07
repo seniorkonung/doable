@@ -60,6 +60,155 @@ void main() {
 
   tearDown(() => database.close());
 
+  group('Изменение вида намерения', () {
+    test(
+      'проверяет входящую связь по архивному состоянию и сохраняет снимки',
+      () async {
+        final source = _id(_firstUuid);
+        final target = _id(_secondUuid);
+        for (final id in [source, target]) {
+          await _insertIntention(
+            database,
+            id: id.toCanonicalString(),
+            title: 'Намерение',
+            createdAt: DateTime.utc(2026, 1, 1),
+          );
+        }
+        final beforeRejection = _storedRows(raw, 'intentions');
+        final rejected = await repository.execute(
+          ChangeIntentionKind(target, IntentionKind.supporting),
+        );
+        expect(_storedRows(raw, 'intentions'), beforeRejection);
+        expect(
+          rejected,
+          isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
+              .having(
+                (r) => r.failure,
+                'отказ',
+                isA<IntentionMissingIncomingRelationFailure>(),
+              ),
+        );
+        expect(clock.calls, 0);
+        seedRawGraph(raw, () {
+          raw.execute(
+            "INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at) VALUES (?, ?, ?, 'need', 4, 1, 1)",
+            [
+              _idForSequence(0x801).toCanonicalString(),
+              source.toCanonicalString(),
+              target.toCanonicalString(),
+            ],
+          );
+        });
+        final beforeIntentions = _storedRows(raw, 'intentions');
+        final beforeRelations = _storedRows(raw, 'long_term_relations');
+        final saved = _commandSuccess(
+          await repository.execute(
+            ChangeIntentionKind(target, IntentionKind.supporting),
+          ),
+        ) as IntentionSaved;
+        final mutation = saved.catalogMutation as IntentionCatalogUpdated;
+        expect(mutation.before.summary.kind, IntentionKind.main);
+        expect(mutation.after.summary.kind, IntentionKind.supporting);
+        expect(_storedRows(raw, 'intentions').first, beforeIntentions.first);
+        expect(_storedRows(raw, 'long_term_relations'), beforeRelations);
+        expect(saved.intention.updatedAt.value, DateTime.utc(2026, 9, 3, 12));
+        final unchanged = _commandSuccess(
+          await repository.execute(
+            ChangeIntentionKind(target, IntentionKind.supporting),
+          ),
+        ) as IntentionSaved;
+        expect(unchanged.catalogMutation, isA<IntentionCatalogUnchanged>());
+        expect(
+          mutation.revision.compareTo(unchanged.catalogMutation.revision),
+          GraphRevisionOrder.same,
+        );
+        expect(unchanged.intention.updatedAt, saved.intention.updatedAt);
+        expect(clock.calls, 1);
+        expect(
+          diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>(),
+          [
+            _failedCommand(
+              IntentionCommandDiagnosticsType.changeKind,
+              DiagnosticsFailureCode.validation,
+            ),
+            _successfulCommand(IntentionCommandDiagnosticsType.changeKind),
+            _successfulCommand(IntentionCommandDiagnosticsType.changeKind),
+          ],
+        );
+      },
+    );
+
+    test(
+      'архивная входящая связь допускает только архивное намерение',
+      () async {
+        clock = _DeterministicClock([
+          DateTime.utc(2026, 9, 3, 12),
+          DateTime.utc(2026, 9, 3, 13),
+        ]);
+        repository = DriftPersonalGraphRepository(
+          database,
+          idGenerator,
+          clock.call,
+          diagnostics,
+        );
+        final source = _id(_firstUuid);
+        final target = _id(_secondUuid);
+        for (final id in [source, target]) {
+          await _insertIntention(
+            database,
+            id: id.toCanonicalString(),
+            title: 'Намерение',
+            createdAt: DateTime.utc(2026, 1, 1),
+          );
+        }
+        seedRawGraph(raw, () {
+          raw.execute(
+            "INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived, created_at, updated_at) VALUES (?, ?, ?, 'can', 4, 1, 1, 1)",
+            [
+              _idForSequence(0x802).toCanonicalString(),
+              source.toCanonicalString(),
+              target.toCanonicalString(),
+            ],
+          );
+        });
+        expect(
+          await repository.execute(
+            ChangeIntentionKind(target, IntentionKind.supporting),
+          ),
+          isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
+              .having(
+                (r) => r.failure,
+                'отказ',
+                isA<IntentionMissingIncomingRelationFailure>(),
+              ),
+        );
+        seedRawGraph(
+          raw,
+          () => raw.execute(
+            'UPDATE intentions SET is_archived = 1 WHERE id = ?',
+            [target.toCanonicalString()],
+          ),
+        );
+        final saved = _saved(
+          await repository.execute(
+            ChangeIntentionKind(target, IntentionKind.supporting),
+          ),
+        );
+        expect(saved.kind, IntentionKind.supporting);
+        expect(saved.archiveState, IntentionArchiveState.archived);
+        final main = _commandSuccess(
+          await repository.execute(
+            ChangeIntentionKind(target, IntentionKind.main),
+          ),
+        ) as IntentionSaved;
+        final mutation = main.catalogMutation as IntentionCatalogUpdated;
+        expect(mutation.before.summary.kind, IntentionKind.supporting);
+        expect(mutation.after.summary.kind, IntentionKind.main);
+        expect(main.intention.updatedAt.value, DateTime.utc(2026, 9, 3, 13));
+      },
+    );
+  });
+
   group('DriftPersonalGraphRepository.execute', () {
     group('Собственные теги каталожных снимков команд', () {
       late IntentionId id;

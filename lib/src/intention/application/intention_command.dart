@@ -71,6 +71,12 @@ final class UpdateIntention extends ExistingIntentionCommand {
   final String? description;
 }
 
+final class ChangeIntentionKind extends ExistingIntentionCommand {
+  const ChangeIntentionKind(super.id, this.kind);
+
+  final IntentionKind kind;
+}
+
 final class EnableIntentionReadiness extends ExistingIntentionCommand {
   const EnableIntentionReadiness(super.id);
 }

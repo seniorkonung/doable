@@ -90,6 +90,7 @@ final class QuickCreationModeDiagnosticsEvent extends DiagnosticsEvent {
 enum IntentionCommandDiagnosticsType {
   create,
   update,
+  changeKind,
   enableReadiness,
   disableReadiness,
   archive,

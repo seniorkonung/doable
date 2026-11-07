@@ -1916,6 +1916,12 @@ abstract class AppLocalizations {
   /// **'Create'**
   String get graphOperationCreate;
 
+  /// Вид операции изменения вида намерения в сообщении оболочки
+  ///
+  /// In en, this message translates to:
+  /// **'Change kind'**
+  String get graphOperationChangeKind;
+
   /// Вид операции изменения намерения в сообщении оболочки
   ///
   /// In en, this message translates to:

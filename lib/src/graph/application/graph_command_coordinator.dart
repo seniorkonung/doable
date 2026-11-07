@@ -26,6 +26,7 @@ part 'graph_command_coordinator.g.dart';
 enum IntentionCommandKind {
   create,
   update,
+  changeKind,
   enableReadiness,
   disableReadiness,
   archive,
@@ -1939,6 +1940,7 @@ _PresentationPolicy _intentionPresentationPolicyOf(IntentionCommandKind kind) =>
       IntentionCommandKind.create ||
       IntentionCommandKind.delete => _PresentationPolicy.standard,
       IntentionCommandKind.update => _PresentationPolicy.silentSuccess,
+      IntentionCommandKind.changeKind ||
       IntentionCommandKind.enableReadiness ||
       IntentionCommandKind.disableReadiness ||
       IntentionCommandKind.archive ||
@@ -1955,6 +1957,7 @@ _PresentationPolicy _actionPresentationPolicyOf(ActionCommandKind kind) =>
 IntentionCommandKind _kindOf(IntentionCommand command) => switch (command) {
   CreateIntention() => IntentionCommandKind.create,
   UpdateIntention() => IntentionCommandKind.update,
+  ChangeIntentionKind() => IntentionCommandKind.changeKind,
   EnableIntentionReadiness() => IntentionCommandKind.enableReadiness,
   DisableIntentionReadiness() => IntentionCommandKind.disableReadiness,
   ArchiveIntention() => IntentionCommandKind.archive,

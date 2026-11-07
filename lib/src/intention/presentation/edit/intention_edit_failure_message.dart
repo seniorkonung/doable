@@ -58,7 +58,8 @@ String? intentionEditGeneralFailureMessage(
       null,
     IntentionGenericValidationFailure() ||
     IntentionTextInputValidationFailure() ||
-    IntentionCreationTagsMissingFailure() =>
+    IntentionCreationTagsMissingFailure() ||
+    IntentionMissingIncomingRelationFailure() =>
       localizations.detailsUpdateInvalidInput,
     IntentionNotFoundFailure() => localizations.detailsUpdateNotFound,
     IntentionConflictFailure() => localizations.detailsUpdateConflict,

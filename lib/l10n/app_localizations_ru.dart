@@ -1205,6 +1205,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationCreate => 'Создание';
 
   @override
+  String get graphOperationChangeKind => 'Изменение вида';
+
+  @override
   String get graphOperationUpdate => 'Изменение';
 
   @override

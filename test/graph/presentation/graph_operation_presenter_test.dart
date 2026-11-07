@@ -512,6 +512,24 @@ void main() {
     expect(find.byType(SnackBar), findsNothing);
   });
 
+  testWidgets('отказ изменения вида предъявляется общей поверхностью', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final operation = harness.startKindChange();
+    harness.completeFailure(
+      operation,
+      const IntentionMissingIncomingRelationFailure(),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Изменение вида — «Намерение»: Не удалось изменить состояние намерения.',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets(
     'показывает безопасный конфликт блокирующих связей в общей поверхности',
     (tester) async {
@@ -2102,6 +2120,16 @@ final class _PresenterHarness {
     _actionIndexes[accepted]!,
     GraphCommandFailed(failure),
   );
+
+  IntentionCommandAccepted startKindChange() {
+    final commandIndex = repository.commands.length;
+    final accepted = _coordinator.acceptExisting(
+      ChangeIntentionKind(testDetailsIntentionId(1), IntentionKind.supporting),
+      presentationTitle: 'Намерение',
+    ) as IntentionCommandAccepted;
+    _commandIndexes[accepted] = commandIndex;
+    return accepted;
+  }
 
   IntentionCommandAccepted startDelete({
     required int index,

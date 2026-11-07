@@ -141,6 +141,7 @@ final class IntentionEditState {
       IntentionGenericValidationFailure() => const OperationIdle<Intention>(),
       IntentionTextInputValidationFailure() ||
       IntentionCreationTagsMissingFailure() ||
+      IntentionMissingIncomingRelationFailure() ||
       IntentionNotFoundFailure() ||
       IntentionConflictFailure() ||
       IntentionHasBlockingRelationsFailure() ||

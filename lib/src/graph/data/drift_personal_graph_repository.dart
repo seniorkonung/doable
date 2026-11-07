@@ -551,6 +551,7 @@ final class DriftPersonalGraphRepository
             onStage: (stage) => creationStage = stage,
           ),
           UpdateIntention() => _updateIntention(command, clock),
+          ChangeIntentionKind() => _changeIntentionKind(command, clock),
           EnableIntentionReadiness() => _changeReadiness(
             command.id,
             domain.IntentionReadiness.ready,
@@ -844,6 +845,49 @@ final class DriftPersonalGraphRepository
         title: Value(updated.title),
         description: Value(updated.description),
         updatedAt: Value(updated.updatedAt.value.microsecondsSinceEpoch),
+      ),
+    );
+    final stored = await _readCommandSnapshot(command.id);
+    if (stored == null) throw const StoredGraphCorruption();
+    return _CommittedIntentionUpdated(
+      intention: stored.intention,
+      before: before,
+      after: await _catalogEntrySnapshot(stored),
+    );
+  }
+
+  Future<_CommittedIntentionCommand> _changeIntentionKind(
+    ChangeIntentionKind command,
+    _GraphWriteClock clock,
+  ) async {
+    final storedBefore = await _readCommandSnapshot(command.id);
+    if (storedBefore == null) throw const _IntentionNotFound();
+    final existing = storedBefore.intention;
+    final before = await _catalogEntrySnapshot(storedBefore);
+    if (existing.kind == command.kind) {
+      return _CommittedIntentionUnchanged(intention: existing, entry: before);
+    }
+    if (command.kind == domain.IntentionKind.supporting) {
+      final relations = _database.longTermRelations;
+      final query = _database.select(relations)
+        ..where(
+          (row) =>
+              row.relatedIntentionId.equals(command.id.toCanonicalString()) &
+              (existing.archiveState == domain.IntentionArchiveState.active
+                  ? row.isArchived.equals(false)
+                  : const Constant(true)),
+        )
+        ..limit(1);
+      if ((await query.get()).isEmpty) {
+        throw const _IntentionMissingIncomingRelation();
+      }
+    }
+    await (_database.update(
+      _database.intentions,
+    )..where((row) => row.id.equals(command.id.toCanonicalString()))).write(
+      local.IntentionsCompanion(
+        kind: Value(command.kind.name),
+        updatedAt: Value(clock.read().microsecondsSinceEpoch),
       ),
     );
     final stored = await _readCommandSnapshot(command.id);
@@ -1910,6 +1954,9 @@ IntentionFailure _classifyCommandFailure(
   if (error is IntentionTextValidationException) {
     return IntentionTextInputValidationFailure(error.failure);
   }
+  if (error is _IntentionMissingIncomingRelation) {
+    return const IntentionMissingIncomingRelationFailure();
+  }
   if (error is _IntentionNotFound) {
     return const IntentionNotFoundFailure();
   }
@@ -1945,7 +1992,8 @@ void _validateCommandText(IntentionCommand command) {
       if (description != null) {
         IntentionText.normalizeDescription(description);
       }
-    case EnableIntentionReadiness() ||
+    case ChangeIntentionKind() ||
+        EnableIntentionReadiness() ||
         DisableIntentionReadiness() ||
         ArchiveIntention() ||
         RestoreIntention() ||
@@ -1974,6 +2022,7 @@ IntentionCommandDiagnosticsEvent _commandDiagnosticsEvent(
       status: status,
     ),
     UpdateIntention() => event(IntentionCommandDiagnosticsType.update),
+    ChangeIntentionKind() => event(IntentionCommandDiagnosticsType.changeKind),
     EnableIntentionReadiness() => event(
       IntentionCommandDiagnosticsType.enableReadiness,
     ),
@@ -1996,6 +2045,10 @@ DiagnosticsFailureCode _diagnosticsFailureCode(IntentionFailure failure) =>
       IntentionCorruptionFailure() => DiagnosticsFailureCode.corruption,
       IntentionUnexpectedFailure() => DiagnosticsFailureCode.unexpected,
     };
+
+final class _IntentionMissingIncomingRelation implements Exception {
+  const _IntentionMissingIncomingRelation();
+}
 
 final class _IntentionNotFound implements Exception {
   const _IntentionNotFound();

@@ -388,6 +388,7 @@
   "editorCreateTagsMissing": "{count, plural, =1{Выбранный тег удалён из каталога и убран из черновика. Сохраните намерение ещё раз.} other{Удалено из каталога выбранных тегов: {count}. Они убраны из черновика. Сохраните намерение ещё раз.}}",
   "@editorCreateTagsMissing": {"placeholders": {"count": {"type": "int"}}},
   "graphOperationCreate": "Создание",
+  "graphOperationChangeKind": "Изменение вида",
   "graphOperationUpdate": "Изменение",
   "graphOperationEnableReadiness": "Включение готовности",
   "graphOperationDisableReadiness": "Отключение готовности",

@@ -1034,7 +1034,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/graph_format/graph_format_records.dart`, `graph_format_codec.dart`, `lib/src/graph/data/graph_fact_capture.dart`, `drift_personal_graph_repository_fact_log.dart`, `drift_personal_graph_repository_replacement.dart`, `lib/src/graph_snapshots/graph_state_assembly.dart`, `test/graph_format/golden/graph_format_v1.jsonl`, `graph_fact_package_v1.jsonl`, `test/support/graph_log_completeness_reference.dart` и тесты формата, замены графа и снимков.
   - **Размер:** M.
 
-- [ ] 3.3 Вид намерения меняется командой графа только при допустимой входящей связи
+- [x] 3.3 Вид намерения меняется командой графа только при допустимой входящей связи
   - **Критерии приёмки:**
     - `ChangeIntentionKind(id, kind)` выполняется `GraphCommandCoordinator` одной транзакцией с одной ревизией (ADR-0009, D9) для активного и архивированного намерения. Вспомогательным намерение становится, только если у активного есть активная входящая связь, а у архивированного — любая входящая; иначе команда завершается типизированным отказом без записи. Другие намерения и связи не меняются (требование «Вид намерения»).
     - Показание времени изменения обновляется только при действительной смене вида, а повтор текущего вида завершается без изменений; пакет несёт `IntentionCatalogUpdated` со снимками до и после.
