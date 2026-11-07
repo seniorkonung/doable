@@ -608,6 +608,18 @@ abstract class AppLocalizations {
   /// **'Touch and hold to change mode'**
   String get quickCreationLongPressHint;
 
+  /// Quick creation action mode
+  ///
+  /// In en, this message translates to:
+  /// **'New action'**
+  String get quickCreationModeAction;
+
+  /// Quick creation action mode explanation
+  ///
+  /// In en, this message translates to:
+  /// **'A one-time task for the day'**
+  String get quickCreationModeActionHint;
+
   /// Название режима создания намерения
   ///
   /// In en, this message translates to:

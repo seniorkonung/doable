@@ -517,4 +517,5 @@ Type _pageForCatalogPurpose(IntentionCatalogPurpose purpose) =>
     switch (purpose) {
       BrowseIntentionCatalog() => IntentionCatalogPage,
       SelectRelationParticipant() => RelationBatchPickerPage,
+      SelectPathStart() => PathStartPickerPage,
     };

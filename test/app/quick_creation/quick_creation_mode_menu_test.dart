@@ -19,26 +19,26 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/app_root_pages.dart';
 
 const _titles = {
-  'ru': ['Новое намерение'],
-  'en': ['New intention'],
+  'ru': ['Новое намерение', 'Новое действие'],
+  'en': ['New intention', 'New action'],
 };
 const _hints = {
-  'ru': ['То, что вы хотите сделать или изменить'],
-  'en': ['Something you want to do or change'],
+  'ru': ['То, что вы хотите сделать или изменить', 'Разовое дело на день'],
+  'en': ['Something you want to do or change', 'A one-time task for the day'],
 };
 
 void main() {
   const initial = QuickCreationMode.intention;
   for (final language in ['ru', 'en']) {
     final titles = _titles[language]!;
-    testWidgets('$language: единственный режим «${titles[initial.index]}» '
+    testWidgets('$language: режимы «${titles[initial.index]}» '
         'и его выбор без запуска создания и изменения исходной истории', (
       tester,
     ) async {
       final app = await _openApp(tester, language: language);
       await _openMenu(tester);
 
-      expect(find.byType(OptionRow), findsOneWidget);
+      expect(find.byType(OptionRow), findsNWidgets(2));
       expect(
         find.text(
           language == 'ru' ? 'Что создаёт кнопка' : 'What the button creates',
@@ -103,7 +103,7 @@ void main() {
         'у «${titles[initial.index]}»', (tester) async {
       await _openApp(tester, language: language);
       await _openMenu(tester);
-      const icons = [DoableIconData.intention];
+      const icons = [DoableIconData.intention, DoableIconData.calendar];
       for (final (index, title) in titles.indexed) {
         final row = find.widgetWithText(OptionRow, title);
         final leading = find.descendant(

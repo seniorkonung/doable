@@ -60,6 +60,18 @@ void main() {
   });
 
   test(
+    'режим действия сохраняется ключом action и восстанавливается',
+    () async {
+      expect(
+        await store().save(QuickCreationMode.action),
+        isA<QuickCreationModeSaved>(),
+      );
+      expect(await modeFile.readAsString(), 'action');
+      expect(await store().read(), QuickCreationMode.action);
+    },
+  );
+
+  test(
     'неизвестный ключ возвращает начальный режим с категорией повреждения',
     () async {
       await modeFile.parent.create();

@@ -192,6 +192,10 @@
   "@quickCreationLongPressHint": {
     "description": "Подсказка долгого нажатия на кнопку быстрого создания для экранного диктора"
   },
+  "quickCreationModeAction": "New action",
+  "@quickCreationModeAction": {"description": "Quick creation action mode"},
+  "quickCreationModeActionHint": "A one-time task for the day",
+  "@quickCreationModeActionHint": {"description": "Quick creation action mode explanation"},
   "quickCreationModeIntention": "New intention",
   "@quickCreationModeIntention": {
     "description": "Название режима создания намерения"

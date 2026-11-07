@@ -24,8 +24,8 @@ import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/app_root_pages.dart';
 
 const _titles = {
-  'ru': ['Новое намерение'],
-  'en': ['New intention'],
+  'ru': ['Новое намерение', 'Новое действие'],
+  'en': ['New intention', 'New action'],
 };
 
 // Размер экрана не меняет ветвление кода, поэтому берём телефонную ширину.

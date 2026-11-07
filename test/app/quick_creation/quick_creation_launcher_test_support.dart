@@ -33,7 +33,10 @@ Future<BuildContext> _source(
   return tester.element(find.byType(origin.page));
 }
 
-Future<RootStackRouter> _openApp(WidgetTester tester) async {
+Future<RootStackRouter> _openApp(
+  WidgetTester tester, {
+  CalendarDate? today,
+}) async {
   tester.view.physicalSize = const Size(1200, 2400);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -42,6 +45,7 @@ Future<RootStackRouter> _openApp(WidgetTester tester) async {
   final container = ProviderContainer(
     overrides: [
       inMemoryQuickCreationModeOverride,
+      if (today != null) ControlledLocalDate(today).override,
       personalGraphRepositoryProvider.overrideWithValue(
         durabilityRepository(database),
       ),

@@ -3,10 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/navigation/graph_generation.dart';
 import '../../../design_system/components/scroll_top_button.dart';
 import '../../../shared/presentation/local_day/local_date_provider.dart';
 import 'action_day_body.dart';
 import 'action_day_instance.dart';
+
+/// Экземпляр корневого экрана доступен его панели вне дерева вкладки.
+final actionDayRootInstanceProvider = Provider<ActionDayInstance>((ref) {
+  ref.watch(currentGraphGenerationProvider);
+  return ActionDayInstance(
+    initialDate: ref.read(localDateSourceProvider)().date,
+  );
+});
 
 @RoutePage()
 final class ActionDayRootPage extends ConsumerStatefulWidget {
@@ -23,9 +32,7 @@ final class _ActionDayRootPageState extends ConsumerState<ActionDayRootPage> {
   @override
   void initState() {
     super.initState();
-    _instance = ActionDayInstance(
-      initialDate: ref.read(localDateSourceProvider)().date,
-    );
+    _instance = ref.read(actionDayRootInstanceProvider);
   }
 
   @override

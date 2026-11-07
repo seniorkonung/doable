@@ -408,6 +408,12 @@ class AppLocalizationsRu extends AppLocalizations {
       'Нажмите и удерживайте, чтобы сменить режим';
 
   @override
+  String get quickCreationModeAction => 'Новое действие';
+
+  @override
+  String get quickCreationModeActionHint => 'Разовое дело на день';
+
+  @override
   String get quickCreationModeIntention => 'Новое намерение';
 
   @override

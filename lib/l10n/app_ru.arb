@@ -104,6 +104,8 @@
   "quickCreationMenuTitle": "Что создаёт кнопка",
   "quickCreationMenuPrompt": "Нажатие на плюс создаст выбранное",
   "quickCreationLongPressHint": "Нажмите и удерживайте, чтобы сменить режим",
+  "quickCreationModeAction": "Новое действие",
+  "quickCreationModeActionHint": "Разовое дело на день",
   "quickCreationModeIntention": "Новое намерение",
   "quickCreationModeIntentionHint": "То, что вы хотите сделать или изменить",
   "commonLoading": "Загрузка…",

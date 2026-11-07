@@ -406,6 +406,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quickCreationLongPressHint => 'Touch and hold to change mode';
 
   @override
+  String get quickCreationModeAction => 'New action';
+
+  @override
+  String get quickCreationModeActionHint => 'A one-time task for the day';
+
+  @override
   String get quickCreationModeIntention => 'New intention';
 
   @override
