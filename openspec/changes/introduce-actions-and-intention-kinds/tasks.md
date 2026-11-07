@@ -915,3 +915,15 @@
   - **Зависимости:** 2.11.
   - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart`, `relation_batch_view_model.dart` и/или `relation_batch_picker_purpose.dart`, `lib/src/action/presentation/path/path_view_model.dart`, при необходимости `path_page.dart`, тесты в `test/action/presentation/path/`, `test/long_term_relation/presentation/batch_picker/`, `test/app/action_path_app_flow_test.dart`.
   - **Размер:** S.
+
+- [ ] 2.27 Диагностика чтения пути черновика отличается от чтения сохранённого действия видом операции
+  - **Критерии приёмки:**
+    - Чтение состояния пути черновика (`_watchActionPathState` в `lib/src/graph/data/drift_personal_graph_repository_action_reads.dart`) записывает диагностику своим видом операции — отдельным событием (например `ActionPathStateReadDiagnosticsEvent`) или видом чтения у события в `lib/src/shared/diagnostics/diagnostics_sink.dart` — с отдельным значением `operation` (например `actionPathStateRead`) в `developer_diagnostics_sink.dart` (требование «Диагностика действий без пользовательского содержимого» в `action-management`: различать вид операции).
+    - Чтение панели действия (`_watchAction`) по-прежнему записывается как `operation: actionRead`.
+    - Этап `read`, исходы и безопасные категории отказа обоих чтений прежние; события по-прежнему не содержат идентификаторов, путей, названий, параметров запросов и исходных исключений.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_action_path_state_read_test.dart test/graph/data/drift_action_watch_test.dart test/shared/diagnostics`.
+    - Тест хранилища в `test/graph/data/drift_action_path_state_read_test.dart`: успешное и отказавшее чтение пути черновика записывают события с видом операции чтения пути черновика, а не `actionRead`, с прежними этапом, исходом и категорией отказа; сериализованные события не содержат маркеров названий намерений и исходного исключения. Существующий тест `drift_action_watch_test.dart` подтверждает, что чтение панели действия остаётся `actionRead`.
+  - **Зависимости:** 2.17.
+  - **Предполагаемые файлы:** меняются `lib/src/graph/data/drift_personal_graph_repository_action_reads.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, `developer_diagnostics_sink.dart`, `test/graph/data/drift_action_path_state_read_test.dart`, при необходимости `test/shared/diagnostics/diagnostics_sink_test.dart`.
+  - **Размер:** S.
