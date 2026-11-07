@@ -76,7 +76,7 @@ void main() {
     );
   });
 
-  test('год сохраняет ровно 12 месяцев, включая месяцы без выборов', () {
+  test('год сохраняет ровно 12 месяцев, включая месяцы без действий', () {
     final months = List.generate(
       12,
       (index) => ContributionCounts(planned: index, contribution: 0),

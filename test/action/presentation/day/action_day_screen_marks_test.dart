@@ -643,7 +643,7 @@ Future<void> _pumpNovember(
     tester,
     repository,
     today: selected,
-    catalogDate: onDate ? selected : null,
+    actionDayDate: onDate ? selected : null,
     locale: const Locale('ru'),
     size: const Size(1200, 2400),
   );

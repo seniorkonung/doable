@@ -50,7 +50,7 @@ import '../../../support/tag_read_contract_test_fallback.dart';
 /// приложения, поэтому [locale] — системная локаль устройства, а
 /// неподдерживаемый язык даёт английский. [size] — логический размер экрана;
 /// [today] — локальное сегодня.
-/// [catalogDate] открывает отдельный экран дня на дату вместо корневого.
+/// [actionDayDate] открывает отдельный экран дня на дату вместо корневого.
 /// Чтения экрана дня предоставляет [repository].
 Future<AppRouter> pumpActionDay(
   WidgetTester tester,
@@ -58,7 +58,7 @@ Future<AppRouter> pumpActionDay(
   required CalendarDate today,
   required Locale locale,
   required Size size,
-  CalendarDate? catalogDate,
+  CalendarDate? actionDayDate,
 }) async {
   tester.platformDispatcher.localesTestValue = [locale];
   addTearDown(tester.platformDispatcher.clearLocalesTestValue);
@@ -85,10 +85,10 @@ Future<AppRouter> pumpActionDay(
       ),
     ),
   );
-  if (catalogDate == null) {
+  if (actionDayDate == null) {
     openActionsOn(router);
   } else {
-    unawaited(router.push(ActionDayDateRoute(date: catalogDate)));
+    unawaited(router.push(ActionDayDateRoute(date: actionDayDate)));
   }
   await tester.pump();
   // Переход к экрану дня заканчивается без анимации, а первое чтение выдачи
@@ -156,7 +156,7 @@ final class ActionDayRepository
   }
 
   /// Завершает отдельное чтение отметками только запрошенного диапазона,
-  /// без изменения выдачи каталога.
+  /// без изменения выдачи экрана дня.
   void completeDayStatuses(
     int index,
     Map<CalendarDate, ActionDayStatus> statuses, {
@@ -323,7 +323,7 @@ final class ActionDayRepository
   );
 
   /// Завершает запрос номер [index] доказанно временной недоступностью
-  /// хранилища: каталог предлагает повтор.
+  /// хранилища: экран дня предлагает повтор.
   void failUnavailable(int index) =>
       fail(index, const ActionDayUnavailableFailure());
 

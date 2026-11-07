@@ -231,7 +231,7 @@ void main() {
     final page = harness.open();
     await pumpEventQueue();
     final relationCursor = StatisticsTestCursor<StatisticsRelationItem>();
-    final actionCursor = StatisticsTestCursor<StatisticsItem>();
+    final terminalIntentionCursor = StatisticsTestCursor<StatisticsItem>();
     harness.reader.section(
       0,
       marker: 106,
@@ -239,7 +239,7 @@ void main() {
       total: 205,
       relationsTotal: 101,
       relationsCursor: relationCursor,
-      actionsCursor: actionCursor,
+      terminalIntentionsCursor: terminalIntentionCursor,
     );
     await pumpEventQueue();
     await page.model.loadMoreIfNeeded(StatisticsBreakdown.relations, 68);
@@ -248,7 +248,7 @@ void main() {
       StatisticsBreakdown.relations,
       69,
     );
-    final actionsLoad = page.model.loadMoreIfNeeded(
+    final terminalIntentionsLoad = page.model.loadMoreIfNeeded(
       StatisticsBreakdown.terminalIntentions,
       69,
     );
@@ -261,7 +261,7 @@ void main() {
       List.generate(100, (i) => statisticsItem(105 - i)),
       cursor: lastCursor,
     );
-    await actionsLoad;
+    await terminalIntentionsLoad;
     harness.reader.more<StatisticsRelationItem>(0, [
       statisticsRelation(105, planned: 3),
     ]);
@@ -302,7 +302,7 @@ void main() {
       harness.reader.section(
         0,
         total: 2,
-        actionsCursor: StatisticsTestCursor<StatisticsItem>(),
+        terminalIntentionsCursor: StatisticsTestCursor<StatisticsItem>(),
       );
       await pumpEventQueue();
       final oldLoad = page.model.loadMore(
@@ -323,7 +323,7 @@ void main() {
   );
 
   test(
-    'разбивка по исходным намерениям продолжает выбранные действия',
+    'разбивка по корневым намерениям продолжает выбранные действия',
     () async {
       final harness = IntentionStatisticsHarness();
       addTearDown(harness.dispose);
@@ -338,7 +338,7 @@ void main() {
         0,
         marker: 2,
         total: 2,
-        sourcesCursor: StatisticsTestCursor<StatisticsItem>(),
+        rootIntentionsCursor: StatisticsTestCursor<StatisticsItem>(),
       );
       await pumpEventQueue();
       final load = page.model.loadMore(StatisticsBreakdown.rootIntentions);
@@ -405,7 +405,7 @@ void main() {
         harness.reader.section(
           0,
           total: 2,
-          actionsCursor: StatisticsTestCursor<StatisticsItem>(),
+          terminalIntentionsCursor: StatisticsTestCursor<StatisticsItem>(),
         );
         await pumpEventQueue();
         final load = page.model.loadMore(

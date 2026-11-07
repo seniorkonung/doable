@@ -38,7 +38,10 @@ void main() {
     final h = IntentionStatisticsHarness();
     addTearDown(h.dispose);
     final page = h.open();
-    h.reader.section(0, actionsCursor: StatisticsTestCursor<StatisticsItem>());
+    h.reader.section(
+      0,
+      terminalIntentionsCursor: StatisticsTestCursor<StatisticsItem>(),
+    );
     await pumpEventQueue();
     page.model.setVisible(false);
     final top = h.open();
@@ -102,9 +105,9 @@ void main() {
           marker: 501,
           count: 100,
           total: 350,
-          sourcesCursor: StatisticsTestCursor<StatisticsItem>(),
+          rootIntentionsCursor: StatisticsTestCursor<StatisticsItem>(),
           relationsCursor: StatisticsTestCursor<StatisticsRelationItem>(),
-          actionsCursor: StatisticsTestCursor<StatisticsItem>(),
+          terminalIntentionsCursor: StatisticsTestCursor<StatisticsItem>(),
         );
         await pumpEventQueue();
         expect(page.loaded.section.selectedCounts.planned, 300);
@@ -168,7 +171,7 @@ void main() {
         count: 100,
         total: 300,
         relationsCursor: StatisticsTestCursor<StatisticsRelationItem>(),
-        actionsCursor: StatisticsTestCursor<StatisticsItem>(),
+        terminalIntentionsCursor: StatisticsTestCursor<StatisticsItem>(),
       );
       await pumpEventQueue();
       _moreFirst(
@@ -218,7 +221,7 @@ void main() {
         count: 100,
         total: 300,
         relationsCursor: StatisticsTestCursor<StatisticsRelationItem>(),
-        actionsCursor: StatisticsTestCursor<StatisticsItem>(),
+        terminalIntentionsCursor: StatisticsTestCursor<StatisticsItem>(),
       );
       await pumpEventQueue();
       page.model.setVisible(false);
@@ -260,7 +263,7 @@ void main() {
           count: 100,
           total: 300,
           relationsCursor: StatisticsTestCursor<StatisticsRelationItem>(),
-          actionsCursor: StatisticsTestCursor<StatisticsItem>(),
+          terminalIntentionsCursor: StatisticsTestCursor<StatisticsItem>(),
         );
         await pumpEventQueue();
         h.reader.failMore<StatisticsRelationItem>(4, failure);
@@ -363,7 +366,7 @@ void main() {
       h.reader.section(
         0,
         total: 300,
-        actionsCursor: StatisticsTestCursor<StatisticsItem>(),
+        terminalIntentionsCursor: StatisticsTestCursor<StatisticsItem>(),
       );
       await pumpEventQueue();
       final more = page.model.loadMore(StatisticsBreakdown.terminalIntentions);
@@ -387,7 +390,7 @@ void main() {
     h.reader.section(
       0,
       total: 2,
-      actionsCursor: StatisticsTestCursor<StatisticsItem>(),
+      terminalIntentionsCursor: StatisticsTestCursor<StatisticsItem>(),
       relationsCursor: StatisticsTestCursor<StatisticsRelationItem>(),
     );
     await pumpEventQueue();
@@ -463,7 +466,7 @@ void main() {
       h.reader.section(
         0,
         total: 2,
-        actionsCursor: StatisticsTestCursor<StatisticsItem>(),
+        terminalIntentionsCursor: StatisticsTestCursor<StatisticsItem>(),
       );
       await pumpEventQueue();
       final more = page.model.loadMore(StatisticsBreakdown.terminalIntentions);
@@ -514,7 +517,7 @@ void main() {
         count: 100,
         total: 300,
         relationsCursor: StatisticsTestCursor<StatisticsRelationItem>(),
-        actionsCursor: StatisticsTestCursor<StatisticsItem>(),
+        terminalIntentionsCursor: StatisticsTestCursor<StatisticsItem>(),
       );
       await pumpEventQueue();
       page.close();
@@ -561,7 +564,7 @@ void main() {
       h.reader.section(
         0,
         total: 2,
-        actionsCursor: StatisticsTestCursor<StatisticsItem>(),
+        terminalIntentionsCursor: StatisticsTestCursor<StatisticsItem>(),
         relationsCursor: StatisticsTestCursor<StatisticsRelationItem>(),
       );
       await pumpEventQueue();
@@ -605,9 +608,9 @@ Future<void> _loadBoth(
     0,
     count: 100,
     total: 300,
-    sourcesCursor: StatisticsTestCursor<StatisticsItem>(),
+    rootIntentionsCursor: StatisticsTestCursor<StatisticsItem>(),
     relationsCursor: StatisticsTestCursor<StatisticsRelationItem>(),
-    actionsCursor: StatisticsTestCursor<StatisticsItem>(),
+    terminalIntentionsCursor: StatisticsTestCursor<StatisticsItem>(),
   );
   await pumpEventQueue();
   final breakdown = view == StatisticsView.throughRelations

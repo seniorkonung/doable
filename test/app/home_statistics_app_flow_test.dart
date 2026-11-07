@@ -247,7 +247,7 @@ void main() {
         tester,
         UpdateIntention(
           id: durabilityIntention(1),
-          title: 'Новое исходное намерение',
+          title: 'Новое корневое намерение',
           description: null,
         ),
       );
@@ -362,7 +362,7 @@ void main() {
         tester,
         UpdateIntention(
           id: durabilityIntention(1),
-          title: 'Новое исходное намерение',
+          title: 'Новое корневое намерение',
           description: null,
         ),
       );
@@ -519,7 +519,7 @@ void main() {
   );
 
   testWidgets(
-    'новый запуск на том же SQLite начинает текущий месяц и исходные намерения',
+    'новый запуск на том же SQLite начинает текущий месяц и корневые намерения',
     (tester) async {
       final semantics = tester.ensureSemantics();
       final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;

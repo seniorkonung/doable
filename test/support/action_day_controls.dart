@@ -1,12 +1,12 @@
 /// Общие шаги управления экраном дня в сценариях приложения.
 ///
-/// Сценарий называет только намерение человека — «выбрать день каталога»,
-/// «какой день каталог показывает выбранным», «где выбирается день»,
+/// Сценарий называет только намерение человека — «выбрать день на экране дня»,
+/// «какой день экран дня показывает выбранным», «где выбирается день»,
 /// «перелистать или раскрыть календарь», «какой период он показывает» — и не
 /// знает, каким элементом страница позволяет выбрать дату. Шаги действуют и
-/// наблюдают через интерфейс каталога и не обращаются к его модели.
+/// наблюдают через интерфейс экрана дня и не обращаются к его модели.
 ///
-/// Каталог выбирает день встроенным календарём: шаги, как человек,
+/// Экран дня показывает день встроенным календарём: шаги, как человек,
 /// перелистывают недели свайпом, месяцы командами шапки и нажимают день.
 /// Смена способа выбора дня меняет только этот файл, а не сценарии.
 library;
@@ -43,7 +43,7 @@ final actionDayDateControl = find.byType(ActionDayCalendar);
 Finder actionDayDay(CalendarDate date) =>
     find.byKey(ValueKey('action-day-calendar-day-${date.toCanonicalString()}'));
 
-/// Отметка показанного дня. У дня без выборов отметки нет.
+/// Отметка показанного дня. У дня без действий отметки нет.
 Finder actionDayDayMark(CalendarDate date, {DayMark? mark}) => find.descendant(
   of: actionDayDay(date),
   matching: find.byWidgetPredicate((widget) {
@@ -105,7 +105,7 @@ Future<void> selectActionDayDate(
 ///
 /// Заголовок называет выбранный день полной датой и тогда, когда календарь
 /// просматривает другой период. Заголовок прокручивается вместе с выдачей,
-/// поэтому шаг читает его и за краем видимой части страницы. Каталог, который
+/// поэтому шаг читает его и за краем видимой части страницы. Экран дня, который
 /// не называет выбранный день, проваливает проверку.
 CalendarDate shownActionDayDate(WidgetTester tester) {
   final calendar = find.byType(ActionDayCalendar, skipOffstage: false);
@@ -125,7 +125,7 @@ CalendarDate shownActionDayDate(WidgetTester tester) {
   return selected;
 }
 
-/// Перелистывает календарь открытого каталога: недели свайпом, месяцы
+/// Перелистывает календарь открытого экрана дня: недели свайпом, месяцы
 /// командами шапки, пока он не покажет [date], и день не выбирает.
 ///
 /// Календарь закреплён над выдачей. [tap] — нажатие сценария для команд;
@@ -272,7 +272,7 @@ Future<void> _turnUntilShown(
       await tester.pump();
     }
   }
-  fail('Календарь каталога не показал день $date.');
+  fail('Календарь экрана дня не показал день $date.');
 }
 
 /// Выполняет команду шапки календаря и доводит смену периода до конца.
@@ -322,7 +322,7 @@ Finder actionCompletionNoticeAction(String label) =>
     find.descendant(of: find.byType(Notice), matching: find.text(label));
 
 /// Вертикальная прокрутка выдачи открытого экрана дня.
-Finder _catalogScroll() => find.descendant(
+Finder _actionDayScroll() => find.descendant(
   of: find.byType(ActionDayBody).last,
   matching: find.byWidgetPredicate(
     (widget) =>
@@ -350,7 +350,7 @@ Finder actionDayPageFooter({
 const _maxScrolls = 60;
 
 /// Прокручивает выдачу жестами, пока конец загруженной части секции не
-/// подойдёт к видимой области: тогда каталог сам запрашивает следующую порцию.
+/// подойдёт к видимой области: тогда экран дня сам запрашивает следующую порцию.
 ///
 /// Шаг останавливается на подвале, который увидел первым, и ответа на запрос
 /// не ждёт: его завершает сам сценарий.
@@ -361,9 +361,9 @@ Future<void> scrollToActionDayEnd(
   final footer = actionDayPageFooter(section: section, skipOffstage: false);
   for (var scroll = 0; footer.evaluate().isEmpty; scroll++) {
     if (scroll == _maxScrolls) {
-      fail('Каталог не показал конец загруженной части секции.');
+      fail('Экран дня не показал конец загруженной части секции.');
     }
-    await tester.drag(_catalogScroll(), const Offset(0, -300));
+    await tester.drag(_actionDayScroll(), const Offset(0, -300));
     await tester.pump();
   }
   await tester.pump();
@@ -375,7 +375,7 @@ Future<void> showActionDaySection(
   ActionDaySection shown,
 ) async {
   final body = find.byType(ActionDayBody).last;
-  final scroll = _catalogScroll();
+  final scroll = _actionDayScroll();
   Finder header(ActionDaySection section) => find.descendant(
     of: body,
     matching: find.byKey(ValueKey('action-day-section-${section.name}')),

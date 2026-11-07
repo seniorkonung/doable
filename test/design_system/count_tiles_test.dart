@@ -137,7 +137,7 @@ void main() {
             columns: CountTileColumns.three,
             value: _Group.needs,
             onPick: (_) {},
-            label: 'Выборы намерения',
+            label: 'Действия намерения',
           ),
         ),
       );
@@ -283,7 +283,7 @@ void main() {
             wide: _reach,
             value: _Group.needs,
             onPick: picked.add,
-            label: 'Выборы намерения',
+            label: 'Действия намерения',
           ),
         ),
       );
@@ -337,16 +337,16 @@ void main() {
             wide: _reach,
             value: _Group.canBeUsed,
             onPick: (_) {},
-            label: 'Выборы намерения',
+            label: 'Действия намерения',
           ),
         ),
       );
 
       expect(_plane(tester, _reach.name).color, colors.fill);
       expect(
-        tester.getSemantics(find.bySemanticsLabel('Выборы намерения')),
+        tester.getSemantics(find.bySemanticsLabel('Действия намерения')),
         matchesSemantics(
-          label: 'Выборы намерения',
+          label: 'Действия намерения',
           children: [
             _tileSemantics('Начаты здесь: 81', selected: false),
             _tileSemantics('На пути: 5', selected: false),
@@ -368,7 +368,7 @@ void main() {
             columns: CountTileColumns.three,
             value: _Group.needs,
             onPick: (_) {},
-            label: 'Выборы намерения',
+            label: 'Действия намерения',
           ),
         ),
       );

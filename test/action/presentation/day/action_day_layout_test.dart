@@ -253,7 +253,7 @@ void main() {
         tester,
         repository,
         today: _today,
-        catalogDate: onDate ? _today : null,
+        actionDayDate: onDate ? _today : null,
         locale: const Locale('ru'),
         size: _screen,
       );
@@ -741,7 +741,7 @@ Future<ActionDayRepository> _openExpandedDayAtEnd(
     tester,
     repository,
     today: _today,
-    catalogDate: onDate ? _today : null,
+    actionDayDate: onDate ? _today : null,
     locale: const Locale('ru'),
     size: _screen,
   );

@@ -670,7 +670,7 @@ void main() {
         today: selected,
         locale: const Locale('ru'),
         size: const Size(390, 844),
-        catalogDate: onDate ? selected : null,
+        actionDayDate: onDate ? selected : null,
       );
       repository.completeFirst(0, [actionDayItem(1, date: selected)], total: 1);
       repository.completeDayStatuses(0, {});

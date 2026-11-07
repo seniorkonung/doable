@@ -69,7 +69,7 @@ void main() {
           today: _day,
           locale: const Locale('ru'),
           size: const Size(360, 900),
-          catalogDate: onDate ? _day : null,
+          actionDayDate: onDate ? _day : null,
         );
         await _until(
           tester,

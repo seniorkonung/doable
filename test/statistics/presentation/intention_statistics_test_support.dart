@@ -166,8 +166,8 @@ final class IntentionStatisticsReader implements PersonalGraphRepository {
     int? total,
     int? relationsTotal,
     bool empty = false,
-    StatisticsBreakdownCursor<StatisticsItem>? sourcesCursor,
-    StatisticsBreakdownCursor<StatisticsItem>? actionsCursor,
+    StatisticsBreakdownCursor<StatisticsItem>? rootIntentionsCursor,
+    StatisticsBreakdownCursor<StatisticsItem>? terminalIntentionsCursor,
     StatisticsBreakdownCursor<StatisticsRelationItem>? relationsCursor,
   }) {
     final query = queries[index];
@@ -189,15 +189,15 @@ final class IntentionStatisticsReader implements PersonalGraphRepository {
     );
     final details = switch (view) {
       StatisticsView.rootIntentions => IntentionStatisticsRootDetails(
-        terminalIntentions: intentions(actionsCursor),
+        terminalIntentions: intentions(terminalIntentionsCursor),
       ),
       StatisticsView.intermediateIntentions =>
         IntentionStatisticsIntermediateDetails(
-          rootIntentions: intentions(sourcesCursor),
-          terminalIntentions: intentions(actionsCursor),
+          rootIntentions: intentions(rootIntentionsCursor),
+          terminalIntentions: intentions(terminalIntentionsCursor),
         ),
       StatisticsView.terminalIntentions => IntentionStatisticsTerminalDetails(
-        rootIntentions: intentions(sourcesCursor),
+        rootIntentions: intentions(rootIntentionsCursor),
       ),
       StatisticsView.throughRelations =>
         IntentionStatisticsThroughRelationsDetails(
@@ -215,7 +215,7 @@ final class IntentionStatisticsReader implements PersonalGraphRepository {
             totalItems: empty ? 0 : relationsTotal ?? total ?? count,
             nextCursor: relationsCursor,
           ),
-          terminalIntentions: intentions(actionsCursor),
+          terminalIntentions: intentions(terminalIntentionsCursor),
         ),
     };
     responses[index].complete(

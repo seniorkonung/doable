@@ -367,7 +367,7 @@ void main() {
           today: selected,
           locale: const Locale('ru'),
           size: const Size(360, 900),
-          catalogDate: onDate ? selected : null,
+          actionDayDate: onDate ? selected : null,
         );
         repository.completeFirst(
           0,

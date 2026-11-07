@@ -64,7 +64,7 @@ void main() {
           today: day,
           locale: const Locale('ru'),
           size: const Size(390, 1000),
-          catalogDate: onDate ? day : null,
+          actionDayDate: onDate ? day : null,
         );
         repository.completeFirst(0, [first, second], total: 2);
         await tester.pumpAndSettle();
@@ -832,7 +832,7 @@ void main() {
         today: day,
         locale: const Locale('ru'),
         size: size,
-        catalogDate: onDate ? day : null,
+        actionDayDate: onDate ? day : null,
       );
       repository.completeFirst(0, rows, total: rows.length);
       await tester.pumpAndSettle();
@@ -860,9 +860,9 @@ void main() {
     }
 
     for (final onDate in [false, true]) {
-      final catalog = onDate ? 'экран дня на дату' : 'корневой экран дня';
+      final screen = onDate ? 'экран дня на дату' : 'корневой экран дня';
 
-      testWidgets('$catalog показывает кнопку за высотой видимой области на '
+      testWidgets('$screen показывает кнопку за высотой видимой области на '
           'месте из макета, а нажатие плавно возвращает к заголовку дня и '
           'сохраняет дату и секции', (tester) async {
         final position = await openLongDay(
@@ -906,7 +906,7 @@ void main() {
         expect(find.byKey(const ValueKey('action-day-row-1')), findsOneWidget);
       });
 
-      testWidgets('$catalog ставит показанное сообщение над кнопкой', (
+      testWidgets('$screen ставит показанное сообщение над кнопкой', (
         tester,
       ) async {
         final position = await openLongDay(
