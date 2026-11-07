@@ -626,7 +626,7 @@
   - **Предполагаемые файлы:** добавляются `lib/src/action/application/path_candidates.dart`, `lib/src/graph/data/drift_personal_graph_repository_path_candidates.dart` и два теста в `test/graph/data/`; меняются `lib/src/action/application/action_read_contract.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, `test/support/action_read_contract_test_fallback.dart`.
   - **Размер:** M.
 
-- [ ] 2.4 Дизайн-система рисует построение пути компонентами `PathBuilder`, `StepOption` и `PathAction`
+- [x] 2.4 Дизайн-система рисует построение пути компонентами `PathBuilder`, `StepOption` и `PathAction`
   - **Критерии приёмки:**
     - Компоненты следуют своим README в `context/doable-design-system/components/`: путь сверху вниз с глифами и связями `ActionPath` в плотных размерах, место «Выберите причину» с подсказкой, цепочка, которую замыкает действие с приглушённым «Новое действие» без названия, переключатель «Нужно» и «Можно» с числами, включая 0, и «Добавить», строки кандидатов с приоритетом связи, стрелкой и отметкой «Новое», карточка пустой половины.
     - Названия корня и промежуточных намерений — кнопки; в пути из одного намерения его название — кнопка корня; простым текстом остаётся только последнее намерение пути из двух и более намерений (требование «Сокращение пути и смена корня»); доступные имена называют путь, связь кандидата и действие, как в README.
