@@ -1,4 +1,11 @@
+import 'dart:async';
+
 import 'package:doable/src/action/application/action_details.dart';
+import 'package:doable/src/action/domain/action_priority.dart';
+import 'package:doable/src/action/presentation/path/path_page.dart';
+import 'package:doable/src/design_system/doable_theme.dart';
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/action/domain/action_path.dart';
 import 'package:doable/src/action/presentation/path/path_state.dart';
 import 'package:doable/src/action/presentation/path_start/path_start_picker_page.dart';
@@ -24,6 +31,7 @@ import '../../../support/action_seed.dart';
 import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/path_screen_controls.dart';
+import '../../../support/path_candidates_controlled_repository.dart';
 
 /// Отказывает чтению участка пути, пока включён.
 final class _PathReadFailure extends LocalDatabaseConnectionObserver {
@@ -550,13 +558,78 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Пока ничего не нужно'), findsNothing);
-      expect(find.text('0'), findsNothing);
+      expect(find.text('0'), findsOneWidget);
       readFailure.failure = null;
       await tester.tap(find.text('Повторить'));
       await settlePathScreen(tester);
       expect(find.text('Пока ничего не нужно'), findsOneWidget);
     },
   );
+
+  testWidgets('переключатель доступен во время чтения и после отказа', (
+    tester,
+  ) async {
+    seedRawGraph(raw, () {
+      seedRelation(raw, seedUuid(103), seedUuid(1), seedUuid(4));
+      raw.execute('UPDATE long_term_relations SET type = ? WHERE id = ?', [
+        LongTermRelationType.can.name,
+        seedUuid(103),
+      ]);
+    });
+    final controlled = PathCandidatesControlledRepository(repository);
+    final gate = Completer<void>();
+    controlled.gate = gate;
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          personalGraphRepositoryProvider.overrideWithValue(controlled),
+        ],
+        child: MaterialApp(
+          theme: doableTheme(Brightness.light),
+          locale: const Locale('ru'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: PathPage(
+            purpose: NewActionPathPurpose(_path([1])),
+            actionTitle: '',
+            actionPriority: ActionPriority.p4,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.bySemanticsLabel('Нужно'), findsOneWidget);
+    expect(find.bySemanticsLabel('Можно'), findsOneWidget);
+    expect(find.text('0'), findsNothing);
+    await tester.tap(find.text('Можно'));
+    await tester.pump();
+    gate.complete();
+    controlled.gate = null;
+    await settlePathScreen(tester);
+    expect(find.bySemanticsLabel('Нужно: 1'), findsOneWidget);
+    expect(find.bySemanticsLabel('Можно: 1'), findsOneWidget);
+    expect(find.text('Высыпаться'), findsOneWidget);
+    await tester.tap(find.text('Нужно').last);
+    await settlePathScreen(tester);
+
+    controlled.gate = Completer<void>();
+    controlled.fail = true;
+    await tester.tap(find.text('Можно').last);
+    await tester.pump();
+    expect(find.bySemanticsLabel('Нужно: 1'), findsOneWidget);
+    expect(find.bySemanticsLabel('Можно: 1'), findsOneWidget);
+    controlled.gate!.complete();
+    controlled.gate = null;
+    await settlePathScreen(tester);
+    expect(find.bySemanticsLabel('Можно: 1'), findsOneWidget);
+    expect(find.text('Пока нечего использовать'), findsNothing);
+    controlled.fail = false;
+    await tester.tap(find.text('Нужно').last);
+    await settlePathScreen(tester);
+    expect(find.text('Много ходить'), findsOneWidget);
+    semantics.dispose();
+  });
 
   testWidgets(
     'сокращение пути заново выбирает половину и показывает кандидата по приоритету',

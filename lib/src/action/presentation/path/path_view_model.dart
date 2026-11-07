@@ -56,7 +56,14 @@ final class PathViewModel extends _$PathViewModel {
     }
     final draft = LoadingPathDraft(start.intentions);
     unawaited(Future.microtask(() => _read(draft.intentions)));
-    final state = PathState(original: purpose.original, draft: draft);
+    final state = PathState(original: purpose.original, draft: draft)
+        .withCandidates(
+          const CandidateState(
+            half: LongTermRelationType.need,
+            loading: true,
+            chooseDefault: true,
+          ),
+        );
     return switch (purpose) {
       NewActionPathPurpose(createdIntention: true) => state.withCreations(
         const PathCreations(intentions: 1),
@@ -68,8 +75,16 @@ final class PathViewModel extends _$PathViewModel {
   void selectRoot(PathStartChoice choice) {
     if (choice is PathStartCreated) acceptCreatedIntention();
     final root = choice.intention;
+    final previous = state.draft.intentions.lastOrNull == root
+        ? state.candidates
+        : null;
     state = state.withDraft(LoadingPathDraft([root]));
-    unawaited(_read([root]));
+    if (previous != null) state = state.withCandidates(previous);
+    unawaited(
+      _read([
+        root,
+      ], half: previous?.chooseDefault == true ? null : previous?.half),
+    );
   }
 
   /// Связи, добавленные к последнему намерению, сами в путь не входят: экран
@@ -132,8 +147,12 @@ final class PathViewModel extends _$PathViewModel {
   Future<void> retry() {
     final draft = state.draft;
     if (draft is FailedPathDraft && draft.canRetry) {
+      final candidates = state.candidates;
       state = state.withDraft(LoadingPathDraft(draft.intentions));
-      return _read(draft.intentions);
+      return _read(
+        draft.intentions,
+        half: candidates?.chooseDefault == true ? null : candidates?.half,
+      );
     }
     final candidates = state.candidates;
     if (candidates?.failure is PathCandidatesUnavailableFailure) {
@@ -288,14 +307,28 @@ final class PathViewModel extends _$PathViewModel {
       _refreshAfterSaving = true;
       return;
     }
-    unawaited(_read(ids, half: state.candidates?.half));
+    final candidates = state.candidates;
+    unawaited(
+      _read(
+        ids,
+        half: candidates?.chooseDefault == true ? null : candidates?.half,
+      ),
+    );
   }
 
   void _refreshAfterFailedSave() {
     if (!_refreshAfterSaving) return;
     _refreshAfterSaving = false;
     final ids = state.draft.intentions;
-    if (ids.isNotEmpty) unawaited(_read(ids, half: state.candidates?.half));
+    if (ids.isNotEmpty) {
+      final candidates = state.candidates;
+      unawaited(
+        _read(
+          ids,
+          half: candidates?.chooseDefault == true ? null : candidates?.half,
+        ),
+      );
+    }
   }
 
   Future<void> _read(
@@ -304,11 +337,18 @@ final class PathViewModel extends _$PathViewModel {
   }) async {
     final generation = ++_generation;
     final selected = half ?? LongTermRelationType.need;
-    if (state.draft is LoadedPathDraft) {
-      state = state.withCandidates(
-        CandidateState(half: selected, loading: true),
-      );
+    final counts = state.candidates?.counts;
+    if (state.draft is FailedPathDraft) {
+      state = state.withDraft(LoadingPathDraft(ids));
     }
+    state = state.withCandidates(
+      CandidateState(
+        half: selected,
+        counts: counts,
+        loading: true,
+        chooseDefault: half == null,
+      ),
+    );
     final result = await _repository.getPathCandidates(
       PathCandidatesQuery(draft: ActionPath(ids), half: selected),
     );
@@ -321,6 +361,9 @@ final class PathViewModel extends _$PathViewModel {
         } else if (half == null &&
             page.counts.need == 0 &&
             page.counts.can > 0) {
+          state = state.withCandidates(
+            CandidateState(half: selected, counts: page.counts),
+          );
           await _read(state.draft.intentions, half: LongTermRelationType.can);
         } else {
           state = state.withCandidates(
@@ -339,17 +382,35 @@ final class PathViewModel extends _$PathViewModel {
           state = state.withCandidates(
             CandidateState(
               half: selected,
+              counts: counts,
               failure: failure,
               chooseDefault: half == null,
             ),
           );
         } else {
-          state = state.withDraft(FailedPathDraft(ids, failure));
+          state = state
+              .withDraft(FailedPathDraft(ids, failure))
+              .withCandidates(
+                CandidateState(
+                  half: selected,
+                  counts: counts,
+                  failure: failure,
+                  chooseDefault: half == null,
+                ),
+              );
         }
       case GraphResultSuccess():
-        state = state.withDraft(
-          FailedPathDraft(ids, const PathCandidatesUnexpectedFailure()),
-        );
+        state = state
+            .withDraft(
+              FailedPathDraft(ids, const PathCandidatesUnexpectedFailure()),
+            )
+            .withCandidates(
+              CandidateState(
+                half: selected,
+                counts: counts,
+                failure: const PathCandidatesUnexpectedFailure(),
+              ),
+            );
     }
   }
 }

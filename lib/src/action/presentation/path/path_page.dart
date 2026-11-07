@@ -147,15 +147,27 @@ final class _PathPageState extends ConsumerState<PathPage> {
 
   Widget _draft(AppLocalizations l10n, PathViewModel model, PathState path) =>
       switch (path.draft) {
-        LoadingPathDraft() => ListState.loading(text: l10n.pathLoading),
-        final FailedPathDraft failed => ListState.error(
-          message: _failureMessage(l10n, failed.failure),
-          retry: failed.canRetry
-              ? (
-                  label: l10n.commonRetry,
-                  onPressed: () => unawaited(model.retry()),
-                )
-              : null,
+        LoadingPathDraft() => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _switcher(l10n, model, path.candidates!),
+            ListState.loading(text: l10n.pathLoading),
+          ],
+        ),
+        final FailedPathDraft failed => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _switcher(l10n, model, path.candidates!),
+            ListState.error(
+              message: _failureMessage(l10n, failed.failure),
+              retry: failed.canRetry
+                  ? (
+                      label: l10n.commonRetry,
+                      onPressed: () => unawaited(model.retry()),
+                    )
+                  : null,
+            ),
+          ],
         ),
         EmptyPathDraft() => _builder(l10n, model, path, const [], null),
         final LoadedPathDraft loaded => _builder(
@@ -200,30 +212,9 @@ final class _PathPageState extends ConsumerState<PathPage> {
         1 => '',
         _ => l10n.pathShortenHint,
       },
-      switcher: candidates != null && candidates.counts != null
-          ? Tabs<LongTermRelationType>.toggle(
-              items: [
-                TabItem(
-                  id: LongTermRelationType.need,
-                  label: l10n.relationNeighborhoodTypeNeed,
-                  semanticLabel:
-                      '${l10n.relationNeighborhoodTypeNeed}: ${candidates.counts!.need}',
-                  count: candidates.counts!.need,
-                ),
-                TabItem(
-                  id: LongTermRelationType.can,
-                  label: l10n.relationNeighborhoodTypeCan,
-                  semanticLabel:
-                      '${l10n.relationNeighborhoodTypeCan}: ${candidates.counts!.can}',
-                  count: candidates.counts!.can,
-                ),
-              ],
-              value: candidates.half,
-              onChange: model.selectHalf,
-              label: l10n.pathNextIntention,
-              minWidth: 0,
-            )
-          : const SizedBox.shrink(),
+      switcher: candidates == null
+          ? const SizedBox.shrink()
+          : _switcher(l10n, model, candidates),
       emptyHalf:
           candidates != null &&
               candidates.counts != null &&
@@ -305,6 +296,38 @@ final class _PathPageState extends ConsumerState<PathPage> {
             ),
         ],
       ],
+    );
+  }
+
+  Widget _switcher(
+    AppLocalizations l10n,
+    PathViewModel model,
+    CandidateState candidates,
+  ) {
+    final counts = candidates.counts;
+    return Tabs<LongTermRelationType>.toggle(
+      items: [
+        TabItem(
+          id: LongTermRelationType.need,
+          label: l10n.relationNeighborhoodTypeNeed,
+          semanticLabel: counts == null
+              ? l10n.relationNeighborhoodTypeNeed
+              : '${l10n.relationNeighborhoodTypeNeed}: ${counts.need}',
+          count: counts?.need,
+        ),
+        TabItem(
+          id: LongTermRelationType.can,
+          label: l10n.relationNeighborhoodTypeCan,
+          semanticLabel: counts == null
+              ? l10n.relationNeighborhoodTypeCan
+              : '${l10n.relationNeighborhoodTypeCan}: ${counts.can}',
+          count: counts?.can,
+        ),
+      ],
+      value: candidates.half,
+      onChange: model.selectHalf,
+      label: l10n.pathNextIntention,
+      minWidth: 0,
     );
   }
 
