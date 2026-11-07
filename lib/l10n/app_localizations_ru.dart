@@ -2734,6 +2734,86 @@ class AppLocalizationsRu extends AppLocalizations {
   String get pathStartCurrentStep => 'Вы здесь';
 
   @override
+  String get pathTitle => 'Путь';
+
+  @override
+  String get pathEditTitle => 'Изменить путь';
+
+  @override
+  String get pathSave => 'Сохранить';
+
+  @override
+  String get pathChooseReason => 'Выберите причину';
+
+  @override
+  String get pathChooseReasonLabel =>
+      'Выберите причину: намерение, с которого начинается путь';
+
+  @override
+  String get pathEmptyHint =>
+      'Начните с цели, ради которой делается действие, и спускайтесь вниз шаг за шагом или сразу с ближайшей причины. Достаточно одного намерения.';
+
+  @override
+  String get pathShortenHint =>
+      'Нажмите на намерение, чтобы закончить путь на нём.';
+
+  @override
+  String get pathNewAction => 'Новое действие';
+
+  @override
+  String pathActionLabel(String title) {
+    return 'Путь ведёт к действию «$title»';
+  }
+
+  @override
+  String get pathNewActionLabel => 'Путь ведёт к новому действию';
+
+  @override
+  String pathRootLabel(String title) {
+    return 'Корневое намерение «$title». Выбрать другое начало пути';
+  }
+
+  @override
+  String pathEndAtLabel(String title) {
+    return 'Промежуточное намерение «$title». Закончить путь на нём';
+  }
+
+  @override
+  String pathFinalLabel(String title) {
+    return 'Конечное намерение «$title»';
+  }
+
+  @override
+  String get pathAdd => 'Добавить';
+
+  @override
+  String get pathLoading => 'Загружаем путь…';
+
+  @override
+  String get pathReadUnavailable =>
+      'Не удалось загрузить путь. Повторите попытку.';
+
+  @override
+  String get pathReadCorruption =>
+      'Сохранённые данные повреждены, путь не может быть показан.';
+
+  @override
+  String get pathReadUnexpected =>
+      'Не удалось загрузить путь из-за непредвиденной ошибки.';
+
+  @override
+  String get pathDiscardTitle => 'Отменить изменения?';
+
+  @override
+  String get pathDiscardMessage => 'Изменения пути не сохранятся.';
+
+  @override
+  String get pathDiscardAction => 'Отменить';
+
+  @override
+  String get pathContinueAction => 'Продолжить правку';
+
+  @override
   String get participantPickerTitle => 'Выбор намерений';
 
   @override

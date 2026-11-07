@@ -10,17 +10,20 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
-import 'package:auto_route/auto_route.dart' as _i14;
+import 'package:auto_route/auto_route.dart' as _i15;
+import 'package:doable/src/action/domain/action_path.dart' as _i20;
+import 'package:doable/src/action/domain/action_priority.dart' as _i21;
 import 'package:doable/src/action/presentation/day/action_day_date_page.dart'
     as _i1;
 import 'package:doable/src/action/presentation/day/action_day_root_page.dart'
     as _i2;
+import 'package:doable/src/action/presentation/path/path_page.dart' as _i11;
 import 'package:doable/src/action/presentation/path_start/path_start_picker_page.dart'
-    as _i11;
+    as _i12;
 import 'package:doable/src/app/home/home_page.dart' as _i4;
 import 'package:doable/src/app/navigation/app_shell_page.dart' as _i3;
-import 'package:doable/src/app/settings/settings_page.dart' as _i13;
-import 'package:doable/src/intention/domain/intention_id.dart' as _i17;
+import 'package:doable/src/app/settings/settings_page.dart' as _i14;
+import 'package:doable/src/intention/domain/intention_id.dart' as _i18;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
     as _i5;
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart'
@@ -34,21 +37,21 @@ import 'package:doable/src/intention/presentation/editor/intention_creation_laun
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart'
     as _i9;
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart'
-    as _i20;
+    as _i23;
 import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart'
-    as _i12;
-import 'package:doable/src/shared/domain/calendar_date.dart' as _i15;
-import 'package:flutter/foundation.dart' as _i18;
-import 'package:flutter/material.dart' as _i16;
-import 'package:flutter/widgets.dart' as _i19;
+    as _i13;
+import 'package:doable/src/shared/domain/calendar_date.dart' as _i16;
+import 'package:flutter/foundation.dart' as _i19;
+import 'package:flutter/material.dart' as _i17;
+import 'package:flutter/widgets.dart' as _i22;
 
 /// generated route for
 /// [_i1.ActionDayDatePage]
-class ActionDayDateRoute extends _i14.PageRouteInfo<ActionDayDateRouteArgs> {
+class ActionDayDateRoute extends _i15.PageRouteInfo<ActionDayDateRouteArgs> {
   ActionDayDateRoute({
-    required _i15.CalendarDate date,
-    _i16.Key? key,
-    List<_i14.PageRouteInfo>? children,
+    required _i16.CalendarDate date,
+    _i17.Key? key,
+    List<_i15.PageRouteInfo>? children,
   }) : super(
          ActionDayDateRoute.name,
          args: ActionDayDateRouteArgs(date: date, key: key),
@@ -57,7 +60,7 @@ class ActionDayDateRoute extends _i14.PageRouteInfo<ActionDayDateRouteArgs> {
 
   static const String name = 'ActionDayDateRoute';
 
-  static _i14.PageInfo page = _i14.PageInfo(
+  static _i15.PageInfo page = _i15.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<ActionDayDateRouteArgs>();
@@ -69,9 +72,9 @@ class ActionDayDateRoute extends _i14.PageRouteInfo<ActionDayDateRouteArgs> {
 class ActionDayDateRouteArgs {
   const ActionDayDateRouteArgs({required this.date, this.key});
 
-  final _i15.CalendarDate date;
+  final _i16.CalendarDate date;
 
-  final _i16.Key? key;
+  final _i17.Key? key;
 
   @override
   String toString() {
@@ -91,13 +94,13 @@ class ActionDayDateRouteArgs {
 
 /// generated route for
 /// [_i2.ActionDayRootPage]
-class ActionDayRootRoute extends _i14.PageRouteInfo<void> {
-  const ActionDayRootRoute({List<_i14.PageRouteInfo>? children})
+class ActionDayRootRoute extends _i15.PageRouteInfo<void> {
+  const ActionDayRootRoute({List<_i15.PageRouteInfo>? children})
     : super(ActionDayRootRoute.name, initialChildren: children);
 
   static const String name = 'ActionDayRootRoute';
 
-  static _i14.PageInfo page = _i14.PageInfo(
+  static _i15.PageInfo page = _i15.PageInfo(
     name,
     builder: (data) {
       return const _i2.ActionDayRootPage();
@@ -107,13 +110,13 @@ class ActionDayRootRoute extends _i14.PageRouteInfo<void> {
 
 /// generated route for
 /// [_i3.AppShellPage]
-class AppShellRoute extends _i14.PageRouteInfo<void> {
-  const AppShellRoute({List<_i14.PageRouteInfo>? children})
+class AppShellRoute extends _i15.PageRouteInfo<void> {
+  const AppShellRoute({List<_i15.PageRouteInfo>? children})
     : super(AppShellRoute.name, initialChildren: children);
 
   static const String name = 'AppShellRoute';
 
-  static _i14.PageInfo page = _i14.PageInfo(
+  static _i15.PageInfo page = _i15.PageInfo(
     name,
     builder: (data) {
       return const _i3.AppShellPage();
@@ -123,13 +126,13 @@ class AppShellRoute extends _i14.PageRouteInfo<void> {
 
 /// generated route for
 /// [_i4.HomePage]
-class HomeRoute extends _i14.PageRouteInfo<void> {
-  const HomeRoute({List<_i14.PageRouteInfo>? children})
+class HomeRoute extends _i15.PageRouteInfo<void> {
+  const HomeRoute({List<_i15.PageRouteInfo>? children})
     : super(HomeRoute.name, initialChildren: children);
 
   static const String name = 'HomeRoute';
 
-  static _i14.PageInfo page = _i14.PageInfo(
+  static _i15.PageInfo page = _i15.PageInfo(
     name,
     builder: (data) {
       return const _i4.HomePage();
@@ -139,13 +142,13 @@ class HomeRoute extends _i14.PageRouteInfo<void> {
 
 /// generated route for
 /// [_i5.IntentionCatalogPage]
-class IntentionCatalogRoute extends _i14.PageRouteInfo<void> {
-  const IntentionCatalogRoute({List<_i14.PageRouteInfo>? children})
+class IntentionCatalogRoute extends _i15.PageRouteInfo<void> {
+  const IntentionCatalogRoute({List<_i15.PageRouteInfo>? children})
     : super(IntentionCatalogRoute.name, initialChildren: children);
 
   static const String name = 'IntentionCatalogRoute';
 
-  static _i14.PageInfo page = _i14.PageInfo(
+  static _i15.PageInfo page = _i15.PageInfo(
     name,
     builder: (data) {
       return const _i5.IntentionCatalogPage();
@@ -156,12 +159,12 @@ class IntentionCatalogRoute extends _i14.PageRouteInfo<void> {
 /// generated route for
 /// [_i6.IntentionDetailsPage]
 class IntentionDetailsRoute
-    extends _i14.PageRouteInfo<IntentionDetailsRouteArgs> {
+    extends _i15.PageRouteInfo<IntentionDetailsRouteArgs> {
   IntentionDetailsRoute({
-    required _i17.IntentionId intentionId,
+    required _i18.IntentionId intentionId,
     _i7.IntentionPageTarget target = const _i7.OverviewTarget(),
-    _i18.Key? key,
-    List<_i14.PageRouteInfo>? children,
+    _i19.Key? key,
+    List<_i15.PageRouteInfo>? children,
   }) : super(
          IntentionDetailsRoute.name,
          args: IntentionDetailsRouteArgs(
@@ -174,7 +177,7 @@ class IntentionDetailsRoute
 
   static const String name = 'IntentionDetailsRoute';
 
-  static _i14.PageInfo page = _i14.PageInfo(
+  static _i15.PageInfo page = _i15.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<IntentionDetailsRouteArgs>();
@@ -194,11 +197,11 @@ class IntentionDetailsRouteArgs {
     this.key,
   });
 
-  final _i17.IntentionId intentionId;
+  final _i18.IntentionId intentionId;
 
   final _i7.IntentionPageTarget target;
 
-  final _i18.Key? key;
+  final _i19.Key? key;
 
   @override
   String toString() {
@@ -220,12 +223,12 @@ class IntentionDetailsRouteArgs {
 
 /// generated route for
 /// [_i8.IntentionEditPage]
-class IntentionEditRoute extends _i14.PageRouteInfo<IntentionEditRouteArgs> {
+class IntentionEditRoute extends _i15.PageRouteInfo<IntentionEditRouteArgs> {
   IntentionEditRoute({
-    required _i17.IntentionId intentionId,
+    required _i18.IntentionId intentionId,
     _i8.IntentionEditFocus focus = _i8.IntentionEditFocus.title,
-    _i16.Key? key,
-    List<_i14.PageRouteInfo>? children,
+    _i17.Key? key,
+    List<_i15.PageRouteInfo>? children,
   }) : super(
          IntentionEditRoute.name,
          args: IntentionEditRouteArgs(
@@ -238,7 +241,7 @@ class IntentionEditRoute extends _i14.PageRouteInfo<IntentionEditRouteArgs> {
 
   static const String name = 'IntentionEditRoute';
 
-  static _i14.PageInfo page = _i14.PageInfo(
+  static _i15.PageInfo page = _i15.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<IntentionEditRouteArgs>();
@@ -258,11 +261,11 @@ class IntentionEditRouteArgs {
     this.key,
   });
 
-  final _i17.IntentionId intentionId;
+  final _i18.IntentionId intentionId;
 
   final _i8.IntentionEditFocus focus;
 
-  final _i16.Key? key;
+  final _i17.Key? key;
 
   @override
   String toString() {
@@ -285,12 +288,12 @@ class IntentionEditRouteArgs {
 /// generated route for
 /// [_i9.IntentionEditorPage]
 class IntentionEditorRoute
-    extends _i14.PageRouteInfo<IntentionEditorRouteArgs> {
+    extends _i15.PageRouteInfo<IntentionEditorRouteArgs> {
   IntentionEditorRoute({
-    _i16.Key? key,
+    _i17.Key? key,
     _i10.IntentionCreationLaunch launch =
         const _i10.IntentionCreationStandalone(),
-    List<_i14.PageRouteInfo>? children,
+    List<_i15.PageRouteInfo>? children,
   }) : super(
          IntentionEditorRoute.name,
          args: IntentionEditorRouteArgs(key: key, launch: launch),
@@ -299,7 +302,7 @@ class IntentionEditorRoute
 
   static const String name = 'IntentionEditorRoute';
 
-  static _i14.PageInfo page = _i14.PageInfo(
+  static _i15.PageInfo page = _i15.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<IntentionEditorRouteArgs>(
@@ -316,7 +319,7 @@ class IntentionEditorRouteArgs {
     this.launch = const _i10.IntentionCreationStandalone(),
   });
 
-  final _i16.Key? key;
+  final _i17.Key? key;
 
   final _i10.IntentionCreationLaunch launch;
 
@@ -337,14 +340,97 @@ class IntentionEditorRouteArgs {
 }
 
 /// generated route for
-/// [_i11.PathStartPickerPage]
+/// [_i11.PathPage]
+class PathRoute extends _i15.PageRouteInfo<PathRouteArgs> {
+  PathRoute({
+    required _i12.PathStartFlow flow,
+    required _i20.ActionPath? originalPath,
+    required String actionTitle,
+    required _i21.ActionPriority actionPriority,
+    _i17.Key? key,
+    List<_i15.PageRouteInfo>? children,
+  }) : super(
+         PathRoute.name,
+         args: PathRouteArgs(
+           flow: flow,
+           originalPath: originalPath,
+           actionTitle: actionTitle,
+           actionPriority: actionPriority,
+           key: key,
+         ),
+         initialChildren: children,
+       );
+
+  static const String name = 'PathRoute';
+
+  static _i15.PageInfo page = _i15.PageInfo(
+    name,
+    builder: (data) {
+      final args = data.argsAs<PathRouteArgs>();
+      return _i11.PathPage(
+        flow: args.flow,
+        originalPath: args.originalPath,
+        actionTitle: args.actionTitle,
+        actionPriority: args.actionPriority,
+        key: args.key,
+      );
+    },
+  );
+}
+
+class PathRouteArgs {
+  const PathRouteArgs({
+    required this.flow,
+    required this.originalPath,
+    required this.actionTitle,
+    required this.actionPriority,
+    this.key,
+  });
+
+  final _i12.PathStartFlow flow;
+
+  final _i20.ActionPath? originalPath;
+
+  final String actionTitle;
+
+  final _i21.ActionPriority actionPriority;
+
+  final _i17.Key? key;
+
+  @override
+  String toString() {
+    return 'PathRouteArgs{flow: $flow, originalPath: $originalPath, actionTitle: $actionTitle, actionPriority: $actionPriority, key: $key}';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! PathRouteArgs) return false;
+    return flow == other.flow &&
+        originalPath == other.originalPath &&
+        actionTitle == other.actionTitle &&
+        actionPriority == other.actionPriority &&
+        key == other.key;
+  }
+
+  @override
+  int get hashCode =>
+      flow.hashCode ^
+      originalPath.hashCode ^
+      actionTitle.hashCode ^
+      actionPriority.hashCode ^
+      key.hashCode;
+}
+
+/// generated route for
+/// [_i12.PathStartPickerPage]
 class PathStartPickerRoute
-    extends _i14.PageRouteInfo<PathStartPickerRouteArgs> {
+    extends _i15.PageRouteInfo<PathStartPickerRouteArgs> {
   PathStartPickerRoute({
-    required _i11.PathStartFlow flow,
-    _i17.IntentionId? currentRoot,
-    _i19.Key? key,
-    List<_i14.PageRouteInfo>? children,
+    required _i12.PathStartFlow flow,
+    _i18.IntentionId? currentRoot,
+    _i22.Key? key,
+    List<_i15.PageRouteInfo>? children,
   }) : super(
          PathStartPickerRoute.name,
          args: PathStartPickerRouteArgs(
@@ -357,11 +443,11 @@ class PathStartPickerRoute
 
   static const String name = 'PathStartPickerRoute';
 
-  static _i14.PageInfo page = _i14.PageInfo(
+  static _i15.PageInfo page = _i15.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<PathStartPickerRouteArgs>();
-      return _i11.PathStartPickerPage(
+      return _i12.PathStartPickerPage(
         flow: args.flow,
         currentRoot: args.currentRoot,
         key: args.key,
@@ -377,11 +463,11 @@ class PathStartPickerRouteArgs {
     this.key,
   });
 
-  final _i11.PathStartFlow flow;
+  final _i12.PathStartFlow flow;
 
-  final _i17.IntentionId? currentRoot;
+  final _i18.IntentionId? currentRoot;
 
-  final _i19.Key? key;
+  final _i22.Key? key;
 
   @override
   String toString() {
@@ -402,15 +488,15 @@ class PathStartPickerRouteArgs {
 }
 
 /// generated route for
-/// [_i12.RelationBatchPickerPage]
+/// [_i13.RelationBatchPickerPage]
 class RelationBatchPickerRoute
-    extends _i14.PageRouteInfo<RelationBatchPickerRouteArgs> {
+    extends _i15.PageRouteInfo<RelationBatchPickerRouteArgs> {
   RelationBatchPickerRoute({
-    required _i17.IntentionId pageIntentionId,
+    required _i18.IntentionId pageIntentionId,
     required String pageTitle,
-    required _i20.IntentionRelationGroup group,
-    _i19.Key? key,
-    List<_i14.PageRouteInfo>? children,
+    required _i23.IntentionRelationGroup group,
+    _i22.Key? key,
+    List<_i15.PageRouteInfo>? children,
   }) : super(
          RelationBatchPickerRoute.name,
          args: RelationBatchPickerRouteArgs(
@@ -424,11 +510,11 @@ class RelationBatchPickerRoute
 
   static const String name = 'RelationBatchPickerRoute';
 
-  static _i14.PageInfo page = _i14.PageInfo(
+  static _i15.PageInfo page = _i15.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<RelationBatchPickerRouteArgs>();
-      return _i12.RelationBatchPickerPage(
+      return _i13.RelationBatchPickerPage(
         pageIntentionId: args.pageIntentionId,
         pageTitle: args.pageTitle,
         group: args.group,
@@ -446,13 +532,13 @@ class RelationBatchPickerRouteArgs {
     this.key,
   });
 
-  final _i17.IntentionId pageIntentionId;
+  final _i18.IntentionId pageIntentionId;
 
   final String pageTitle;
 
-  final _i20.IntentionRelationGroup group;
+  final _i23.IntentionRelationGroup group;
 
-  final _i19.Key? key;
+  final _i22.Key? key;
 
   @override
   String toString() {
@@ -478,17 +564,17 @@ class RelationBatchPickerRouteArgs {
 }
 
 /// generated route for
-/// [_i13.SettingsPage]
-class SettingsRoute extends _i14.PageRouteInfo<void> {
-  const SettingsRoute({List<_i14.PageRouteInfo>? children})
+/// [_i14.SettingsPage]
+class SettingsRoute extends _i15.PageRouteInfo<void> {
+  const SettingsRoute({List<_i15.PageRouteInfo>? children})
     : super(SettingsRoute.name, initialChildren: children);
 
   static const String name = 'SettingsRoute';
 
-  static _i14.PageInfo page = _i14.PageInfo(
+  static _i15.PageInfo page = _i15.PageInfo(
     name,
     builder: (data) {
-      return const _i13.SettingsPage();
+      return const _i14.SettingsPage();
     },
   );
 }

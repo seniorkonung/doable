@@ -2705,6 +2705,85 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pathStartCurrentStep => 'You are here';
 
   @override
+  String get pathTitle => 'Path';
+
+  @override
+  String get pathEditTitle => 'Edit path';
+
+  @override
+  String get pathSave => 'Save';
+
+  @override
+  String get pathChooseReason => 'Choose a reason';
+
+  @override
+  String get pathChooseReasonLabel =>
+      'Choose a reason: the intention where the path starts';
+
+  @override
+  String get pathEmptyHint =>
+      'Start from the goal this action serves and go down step by step, or start right from the nearest reason. One intention is enough.';
+
+  @override
+  String get pathShortenHint => 'Tap an intention to end the path at it.';
+
+  @override
+  String get pathNewAction => 'New action';
+
+  @override
+  String pathActionLabel(String title) {
+    return 'The path leads to the action “$title”';
+  }
+
+  @override
+  String get pathNewActionLabel => 'The path leads to a new action';
+
+  @override
+  String pathRootLabel(String title) {
+    return 'Root intention “$title”. Choose another start of the path';
+  }
+
+  @override
+  String pathEndAtLabel(String title) {
+    return 'Intermediate intention “$title”. End the path at it';
+  }
+
+  @override
+  String pathFinalLabel(String title) {
+    return 'Final intention “$title”';
+  }
+
+  @override
+  String get pathAdd => 'Add';
+
+  @override
+  String get pathLoading => 'Loading the path…';
+
+  @override
+  String get pathReadUnavailable => 'Couldn\'t load the path. Try again.';
+
+  @override
+  String get pathReadCorruption =>
+      'Saved data is damaged, so the path can\'t be shown.';
+
+  @override
+  String get pathReadUnexpected =>
+      'Couldn\'t load the path because of an unexpected error.';
+
+  @override
+  String get pathDiscardTitle => 'Discard changes?';
+
+  @override
+  String get pathDiscardMessage =>
+      'Your changes to the path will not be saved.';
+
+  @override
+  String get pathDiscardAction => 'Discard';
+
+  @override
+  String get pathContinueAction => 'Keep editing';
+
+  @override
   String get participantPickerTitle => 'Choose intentions';
 
   @override

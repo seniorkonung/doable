@@ -4175,6 +4175,138 @@ abstract class AppLocalizations {
   /// **'You are here'**
   String get pathStartCurrentStep;
 
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Path'**
+  String get pathTitle;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Edit path'**
+  String get pathEditTitle;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get pathSave;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a reason'**
+  String get pathChooseReason;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a reason: the intention where the path starts'**
+  String get pathChooseReasonLabel;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Start from the goal this action serves and go down step by step, or start right from the nearest reason. One intention is enough.'**
+  String get pathEmptyHint;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Tap an intention to end the path at it.'**
+  String get pathShortenHint;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'New action'**
+  String get pathNewAction;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'The path leads to the action “{title}”'**
+  String pathActionLabel(String title);
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'The path leads to a new action'**
+  String get pathNewActionLabel;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Root intention “{title}”. Choose another start of the path'**
+  String pathRootLabel(String title);
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Intermediate intention “{title}”. End the path at it'**
+  String pathEndAtLabel(String title);
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Final intention “{title}”'**
+  String pathFinalLabel(String title);
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get pathAdd;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the path…'**
+  String get pathLoading;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the path. Try again.'**
+  String get pathReadUnavailable;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Saved data is damaged, so the path can\'t be shown.'**
+  String get pathReadCorruption;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the path because of an unexpected error.'**
+  String get pathReadUnexpected;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Discard changes?'**
+  String get pathDiscardTitle;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Your changes to the path will not be saved.'**
+  String get pathDiscardMessage;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get pathDiscardAction;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get pathContinueAction;
+
   /// Заголовок поиска участников связи
   ///
   /// In en, this message translates to:

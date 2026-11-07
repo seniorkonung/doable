@@ -68,7 +68,7 @@ final class IntentionCatalogViewModelProvider
 }
 
 String _$intentionCatalogViewModelHash() =>
-    r'292a2a2cde7b65816f2d44411b9a54766be2581f';
+    r'1f125d600b606ff5f50779a4d395a1fcc02196d0';
 
 /// Ограниченный каталог намерений для одного назначения.
 ///
