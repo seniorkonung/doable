@@ -699,12 +699,9 @@
   "relationSheetDeleteDialogCancel": "Отмена",
   "relationSheetDeleteDialogConfirm": "Удалить",
   "intentionPickerArchived": "в архиве",
-  "intentionPickerKindAction": "действие",
-  "intentionPickerKindIntention": "намерение",
-  "intentionPickerOpenActionPage": "Открыть страницу действия «{title}»",
-  "@intentionPickerOpenActionPage": {
-    "placeholders": {"title": {"type": "String"}}
-  },
+  "intentionPickerKindMain": "главное",
+  "intentionPickerKindSupporting": "вспомогательное",
+  "intentionPickerKindSupportingUnheld": "вспомогательное, его не удерживает ни одно главное намерение",
   "intentionPickerOpenIntentionPage": "Открыть страницу намерения «{title}»",
   "@intentionPickerOpenIntentionPage": {
     "placeholders": {"title": {"type": "String"}}

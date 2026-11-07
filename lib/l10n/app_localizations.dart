@@ -3756,23 +3756,23 @@ abstract class AppLocalizations {
   /// **'archived'**
   String get intentionPickerArchived;
 
-  /// Вид намерения с готовностью к действию в доступном названии строки экрана выбора
+  /// Главный вид намерения в доступном названии строки каталога и экрана выбора
   ///
   /// In en, this message translates to:
-  /// **'action'**
-  String get intentionPickerKindAction;
+  /// **'main'**
+  String get intentionPickerKindMain;
 
-  /// Вид намерения без готовности к действию в доступном названии строки экрана выбора
+  /// Вспомогательный вид намерения в доступном названии строки каталога и экрана выбора, когда его удерживает главное намерение или удержание ещё не известно
   ///
   /// In en, this message translates to:
-  /// **'intention'**
-  String get intentionPickerKindIntention;
+  /// **'supporting'**
+  String get intentionPickerKindSupporting;
 
-  /// Доступное название стрелки строки экрана выбора, которая открывает страницу действия
+  /// Вспомогательный вид активного намерения, которого не удерживает ни одно главное, в доступном названии строки каталога и экрана выбора
   ///
   /// In en, this message translates to:
-  /// **'Open the page of action {title}'**
-  String intentionPickerOpenActionPage(String title);
+  /// **'supporting, no main intention holds it'**
+  String get intentionPickerKindSupportingUnheld;
 
   /// Доступное название стрелки строки экрана выбора, которая открывает страницу намерения
   ///

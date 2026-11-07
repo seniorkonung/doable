@@ -2411,15 +2411,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerArchived => 'archived';
 
   @override
-  String get intentionPickerKindAction => 'action';
+  String get intentionPickerKindMain => 'main';
 
   @override
-  String get intentionPickerKindIntention => 'intention';
+  String get intentionPickerKindSupporting => 'supporting';
 
   @override
-  String intentionPickerOpenActionPage(String title) {
-    return 'Open the page of action $title';
-  }
+  String get intentionPickerKindSupportingUnheld =>
+      'supporting, no main intention holds it';
 
   @override
   String intentionPickerOpenIntentionPage(String title) {

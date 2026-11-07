@@ -13,6 +13,7 @@ import '../../../tag/application/tag_change.dart';
 import '../../../tag/domain/tag.dart';
 import '../../../tag/domain/tag_id.dart';
 import '../../application/intention_catalog.dart';
+import '../../application/intention_holding.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
@@ -58,6 +59,14 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   final _packagesBeforeFirstPage = <_CatalogChangePackage>[];
   IntentionSummary? _cursorBoundary;
   _PendingCatalogContinuation? _pendingContinuation;
+
+  /// Поколение чтений удержания: меняется с выдачей и с каждым применённым
+  /// изменением удержания, и ответ прежнего поколения отбрасывается.
+  int _holdingGeneration = 0;
+
+  /// Строки, удержание которых уже запрошено в текущем поколении. Отказавшее
+  /// чтение не повторяется до следующего поколения: метка остаётся серой.
+  final _requestedHoldings = <IntentionId>{};
 
   IntentionCatalogSelection get selection => IntentionCatalogSelection(
     scope: switch (_purpose) {
@@ -106,6 +115,11 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         .listen(_handleCompletion);
     ref.onDispose(() => unawaited(completionSubscription.cancel()));
     ref.onCancel(() => _filterTimer?.cancel());
+    listenSelf((_, next) {
+      if (next case AsyncData(:final value)) {
+        _readMissingHoldings(value);
+      }
+    });
 
     if (_isDebouncingFilter) {
       return Future.value(IntentionCatalogDebouncing(selection: selection));
@@ -529,6 +543,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       nextCursor: page.nextCursor,
       revision: confirmed.revision,
       pairOccupants: pairOccupants,
+      holdings: confirmed.holdings,
     );
   }
 
@@ -612,6 +627,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     nextCursor: confirmed.nextCursor,
     revision: confirmed.revision,
     pairOccupants: confirmed.pairOccupants,
+    holdings: confirmed.holdings,
     continuation: continuation,
   );
 
@@ -623,7 +639,73 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   void _invalidatePageRequest() {
     _queryGeneration += 1;
     _activePageRequest = null;
+    _resetHoldingReads();
   }
+
+  void _resetHoldingReads() {
+    _holdingGeneration += 1;
+    _requestedHoldings.clear();
+  }
+
+  /// Читает удержание загруженных активных вспомогательных строк, которое ещё
+  /// не запрошено в текущем поколении: метки остальных строк от удержания не
+  /// зависят.
+  void _readMissingHoldings(IntentionCatalogState state) {
+    if (state is! IntentionCatalogLoaded) {
+      return;
+    }
+    final ids = <IntentionId>{};
+    for (final item in state.items) {
+      if (item.kind == IntentionKind.supporting &&
+          item.archiveState == IntentionArchiveState.active &&
+          !state.holdings.containsKey(item.id) &&
+          _requestedHoldings.add(item.id)) {
+        ids.add(item.id);
+      }
+    }
+    if (ids.isNotEmpty) {
+      unawaited(_readHoldings(ids, _holdingGeneration));
+    }
+  }
+
+  Future<void> _readHoldings(Set<IntentionId> ids, int generation) async {
+    final result = await ref
+        .read(personalGraphRepositoryProvider)
+        .getIntentionHolding(ids);
+    if (!ref.mounted || generation != _holdingGeneration) {
+      return;
+    }
+    switch (result) {
+      case IntentionHoldingRead(:final holdings):
+        if (state case AsyncData(value: final IntentionCatalogLoaded current)) {
+          state = AsyncData(
+            _withHoldings(current, {...current.holdings, ...holdings}),
+          );
+        }
+      // Истёкшее чтение перечитает пакет с изменением удержания, который
+      // ещё придёт, а отказ уже записан в диагностику: до тех пор метка
+      // остаётся серой (D5).
+      case IntentionHoldingExpired() || IntentionHoldingFailed():
+        return;
+    }
+  }
+
+  IntentionCatalogLoaded _withHoldings(
+    IntentionCatalogLoaded confirmed,
+    Map<IntentionId, IntentionHolding> holdings,
+  ) => IntentionCatalogLoaded(
+    selection: confirmed.selection,
+    query: confirmed.query,
+    items: confirmed.items,
+    totalCount: confirmed.totalCount,
+    counts: confirmed.counts,
+    exactTitleCount: confirmed.exactTitleCount,
+    nextCursor: confirmed.nextCursor,
+    revision: confirmed.revision,
+    pairOccupants: confirmed.pairOccupants,
+    holdings: holdings,
+    continuation: confirmed.continuation,
+  );
 
   void _restoreInitialShowParameters() {
     _scope = _initialScope;
@@ -693,6 +775,12 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       return;
     }
 
+    if (package.changesHolding &&
+        package.revision.compareTo(current.revision) ==
+            GraphRevisionOrder.newer) {
+      // Удержание прежней ревизии и запоздалые ответы о нём больше не годны.
+      _resetHoldingReads();
+    }
     final reconciled = _applyPackage(current, package);
     if (reconciled == null) {
       _restartFromFirstPage();
@@ -793,7 +881,13 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       reconciled = _applyDeletedTagContent(reconciled, deletedTagId);
     }
     reconciled = _applyRelationChanges(reconciled, package.relationChanges);
-    return _withRevision(reconciled, package.revision);
+    reconciled = _withRevision(reconciled, package.revision);
+    return switch (reconciled) {
+      // Строки, оставшиеся в выдаче, ждут удержания новой ревизии серыми.
+      final IntentionCatalogLoaded loaded when package.changesHolding =>
+        _withHoldings(loaded, const {}),
+      _ => reconciled,
+    };
   }
 
   /// Согласует занимающие связи загруженных строк с фактами о связях.
@@ -825,6 +919,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         rowIds: confirmed.items.map((item) => item.id).toSet(),
         changes: changes,
       ),
+      holdings: confirmed.holdings,
       continuation: confirmed.continuation,
     );
   }
@@ -858,6 +953,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       nextCursor: confirmed.nextCursor,
       revision: confirmed.revision,
       pairOccupants: confirmed.pairOccupants,
+      holdings: confirmed.holdings,
       continuation: confirmed.continuation,
     );
   }
@@ -892,6 +988,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       nextCursor: confirmed.nextCursor,
       revision: confirmed.revision,
       pairOccupants: confirmed.pairOccupants,
+      holdings: confirmed.holdings,
       continuation: confirmed.continuation,
     );
   }
@@ -910,6 +1007,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       IntentionCatalogLoaded(
         :final items,
         :final pairOccupants,
+        :final holdings,
         :final continuation,
       ) =>
         IntentionCatalogLoaded(
@@ -922,6 +1020,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
           nextCursor: confirmed.nextCursor,
           revision: revision,
           pairOccupants: pairOccupants,
+          holdings: holdings,
           continuation: continuation,
         ),
       IntentionCatalogEmpty() => IntentionCatalogEmpty(
@@ -1014,6 +1113,10 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       nextCursor: confirmed.nextCursor,
       revision: mutation.revision,
       pairOccupants: pairOccupants,
+      holdings: switch (confirmed) {
+        IntentionCatalogLoaded(:final holdings) => holdings,
+        IntentionCatalogEmpty() => const {},
+      },
       continuation: switch (confirmed) {
         IntentionCatalogLoaded(:final continuation) => continuation,
         IntentionCatalogEmpty() => const IntentionCatalogContinuationIdle(),
@@ -1138,12 +1241,18 @@ final class _CatalogChangePackage {
       tagChanges = List.unmodifiable(changes.whereType<TagChange>()),
       relationChanges = List.unmodifiable(
         changes.whereType<LongTermRelationChange>(),
+      ),
+      changesHolding = changes.any(
+        (change) => change is IntentionHoldingChanged,
       );
 
   final GraphRevision revision;
   final List<IntentionCatalogMutation> mutations;
   final List<TagChange> tagChanges;
   final List<LongTermRelationChange> relationChanges;
+
+  /// Пакет изменил удержание: загруженные строки перечитывают его.
+  final bool changesHolding;
 
   /// Новые полные состояния тегов, отредактированных пакетом.
   Iterable<Tag> get updatedTags =>

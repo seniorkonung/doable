@@ -5,6 +5,7 @@ import 'package:doable/src/design_system/components/tag_chip.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_holding.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_row.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -17,37 +18,35 @@ import '../../../support/tag_positions.dart';
 import 'catalog_test_support.dart';
 
 void main() {
-  testWidgets('вся карточка — одна кнопка, которая называет открытие и тип '
+  testWidgets('вся карточка — одна кнопка, которая называет открытие и вид '
       'намерения на двух языках', (tester) async {
     final semantics = tester.ensureSemantics();
     var openings = 0;
+    final supporting = testSummary(
+      title: 'Пройти пешком до парка',
+      kind: IntentionKind.supporting,
+    );
 
     for (final (locale, summary, label) in [
       (
         const Locale('ru'),
-        testSummary(
-          title: 'Бегать по утрам',
-          readiness: IntentionReadiness.ready,
-        ),
-        'Открыть: Бегать по утрам, действие, Без тегов',
+        testSummary(title: 'Быть здоровым'),
+        'Открыть: Быть здоровым, главное, Без тегов',
       ),
       (
         const Locale('ru'),
-        testSummary(title: 'Быть здоровым'),
-        'Открыть: Быть здоровым, намерение, Без тегов',
-      ),
-      (
-        const Locale('en'),
-        testSummary(
-          title: 'Бегать по утрам',
-          readiness: IntentionReadiness.ready,
-        ),
-        'Open: Бегать по утрам, action, No tags',
+        supporting,
+        'Открыть: Пройти пешком до парка, вспомогательное, Без тегов',
       ),
       (
         const Locale('en'),
         testSummary(title: 'Быть здоровым'),
-        'Open: Быть здоровым, intention, No tags',
+        'Open: Быть здоровым, main, No tags',
+      ),
+      (
+        const Locale('en'),
+        supporting,
+        'Open: Пройти пешком до парка, supporting, No tags',
       ),
     ]) {
       await tester.pumpWidget(
@@ -65,15 +64,66 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('архивированное действие несёт метку архива, приглушено, не '
-      'выделяет обязательный тег и называет архив на двух языках', (
+  testWidgets('метка вспомогательного серая у удерживаемого и при неизвестном '
+      'удержании, красная у неудерживаемого, а у главного метки вида нет', (
     tester,
   ) async {
     final semantics = tester.ensureSemantics();
+    final supporting = testSummary(
+      title: 'Вести дневник сна',
+      kind: IntentionKind.supporting,
+    );
+
+    for (final (summary, holding, marks, label) in [
+      (
+        testSummary(title: 'Быть в форме'),
+        IntentionHolding.notHeld,
+        <(DoableIconData, BadgeTone)>[],
+        'Открыть: Быть в форме, главное, Без тегов',
+      ),
+      (
+        supporting,
+        IntentionHolding.held,
+        [(DoableIconData.supporting, BadgeTone.muted)],
+        'Открыть: Вести дневник сна, вспомогательное, Без тегов',
+      ),
+      (
+        supporting,
+        null,
+        [(DoableIconData.supporting, BadgeTone.muted)],
+        'Открыть: Вести дневник сна, вспомогательное, Без тегов',
+      ),
+      (
+        supporting,
+        IntentionHolding.notHeld,
+        [(DoableIconData.supporting, BadgeTone.accent)],
+        'Открыть: Вести дневник сна, вспомогательное, его не удерживает ни '
+            'одно главное намерение, Без тегов',
+      ),
+    ]) {
+      await tester.pumpWidget(
+        _app(
+          locale: const Locale('ru'),
+          summary: summary,
+          holding: holding,
+          onOpen: () {},
+        ),
+      );
+
+      expect(_marks(tester), marks);
+      expect(find.bySemanticsLabel(label), findsOneWidget);
+    }
+    semantics.dispose();
+  });
+
+  testWidgets('архивированное вспомогательное намерение несёт приглушённые '
+      'метки вида и архива, не выделяет обязательный тег и называет вид и '
+      'архив на двух языках', (tester) async {
+    final semantics = tester.ensureSemantics();
     final health = _tag(2, 'Здоровье');
     final summary = testSummary(
-      title: 'Бегать',
-      readiness: IntentionReadiness.ready,
+      title: 'Плавать',
+      kind: IntentionKind.supporting,
       archiveState: IntentionArchiveState.archived,
       tags: [_tag(1, 'Утро'), health],
     );
@@ -81,28 +131,29 @@ void main() {
     for (final (locale, label) in const [
       (
         Locale('ru'),
-        'Открыть: Бегать, в архиве, действие, Теги: Здоровье, Утро',
+        'Открыть: Плавать, вспомогательное, в архиве, Теги: Здоровье, Утро',
       ),
-      (Locale('en'), 'Open: Бегать, archived, action, Tags: Здоровье, Утро'),
+      (
+        Locale('en'),
+        'Open: Плавать, supporting, archived, Tags: Здоровье, Утро',
+      ),
     ]) {
       await tester.pumpWidget(
         _app(
           locale: locale,
           summary: summary,
           requiredTagIds: {health.id},
+          // Архивное намерение не удерживается, но красной метки у него нет.
+          holding: IntentionHolding.notHeld,
           onOpen: () {},
         ),
       );
 
       final row = tester.widget<CatalogRow>(find.byType(CatalogRow));
       expect(row.archived, isTrue);
-      expect(row.marks, [
-        isA<BadgeMark>()
-            .having((mark) => mark.icon, 'icon', DoableIconData.archive)
-            .having((mark) => mark.tone, 'tone', BadgeTone.muted),
-        isA<BadgeMark>()
-            .having((mark) => mark.icon, 'icon', DoableIconData.bolt)
-            .having((mark) => mark.tone, 'tone', BadgeTone.muted),
+      expect(_marks(tester), [
+        (DoableIconData.supporting, BadgeTone.muted),
+        (DoableIconData.archive, BadgeTone.muted),
       ]);
       expect(
         [
@@ -116,6 +167,14 @@ void main() {
     semantics.dispose();
   });
 }
+
+List<(DoableIconData, BadgeTone)> _marks(WidgetTester tester) => [
+  for (final mark in tester.widget<CatalogRow>(find.byType(CatalogRow)).marks)
+    switch (mark) {
+      BadgeMark(:final icon, :final tone) => (icon, tone),
+      _ => throw StateError('Строка каталога несёт только метки-значки.'),
+    },
+];
 
 Tag _tag(int number, String name) => Tag(
   id: (TagId.decode(
@@ -131,6 +190,7 @@ Widget _app({
   required IntentionSummary summary,
   required VoidCallback onOpen,
   Set<TagId> requiredTagIds = const {},
+  IntentionHolding? holding,
 }) => MaterialApp(
   theme: doableTheme(Brightness.light),
   locale: locale,
@@ -143,6 +203,7 @@ Widget _app({
         child: IntentionCatalogRow(
           summary: summary,
           requiredTagIds: requiredTagIds,
+          holding: holding,
           onOpen: onOpen,
         ),
       ),

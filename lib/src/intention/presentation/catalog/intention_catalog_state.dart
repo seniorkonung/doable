@@ -1,6 +1,7 @@
 import '../../../graph/application/graph_revision.dart';
 import '../../../long_term_relation/application/relation_pair_probe.dart';
 import '../../application/intention_catalog.dart';
+import '../../application/intention_holding.dart';
 import '../../domain/intention_id.dart';
 
 enum IntentionCatalogFilterValidationFailure {
@@ -141,9 +142,11 @@ final class IntentionCatalogLoaded extends IntentionCatalogConfirmedState {
     required super.revision,
     super.exactTitleCount,
     Map<IntentionId, PairOccupant> pairOccupants = const {},
+    Map<IntentionId, IntentionHolding> holdings = const {},
     this.continuation = const IntentionCatalogContinuationIdle(),
   }) : items = List.unmodifiable(items),
-       pairOccupants = Map.unmodifiable(pairOccupants);
+       pairOccupants = Map.unmodifiable(pairOccupants),
+       holdings = Map.unmodifiable(holdings);
 
   final List<IntentionSummary> items;
 
@@ -152,6 +155,11 @@ final class IntentionCatalogLoaded extends IntentionCatalogConfirmedState {
   /// приходит с той же порцией, что и строка, а затем следует за
   /// подтверждёнными фактами о связях; без пробы карта пуста.
   final Map<IntentionId, PairOccupant> pairOccupants;
+
+  /// Удержание загруженных активных вспомогательных строк, прочитанное после
+  /// первой порции или последнего изменения удержания. У строки без записи
+  /// удержание ещё не получено или его чтение отказало (D5).
+  final Map<IntentionId, IntentionHolding> holdings;
   final IntentionCatalogContinuationState continuation;
 }
 

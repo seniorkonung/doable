@@ -18,6 +18,7 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/application/intention_holding.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
@@ -70,9 +71,8 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('показывает подтверждённые сводки и точное количество', (
-    tester,
-  ) async {
+  testWidgets('показывает подтверждённые сводки, точное количество и метку '
+      'вспомогательного намерения по прочитанному удержанию', (tester) async {
     final repository = ControlledCatalogRepository();
     await tester.pumpWidget(_testApp(repository));
     repository.queryAt(0);
@@ -85,7 +85,7 @@ void main() {
               index: 1,
               title: 'Позвонить врачу',
               description: 'Описание',
-              readiness: IntentionReadiness.ready,
+              kind: IntentionKind.supporting,
             ),
             testSummary(index: 2, title: 'Выбрать страховку'),
           ],
@@ -106,7 +106,19 @@ void main() {
     expect(find.text('Описание'), findsOneWidget);
     expect(find.text('Ready for action'), findsNothing);
     expect(find.text('Has description'), findsNothing);
-    expect(_shownMarks(tester), [DoableIconData.bolt]);
+    expect(_shownMarks(tester), [(DoableIconData.supporting, BadgeTone.muted)]);
+
+    repository.completeHolding(
+      0,
+      IntentionHoldingRead(
+        revision: const TestCatalogRevision(3),
+        holdings: {testSummary(index: 1).id: IntentionHolding.notHeld},
+      ),
+    );
+    await tester.pump();
+    expect(_shownMarks(tester), [
+      (DoableIconData.supporting, BadgeTone.accent),
+    ]);
   });
 
   testWidgets('явно сообщает архивное состояние строки в охвате всех', (
@@ -149,10 +161,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Архивное намерение'), findsOneWidget);
-    expect(_shownMarks(tester), [DoableIconData.archive]);
+    expect(_shownMarks(tester), [(DoableIconData.archive, BadgeTone.muted)]);
     expect(
       find.bySemanticsLabel(
-        'Open: Архивное намерение, archived, intention, No tags',
+        'Open: Архивное намерение, main, archived, No tags',
       ),
       findsOneWidget,
     );
@@ -1005,13 +1017,11 @@ void main() {
 
     expect(find.byIcon(Icons.star), findsNothing);
     expect(_shownMarks(tester), [
-      DoableIconData.archive,
-      DoableIconData.archive,
+      (DoableIconData.archive, BadgeTone.muted),
+      (DoableIconData.archive, BadgeTone.muted),
     ]);
     expect(
-      find.bySemanticsLabel(
-        'Open: Архивное первое, archived, intention, No tags',
-      ),
+      find.bySemanticsLabel('Open: Архивное первое, main, archived, No tags'),
       findsOneWidget,
     );
     expect(intentionCatalogTotal(2), findsOneWidget);
@@ -1614,9 +1624,9 @@ List<String?> _shownMenu(WidgetTester tester) => [
 ];
 
 /// Значки меток построенных строк каталога в порядке показа.
-List<DoableIconData> _shownMarks(WidgetTester tester) => [
+List<(DoableIconData, BadgeTone)> _shownMarks(WidgetTester tester) => [
   for (final badge in tester.widgetList<BadgeMark>(find.byType(BadgeMark)))
-    badge.icon,
+    (badge.icon, badge.tone),
 ];
 
 Future<void> _completeCatalogWidgetCommand(

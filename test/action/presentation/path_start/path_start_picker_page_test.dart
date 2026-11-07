@@ -104,11 +104,11 @@ void main() {
       expect(find.text('Сейчас в начале пути'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          'Корень, Сейчас в начале пути, намерение, Без тегов',
+          'Корень, Сейчас в начале пути, главное, Без тегов',
         ),
         findsOneWidget,
       );
-      expect(find.bySemanticsLabel('Другой, намерение, Без тегов'), findsOne);
+      expect(find.bySemanticsLabel('Другой, главное, Без тегов'), findsOne);
       expect(find.text('Архив'), findsNothing);
       expect(find.text('Выбор намерения'), findsOneWidget);
       expect(

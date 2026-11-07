@@ -94,6 +94,7 @@ final class _IntentionCatalogPageState
                           summary: summary,
                           requiredTagIds:
                               results.query.tagFilter.requiredTagIds,
+                          holding: results.holdings[summary.id],
                           onOpen: () {
                             context.router.push(
                               IntentionDetailsRoute(intentionId: summary.id),

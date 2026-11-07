@@ -864,8 +864,8 @@ void main() {
         await tester.tap(
           find.bySemanticsLabel(
             locale.languageCode == 'ru'
-                ? 'Открыть страницу действия «${items.first.title}»'
-                : 'Open the page of action ${items.first.title}',
+                ? 'Открыть страницу намерения «${items.first.title}»'
+                : 'Open the page of intention ${items.first.title}',
           ),
         );
         expect(h.openedDetails, [items.first.id]);

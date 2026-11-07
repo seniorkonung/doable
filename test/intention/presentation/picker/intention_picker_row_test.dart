@@ -7,6 +7,7 @@ import 'package:doable/src/design_system/components/tag_line.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_holding.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_row.dart';
@@ -22,7 +23,8 @@ import '../../../support/tag_positions.dart';
 import '../../../support/intention_title_order_key.dart';
 
 void main() {
-  testWidgets('карточка показывает начало описания, молнию и теги, которые '
+  testWidgets('карточка показывает начало описания, метку вспомогательного и '
+      'теги, которые '
       'поместились, а диктор слышит все шесть тегов на двух языках', (
     tester,
   ) async {
@@ -36,6 +38,7 @@ void main() {
     final summary = _summary(
       'Сделать силовую тренировку',
       description: description,
+      kind: IntentionKind.supporting,
       tags: [
         _tag(1, 'Утро'),
         _tag(2, 'Спорт'),
@@ -49,12 +52,12 @@ void main() {
     for (final (locale, kind, tagsLabel) in const [
       (
         Locale('ru'),
-        'действие',
+        'вспомогательное',
         'Теги: Утро, Спорт, Здоровье, Сила, Дом, Привычки',
       ),
       (
         Locale('en'),
-        'action',
+        'supporting',
         'Tags: Утро, Спорт, Здоровье, Сила, Дом, Привычки',
       ),
     ]) {
@@ -62,7 +65,7 @@ void main() {
 
       expect(find.text('Сделать силовую тренировку'), findsOneWidget);
       expect(find.text(preview), findsOneWidget);
-      expect(_marks(tester), [(DoableIconData.bolt, BadgeTone.ink)]);
+      expect(_marks(tester), [(DoableIconData.supporting, BadgeTone.muted)]);
       expect(tester.widget<PickerRow>(find.byType(PickerRow)).archived, false);
       expect(find.byType(TagChip), findsNWidgets(6));
       expect(
@@ -79,39 +82,49 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('молния и доступное название отличают '
-      'действие от намерения на двух языках', (tester) async {
+  testWidgets('метка и доступное название отличают главное намерение от '
+      'вспомогательного и неудерживаемое вспомогательное на двух языках', (
+    tester,
+  ) async {
     final semantics = tester.ensureSemantics();
 
-    for (final (locale, intention, action) in const [
+    for (final (locale, main, supporting, unheld) in const [
       (
         Locale('ru'),
-        'Быть здоровым, намерение, Без тегов',
-        'Пройти пешком до парка, действие, Без тегов',
+        'Быть здоровым, главное, Без тегов',
+        'Пройти пешком до парка, вспомогательное, Без тегов',
+        'Пройти пешком до парка, вспомогательное, его не удерживает ни одно '
+            'главное намерение, Без тегов',
       ),
       (
         Locale('en'),
-        'Быть здоровым, intention, No tags',
-        'Пройти пешком до парка, action, No tags',
+        'Быть здоровым, main, No tags',
+        'Пройти пешком до парка, supporting, No tags',
+        'Пройти пешком до парка, supporting, no main intention holds it, '
+            'No tags',
       ),
     ]) {
       await tester.pumpWidget(
-        _app(
-          locale: locale,
-          summary: _summary(
-            'Быть здоровым',
-            readiness: IntentionReadiness.notReady,
-          ),
-        ),
+        _app(locale: locale, summary: _summary('Быть здоровым')),
       );
       expect(_marks(tester), isEmpty);
-      expect(find.bySemanticsLabel(intention), findsOneWidget);
+      expect(find.bySemanticsLabel(main), findsOneWidget);
+
+      final walk = _summary(
+        'Пройти пешком до парка',
+        kind: IntentionKind.supporting,
+      );
+      await tester.pumpWidget(
+        _app(locale: locale, summary: walk, holding: IntentionHolding.held),
+      );
+      expect(_marks(tester), [(DoableIconData.supporting, BadgeTone.muted)]);
+      expect(find.bySemanticsLabel(supporting), findsOneWidget);
 
       await tester.pumpWidget(
-        _app(locale: locale, summary: _summary('Пройти пешком до парка')),
+        _app(locale: locale, summary: walk, holding: IntentionHolding.notHeld),
       );
-      expect(_marks(tester), [(DoableIconData.bolt, BadgeTone.ink)]);
-      expect(find.bySemanticsLabel(action), findsOneWidget);
+      expect(_marks(tester), [(DoableIconData.supporting, BadgeTone.accent)]);
+      expect(find.bySemanticsLabel(unheld), findsOneWidget);
     }
     semantics.dispose();
   });
@@ -124,18 +137,22 @@ void main() {
       (
         Locale('ru'),
         'Сейчас в начале пути',
-        'Пройти пешком до парка, Сейчас в начале пути, действие, Без тегов',
+        'Пройти пешком до парка, Сейчас в начале пути, вспомогательное, Без '
+            'тегов',
       ),
       (
         Locale('en'),
         'Current start of path',
-        'Пройти пешком до парка, Current start of path, action, No tags',
+        'Пройти пешком до парка, Current start of path, supporting, No tags',
       ),
     ]) {
       await tester.pumpWidget(
         _app(
           locale: locale,
-          summary: _summary('Пройти пешком до парка'),
+          summary: _summary(
+            'Пройти пешком до парка',
+            kind: IntentionKind.supporting,
+          ),
           currentPathStart: true,
         ),
       );
@@ -145,7 +162,7 @@ void main() {
         isA<BadgeMark>().having(
           (mark) => mark.icon,
           'icon',
-          DoableIconData.bolt,
+          DoableIconData.supporting,
         ),
       ]);
       expect(find.bySemanticsLabel(label), findsOneWidget);
@@ -181,7 +198,7 @@ void main() {
     );
     expect(
       find.bySemanticsLabel(
-        'Бегать по утрам, действие, Теги: Здоровье, Утро, Спорт',
+        'Бегать по утрам, главное, Теги: Здоровье, Утро, Спорт',
       ),
       findsOneWidget,
     );
@@ -189,23 +206,21 @@ void main() {
   });
 
   testWidgets('строка без тегов называет их отсутствие, а стрелка открывает '
-      'страницу без выбора на двух языках', (tester) async {
+      'страницу намерения без выбора на двух языках', (tester) async {
     final semantics = tester.ensureSemantics();
     var picks = 0;
     var pageOpenings = 0;
 
-    for (final (locale, label, actionPage, intentionPage) in const [
+    for (final (locale, label, page) in const [
       (
         Locale('ru'),
-        'Бегать по утрам, действие, Без тегов',
-        'Открыть страницу действия «Бегать по утрам»',
-        'Открыть страницу намерения «Быть здоровым»',
+        'Бегать по утрам, главное, Без тегов',
+        'Открыть страницу намерения «Бегать по утрам»',
       ),
       (
         Locale('en'),
-        'Бегать по утрам, action, No tags',
-        'Open the page of action Бегать по утрам',
-        'Open the page of intention Быть здоровым',
+        'Бегать по утрам, main, No tags',
+        'Open the page of intention Бегать по утрам',
       ),
     ]) {
       await tester.pumpWidget(
@@ -218,22 +233,11 @@ void main() {
       );
       expect(find.bySemanticsLabel(label), findsOneWidget);
 
-      await tester.tap(find.bySemanticsLabel(actionPage));
+      await tester.tap(find.bySemanticsLabel(page));
       expect((picks, pageOpenings), (0, 1));
       await tester.tap(find.bySemanticsLabel(label));
       expect((picks, pageOpenings), (1, 1));
       picks = pageOpenings = 0;
-
-      await tester.pumpWidget(
-        _app(
-          locale: locale,
-          summary: _summary(
-            'Быть здоровым',
-            readiness: IntentionReadiness.notReady,
-          ),
-        ),
-      );
-      expect(find.bySemanticsLabel(intentionPage), findsOneWidget);
     }
     semantics.dispose();
   });
@@ -247,7 +251,7 @@ List<(DoableIconData, BadgeTone)> _marks(WidgetTester tester) => [
 IntentionSummary _summary(
   String title, {
   String? description,
-  IntentionReadiness readiness = IntentionReadiness.ready,
+  IntentionKind kind = IntentionKind.main,
   IntentionArchiveState archiveState = IntentionArchiveState.active,
   List<Tag> tags = const [],
 }) => IntentionSummary(
@@ -256,7 +260,8 @@ IntentionSummary _summary(
   ) as IntentionIdDecodingSuccess).id,
   title: title,
   descriptionPreview: testDescriptionPreview(description),
-  readiness: readiness,
+  kind: kind,
+  readiness: IntentionReadiness.notReady,
   archiveState: archiveState,
   createdAt: IntentionTimestamp(DateTime.utc(2026)),
   updatedAt: IntentionTimestamp(DateTime.utc(2026)),
@@ -279,6 +284,7 @@ Widget _app({
   Set<TagId> requiredTagIds = const {},
   VoidCallback? onPick,
   VoidCallback? onOpenPage,
+  IntentionHolding? holding,
   bool currentPathStart = false,
 }) => MaterialApp(
   theme: doableTheme(Brightness.light),
@@ -292,6 +298,7 @@ Widget _app({
         child: IntentionPickerRow(
           summary: summary,
           requiredTagIds: requiredTagIds,
+          holding: holding,
           onPick: onPick ?? () {},
           onOpenPage: onOpenPage ?? () {},
           currentPathStart: currentPathStart,

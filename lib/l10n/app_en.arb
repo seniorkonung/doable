@@ -1736,18 +1736,17 @@
   "@intentionPickerArchived": {
     "description": "Архивное состояние намерения в доступном названии строки экрана выбора"
   },
-  "intentionPickerKindAction": "action",
-  "@intentionPickerKindAction": {
-    "description": "Вид намерения с готовностью к действию в доступном названии строки экрана выбора"
+  "intentionPickerKindMain": "main",
+  "@intentionPickerKindMain": {
+    "description": "Главный вид намерения в доступном названии строки каталога и экрана выбора"
   },
-  "intentionPickerKindIntention": "intention",
-  "@intentionPickerKindIntention": {
-    "description": "Вид намерения без готовности к действию в доступном названии строки экрана выбора"
+  "intentionPickerKindSupporting": "supporting",
+  "@intentionPickerKindSupporting": {
+    "description": "Вспомогательный вид намерения в доступном названии строки каталога и экрана выбора, когда его удерживает главное намерение или удержание ещё не известно"
   },
-  "intentionPickerOpenActionPage": "Open the page of action {title}",
-  "@intentionPickerOpenActionPage": {
-    "description": "Доступное название стрелки строки экрана выбора, которая открывает страницу действия",
-    "placeholders": {"title": {"type": "String"}}
+  "intentionPickerKindSupportingUnheld": "supporting, no main intention holds it",
+  "@intentionPickerKindSupportingUnheld": {
+    "description": "Вспомогательный вид активного намерения, которого не удерживает ни одно главное, в доступном названии строки каталога и экрана выбора"
   },
   "intentionPickerOpenIntentionPage": "Open the page of intention {title}",
   "@intentionPickerOpenIntentionPage": {

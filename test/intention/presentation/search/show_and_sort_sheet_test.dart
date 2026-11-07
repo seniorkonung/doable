@@ -192,7 +192,11 @@ void main() {
         final h = await _open(tester, purpose, locale);
         final items = [
           for (var i = 10; i > 0; i--)
-            testSummary(index: i, readiness: IntentionReadiness.ready),
+            testSummary(
+              index: i,
+              kind: IntentionKind.supporting,
+              readiness: IntentionReadiness.ready,
+            ),
         ];
         h.repository.complete(0, _page(items));
         await tester.pumpAndSettle();
@@ -626,6 +630,7 @@ void main() {
             testSummary(
               index: i,
               title: 'Читать ${i.toString().padLeft(2, '0')}',
+              kind: IntentionKind.supporting,
               readiness: IntentionReadiness.ready,
             ),
         ];

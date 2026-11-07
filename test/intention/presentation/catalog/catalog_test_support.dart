@@ -6,6 +6,7 @@ import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
+import 'package:doable/src/intention/application/intention_holding.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -28,11 +29,9 @@ import '../../../support/statistics_read_contract_test_fallback.dart';
 import '../../../support/intention_description_preview.dart';
 import '../../../support/intention_title_order_key.dart';
 import '../../../support/intention_type_counts.dart';
-import '../../../support/intention_holding_read_contract_test_fallback.dart';
 
 final class ControlledCatalogRepository
     with
-        IntentionHoldingReadContractTestFallback,
         ActionReadContractTestFallback,
         StatisticsReadContractTestFallback,
         TagReadContractTestFallback
@@ -46,6 +45,8 @@ final class ControlledCatalogRepository
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
   final tagCommands = <TagCommand>[];
   final _tagCommandRequests = <Completer<TagCommandResult>>[];
+  final holdingReads = <Set<IntentionId>>[];
+  final _holdingRequests = <Completer<IntentionHoldingResult>>[];
 
   /// Полный снимок каталога тегов для панели тегов в режиме фильтра; без
   /// него чтение каталога тегов отказывает.
@@ -102,6 +103,18 @@ final class ControlledCatalogRepository
     LongTermRelationCommandResult result,
   ) {
     _relationCommandRequests[index].complete(result);
+  }
+
+  void completeHolding(int index, IntentionHoldingResult result) {
+    _holdingRequests[index].complete(result);
+  }
+
+  @override
+  Future<IntentionHoldingResult> getIntentionHolding(Set<IntentionId> ids) {
+    holdingReads.add(ids);
+    final request = Completer<IntentionHoldingResult>();
+    _holdingRequests.add(request);
+    return request.future;
   }
 
   void completeTagCommand(int index, TagCommandResult result) {
@@ -217,6 +230,7 @@ IntentionSummary testSummary({
   int index = 1,
   String title = 'Намерение',
   String? description,
+  IntentionKind kind = IntentionKind.main,
   IntentionReadiness readiness = IntentionReadiness.notReady,
   IntentionArchiveState archiveState = IntentionArchiveState.active,
   int? createdDay,
@@ -241,6 +255,7 @@ IntentionSummary testSummary({
     id: id,
     title: title,
     descriptionPreview: testDescriptionPreview(description),
+    kind: kind,
     readiness: readiness,
     archiveState: archiveState,
     createdAt: createdAt,

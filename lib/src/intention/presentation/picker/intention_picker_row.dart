@@ -4,15 +4,17 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../design_system/components/picker_row.dart';
 import '../../../tag/domain/tag_id.dart';
 import '../../application/intention_catalog.dart';
+import '../../application/intention_holding.dart';
 import '../search/intention_row_content.dart';
 
 /// Строка экрана выбора для найденного намерения: название, начало описания,
-/// отметка текущего начала пути, метка архива у архивированного намерения, молния у действия и теги, где
-/// обязательные для выдачи идут первыми.
+/// отметка текущего начала пути, метки вспомогательного и архивированного
+/// намерения и теги, где обязательные для выдачи идут первыми.
 final class IntentionPickerRow extends StatelessWidget {
   IntentionPickerRow({
     required this.summary,
     required this.requiredTagIds,
+    required this.holding,
     required VoidCallback onPick,
     required this.onOpenPage,
     this.currentPathStart = false,
@@ -22,6 +24,7 @@ final class IntentionPickerRow extends StatelessWidget {
   IntentionPickerRow.checkable({
     required this.summary,
     required this.requiredTagIds,
+    required this.holding,
     required bool chosen,
     required VoidCallback onPick,
     required this.onOpenPage,
@@ -35,6 +38,7 @@ final class IntentionPickerRow extends StatelessWidget {
     required this.onOpenPage,
     super.key,
   }) : requiredTagIds = const {},
+       holding = null,
        currentPathStart = false,
        _behavior = _Occupied(reason);
 
@@ -44,6 +48,10 @@ final class IntentionPickerRow extends StatelessWidget {
   /// текущих условий: пока новая порция загружается, они уже могут быть
   /// другими.
   final Set<TagId> requiredTagIds;
+
+  /// Удержание намерения на текущей ревизии; `null` — ещё не получено или
+  /// чтение отказало. Занятая строка меток не показывает.
+  final IntentionHolding? holding;
 
   /// Строка текущего корня в поиске начала пути, открытом для смены корня:
   /// первой в линии меток стоит отметка «Сейчас в начале пути».
@@ -59,12 +67,11 @@ final class IntentionPickerRow extends StatelessWidget {
       l10n,
       summary: summary,
       requiredTagIds: requiredTagIds,
+      holding: holding,
       currentPathStart: currentPathStart,
     );
 
-    final pageLabel = content.isAction
-        ? l10n.intentionPickerOpenActionPage(content.name)
-        : l10n.intentionPickerOpenIntentionPage(content.name);
+    final pageLabel = l10n.intentionPickerOpenIntentionPage(content.name);
     return switch (_behavior) {
       _Occupied(:final reason) => PickerRow.occupied(
         name: content.name,

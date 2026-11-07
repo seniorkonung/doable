@@ -222,6 +222,7 @@ final class _IntentionPickerViewState
                       key: key,
                       summary: summary,
                       requiredTagIds: results.query.tagFilter.requiredTagIds,
+                      holding: results.holdings[summary.id],
                       onPick: () => onPick(snapshot),
                       onOpenPage: openPage,
                       currentPathStart: switch (widget.purpose) {
@@ -241,6 +242,7 @@ final class _IntentionPickerViewState
                               summary: summary,
                               requiredTagIds:
                                   results.query.tagFilter.requiredTagIds,
+                              holding: results.holdings[summary.id],
                               chosen: selectedIds.contains(summary.id),
                               onPick: () => onToggle(snapshot),
                               onOpenPage: openPage,

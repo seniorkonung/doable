@@ -2441,15 +2441,14 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerArchived => 'в архиве';
 
   @override
-  String get intentionPickerKindAction => 'действие';
+  String get intentionPickerKindMain => 'главное';
 
   @override
-  String get intentionPickerKindIntention => 'намерение';
+  String get intentionPickerKindSupporting => 'вспомогательное';
 
   @override
-  String intentionPickerOpenActionPage(String title) {
-    return 'Открыть страницу действия «$title»';
-  }
+  String get intentionPickerKindSupportingUnheld =>
+      'вспомогательное, его не удерживает ни одно главное намерение';
 
   @override
   String intentionPickerOpenIntentionPage(String title) {
