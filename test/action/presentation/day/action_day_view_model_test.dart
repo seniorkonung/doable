@@ -40,6 +40,40 @@ final _anotherDay = CalendarDate.fromParts(2026, 9, 21);
 
 void main() {
   _completionScenarios();
+
+  test('создание действия обновляет список выбранного дня', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    await _pair(h);
+    final action = _action(1, _today, false);
+    final start = h.coordinator.acceptActionCreation(
+      ActionCreationFormKey(),
+      CreateAction(
+        title: action.title,
+        description: action.description,
+        path: action.path,
+        date: action.date,
+        schedule: action.schedule,
+        priority: action.priority,
+      ),
+    ) as ActionCommandAccepted;
+    final revision = _Revision(2);
+    h.repository._commands.single.complete(
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: ActionCreated(
+            action: action,
+            changes: [ActionCreatedChange(revision: revision, action: action)],
+          ),
+        ),
+      ),
+    );
+    await start.future;
+    await pumpEventQueue();
+    await _pair(h, index: 2, incomplete: [_item(1)], revision: 2);
+    expect(_loaded(h).incomplete.items.single.id, action.id);
+  });
   test('первые порции публикуются только согласованной парой; раскрытие не читает граф', () async {
     final h = _Harness();
     addTearDown(h.dispose);
@@ -563,6 +597,11 @@ final class _Repository
       final request =
           Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>();
       _intentionCommands.add(request);
+      return await request.future as GraphCommandResult<TSuccess, TFailure>;
+    }
+    if (command is CreateAction) {
+      final request = Completer<ActionCommandResult>();
+      _commands.add(request);
       return await request.future as GraphCommandResult<TSuccess, TFailure>;
     }
     if (command is UpdateActionFields) {

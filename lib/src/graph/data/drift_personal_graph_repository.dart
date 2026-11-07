@@ -92,6 +92,7 @@ import 'stored_graph_rows.dart';
 
 import 'package:drift/drift.dart';
 import 'package:sqlite3/sqlite3.dart';
+import 'package:uuid/uuid.dart';
 
 part 'drift_personal_graph_repository_action_commands.dart';
 part 'drift_personal_graph_repository_action_day.dart';

@@ -33,6 +33,45 @@ import '../../../intention/presentation/catalog/catalog_test_support.dart';
 final _today = CalendarDate.fromParts(2026, 10, 8);
 
 void main() {
+  test('создание действия обновляет строки и числа намерения пути', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.instance.actionsRole = IntentionActionRole.root;
+    h.model.setVisible(true);
+    h.repository.first(0, [], counts: _counts());
+    await pumpEventQueue();
+    final action = _action(1, [1, 2], false);
+    final start = h.coordinator.acceptActionCreation(
+      ActionCreationFormKey(),
+      CreateAction(
+        title: action.title,
+        description: action.description,
+        path: action.path,
+        date: action.date,
+        schedule: action.schedule,
+        priority: action.priority,
+      ),
+    ) as ActionCommandAccepted;
+    final revision = _Revision(2);
+    h.repository.completeCommand(
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: ActionCreated(
+            action: action,
+            changes: [ActionCreatedChange(revision: revision, action: action)],
+          ),
+        ),
+      ),
+    );
+    await start.future;
+    await pumpEventQueue();
+    expect(h.repository.queries, hasLength(2));
+    h.repository.first(1, [_item(1)], counts: _counts(root: 1), revision: 2);
+    await pumpEventQueue();
+    expect((h.state as IntentionActionsLoaded).items.single.id, action.id);
+  });
+
   test(
     'страницы одного намерения независимо выбирают роль и загружают порции',
     () async {

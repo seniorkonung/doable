@@ -14,6 +14,17 @@ sealed class ActionChange implements GraphChange {
   Action? get after;
 }
 
+final class ActionCreatedChange extends ActionChange {
+  const ActionCreatedChange({required this.revision, required this.action});
+  @override
+  final GraphRevision revision;
+  final Action action;
+  @override
+  Action? get before => null;
+  @override
+  Action get after => action;
+}
+
 /// Поля действия подтверждённо записаны. При операции без изменений состояния
 /// до и после совпадают, а ревизия остаётся прежней.
 final class ActionUpdatedChange extends ActionChange {

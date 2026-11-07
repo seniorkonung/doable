@@ -2935,6 +2935,18 @@ abstract class AppLocalizations {
   /// **'Action deleted.'**
   String get actionDeleted;
 
+  /// Успех создания действия
+  ///
+  /// In en, this message translates to:
+  /// **'Action created.'**
+  String get actionCreated;
+
+  /// Конфликт пути действия
+  ///
+  /// In en, this message translates to:
+  /// **'The path no longer matches the graph. Check the path and try again.'**
+  String get actionPathConflict;
+
   /// Ошибка описания действия
   ///
   /// In en, this message translates to:

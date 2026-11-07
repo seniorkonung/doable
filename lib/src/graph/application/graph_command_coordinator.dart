@@ -72,6 +72,10 @@ final class ExistingLongTermRelationKey extends GraphCommandKey {
   int get hashCode => relationId.hashCode;
 }
 
+final class ActionCreationFormKey extends GraphCommandKey {
+  ActionCreationFormKey();
+}
+
 final class ExistingActionKey extends GraphCommandKey {
   const ExistingActionKey(this.actionId);
 
@@ -321,7 +325,7 @@ final class LongTermRelationUnannouncedSuccessCompletion
   }) : super._(confirmedResult: result);
 }
 
-enum ActionCommandKind { update, delete }
+enum ActionCommandKind { create, update, delete }
 
 sealed class ActionCommandCompletion extends GraphCommandCompletion {
   const ActionCommandCompletion._({
@@ -1056,16 +1060,29 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     policy: _PresentationPolicy.standard,
   );
 
+  /// Принимает создание один раз для каждого экземпляра формы.
+  ActionCommandStart acceptActionCreation(
+    ActionCreationFormKey formKey,
+    CreateAction command,
+  ) => _acceptAction(formKey, command, ActionCommandKind.create);
+
   /// Принимает изменение полей действия с политикой «успех без сообщения» по
   /// ADR-0046. Пока принятое изменение или удаление этого действия
   /// выполняется, другое его изменение, удаление и повтор той же команды не
   /// принимаются.
   ActionCommandStart acceptActionUpdate(UpdateActionFields command) =>
-      _acceptAction(command.actionId, command, ActionCommandKind.update);
+      _acceptAction(
+        ExistingActionKey(command.actionId),
+        command,
+        ActionCommandKind.update,
+      );
 
   /// Принимает удаление действия; успех объявляется по ADR-0012.
-  ActionCommandStart acceptActionDelete(DeleteAction command) =>
-      _acceptAction(command.actionId, command, ActionCommandKind.delete);
+  ActionCommandStart acceptActionDelete(DeleteAction command) => _acceptAction(
+    ExistingActionKey(command.actionId),
+    command,
+    ActionCommandKind.delete,
+  );
 
   TagCommandStart acceptTagCreation(
     TagCreationFormKey formKey,
@@ -1138,14 +1155,14 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   }
 
   ActionCommandStart _acceptAction(
-    ActionId actionId,
+    GraphCommandKey key,
     ActionCommand command,
     ActionCommandKind kind,
   ) {
     final token = ActionOperationToken._();
     final policy = _actionPresentationPolicyOf(kind);
     final acceptance = _acceptOperation(
-      keys: {ExistingActionKey(actionId)},
+      keys: {key},
       entry: _PresentationEntry(token),
       execute: () async {
         final result = await _executeAction(command);
@@ -1916,6 +1933,7 @@ _PresentationPolicy _intentionPresentationPolicyOf(IntentionCommandKind kind) =>
 
 _PresentationPolicy _actionPresentationPolicyOf(ActionCommandKind kind) =>
     switch (kind) {
+      ActionCommandKind.create ||
       ActionCommandKind.delete => _PresentationPolicy.standard,
       ActionCommandKind.update => _PresentationPolicy.silentSuccess,
     };

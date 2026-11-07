@@ -22,6 +22,13 @@ final class ActionConflictFailure extends ActionCommandFailure {
   GraphFailureCategory get category => GraphFailureCategory.conflict;
 }
 
+final class ActionPathConflictFailure extends ActionCommandFailure {
+  const ActionPathConflictFailure();
+
+  @override
+  GraphFailureCategory get category => GraphFailureCategory.conflict;
+}
+
 final class ActionUnavailableFailure extends ActionCommandFailure {
   const ActionUnavailableFailure();
 
@@ -52,6 +59,11 @@ sealed class ActionCommandSuccess implements GraphCommandOutcome {
 
   @override
   final List<GraphChange> changes;
+}
+
+final class ActionCreated extends ActionCommandSuccess {
+  ActionCreated({required this.action, required super.changes});
+  final Action action;
 }
 
 final class ActionFieldsUpdated extends ActionCommandSuccess {

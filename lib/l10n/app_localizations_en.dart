@@ -1904,6 +1904,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get actionDeleted => 'Action deleted.';
 
   @override
+  String get actionCreated => 'Action created.';
+
+  @override
+  String get actionPathConflict =>
+      'The path no longer matches the graph. Check the path and try again.';
+
+  @override
   String get actionDescriptionInvalid => 'Check the action description.';
 
   @override

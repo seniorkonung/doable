@@ -8,6 +8,7 @@ String actionCommandFailureMessage(
   ActionCommandFailure failure,
 ) => switch (failure) {
   ActionNotFoundFailure() => localizations.actionOperationNotFound,
+  ActionPathConflictFailure() => localizations.actionPathConflict,
   ActionConflictFailure() => localizations.actionOperationConflict,
   ActionUnavailableFailure() => localizations.actionOperationUnavailable,
   ActionCorruptionFailure() => localizations.actionOperationCorruption,

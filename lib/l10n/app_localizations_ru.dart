@@ -1928,6 +1928,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get actionDeleted => 'Действие удалено.';
 
   @override
+  String get actionCreated => 'Действие создано.';
+
+  @override
+  String get actionPathConflict =>
+      'Путь больше не совпадает с графом. Проверьте путь и попробуйте снова.';
+
+  @override
   String get actionDescriptionInvalid => 'Проверьте описание действия.';
 
   @override

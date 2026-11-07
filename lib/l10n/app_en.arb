@@ -1346,6 +1346,10 @@
   "@actionDeleted": {
     "description": "Подтверждение удаления действия"
   },
+  "actionCreated": "Action created.",
+  "@actionCreated": {"description": "Успех создания действия"},
+  "actionPathConflict": "The path no longer matches the graph. Check the path and try again.",
+  "@actionPathConflict": {"description": "Конфликт пути действия"},
   "actionDescriptionInvalid": "Check the action description.",
   "@actionDescriptionInvalid": {
     "description": "Ошибка описания действия"

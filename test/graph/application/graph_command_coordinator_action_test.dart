@@ -22,6 +22,41 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
 
 void main() {
+  test(
+    'повтор формы не принимается, а другая форма с теми же полями принимается',
+    () async {
+      final repository = _ControlledRepository();
+      final coordinator = _coordinator(repository);
+      final form = ActionCreationFormKey();
+      final command = CreateAction(
+        title: ActionTitle('Пробежка'),
+        description: null,
+        path: ActionPath([_intention]),
+        date: CalendarDate.fromParts(2026, 10, 8),
+        schedule: const ActionAllDay(),
+        priority: ActionPriority.p4,
+      );
+      final first = coordinator.acceptActionCreation(
+        form,
+        command,
+      ) as ActionCommandAccepted;
+      expect(
+        coordinator.acceptActionCreation(form, command),
+        isA<ActionCommandAlreadyRunning>(),
+      );
+      final second = coordinator.acceptActionCreation(
+        ActionCreationFormKey(),
+        command,
+      ) as ActionCommandAccepted;
+      expect(repository.commands, hasLength(2));
+      repository.completeFailure(0);
+      repository.completeFailure(1);
+      await first.future;
+      await second.future;
+      await coordinator.shutdown();
+    },
+  );
+
   test('изменение и удаление одного действия, как и повтор той же команды, '
       'не принимаются, пока принятая выполняется', () async {
     final repository = _ControlledRepository();

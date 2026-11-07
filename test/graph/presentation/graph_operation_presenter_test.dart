@@ -747,6 +747,30 @@ void main() {
     });
   }
 
+  testWidgets('создание действия и конфликт пути предъявляются безопасно', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final creation = harness.startActionCreation();
+    harness.completeActionCreated(creation);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Создание — «действие»: Действие создано.'),
+      findsOneWidget,
+    );
+    await _closeMessage(tester);
+    final conflict = harness.startActionCreation();
+    harness.completeActionFailure(conflict, const ActionPathConflictFailure());
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Создание — «действие»: Путь больше не совпадает с графом. Проверьте путь и попробуйте снова.',
+      ),
+      findsOneWidget,
+    );
+    await _closeMessage(tester);
+  });
+
   testWidgets('действие предъявляет удаление лишь после подтверждения записи', (
     tester,
   ) async {
@@ -1928,6 +1952,41 @@ final class _PresenterHarness {
 
   void releaseInitiatorPresentation(GraphOperationToken token) =>
       _coordinator.releaseInitiatorPresentation(token);
+
+  ActionCommandAccepted startActionCreation() {
+    final commandIndex = repository.actionCommands.length;
+    final accepted = _coordinator.acceptActionCreation(
+      ActionCreationFormKey(),
+      CreateAction(
+        title: ActionTitle('Пробежка'),
+        description: null,
+        path: ActionPath([testDetailsIntentionId(1)]),
+        date: CalendarDate.fromParts(2026, 9, 23),
+        schedule: const ActionAllDay(),
+        priority: ActionPriority.p4,
+      ),
+    ) as ActionCommandAccepted;
+    _coordinator.releaseInitiatorPresentation(accepted.token);
+    _actionIndexes[accepted] = commandIndex;
+    return accepted;
+  }
+
+  void completeActionCreated(ActionCommandAccepted accepted) {
+    const revision = TestDetailsRevision(7);
+    final action = _action();
+    repository.completeActionCommand(
+      _actionIndexes[accepted]!,
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: ActionCreated(
+            action: action,
+            changes: [ActionCreatedChange(revision: revision, action: action)],
+          ),
+        ),
+      ),
+    );
+  }
 
   ActionCommandAccepted startActionUpdate() {
     final commandIndex = repository.actionCommands.length;

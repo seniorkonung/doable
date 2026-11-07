@@ -118,7 +118,7 @@ enum LongTermRelationCommandDiagnosticsType {
   delete,
 }
 
-enum ActionCommandDiagnosticsType { updateFields, delete }
+enum ActionCommandDiagnosticsType { create, updateFields, delete }
 
 /// Проверка состояния действия, запись и чтение подтверждённого результата.
 enum ActionCommandDiagnosticsStage { validation, write, resultRead }

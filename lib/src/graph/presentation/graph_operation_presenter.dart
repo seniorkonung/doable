@@ -405,6 +405,7 @@ String _actionMessage(
   ActionPresentableCompletion completion,
 ) => localizations.graphOperationMessage(
   switch (completion.kind) {
+    ActionCommandKind.create => localizations.graphOperationCreate,
     ActionCommandKind.update => localizations.graphOperationUpdate,
     ActionCommandKind.delete => localizations.graphOperationDelete,
   },
@@ -414,6 +415,7 @@ String _actionMessage(
       ActionCommandKind.update => throw StateError(
         'Успех изменения действия не образует права предъявления.',
       ),
+      ActionCommandKind.create => localizations.actionCreated,
       ActionCommandKind.delete => localizations.actionDeleted,
     },
     GraphResultFailure(:final failure) => actionCommandFailureMessage(

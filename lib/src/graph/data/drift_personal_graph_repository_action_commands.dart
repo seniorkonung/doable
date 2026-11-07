@@ -3,6 +3,10 @@ part of 'drift_personal_graph_repository.dart';
 extension _ActionCommandExecution on DriftPersonalGraphRepository {
   Future<ActionCommandResult> _executeAction(ActionCommand command) =>
       switch (command) {
+        final CreateAction create => _runActionCommand(
+          ActionCommandDiagnosticsType.create,
+          (clock, enterStage) => _createAction(create, clock, enterStage),
+        ),
         final UpdateActionFields update => _runActionCommand(
           ActionCommandDiagnosticsType.updateFields,
           (clock, enterStage) => _updateActionFields(update, clock, enterStage),
@@ -56,6 +60,89 @@ extension _ActionCommandExecution on DriftPersonalGraphRepository {
       );
       return GraphCommandFailed(failure);
     }
+  }
+
+  Future<_GraphWrite<ActionCommandSuccess>> _createAction(
+    CreateAction command,
+    _GraphWriteClock clock,
+    void Function(ActionCommandDiagnosticsStage next) enterStage,
+  ) async {
+    final path = command.path.intentions;
+    for (final (position, intention) in path.indexed) {
+      final id = intention.toCanonicalString();
+      final active = await _database
+          .customSelect(
+            'SELECT 1 FROM intentions WHERE id = ? AND is_archived = 0',
+            variables: [Variable<String>(id)],
+            readsFrom: {_database.intentions},
+          )
+          .getSingleOrNull();
+      if (active == null) throw const ActionPathConflictFailure();
+      if (position > 0) {
+        final relation = await _database
+            .customSelect(
+              'SELECT 1 FROM long_term_relations WHERE source_intention_id = ? AND related_intention_id = ? AND is_archived = 0',
+              variables: [
+                Variable<String>(path[position - 1].toCanonicalString()),
+                Variable<String>(id),
+              ],
+              readsFrom: {_database.longTermRelations},
+            )
+            .getSingleOrNull();
+        if (relation == null) throw const ActionPathConflictFailure();
+      }
+    }
+    final id = switch (ActionId.decode(const Uuid().v7())) {
+      ActionIdDecodingSuccess(:final id) => id,
+      InvalidActionIdDecoding() => throw StateError(
+        'Недопустимый UUID действия.',
+      ),
+    };
+    final serialized = id.toCanonicalString();
+    final timestamp = clock.read().microsecondsSinceEpoch;
+    enterStage(ActionCommandDiagnosticsStage.write);
+    await _database
+        .into(_database.actions)
+        .insert(
+          local.ActionsCompanion.insert(
+            id: serialized,
+            title: command.title.value,
+            description: Value(command.description?.value),
+            date: command.date.toCanonicalString(),
+            scheduledHour: Value(switch (command.schedule) {
+              ActionAllDay() => null,
+              ActionAtHour(:final hour) => hour,
+            }),
+            priority: command.priority.level,
+            isCompleted: false,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          ),
+        );
+    for (final (position, intention) in path.indexed) {
+      await _database.customStatement(
+        """INSERT INTO action_path_items
+           (action_id, position, intention_id, previous_intention_id, role, order_date, order_hour, order_sequence)
+           SELECT ?1, ?2, ?3, ?4, ?5, date, COALESCE(scheduled_hour, -1), creation_sequence FROM actions WHERE id = ?1""",
+        [
+          serialized,
+          position,
+          intention.toCanonicalString(),
+          position == 0 ? null : path[position - 1].toCanonicalString(),
+          _StoredActionPathRole.at(position, path.length).name,
+        ],
+      );
+    }
+    enterStage(ActionCommandDiagnosticsStage.resultRead);
+    final action =
+        await _readStoredAction(id) ?? (throw const StoredGraphCorruption());
+    return _GraphWriteResult<ActionCommandSuccess>(
+      didMutate: true,
+      toSuccess: (revision) => ActionCreated(
+        action: action,
+        changes: [ActionCreatedChange(revision: revision, action: action)],
+      ),
+    );
   }
 
   Future<_GraphWrite<ActionCommandSuccess>> _updateActionFields(

@@ -1,6 +1,7 @@
 import '../../graph/application/graph_command_result.dart';
 import '../../shared/domain/calendar_date.dart';
 import '../domain/action_id.dart';
+import '../domain/action_path.dart';
 import '../domain/action_priority.dart';
 import '../domain/action_schedule.dart';
 import '../domain/action_text.dart';
@@ -12,6 +13,25 @@ import 'action_result.dart';
 sealed class ActionCommand
     implements GraphCommand<ActionCommandSuccess, ActionCommandFailure> {
   const ActionCommand();
+}
+
+/// Создаёт невыполненное действие с указанным путём.
+final class CreateAction extends ActionCommand {
+  const CreateAction({
+    required this.title,
+    required this.description,
+    required this.path,
+    required this.date,
+    required this.schedule,
+    required this.priority,
+  });
+
+  final ActionTitle title;
+  final ActionDescription? description;
+  final ActionPath path;
+  final CalendarDate date;
+  final ActionSchedule schedule;
+  final ActionPriority priority;
 }
 
 /// Правка одного поля действия: оставить или заменить.
