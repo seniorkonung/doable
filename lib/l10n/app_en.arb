@@ -1981,6 +1981,26 @@
   "@intentionCatalogEmptyArchiveText": {
     "description": "Текст пустого архивного охвата каталога"
   },
+  "pathStartPickerTitle": "Choose an intention",
+  "@pathStartPickerTitle": {"description": "Текст поиска начала пути"},
+  "pathStartPickerEmpty": "There are no intentions available to start a path.",
+  "@pathStartPickerEmpty": {"description": "Текст поиска начала пути"},
+  "pathStartNewAction": "New action",
+  "@pathStartNewAction": {"description": "Текст поиска начала пути"},
+  "pathStartEditPath": "Edit path",
+  "@pathStartEditPath": {"description": "Текст поиска начала пути"},
+  "pathStartSubtitle": "{flow}: where the path starts",
+  "pathStartFirstStep": "The intention where the path starts",
+  "@pathStartFirstStep": {"description": "Текст поиска начала пути"},
+  "pathStartFirstNote": "Usually this is the goal behind the action. You can choose the immediate reason if it is clear enough.",
+  "@pathStartFirstNote": {"description": "Текст поиска начала пути"},
+  "pathStartSecondStep": "Further down",
+  "@pathStartSecondStep": {"description": "Текст поиска начала пути"},
+  "pathStartSecondNote": "This is optional: each next intention is something needed or possible for the previous one.",
+  "@pathStartSecondNote": {"description": "Текст поиска начала пути"},
+  "pathStartCurrentStep": "You are here",
+  "@pathStartCurrentStep": {"description": "Текст поиска начала пути"},
+  "@pathStartSubtitle": {"description": "Подзаголовок поиска начала пути", "placeholders": {"flow": {"type": "String"}}},
   "participantPickerTitle": "Choose intentions",
   "@participantPickerTitle": {
     "description": "Заголовок поиска участников связи"

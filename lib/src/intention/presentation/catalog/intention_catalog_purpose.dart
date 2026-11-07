@@ -1,4 +1,5 @@
 import '../../../long_term_relation/application/relation_pair_probe.dart';
+import '../../domain/intention_id.dart';
 
 /// Идентичность одного поиска на всё время жизни его страницы.
 ///
@@ -34,6 +35,24 @@ final class BrowseIntentionCatalog extends IntentionCatalogPurpose {
 /// наследнику.
 sealed class IntentionPickerPurpose extends IntentionCatalogPurpose {
   const IntentionPickerPurpose();
+}
+
+/// Поиск начала пути исключает текущий корень при его замене.
+final class SelectPathStart extends IntentionPickerPurpose {
+  const SelectPathStart({required this.session, this.currentRoot});
+
+  final IntentionSearchSession session;
+  final IntentionId? currentRoot;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SelectPathStart &&
+      identical(other.session, session) &&
+      other.currentRoot == currentRoot;
+
+  @override
+  int get hashCode =>
+      Object.hash(SelectPathStart, identityHashCode(session), currentRoot);
 }
 
 /// Выбор существующего активного намерения участником долговременной связи.

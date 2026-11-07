@@ -2696,6 +2696,40 @@ class AppLocalizationsRu extends AppLocalizations {
       'Архивированное намерение уходит из активного списка и остаётся здесь.';
 
   @override
+  String get pathStartPickerTitle => 'Выбор намерения';
+
+  @override
+  String get pathStartPickerEmpty => 'Нет доступных намерений для начала пути.';
+
+  @override
+  String get pathStartNewAction => 'Новое действие';
+
+  @override
+  String get pathStartEditPath => 'Изменение пути';
+
+  @override
+  String pathStartSubtitle(String flow) {
+    return '$flow: с чего начинается путь';
+  }
+
+  @override
+  String get pathStartFirstStep => 'Намерение, с которого начинается путь';
+
+  @override
+  String get pathStartFirstNote =>
+      'Обычно это цель, ради которой делается действие. Если ближайшая причина достаточно понятна, можно выбрать её.';
+
+  @override
+  String get pathStartSecondStep => 'Дальше вниз';
+
+  @override
+  String get pathStartSecondNote =>
+      'Это необязательно: каждое следующее намерение — то, что нужно или можно для предыдущего.';
+
+  @override
+  String get pathStartCurrentStep => 'Вы здесь';
+
+  @override
   String get participantPickerTitle => 'Выбор намерений';
 
   @override

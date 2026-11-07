@@ -4109,6 +4109,66 @@ abstract class AppLocalizations {
   /// **'An intention you archive leaves the active list and stays here.'**
   String get intentionCatalogEmptyArchiveText;
 
+  /// Текст поиска начала пути
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an intention'**
+  String get pathStartPickerTitle;
+
+  /// Текст поиска начала пути
+  ///
+  /// In en, this message translates to:
+  /// **'There are no intentions available to start a path.'**
+  String get pathStartPickerEmpty;
+
+  /// Текст поиска начала пути
+  ///
+  /// In en, this message translates to:
+  /// **'New action'**
+  String get pathStartNewAction;
+
+  /// Текст поиска начала пути
+  ///
+  /// In en, this message translates to:
+  /// **'Edit path'**
+  String get pathStartEditPath;
+
+  /// Подзаголовок поиска начала пути
+  ///
+  /// In en, this message translates to:
+  /// **'{flow}: where the path starts'**
+  String pathStartSubtitle(String flow);
+
+  /// Текст поиска начала пути
+  ///
+  /// In en, this message translates to:
+  /// **'The intention where the path starts'**
+  String get pathStartFirstStep;
+
+  /// Текст поиска начала пути
+  ///
+  /// In en, this message translates to:
+  /// **'Usually this is the goal behind the action. You can choose the immediate reason if it is clear enough.'**
+  String get pathStartFirstNote;
+
+  /// Текст поиска начала пути
+  ///
+  /// In en, this message translates to:
+  /// **'Further down'**
+  String get pathStartSecondStep;
+
+  /// Текст поиска начала пути
+  ///
+  /// In en, this message translates to:
+  /// **'This is optional: each next intention is something needed or possible for the previous one.'**
+  String get pathStartSecondNote;
+
+  /// Текст поиска начала пути
+  ///
+  /// In en, this message translates to:
+  /// **'You are here'**
+  String get pathStartCurrentStep;
+
   /// Заголовок поиска участников связи
   ///
   /// In en, this message translates to:

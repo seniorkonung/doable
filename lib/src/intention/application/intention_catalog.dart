@@ -144,6 +144,7 @@ final class IntentionCatalogQuery {
     required String? titleFilter,
     IntentionTagFilter tagFilter = IntentionTagFilter.empty,
     RelationPairProbe? pairProbe,
+    IntentionId? excludedIntentionId,
     required IntentionCatalogOrder order,
     required int pageSize,
     IntentionCatalogCursor? cursor,
@@ -162,6 +163,7 @@ final class IntentionCatalogQuery {
       titleFilter: normalizedFilter,
       tagFilter: tagFilter,
       pairProbe: pairProbe,
+      excludedIntentionId: excludedIntentionId,
       order: order,
       pageSize: pageSize,
       cursor: cursor,
@@ -175,6 +177,7 @@ final class IntentionCatalogQuery {
     required this.titleFilter,
     required this.tagFilter,
     required this.pairProbe,
+    required this.excludedIntentionId,
     required this.order,
     required this.pageSize,
     required this.cursor,
@@ -193,6 +196,9 @@ final class IntentionCatalogQuery {
   /// Пара поиска участника связи; её участник другой роли исключается по
   /// идентичности до подсчёта и порции.
   final RelationPairProbe? pairProbe;
+
+  /// Намерение, исключённое до подсчёта и формирования порций.
+  final IntentionId? excludedIntentionId;
   final IntentionCatalogOrder order;
   final int pageSize;
   final IntentionCatalogCursor? cursor;
@@ -208,6 +214,7 @@ final class IntentionCatalogQuery {
     titleFilter: titleFilter,
     tagFilter: tagFilter,
     pairProbe: pairProbe,
+    excludedIntentionId: excludedIntentionId,
     order: order,
     pageSize: pageSize,
     cursor: cursor,
@@ -222,6 +229,7 @@ final class IntentionCatalogQuery {
     titleFilter: titleFilter,
     tagFilter: tagFilter,
     pairProbe: pairProbe,
+    excludedIntentionId: excludedIntentionId,
     order: order,
     pageSize: pageSize,
     cursor: cursor,
@@ -247,6 +255,7 @@ final class IntentionCatalogQuery {
     if (!matchesScope ||
         !matchesReadiness ||
         summary.id == pairProbe?.counterpartId ||
+        summary.id == excludedIntentionId ||
         !tagFilter.matches(summary.tags.map((tag) => tag.id).toSet())) {
       return false;
     }

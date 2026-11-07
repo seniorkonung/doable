@@ -62,9 +62,8 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   IntentionCatalogSelection get selection => IntentionCatalogSelection(
     scope: switch (_purpose) {
       BrowseIntentionCatalog() => IntentionScopeOpen(_scope),
-      SelectRelationParticipant() => const IntentionScopeFixed(
-        IntentionScope.active,
-      ),
+      SelectRelationParticipant() ||
+      SelectPathStart() => const IntentionScopeFixed(IntentionScope.active),
     },
     type: _type,
     titleFilterText: _titleFilterText,
@@ -131,7 +130,11 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         tagFilter: _tagFilter,
         pairProbe: switch (purpose) {
           SelectRelationParticipant(:final pairProbe) => pairProbe,
-          BrowseIntentionCatalog() => null,
+          BrowseIntentionCatalog() || SelectPathStart() => null,
+        },
+        excludedIntentionId: switch (purpose) {
+          SelectPathStart(:final currentRoot) => currentRoot,
+          _ => null,
         },
         order: _order,
         pageSize: _policy.pageSize,
@@ -594,6 +597,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         titleFilter: confirmed.query.titleFilter?.map((value) => value),
         tagFilter: confirmed.query.tagFilter,
         pairProbe: confirmed.query.pairProbe,
+        excludedIntentionId: confirmed.query.excludedIntentionId,
         order: confirmed.query.order,
         pageSize: confirmed.query.pageSize,
         cursor: confirmed.nextCursor,

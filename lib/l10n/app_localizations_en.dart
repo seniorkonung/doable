@@ -2666,6 +2666,41 @@ class AppLocalizationsEn extends AppLocalizations {
       'An intention you archive leaves the active list and stays here.';
 
   @override
+  String get pathStartPickerTitle => 'Choose an intention';
+
+  @override
+  String get pathStartPickerEmpty =>
+      'There are no intentions available to start a path.';
+
+  @override
+  String get pathStartNewAction => 'New action';
+
+  @override
+  String get pathStartEditPath => 'Edit path';
+
+  @override
+  String pathStartSubtitle(String flow) {
+    return '$flow: where the path starts';
+  }
+
+  @override
+  String get pathStartFirstStep => 'The intention where the path starts';
+
+  @override
+  String get pathStartFirstNote =>
+      'Usually this is the goal behind the action. You can choose the immediate reason if it is clear enough.';
+
+  @override
+  String get pathStartSecondStep => 'Further down';
+
+  @override
+  String get pathStartSecondNote =>
+      'This is optional: each next intention is something needed or possible for the previous one.';
+
+  @override
+  String get pathStartCurrentStep => 'You are here';
+
+  @override
   String get participantPickerTitle => 'Choose intentions';
 
   @override
