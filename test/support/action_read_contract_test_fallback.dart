@@ -23,6 +23,13 @@ mixin ActionReadContractTestFallback implements ActionReadContract {
       Stream.value(const ActionReadError(ActionReadUnexpectedFailure()));
 
   @override
+  Stream<ActionPathStateReadResult> watchActionPathState(
+    ActionDraftPath path,
+  ) => Stream.value(
+    const ActionPathStateReadError(ActionReadUnexpectedFailure()),
+  );
+
+  @override
   Future<IntentionActionsPageResult> getIntentionActionsPage(
     IntentionActionsQuery query,
   ) async =>

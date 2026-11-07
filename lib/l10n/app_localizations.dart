@@ -4919,6 +4919,18 @@ abstract class AppLocalizations {
   /// **'Path: {path}. Change the path'**
   String actionEditorPathLabel(String path);
 
+  /// Архивная связь в доступном названии свёрнутого пути листа нового действия
+  ///
+  /// In en, this message translates to:
+  /// **'A link is archived'**
+  String get actionEditorPathLinkArchived;
+
+  /// Удалённая связь в доступном названии свёрнутого пути листа нового действия
+  ///
+  /// In en, this message translates to:
+  /// **'A link is deleted'**
+  String get actionEditorPathLinkDeleted;
+
   /// Доступное название значения приоритета в листе нового действия
   ///
   /// In en, this message translates to:

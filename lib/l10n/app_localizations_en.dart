@@ -3211,6 +3211,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get actionEditorPathLinkArchived => 'A link is archived';
+
+  @override
+  String get actionEditorPathLinkDeleted => 'A link is deleted';
+
+  @override
   String actionEditorPriorityLabel(String priority) {
     return 'Priority $priority. Change the priority';
   }

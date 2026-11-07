@@ -151,7 +151,7 @@ final class DriftPersonalGraphRepository
   /// Сигнал подтверждённой записи реестра копий.
   final StreamController<void> _backupsChanged = StreamController.broadcast();
   final Map<IntentionId, Set<StreamController<void>>> _intentionWatchers = {};
-  final Map<ActionId, Set<_ActionWatchRegistration>> _actionWatchers = {};
+  final Set<_ActionWatchRegistration> _actionWatchers = {};
   final Map<LongTermRelationId, Set<_RelationWatchRegistration>>
   _relationWatchers = {};
   var _mutationSequence = 0;
@@ -302,6 +302,11 @@ final class DriftPersonalGraphRepository
 
   @override
   Stream<ActionReadResult> watchAction(ActionId id) => _watchAction(id);
+
+  @override
+  Stream<ActionPathStateReadResult> watchActionPathState(
+    ActionDraftPath path,
+  ) => _watchActionPathState(path);
 
   @override
   Future<IntentionActionsPageResult> getIntentionActionsPage(

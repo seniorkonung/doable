@@ -240,8 +240,8 @@ final class ActionDayStatusesReadDiagnosticsEvent extends DiagnosticsEvent {
   }) : super(status);
 }
 
-/// Чтение действия с сохранённым путём: исход, длительность и безопасная
-/// категория отказа. Идентификаторы, пользовательский текст и исходное
+/// Чтение действия с сохранённым путём или пути черновика нового действия:
+/// исход, длительность и безопасная категория отказа. Идентификаторы, пользовательский текст и исходное
 /// исключение не входят в контракт события.
 final class ActionReadDiagnosticsEvent extends DiagnosticsEvent {
   const ActionReadDiagnosticsEvent({required DiagnosticsStatus status})

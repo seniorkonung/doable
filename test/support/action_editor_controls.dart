@@ -9,6 +9,7 @@ import 'package:doable/src/action/application/action_day_statuses.dart';
 import 'package:doable/src/action/application/action_result.dart';
 import 'package:doable/src/action/domain/action.dart';
 import 'package:doable/src/action/presentation/editor/action_editor_page.dart';
+import 'package:doable/src/action/application/action_details.dart';
 import 'package:doable/src/action/presentation/editor/action_editor_state.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -184,7 +185,21 @@ final class ActionEditorRepository
     implements PersonalGraphRepository {
   final creations = <CreateAction>[];
   final _requests = <Completer<ActionCommandResult>>[];
+  final _pathStates = StreamController<ActionPathStateReadResult>.broadcast();
   var _revision = 0;
+
+  /// Путь черновика открытого листа приходит, только когда его отдаст тест.
+  @override
+  Stream<ActionPathStateReadResult> watchActionPathState(
+    ActionDraftPath path,
+  ) => _pathStates.stream;
+
+  /// Отдаёт листу прочитанный путь черновика.
+  void showPathState(ActionSavedPath path) => _pathStates.add(
+    ActionPathStateReadSuccess(
+      GraphSnapshot(revision: FixtureRevision(++_revision), value: path),
+    ),
+  );
 
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<

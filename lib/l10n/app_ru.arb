@@ -951,6 +951,8 @@
   "actionEditorPathBetween": "{count, plural, one{{count} промежуточное намерение} few{{count} промежуточных намерения} many{{count} промежуточных намерений} other{{count} промежуточного намерения}}",
   "actionEditorPathThen": "{previous}, затем {next}",
   "actionEditorPathLabel": "Путь: {path}. Изменить путь",
+  "actionEditorPathLinkArchived": "Связь в архиве",
+  "actionEditorPathLinkDeleted": "Связь удалена",
   "actionEditorPriorityLabel": "Приоритет {priority}. Изменить приоритет",
   "actionPriorityHighest": "Самый высокий",
   "actionPriorityLowest": "Самый низкий",

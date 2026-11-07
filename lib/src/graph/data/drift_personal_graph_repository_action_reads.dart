@@ -1,21 +1,51 @@
 part of 'drift_personal_graph_repository.dart';
 
 extension _ActionReading on DriftPersonalGraphRepository {
-  Stream<ActionReadResult> _watchAction(ActionId id) {
-    final registration = _ActionWatchRegistration(id);
-    var cancelled = false;
-    void unregister() {
-      final registrations = _actionWatchers[id];
-      registrations?.remove(registration);
-      if (registrations?.isEmpty ?? false) _actionWatchers.remove(id);
-    }
+  Stream<ActionReadResult> _watchAction(ActionId id) => _observeActionRead(
+    _ActionWatchRegistration(actionId: id),
+    (registration) async {
+      final details = await _readActionDetails(id);
+      registration.setDependencies(details?.action.path);
+      return details;
+    },
+  );
 
-    late final StreamController<ActionReadResult> controller;
-    Future<ActionReadResult> readCurrent() async {
+  Stream<ActionPathStateReadResult> _watchActionPathState(
+    ActionDraftPath draft,
+  ) {
+    // Удалённое без надгробия несёт последние прочитанные данные: надгробия
+    // ведутся только для сохранённых путей.
+    var known = draft;
+    return _observeActionRead(_ActionWatchRegistration(), (registration) async {
+      registration.setDependencies(draft.path);
+      final path = await _readActionPathState(draft.path, missing: known);
+      known = _draftPathOf(path);
+      return path;
+    });
+  }
+
+  /// Наблюдение чтения действия или пути: первое чтение и перечитывание при
+  /// подтверждённых изменениях зависимостей [registration]. [read] вызывается
+  /// внутри транзакции общего исполнителя графа и обновляет зависимости.
+  Stream<GraphResult<GraphSnapshot<T>, ActionReadFailure>>
+  _observeActionRead<T>(
+    _ActionWatchRegistration registration,
+    Future<T> Function(_ActionWatchRegistration registration) read,
+  ) {
+    var cancelled = false;
+    void unregister() => _actionWatchers.remove(registration);
+
+    late final StreamController<
+      GraphResult<GraphSnapshot<T>, ActionReadFailure>
+    >
+    controller;
+    Future<GraphResult<GraphSnapshot<T>, ActionReadFailure>>
+    readCurrent() async {
       while (true) {
-        final result = await _readAction(id, registration);
+        final result = await _readActionSnapshot(() => read(registration));
         if (cancelled ||
-            result is! ActionReadSuccess ||
+            result
+                is! GraphResultSuccess<GraphSnapshot<T>, ActionReadFailure> ||
             result.value.revision.compareTo(_currentRevision) !=
                 GraphRevisionOrder.older) {
           return result;
@@ -24,12 +54,12 @@ extension _ActionReading on DriftPersonalGraphRepository {
     }
 
     Future<void> observe() async {
-      _actionWatchers.putIfAbsent(id, () => {}).add(registration);
+      _actionWatchers.add(registration);
       GraphRevision? lastSuccessfulRevision;
       try {
         var result = await readCurrent();
         if (cancelled) return;
-        if (result case ActionReadSuccess(:final value)) {
+        if (result case GraphResultSuccess(:final value)) {
           lastSuccessfulRevision = value.revision;
         }
         controller.add(result);
@@ -41,7 +71,7 @@ extension _ActionReading on DriftPersonalGraphRepository {
           }
           result = await readCurrent();
           if (cancelled) return;
-          if (result case ActionReadSuccess(:final value)) {
+          if (result case GraphResultSuccess(:final value)) {
             if (lastSuccessfulRevision?.compareTo(value.revision)
                 case GraphRevisionOrder.same || GraphRevisionOrder.newer) {
               continue;
@@ -52,7 +82,9 @@ extension _ActionReading on DriftPersonalGraphRepository {
         }
       } on Object {
         if (!cancelled) {
-          controller.add(const ActionReadError(ActionReadUnexpectedFailure()));
+          controller.add(
+            GraphResultFailure(const ActionReadUnexpectedFailure()),
+          );
         }
       } finally {
         unregister();
@@ -60,7 +92,7 @@ extension _ActionReading on DriftPersonalGraphRepository {
       }
     }
 
-    controller = StreamController<ActionReadResult>(
+    controller = StreamController(
       onListen: () => unawaited(observe()),
       onCancel: () {
         cancelled = true;
@@ -71,28 +103,27 @@ extension _ActionReading on DriftPersonalGraphRepository {
     return controller.stream;
   }
 
-  Future<ActionReadResult> _readAction(
-    ActionId id,
-    _ActionWatchRegistration registration,
-  ) async {
+  /// Одно чтение в транзакции общего исполнителя графа с диагностикой и
+  /// безопасной категорией отказа.
+  Future<GraphResult<GraphSnapshot<T>, ActionReadFailure>>
+  _readActionSnapshot<T>(Future<T> Function() read) async {
     final stopwatch = Stopwatch()..start();
     _recordDiagnostics(
       const ActionReadDiagnosticsEvent(status: DiagnosticsStarted()),
     );
     try {
       final snapshot = await _sequencer.run(
-        () => _database.transaction(() async {
-          final details = await _readActionDetails(id);
-          registration.setDependencies(details);
-          return GraphSnapshot(value: details, revision: _currentRevision);
-        }),
+        () => _database.transaction(
+          () async =>
+              GraphSnapshot(value: await read(), revision: _currentRevision),
+        ),
       );
       _recordDiagnostics(
         ActionReadDiagnosticsEvent(
           status: DiagnosticsSucceeded(stopwatch.elapsed),
         ),
       );
-      return ActionReadSuccess(snapshot);
+      return GraphResultSuccess(snapshot);
     } on Object catch (error) {
       final failure = error is StoredGraphCorruption
           ? const ActionReadCorruptionFailure()
@@ -112,7 +143,7 @@ extension _ActionReading on DriftPersonalGraphRepository {
           ),
         ),
       );
-      return ActionReadError(failure);
+      return GraphResultFailure(failure);
     }
   }
 
@@ -144,13 +175,11 @@ extension _ActionReading on DriftPersonalGraphRepository {
           break;
       }
     }
-    for (final registrations in List.of(_actionWatchers.values)) {
-      for (final registration in List.of(registrations)) {
-        if (affectedActions.contains(registration.id) ||
-            registration.intentionIds.any(affectedIntentions.contains) ||
-            registration.pairs.any(affectedPairs.contains)) {
-          registration.invalidations.add(null);
-        }
+    for (final registration in List.of(_actionWatchers)) {
+      if (affectedActions.contains(registration.actionId) ||
+          registration.intentionIds.any(affectedIntentions.contains) ||
+          registration.pairs.any(affectedPairs.contains)) {
+        registration.invalidations.add(null);
       }
     }
   }
@@ -161,72 +190,90 @@ extension _ActionReading on DriftPersonalGraphRepository {
   Future<ActionDetails?> _readActionDetails(ActionId id) async {
     final action = await _readStoredAction(id);
     if (action == null) return null;
-    final actionId = Variable<String>(id.toCanonicalString());
+    return ActionDetails(
+      action: action,
+      path: await _readActionPathState(action.path),
+    );
+  }
 
-    final intentionRows = await _database
+  /// Путь [path] на текущих данных: существующие намерения и связи звеньев
+  /// несут текущие данные, удалённые — данные надгробия. Удалённое без
+  /// надгробия берёт данные из [missing]; без него у сохранённого пути это
+  /// повреждение (ADR-0055). Вызывать только внутри транзакции общего
+  /// исполнителя графа.
+  Future<ActionSavedPath> _readActionPathState(
+    ActionPath path, {
+    ActionDraftPath? missing,
+  }) async {
+    final intentions = path.intentions;
+    // Каждая позиция несёт свою пару звена: у пары есть либо связь, либо
+    // надгробие (ADR-0055).
+    final rows = await _database
         .customSelect(
-          '''SELECT p.position, p.intention_id, i.id AS i_id,
+          '''WITH path_state(position, intention_id, previous_intention_id) AS (
+           VALUES ${List.filled(intentions.length, '(?, ?, ?)').join(', ')}
+         )
+         SELECT p.position, p.intention_id, i.id AS i_id,
                 i.title AS i_title, i.description AS i_description,
                 i.is_action_ready AS i_is_action_ready,
                 i.is_archived AS i_is_archived, i.created_at AS i_created_at,
-                i.updated_at AS i_updated_at, d.title AS deleted_title
-         FROM action_path_items p
+                i.updated_at AS i_updated_at, d.title AS deleted_title,
+                r.creation_sequence, r.id, r.source_intention_id,
+                r.related_intention_id, COALESCE(r.type, dr.type) AS type,
+                r.priority, r.description, r.is_archived, r.created_at,
+                r.updated_at
+         FROM path_state p
          LEFT JOIN intentions i ON i.id = p.intention_id
          LEFT JOIN deleted_intentions d ON d.intention_id = p.intention_id
-         WHERE p.action_id = ? ORDER BY p.position''',
-          variables: [actionId],
-          readsFrom: {
-            _database.actionPathItems,
-            _database.intentions,
-            _database.deletedIntentions,
-          },
-        )
-        .get();
-    final intentions = [
-      for (final (position, row) in intentionRows.indexed)
-        _decodeActionPathIntention(row.data, action.path, position),
-    ];
-    if (intentions.length != action.path.intentions.length) {
-      throw const StoredGraphCorruption();
-    }
-
-    // Звено определяет пара соседних намерений: у пары есть либо связь, либо
-    // надгробие (ADR-0055).
-    final linkRows = await _database
-        .customSelect(
-          '''SELECT p.position, r.creation_sequence, r.id,
-                r.source_intention_id, r.related_intention_id,
-                COALESCE(r.type, d.type) AS type, r.priority, r.description,
-                r.is_archived, r.created_at, r.updated_at
-         FROM action_path_items p
          LEFT JOIN long_term_relations r
            ON r.source_intention_id = p.previous_intention_id
           AND r.related_intention_id = p.intention_id
-         LEFT JOIN deleted_relation_pairs d
-           ON d.source_intention_id = p.previous_intention_id
-          AND d.related_intention_id = p.intention_id
-         WHERE p.action_id = ? AND p.position > 0 ORDER BY p.position''',
-          variables: [actionId],
+         LEFT JOIN deleted_relation_pairs dr
+           ON dr.source_intention_id = p.previous_intention_id
+          AND dr.related_intention_id = p.intention_id
+         ORDER BY p.position''',
+          variables: [
+            for (final (position, id) in intentions.indexed) ...[
+              Variable<int>(position),
+              Variable<String>(id.toCanonicalString()),
+              Variable<String>(
+                position == 0
+                    ? null
+                    : intentions[position - 1].toCanonicalString(),
+              ),
+            ],
+          ],
           readsFrom: {
-            _database.actionPathItems,
+            _database.intentions,
+            _database.deletedIntentions,
             _database.longTermRelations,
             _database.deletedRelationPairs,
           },
         )
         .get();
-    if (linkRows.length != intentions.length - 1) {
-      throw const StoredGraphCorruption();
-    }
-    final steps = [
-      for (final (index, row) in linkRows.indexed)
-        ActionPathStep(
-          link: _decodeActionPathLink(row.data, index + 1),
-          intention: intentions[index + 1],
+    if (rows.length != intentions.length) throw const StoredGraphCorruption();
+    final missingIntentions = missing?.intentions;
+    final read = [
+      for (final (position, row) in rows.indexed)
+        _decodeActionPathIntention(
+          row.data,
+          path,
+          position,
+          missingTitle: missingIntentions?[position].title,
         ),
     ];
-    return ActionDetails(
-      action: action,
-      path: ActionSavedPath(root: intentions.first, steps: steps),
+    return ActionSavedPath(
+      root: read.first,
+      steps: [
+        for (var position = 1; position < rows.length; position++)
+          ActionPathStep(
+            link: _decodeActionPathLink(
+              rows[position].data,
+              missingType: missing?.steps[position - 1].relation,
+            ),
+            intention: read[position],
+          ),
+      ],
     );
   }
 }
@@ -234,10 +281,10 @@ extension _ActionReading on DriftPersonalGraphRepository {
 ActionPathIntention _decodeActionPathIntention(
   Map<String, Object?> data,
   ActionPath path,
-  int position,
-) {
-  if (requiredStoredInteger(data, 'position') != position ||
-      position >= path.intentions.length) {
+  int position, {
+  required String? missingTitle,
+}) {
+  if (requiredStoredInteger(data, 'position') != position) {
     throw const StoredGraphCorruption();
   }
   final id = path.intentions[position];
@@ -250,34 +297,57 @@ ActionPathIntention _decodeActionPathIntention(
   }
   return DeletedActionPathIntention(
     id: id,
-    title: decodeStoredIntentionTitle(data, 'deleted_title'),
+    title: data['deleted_title'] == null && missingTitle != null
+        ? missingTitle
+        : decodeStoredIntentionTitle(data, 'deleted_title'),
   );
 }
 
-ActionPathLink _decodeActionPathLink(Map<String, Object?> data, int position) {
-  if (requiredStoredInteger(data, 'position') != position) {
-    throw const StoredGraphCorruption();
-  }
+ActionPathLink _decodeActionPathLink(
+  Map<String, Object?> data, {
+  required relation_domain.LongTermRelationType? missingType,
+}) {
   if (data['id'] != null) {
     return ExistingActionPathLink(
       StoredLongTermRelation.decode(data).toDomain(),
     );
   }
+  if (data['type'] == null && missingType != null) {
+    return DeletedActionPathLink(missingType);
+  }
   return DeletedActionPathLink(decodeStoredRelationType(data));
 }
+
+/// Путь черновика с данными, которые показало чтение [path].
+ActionDraftPath _draftPathOf(ActionSavedPath path) => ActionDraftPath(
+  root: ActionDraftIntention(id: path.root.id, title: path.root.title),
+  steps: [
+    for (final step in path.steps)
+      ActionDraftPathStep(
+        relation: step.link.type,
+        intention: ActionDraftIntention(
+          id: step.intention.id,
+          title: step.intention.title,
+        ),
+      ),
+  ],
+);
 
 typedef _IntentionPair = ({IntentionId source, IntentionId related});
 
 final class _ActionWatchRegistration {
-  _ActionWatchRegistration(this.id);
+  _ActionWatchRegistration({this.actionId});
 
-  final ActionId id;
+  /// Наблюдаемое действие; у пути черновика его нет.
+  final ActionId? actionId;
   final StreamController<void> invalidations = StreamController<void>();
   Set<IntentionId> intentionIds = const {};
   Set<_IntentionPair> pairs = const {};
 
-  void setDependencies(ActionDetails? details) {
-    final intentions = details?.action.path.intentions ?? const [];
+  /// Запоминает намерения и пары пути [path], изменения которых требуют
+  /// перечитывания.
+  void setDependencies(ActionPath? path) {
+    final intentions = path?.intentions ?? const [];
     intentionIds = Set.unmodifiable(intentions);
     pairs = Set.unmodifiable({
       for (var position = 1; position < intentions.length; position++)

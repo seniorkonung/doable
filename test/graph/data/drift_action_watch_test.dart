@@ -46,7 +46,7 @@ final class _ActionPathReadFailure extends LocalDatabaseConnectionObserver {
     final error = failure;
     if (error != null &&
         statement.operation == LocalDatabaseSqlOperation.select &&
-        statement.statements.single.contains('FROM action_path_items p')) {
+        statement.statements.single.contains('FROM path_state p')) {
       throw error;
     }
   }

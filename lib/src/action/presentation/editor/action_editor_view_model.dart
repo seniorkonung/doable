@@ -4,9 +4,12 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
+import '../../../graph/application/personal_graph_repository.dart';
+import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../../intention/domain/intention_text.dart';
 import '../../../shared/domain/calendar_date.dart';
 import '../../application/action_command.dart';
+import '../../application/action_details.dart';
 import '../../application/action_result.dart';
 import '../../domain/action_priority.dart';
 import '../../domain/action_schedule.dart';
@@ -29,13 +32,20 @@ part 'action_editor_view_model.g.dart';
 /// которое состояние перестало публиковать — правка сняла отказ, принята
 /// новая отправка или лист закрыт, — сессия передаёт общей поверхности.
 ///
+/// Путь черновика сессия наблюдает на текущих данных намерений и связей,
+/// чтобы лист отмечал его разрывы; путь черновика от этого не меняется.
+///
 /// Закрытие во время записи не отменяет команду: сессия отказывается от
 /// права на её результат, и отказ предъявит общая поверхность. Поздний
 /// результат закрытой или освобождённой сессии её состояние не меняет.
 @riverpod
 final class ActionEditorViewModel extends _$ActionEditorViewModel {
   late GraphCommandCoordinator _coordinator;
+  late PersonalGraphRepository _repository;
   late ActionEditorLaunch _launch;
+
+  /// Наблюдение текущего пути черновика.
+  StreamSubscription<ActionPathStateReadResult>? _pathStates;
 
   /// Выполняющаяся отправка, на результат которой сессия ещё имеет право.
   ActionOperationToken? _activeToken;
@@ -47,11 +57,14 @@ final class ActionEditorViewModel extends _$ActionEditorViewModel {
   ActionEditorState build(ActionEditorLaunch launch) {
     _launch = launch;
     _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
+    _repository = ref.watch(personalGraphRepositoryProvider);
     listenSelf((_, next) => _publish(next.failurePresentation));
     ref.onDispose(() {
       _releaseActiveOperation();
       _publish(null);
+      unawaited(_pathStates?.cancel());
     });
+    _watchPath(launch.path);
     return ActionEditorState.initial(launch);
   }
 
@@ -74,7 +87,9 @@ final class ActionEditorViewModel extends _$ActionEditorViewModel {
   }
 
   void changePath(ActionDraftPath value) {
-    if (_isEditable) state = state.withPath(value);
+    if (!_isEditable) return;
+    state = state.withPath(value);
+    _watchPath(value);
   }
 
   void changeSchedule(ActionSchedule value) {
@@ -180,6 +195,21 @@ final class ActionEditorViewModel extends _$ActionEditorViewModel {
         ),
       ),
     };
+  }
+
+  /// Наблюдает путь [path] вместо прежнего. Отказ чтения возвращает показ
+  /// пути таким, каким его знает черновик: создание всё равно проверяет путь.
+  void _watchPath(ActionDraftPath? path) {
+    unawaited(_pathStates?.cancel());
+    _pathStates = path == null
+        ? null
+        : _repository.watchActionPathState(path).listen((result) {
+            if (!ref.mounted) return;
+            state = state.withPathState(switch (result) {
+              GraphResultSuccess(:final value) => value.value,
+              GraphResultFailure() => null,
+            });
+          });
   }
 
   /// Отказывается от права на результат выполняющейся отправки: её отказ

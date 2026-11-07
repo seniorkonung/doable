@@ -18,9 +18,11 @@ import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     show IntentionCatalogOrder, IntentionScope;
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
@@ -45,6 +47,7 @@ import '../support/intention_catalog_controls.dart';
 import '../support/intention_creation_origin.dart';
 import '../support/intention_actions_tab.dart';
 import '../support/local_database_harness.dart';
+import '../support/path_screen_controls.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/quick_creation.dart';
 
@@ -233,6 +236,82 @@ void main() {
       'Первый черновик',
     );
   });
+  testWidgets('разорванный путь листа отмечен и открывается с первого целого '
+      'участка, а создание отклоняется с сохранением полей', (tester) async {
+    final app = await _start(tester);
+    await _tap(tester, find.text('Новое действие'));
+    await tester.enterText(actionEditorTitleField, 'Прогулка');
+    await _tap(tester, actionEditorValue('Выберите причину'));
+    await _until(tester, () => find.text('Намерение 1').evaluate().isNotEmpty);
+    await _tap(tester, find.text('Намерение 1'));
+    await _until(tester, () => find.text('Намерение 2').evaluate().isNotEmpty);
+    await _tap(tester, find.text('Намерение 2'));
+    await _until(tester, () => find.text('Намерение 3').evaluate().isNotEmpty);
+    await _tap(tester, find.text('Намерение 3'));
+    await _tap(tester, find.text('Сохранить'));
+    await _until(
+      tester,
+      () => actionEditorValue('Намерение 3').evaluate().isNotEmpty,
+    );
+
+    final repository = app.container.read(personalGraphRepositoryProvider);
+    var deleted = false;
+    unawaited(() async {
+      for (final command in [
+        DeleteLongTermRelation(durabilityRelation(101)),
+        DeleteLongTermRelation(durabilityRelation(103)),
+        DeleteLongTermRelation(durabilityRelation(104)),
+      ]) {
+        expect(await repository.execute(command), isA<GraphCommandSucceeded>());
+      }
+      expect(
+        await repository.execute(DeleteIntention(durabilityIntention(1))),
+        isA<GraphCommandSucceeded>(),
+      );
+      deleted = true;
+    }());
+    await _until(tester, () => deleted);
+    await _until(
+      tester,
+      () => actionEditorValue('Удалено').evaluate().isNotEmpty,
+    );
+    // Удалены корень и связь от него: отметка после названия и на пути.
+    expect(actionEditorValue('Удалено'), findsNWidgets(2));
+    expect(actionEditorValue('Намерение 1'), findsOneWidget);
+    expect(actionEditorCanCreate(tester), isTrue);
+
+    await _tap(tester, actionEditorValue('Намерение 1'));
+    await settlePathScreen(tester);
+    Finder onPath(String text) =>
+        find.descendant(of: pathScreen, matching: find.text(text));
+    expect(onPath('Намерение 1'), findsNothing);
+    expect(
+      tester.getTopLeft(onPath('Намерение 2')).dy,
+      lessThan(tester.getTopLeft(onPath('Намерение 3')).dy),
+    );
+    expect(isPathSaveEnabled(tester), isTrue);
+    await tapPathBack(tester);
+    await _tap(tester, find.text('Отменить'));
+    expect(actionEditorValue('Намерение 1'), findsOneWidget);
+    expect(actionEditorValue('Удалено'), findsNWidgets(2));
+
+    await _tap(tester, actionEditorCreateButton);
+    await _until(
+      tester,
+      () =>
+          actionEditorValue(app.l10n.actionPathConflict).evaluate().isNotEmpty,
+    );
+    expect(
+      tester.widget<EditableText>(actionEditorTitleField).controller.text,
+      'Прогулка',
+    );
+    expect(actionEditorValue('Намерение 3'), findsOneWidget);
+    expect(
+      await tester.runAsync(() => durabilityRows(app.database, 'actions')),
+      isEmpty,
+    );
+  });
+
   testWidgets('пустой день открывает лист с выбранной датой и без пути', (
     tester,
   ) async {

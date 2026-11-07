@@ -39,6 +39,14 @@ final class NewActionPathPurpose extends PathPurpose {
     this.onSaved,
   }) : start = start ?? original;
 
+  /// Путь листа, прочитанный с разрывом: экран открывается с первого целого
+  /// участка [start], а без актуальных намерений — пустым.
+  const NewActionPathPurpose.segment(
+    ActionPath this.original, {
+    required this.start,
+    this.onSaved,
+  }) : createdIntention = false;
+
   @override
   final ActionPath? original;
 

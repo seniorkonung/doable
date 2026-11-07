@@ -6,6 +6,7 @@ import 'package:flutter/material.dart' hide Badge, TextField;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../action/application/action_details.dart';
 import '../../../action/presentation/editor/action_editor_state.dart';
 import '../../../action/presentation/intention_actions/intention_actions_sliver.dart';
 import '../../../action/presentation/intention_actions/intention_actions_state.dart';

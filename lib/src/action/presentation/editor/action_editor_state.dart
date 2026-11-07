@@ -1,10 +1,8 @@
 import '../../../graph/application/graph_command_coordinator.dart';
-import '../../../intention/domain/intention_id.dart';
 import '../../../intention/domain/intention_text.dart';
-import '../../../long_term_relation/domain/long_term_relation.dart';
 import '../../../shared/domain/calendar_date.dart';
+import '../../application/action_details.dart';
 import '../../application/action_result.dart';
-import '../../domain/action_path.dart';
 import '../../domain/action_priority.dart';
 import '../../domain/action_schedule.dart';
 
@@ -27,54 +25,6 @@ final class ActionEditorLaunch {
   /// Ключ формы сессии: координатор не принимает её повторную отправку во
   /// время записи, а по завершении записи ключ снова свободен.
   final formKey = ActionCreationFormKey();
-}
-
-/// Намерение пути черновика и название, под которым его показывает лист.
-final class ActionDraftIntention {
-  const ActionDraftIntention({required this.id, required this.title});
-
-  final IntentionId id;
-  final String title;
-}
-
-/// Звено пути черновика: вид связи от предыдущего намерения и само намерение.
-final class ActionDraftPathStep {
-  const ActionDraftPathStep({required this.relation, required this.intention});
-
-  final LongTermRelationType relation;
-  final ActionDraftIntention intention;
-}
-
-/// Непустой путь черновика от корневого намерения до конечного.
-///
-/// Форму пути проверяет [ActionPath]; что намерения активны, а связи
-/// существуют, проверяет команда создания.
-final class ActionDraftPath {
-  factory ActionDraftPath({
-    required ActionDraftIntention root,
-    Iterable<ActionDraftPathStep> steps = const [],
-  }) {
-    final ordered = List<ActionDraftPathStep>.unmodifiable(steps);
-    return ActionDraftPath._(
-      root,
-      ordered,
-      ActionPath([root.id, for (final step in ordered) step.intention.id]),
-    );
-  }
-
-  const ActionDraftPath._(this.root, this.steps, this.path);
-
-  final ActionDraftIntention root;
-  final List<ActionDraftPathStep> steps;
-
-  /// Путь команды создания.
-  final ActionPath path;
-
-  /// Намерения пути от корневого до конечного.
-  List<ActionDraftIntention> get intentions => [
-    root,
-    for (final step in steps) step.intention,
-  ];
 }
 
 /// Данные будущего действия. Тексты хранятся так, как введены: их проверяет
@@ -185,16 +135,24 @@ enum ActionEditorCloseDecision {
 final class ActionEditorState {
   const ActionEditorState._({
     required this.draft,
+    required this.pathState,
     required this.submission,
     required this.isClosed,
   });
 
   ActionEditorState.initial(ActionEditorLaunch launch)
     : draft = ActionEditorDraft.initial(launch),
+      pathState = null,
       submission = const ActionEditorEditing(),
       isClosed = false;
 
   final ActionEditorDraft draft;
+
+  /// Путь черновика на текущих данных намерений и связей; `null`, пока он не
+  /// прочитан или чтение не удалось, и тогда лист показывает путь так, как
+  /// его знает черновик.
+  final ActionSavedPath? pathState;
+
   final ActionEditorSubmission submission;
 
   /// Лист закрыт по запросу: черновик больше не меняется.
@@ -251,13 +209,24 @@ final class ActionEditorState {
     submission: _failureAfterValueEdit(),
   );
 
-  ActionEditorState withPath(ActionDraftPath value) => _edited(
-    draft.copyWith(path: value),
+  /// Новый путь сбрасывает прочитанное состояние прежнего.
+  ActionEditorState withPath(ActionDraftPath value) => ActionEditorState._(
+    draft: draft.copyWith(path: value),
+    pathState: null,
     submission: switch (submission) {
       ActionEditorFailed() => const ActionEditorEditing(),
       _ => submission,
     },
+    isClosed: isClosed,
   );
+
+  ActionEditorState withPathState(ActionSavedPath? value) =>
+      ActionEditorState._(
+        draft: draft,
+        pathState: value,
+        submission: submission,
+        isClosed: isClosed,
+      );
 
   ActionEditorState withSchedule(ActionSchedule value) => _edited(
     draft.copyWith(schedule: value),
@@ -270,24 +239,35 @@ final class ActionEditorState {
   );
 
   ActionEditorState withSubmission(ActionEditorSubmission value) =>
-      ActionEditorState._(draft: draft, submission: value, isClosed: isClosed);
+      ActionEditorState._(
+        draft: draft,
+        pathState: pathState,
+        submission: value,
+        isClosed: isClosed,
+      );
 
   /// Подтверждённое создание очищает название и описание, а путь, дату, время
   /// и приоритет оставляет для следующего действия.
   ActionEditorState created() => ActionEditorState._(
     draft: draft.copyWith(title: '', description: ''),
+    pathState: pathState,
     submission: const ActionEditorEditing(),
     isClosed: isClosed,
   );
 
-  ActionEditorState closed() =>
-      ActionEditorState._(draft: draft, submission: submission, isClosed: true);
+  ActionEditorState closed() => ActionEditorState._(
+    draft: draft,
+    pathState: pathState,
+    submission: submission,
+    isClosed: true,
+  );
 
   ActionEditorState _edited(
     ActionEditorDraft draft, {
     required ActionEditorSubmission submission,
   }) => ActionEditorState._(
     draft: draft,
+    pathState: pathState,
     submission: submission,
     isClosed: isClosed,
   );

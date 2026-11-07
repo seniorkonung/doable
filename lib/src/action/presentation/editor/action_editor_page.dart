@@ -1,13 +1,14 @@
 import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
-import 'package:flutter/material.dart' hide TextField;
+import 'package:flutter/material.dart' hide Badge, TextField;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../design_system/components/action_path.dart'
     show ActionPathRelationKind;
+import '../../../design_system/components/badge.dart';
 import '../../../design_system/components/button.dart';
 import '../../../design_system/components/confirm_dialog.dart';
 import '../../../design_system/components/notice.dart';
@@ -17,16 +18,19 @@ import '../../../design_system/components/text_field.dart';
 import '../../../design_system/components/value_chip.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
+import '../../../intention/domain/intention.dart';
 import '../../../intention/domain/intention_text.dart';
 import '../../../long_term_relation/domain/long_term_relation.dart';
 import '../../../shared/presentation/local_day/local_date_provider.dart';
 import '../../../shared/presentation/local_day/local_day_observer.dart';
+import '../../application/action_details.dart';
 import '../../domain/action_priority.dart';
 import '../../domain/action_path.dart';
 import '../action_command_failure_message.dart';
 import '../panel/action_date_sheet.dart';
 import '../panel/action_field_labels.dart';
 import '../panel/action_time_sheet.dart';
+import '../path/path_segment.dart';
 import '../path/path_state.dart';
 import '../path_start/path_start_picker_page.dart';
 import 'action_editor_state.dart';
@@ -158,56 +162,67 @@ final class _ActionEditorPageState extends ConsumerState<ActionEditorPage> {
     }
   }
 
-  Future<void> _pickPath(ActionEditorDraft draft) async {
+  Future<void> _pickPath(ActionEditorState state) async {
     final router = context.router;
+    final draft = state.draft;
+    final path = draft.path;
     PathStartChoice? choice;
-    if (draft.path == null) {
+    if (path == null) {
       choice = await router.push<PathStartChoice>(
         PathStartPickerRoute(flow: PathStartFlow.newAction),
       );
       if (!mounted || choice == null) return;
     }
     if (!mounted) return;
+    void onSaved(LoadedPathDraft loaded) {
+      if (!mounted) return;
+      final segment = loaded.segment;
+      final appended = loaded.appended;
+      ref
+          .read(_provider.notifier)
+          .changePath(
+            ActionDraftPath(
+              root: ActionDraftIntention(
+                id: segment.root.id,
+                title: segment.root.title,
+              ),
+              steps: [
+                for (final step in segment.steps)
+                  ActionDraftPathStep(
+                    relation: step.relation.type,
+                    intention: ActionDraftIntention(
+                      id: step.intention.id,
+                      title: step.intention.title,
+                    ),
+                  ),
+                if (appended != null)
+                  ActionDraftPathStep(
+                    relation: appended.relation.type,
+                    intention: ActionDraftIntention(
+                      id: appended.relation.relatedIntentionId,
+                      title: appended.title,
+                    ),
+                  ),
+              ],
+            ),
+          );
+    }
+
+    final pathState = state.pathState;
     await router.push<ActionPath>(
       PathRoute(
-        purpose: NewActionPathPurpose(
-          draft.path?.path,
-          start: choice == null ? null : ActionPath([choice.intention]),
-          createdIntention: choice is PathStartCreated,
-          onSaved: (loaded) {
-            if (!mounted) return;
-            final segment = loaded.segment;
-            final appended = loaded.appended;
-            ref
-                .read(_provider.notifier)
-                .changePath(
-                  ActionDraftPath(
-                    root: ActionDraftIntention(
-                      id: segment.root.id,
-                      title: segment.root.title,
-                    ),
-                    steps: [
-                      for (final step in segment.steps)
-                        ActionDraftPathStep(
-                          relation: step.relation.type,
-                          intention: ActionDraftIntention(
-                            id: step.intention.id,
-                            title: step.intention.title,
-                          ),
-                        ),
-                      if (appended != null)
-                        ActionDraftPathStep(
-                          relation: appended.relation.type,
-                          intention: ActionDraftIntention(
-                            id: appended.relation.relatedIntentionId,
-                            title: appended.title,
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-          },
-        ),
+        purpose: path != null && pathState != null
+            ? NewActionPathPurpose.segment(
+                path.path,
+                start: firstWholeSegment(pathState),
+                onSaved: onSaved,
+              )
+            : NewActionPathPurpose(
+                path?.path,
+                start: choice == null ? null : ActionPath([choice.intention]),
+                createdIntention: choice is PathStartCreated,
+                onSaved: onSaved,
+              ),
         actionTitle: draft.title,
         actionPriority: draft.priority,
       ),
@@ -297,8 +312,9 @@ final class _ActionEditorPageState extends ConsumerState<ActionEditorPage> {
               const SizedBox(height: DoableMetrics.space2),
               _PathBrief(
                 path: draft.path,
+                pathState: state.pathState,
                 priority: draft.priority,
-                onPressed: editable ? () => unawaited(_pickPath(draft)) : null,
+                onPressed: editable ? () => unawaited(_pickPath(state)) : null,
               ),
               const SizedBox(height: 6),
               Wrap(
@@ -361,54 +377,161 @@ final class _ActionEditorPageState extends ConsumerState<ActionEditorPage> {
 }
 
 /// Свёрнутый путь черновика и переход к его изменению.
+///
+/// Прочитанный путь показывает текущие названия и отметки разрывов: после
+/// корневого и конечного намерений — их собственные, а разрывы промежуточных
+/// намерений и связей — на самом пути.
 final class _PathBrief extends StatelessWidget {
   const _PathBrief({
     required this.path,
+    required this.pathState,
     required this.priority,
     required this.onPressed,
   });
 
   final ActionDraftPath? path;
+  final ActionSavedPath? pathState;
   final ActionPriority priority;
   final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    final path = this.path;
-    final intentions = path?.intentions ?? const [];
+    final steps = _steps();
+    final last = steps.length - 1;
+    final between = [
+      for (var index = 0; index < steps.length; index++) ...[
+        if (index > 0) steps[index].link,
+        if (index > 0 && index < last) steps[index].intention,
+      ],
+    ];
+    final archivedBetween = between.contains(_PathMark.archived);
+    final deletedBetween = between.contains(_PathMark.deleted);
+    String named(_BriefStep step) =>
+        [step.title, ..._words(localizations, step.intention)].join(', ');
     return PathBrief(
       steps: [
-        if (path != null) ...[
-          PathBriefStep(name: path.root.title),
-          for (final step in path.steps)
-            PathBriefStep(
-              name: step.intention.title,
-              relation: switch (step.relation) {
-                LongTermRelationType.need => ActionPathRelationKind.need,
-                LongTermRelationType.can => ActionPathRelationKind.can,
-              },
-            ),
-        ],
+        for (final (index, step) in steps.indexed)
+          PathBriefStep(
+            name: step.title,
+            relation: switch (step.relation) {
+              LongTermRelationType.need => ActionPathRelationKind.need,
+              LongTermRelationType.can => ActionPathRelationKind.can,
+              null => null,
+            },
+            marks: index == 0 || index == last
+                ? [
+                    if (step.intention == _PathMark.archived)
+                      Badge.archivedInline(word: localizations.detailsArchived),
+                    if (step.intention == _PathMark.deleted)
+                      Badge.deletedInline(
+                        word: localizations.actionPathDeletedBadge,
+                      ),
+                  ]
+                : const [],
+          ),
+      ],
+      marks: [
+        if (archivedBetween)
+          Badge.archived(word: localizations.detailsArchived),
+        if (deletedBetween)
+          Badge.deleted(word: localizations.actionPathDeletedBadge),
       ],
       priority: actionDesignPriority(priority),
       emptyText: localizations.pathChooseReason,
       emptyHint: localizations.actionEditorPathEmptyHint,
       // Строку промежуточных намерений лист показывает только при них.
-      betweenText: intentions.length > 2
-          ? localizations.actionEditorPathBetween(intentions.length - 2)
+      betweenText: steps.length > 2
+          ? localizations.actionEditorPathBetween(steps.length - 2)
           : '',
-      label: intentions.isEmpty
+      label: steps.isEmpty
           ? localizations.pathChooseReasonLabel
           : localizations.actionEditorPathLabel(
-              intentions
-                  .map((intention) => intention.title)
-                  .reduce(
-                    (previous, next) =>
-                        localizations.actionEditorPathThen(previous, next),
-                  ),
+              [
+                steps
+                    .map(named)
+                    .reduce(
+                      (previous, next) =>
+                          localizations.actionEditorPathThen(previous, next),
+                    ),
+                if (steps
+                    .skip(1)
+                    .any((step) => step.link == _PathMark.archived))
+                  localizations.actionEditorPathLinkArchived,
+                if (steps.skip(1).any((step) => step.link == _PathMark.deleted))
+                  localizations.actionEditorPathLinkDeleted,
+              ].join('. '),
             ),
       onPressed: onPressed,
     );
   }
+
+  /// Шаги пути: прочитанные, а до чтения — как их знает черновик.
+  List<_BriefStep> _steps() {
+    final state = pathState;
+    if (state != null) {
+      return [
+        _BriefStep(
+          title: state.root.title,
+          intention: _intentionMark(state.root),
+        ),
+        for (final step in state.steps)
+          _BriefStep(
+            title: step.intention.title,
+            intention: _intentionMark(step.intention),
+            relation: step.link.type,
+            link: _linkMark(step.link),
+          ),
+      ];
+    }
+    final path = this.path;
+    if (path == null) return const [];
+    return [
+      _BriefStep(title: path.root.title),
+      for (final step in path.steps)
+        _BriefStep(title: step.intention.title, relation: step.relation),
+    ];
+  }
+
+  static List<String> _words(AppLocalizations localizations, _PathMark? mark) =>
+      switch (mark) {
+        _PathMark.archived => [localizations.detailsArchived],
+        _PathMark.deleted => [localizations.actionPathDeletedBadge],
+        null => const [],
+      };
+}
+
+/// Разрыв звена или намерения пути.
+enum _PathMark { archived, deleted }
+
+_PathMark? _intentionMark(ActionPathIntention intention) => switch (intention) {
+  DeletedActionPathIntention() => _PathMark.deleted,
+  ExistingActionPathIntention(:final intention) =>
+    switch (intention.archiveState) {
+      IntentionArchiveState.archived => _PathMark.archived,
+      IntentionArchiveState.active => null,
+    },
+};
+
+_PathMark? _linkMark(ActionPathLink link) => switch (link) {
+  DeletedActionPathLink() => _PathMark.deleted,
+  ExistingActionPathLink(:final relation) => switch (relation.scope) {
+    RelationScope.archived => _PathMark.archived,
+    RelationScope.active => null,
+  },
+};
+
+/// Намерение свёрнутого пути, связь к нему от предыдущего и их разрывы.
+final class _BriefStep {
+  const _BriefStep({
+    required this.title,
+    this.intention,
+    this.relation,
+    this.link,
+  });
+
+  final String title;
+  final _PathMark? intention;
+  final LongTermRelationType? relation;
+  final _PathMark? link;
 }

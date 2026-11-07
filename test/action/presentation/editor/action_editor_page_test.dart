@@ -1,8 +1,9 @@
+import 'package:doable/src/action/application/action_details.dart';
 import 'package:doable/src/action/application/action_result.dart';
 import 'package:doable/src/action/domain/action_priority.dart';
 import 'package:doable/src/action/domain/action_schedule.dart';
-import 'package:doable/src/action/presentation/editor/action_editor_state.dart';
 import 'package:doable/src/design_system/components/time_dial.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
@@ -75,6 +76,84 @@ void main() {
     expect(actionEditorValue('2 промежуточных намерения'), findsOneWidget);
     expect(actionEditorValue('Намерение 4'), findsOneWidget);
     expect(actionEditorValue('Намерение 2'), findsNothing);
+  });
+
+  testWidgets('разрывы прочитанного пути отмечены после концов или на самом '
+      'пути, а «Создать действие» остаётся доступной', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final app = await pumpActionEditorPage(tester);
+    final whole = actionDetailsFixture(pathLength: 4).path;
+    await app.open(
+      tester,
+      path: ActionDraftPath(
+        root: ActionDraftIntention(id: whole.root.id, title: whole.root.title),
+        steps: [
+          for (final step in whole.steps)
+            ActionDraftPathStep(
+              relation: step.link.type,
+              intention: ActionDraftIntention(
+                id: step.intention.id,
+                title: step.intention.title,
+              ),
+            ),
+        ],
+      ),
+    );
+    await app.enterTexts(tester, title: 'Силовая тренировка');
+    final [first, middle, last] = whole.steps;
+
+    app.repository.showPathState(
+      ActionSavedPath(
+        root: DeletedActionPathIntention(
+          id: whole.root.id,
+          title: 'Быть здоровым',
+        ),
+        steps: [
+          first,
+          middle,
+          ActionPathStep(
+            link: last.link,
+            intention: ExistingActionPathIntention(
+              _archived(last.intention, title: 'Купить кроссовки'),
+            ),
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+
+    expect(_marksAfter('Быть здоровым'), ['Удалено']);
+    expect(_marksAfter('Купить кроссовки'), ['В архиве']);
+    expect(actionEditorValue('Намерение 4'), findsNothing);
+    expect(
+      find.bySemanticsLabel(
+        RegExp(r'^Путь: Быть здоровым, Удалено, .*Купить кроссовки, В архиве'),
+      ),
+      findsOneWidget,
+    );
+    expect(actionEditorCanCreate(tester), isTrue);
+
+    app.repository.showPathState(
+      ActionSavedPath(
+        root: whole.root,
+        steps: [
+          first,
+          ActionPathStep(
+            link: const DeletedActionPathLink(LongTermRelationType.need),
+            intention: ExistingActionPathIntention(_archived(middle.intention)),
+          ),
+          last,
+        ],
+      ),
+    );
+    await tester.pump();
+
+    expect(_marksAfter('Быть здоровым'), isEmpty);
+    expect(_marksAfter('Намерение 4'), isEmpty);
+    expect(actionEditorValue('В архиве'), findsOneWidget);
+    expect(actionEditorValue('Удалено'), findsOneWidget);
+    expect(actionEditorCanCreate(tester), isTrue);
+    semantics.dispose();
   });
 
   testWidgets('создание без выбора времени и приоритета сохраняет «Весь день» '
@@ -393,4 +472,36 @@ Future<void> _swipeDown(WidgetTester tester) async {
     1500,
   );
   await tester.pumpAndSettle();
+}
+
+/// Отметки в строке названия [title] свёрнутого пути.
+List<String> _marksAfter(String title) => [
+  for (final text
+      in find
+          .descendant(
+            of: find
+                .ancestor(
+                  of: actionEditorValue(title),
+                  matching: find.byType(Wrap),
+                )
+                .first,
+            matching: find.byType(Text),
+          )
+          .evaluate()
+          .map((element) => (element.widget as Text).data))
+    if (text != title) text!,
+];
+
+/// Намерение [intention] в архиве, при необходимости под названием [title].
+Intention _archived(ActionPathIntention intention, {String? title}) {
+  final current = (intention as ExistingActionPathIntention).intention;
+  return Intention(
+    id: current.id,
+    title: title ?? current.title,
+    description: current.description,
+    readiness: current.readiness,
+    archiveState: IntentionArchiveState.archived,
+    createdAt: current.createdAt,
+    updatedAt: current.updatedAt,
+  );
 }

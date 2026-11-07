@@ -4,6 +4,7 @@ import '../../intention/domain/intention.dart';
 import '../../intention/domain/intention_id.dart';
 import '../../long_term_relation/domain/long_term_relation.dart';
 import '../domain/action.dart';
+import '../domain/action_path.dart';
 
 /// Намерение сохранённого пути. Пока намерение существует, оно несёт текущие
 /// данные; удалённое — название, которое было при удалении (ADR-0055).
@@ -84,6 +85,55 @@ final class ActionSavedPath {
   int get intentionCount => steps.length + 1;
 }
 
+/// Намерение пути черновика и название, под которым его знает черновик.
+final class ActionDraftIntention {
+  const ActionDraftIntention({required this.id, required this.title});
+
+  final IntentionId id;
+  final String title;
+}
+
+/// Звено пути черновика: вид связи от предыдущего намерения и само намерение.
+final class ActionDraftPathStep {
+  const ActionDraftPathStep({required this.relation, required this.intention});
+
+  final LongTermRelationType relation;
+  final ActionDraftIntention intention;
+}
+
+/// Непустой путь черновика нового действия от корневого намерения до
+/// конечного с названиями и видами связей, под которыми его знает черновик.
+///
+/// Форму пути проверяет [ActionPath]; что намерения активны, а связи
+/// существуют, проверяет команда создания.
+final class ActionDraftPath {
+  factory ActionDraftPath({
+    required ActionDraftIntention root,
+    Iterable<ActionDraftPathStep> steps = const [],
+  }) {
+    final ordered = List<ActionDraftPathStep>.unmodifiable(steps);
+    return ActionDraftPath._(
+      root,
+      ordered,
+      ActionPath([root.id, for (final step in ordered) step.intention.id]),
+    );
+  }
+
+  const ActionDraftPath._(this.root, this.steps, this.path);
+
+  final ActionDraftIntention root;
+  final List<ActionDraftPathStep> steps;
+
+  /// Путь команды создания.
+  final ActionPath path;
+
+  /// Намерения пути от корневого до конечного.
+  List<ActionDraftIntention> get intentions => [
+    root,
+    for (final step in steps) step.intention,
+  ];
+}
+
 /// Действие для панели: его поля и сохранённый путь [path] на текущих данных
 /// намерений и связей.
 final class ActionDetails {
@@ -125,3 +175,11 @@ typedef ActionReadSuccess =
     GraphResultSuccess<GraphSnapshot<ActionDetails?>, ActionReadFailure>;
 typedef ActionReadError =
     GraphResultFailure<GraphSnapshot<ActionDetails?>, ActionReadFailure>;
+
+/// Текущее состояние пути черновика.
+typedef ActionPathStateReadResult =
+    GraphResult<GraphSnapshot<ActionSavedPath>, ActionReadFailure>;
+typedef ActionPathStateReadSuccess =
+    GraphResultSuccess<GraphSnapshot<ActionSavedPath>, ActionReadFailure>;
+typedef ActionPathStateReadError =
+    GraphResultFailure<GraphSnapshot<ActionSavedPath>, ActionReadFailure>;

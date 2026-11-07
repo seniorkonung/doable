@@ -752,6 +752,11 @@ final class _ObservedRepository implements PersonalGraphRepository {
       _delegate.watchAction(id);
 
   @override
+  Stream<ActionPathStateReadResult> watchActionPathState(
+    ActionDraftPath path,
+  ) => _delegate.watchActionPathState(path);
+
+  @override
   Future<IntentionActionsPageResult> getIntentionActionsPage(
     IntentionActionsQuery query,
   ) => _delegate.getIntentionActionsPage(query);

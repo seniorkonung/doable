@@ -3259,6 +3259,12 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get actionEditorPathLinkArchived => 'Связь в архиве';
+
+  @override
+  String get actionEditorPathLinkDeleted => 'Связь удалена';
+
+  @override
   String actionEditorPriorityLabel(String priority) {
     return 'Приоритет $priority. Изменить приоритет';
   }
