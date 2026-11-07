@@ -4,8 +4,10 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
+import '../../../graph/application/graph_change.dart';
 import '../../../graph/application/personal_graph_repository.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
+import '../../../intention/application/intention_catalog.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../long_term_relation/domain/long_term_relation.dart';
 import '../../application/action_command.dart';
@@ -32,11 +34,18 @@ final class PathViewModel extends _$PathViewModel {
 
   /// Замена, право предъявить отказ которой ещё у экрана.
   ActionOperationToken? _replacement;
+  StreamSubscription<GraphCommandCompletion>? _completions;
+  var _refreshAfterSaving = false;
 
   @override
   PathState build(PathSessionKey sessionKey, PathPurpose purpose) {
     _repository = ref.watch(personalGraphRepositoryProvider);
     _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
+    unawaited(_completions?.cancel());
+    _completions = _coordinator.completions.listen((completion) {
+      scheduleMicrotask(() => _onCompletion(completion));
+    });
+    ref.onDispose(() => unawaited(_completions?.cancel()));
     ref.onDispose(_releaseReplacement);
     final start = purpose.start;
     if (start == null) {
@@ -226,10 +235,12 @@ final class PathViewModel extends _$PathViewModel {
                 presentation: _coordinator.claimInitiatorFailure(token),
               ),
             );
+            _refreshAfterFailedSave();
           case GraphResultSuccess():
             state = state.withSaving(
               const PathSavingFailed(ActionUnexpectedFailure()),
             );
+            _refreshAfterFailedSave();
         }
       // Действие ещё меняет другая принятая операция, например замена с
       // экрана, с которого ушли до её исхода.
@@ -253,6 +264,34 @@ final class PathViewModel extends _$PathViewModel {
     _replacement = null;
   }
 
+  void _onCompletion(GraphCommandCompletion completion) {
+    if (!ref.mounted) return;
+    final changes = completion.confirmedChange?.changes;
+    if (changes == null ||
+        !changes.any(
+          (change) =>
+              change is IntentionCatalogMutation ||
+              change is LongTermRelationChange ||
+              change is GraphReplaced,
+        )) {
+      return;
+    }
+    final ids = state.draft.intentions;
+    if (ids.isEmpty) return;
+    if (state.saving is PathSavingRunning) {
+      _refreshAfterSaving = true;
+      return;
+    }
+    unawaited(_read(ids, half: state.candidates?.half));
+  }
+
+  void _refreshAfterFailedSave() {
+    if (!_refreshAfterSaving) return;
+    _refreshAfterSaving = false;
+    final ids = state.draft.intentions;
+    if (ids.isNotEmpty) unawaited(_read(ids, half: state.candidates?.half));
+  }
+
   Future<void> _read(
     List<IntentionId> ids, {
     LongTermRelationType? half,
@@ -271,7 +310,11 @@ final class PathViewModel extends _$PathViewModel {
     switch (result) {
       case GraphResultSuccess(value: PathCandidatesFirstPage page):
         state = state.withDraft(LoadedPathDraft(page.segment));
-        if (half == null && page.counts.need == 0 && page.counts.can > 0) {
+        if (half != null && page.segment.last.id != ids.last) {
+          await _read(state.draft.intentions);
+        } else if (half == null &&
+            page.counts.need == 0 &&
+            page.counts.can > 0) {
           await _read(state.draft.intentions, half: LongTermRelationType.can);
         } else {
           state = state.withCandidates(

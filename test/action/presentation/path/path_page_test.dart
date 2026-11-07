@@ -7,11 +7,16 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -137,6 +142,98 @@ void main() {
     ))
       row['intention_id'] as String,
   ];
+
+  GraphCommandCoordinator coordinator(WidgetTester tester) =>
+      ProviderScope.containerOf(tester.element(pathScreen))
+          .read(graphCommandCoordinatorProvider.notifier);
+
+  LongTermRelationId relationId(int number) => (LongTermRelationId.decode(
+    seedUuid(number),
+  ) as LongTermRelationIdDecodingSuccess).id;
+
+  testWidgets('архивная связь сокращает открытый путь и исключает кандидата', (
+    tester,
+  ) async {
+    await openPathScreen(
+      tester,
+      router: router,
+      repository: repository,
+      purpose: NewActionPathPurpose(_path([1, 2, 3])),
+    );
+    final start = coordinator(tester).acceptRelationArchive(
+      ArchiveLongTermRelation(relationId(102)),
+    ) as LongTermRelationCommandAccepted;
+    final completion = await tester.runAsync(() => start.future);
+    expect(completion!.isFailure, isFalse);
+    await settlePathScreen(tester);
+    expect(find.text('Много ходить'), findsOneWidget);
+    expect(find.text('Покупать обувь'), findsNothing);
+    expect(isPathSaveEnabled(tester), isTrue);
+    await tapPathBack(tester);
+    expect(find.text('Отменить изменения?'), findsOneWidget);
+  });
+
+  testWidgets('архивирование корня очищает путь', (tester) async {
+    await openPathScreen(
+      tester,
+      router: router,
+      repository: repository,
+      purpose: NewActionPathPurpose(_path([1, 2])),
+    );
+    final start = coordinator(tester).acceptExisting(
+      ArchiveIntention(seedIntentionId(1)),
+      presentationTitle: 'Быть здоровым',
+    ) as IntentionCommandAccepted;
+    final completion = await tester.runAsync(() => start.future);
+    expect(completion!.isFailure, isFalse);
+    await settlePathScreen(tester);
+    expect(find.text('Выберите причину'), findsOneWidget);
+    expect(isPathSaveEnabled(tester), isFalse);
+    await tapPathBack(tester);
+    expect(find.text('Отменить изменения?'), findsOneWidget);
+  });
+
+  testWidgets(
+    'изменения названия и связи обновляют путь без изменения состава',
+    (tester) async {
+      await openPathScreen(
+        tester,
+        router: router,
+        repository: repository,
+        purpose: NewActionPathPurpose(_path([1, 2])),
+      );
+      final rename = coordinator(tester).acceptExisting(
+        UpdateIntention(
+          id: seedIntentionId(2),
+          title: 'Ходить пешком',
+          description: null,
+        ),
+        presentationTitle: 'Много ходить',
+      ) as IntentionCommandAccepted;
+      expect((await tester.runAsync(() => rename.future))!.isFailure, isFalse);
+      final update = coordinator(tester).acceptRelationUpdate(
+        UpdateLongTermRelation(
+          relationId: relationId(101),
+          patch: const LongTermRelationPatch(
+            type: LongTermRelationFieldSet(LongTermRelationType.can),
+            priority: LongTermRelationFieldSet(RelationPriority.p3),
+          ),
+        ),
+      ) as LongTermRelationCommandAccepted;
+      expect((await tester.runAsync(() => update.future))!.isFailure, isFalse);
+      await settlePathScreen(tester);
+      expect(find.text('Ходить пешком'), findsOneWidget);
+      expect(find.text('Много ходить'), findsNothing);
+      expect(find.text('Можно'), findsWidgets);
+      expect(
+        find.bySemanticsLabel(
+          'Связь Можно. Быть здоровым, Ходить пешком. Приоритет P3',
+        ),
+        findsOneWidget,
+      );
+      expect(isPathSaveEnabled(tester), isFalse);
+    },
+  );
 
   testWidgets(
     'пустой путь предлагает выбрать причину, а «Назад» сразу возвращает',
