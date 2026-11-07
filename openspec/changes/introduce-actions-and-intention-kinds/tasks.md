@@ -521,3 +521,16 @@
   - **Зависимости:** нет.
   - **Предполагаемые файлы:** `test/app/home_statistics_app_flow_test.dart`, `test/app/intention_statistics_navigation_test.dart`, `test/statistics/presentation/intention_statistics_view_model_test.dart`, `intention_statistics_reconciliation_test.dart`, `intention_statistics_test_support.dart`, `test/statistics/application/intention_statistics_read_contract_test.dart`, `test/action/presentation/day/action_day_rows_test.dart`, `action_day_root_page_test.dart`, `action_day_page_test_support.dart` и тесты экрана дня, вызывающие его помощники, `test/support/action_day_controls.dart` и его потребители в `test/app` и `test/action/presentation/day`, `test/design_system/count_tiles_test.dart`.
   - **Размер:** S по логике: файлов больше нормы, но меняются только имена и тексты.
+
+- [ ] 1.41 Сводка статистики намерения показывает долю без недостижимой ветви, а описания контракта называют только реальные условия
+  - **Критерии приёмки:**
+    - `_shareLabel` в `lib/src/statistics/presentation/intention_statistics_overview.dart` всегда возвращает долю (`String`, не `String?`) без ветви `periodCounts.planned == 0`: сводка строится только для `IntentionStatisticsData`, где `selectedCounts.planned > 0`, а `IntentionStatisticsSection` отклоняет `selectedCounts.planned > periodCounts.planned`. Комментарий функции не упоминает случай без действий периода, а сводка показывает долю без проверки на `null`.
+    - В комментарии к `periodCounts` в `lib/src/statistics/application/intention_statistics_read_contract.dart` нет описания случая «при нуле доли нет».
+    - Описание привязки курсора `StatisticsBreakdownCursor` в `lib/src/statistics/application/intention_statistics_breakdown.dart` не называет местную дату и перечисляет только условия, которые курсор действительно связывает.
+    - Поведение не меняется: сводка, доля и продолжение разбивок остаются прежними.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter analyze` — без замечаний.
+    - `mise exec --no-deps -- flutter test test/statistics`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/statistics/presentation/intention_statistics_overview.dart`, `lib/src/statistics/application/intention_statistics_read_contract.dart`, `lib/src/statistics/application/intention_statistics_breakdown.dart`.
+  - **Размер:** XS.

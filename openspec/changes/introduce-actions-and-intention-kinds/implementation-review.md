@@ -5,7 +5,7 @@
 **Format version:** 1
 **Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Фаза 1 по существу выполнена: дневные выборы заменены действиями в хранилище, формате, журнале фактов, копиях, интерфейсе и статистике. Полные проверки проекта проходят, `openspec validate --strict` — valid. Остаются две находки низкой важности; они касаются обработки недостижимого состояния в статистике намерения и тестов без собственной регрессии. Принятых остаточных рисков нет.
+**Summary:** Фаза 1 по существу выполнена: дневные выборы заменены действиями в хранилище, формате, журнале фактов, копиях, интерфейсе и статистике. Полные проверки проекта проходят, `openspec validate --strict` — valid. Остаётся одна находка низкой важности: тесты без собственной регрессии. Принятых остаточных рисков нет.
 
 ## Review target
 
@@ -87,15 +87,6 @@
 | Code quality | Complete | Те же пять проходов применили линзы корректности, читаемости, архитектуры, безопасности и производительности `code-review-and-quality` ко всем путям поставки своих блоков с проверкой вызывающих, тестов, схемы и границ выполнения. На `70603dd3` в этом рабочем дереве `mise run check` — EXIT 0: `dart format` без изменений (845 файлов), `flutter analyze` — No issues found, все 3931 обычных теста и 18 процессных тестов прошли. Каждая находка ниже перепроверена координатором по коду головы. |
 
 ## Findings
-
-### F11 · Low — Статистика намерения обрабатывает недостижимую нулевую долю и описывает несуществующую привязку курсора
-
-- **Evidence:** `lib/src/statistics/presentation/intention_statistics_overview.dart:319, 334-343`: `_shareLabel` возвращает `null` при `periodCounts.planned == 0`, а сводка строится только для `IntentionStatisticsData`, которое создаётся при `selectedCounts.planned > 0` (`lib/src/statistics/presentation/intention_statistics_state.dart:283-286`), тогда как `IntentionStatisticsSection` отклоняет `selectedCounts.planned > periodCounts.planned` (`lib/src/statistics/application/intention_statistics_read_contract.dart:197`); комментарий `intention_statistics_read_contract.dart:216-217` описывает тот же невозможный случай. `lib/src/statistics/application/intention_statistics_breakdown.dart:46` говорит, что курсор разбивки привязан к «местной дате», которой в запросе и курсоре больше нет.
-- **Evidence revisions:** ["70603dd3735a93a26734d943c29d42e099e2e98d"]
-- **Impact:** Обработка состояния, которое архитектура исключает, и неверное описание контракта вводят читателя в заблуждение (proven-necessity).
-- **Required outcome:** Доля в сводке показывается без недостижимой ветви, а описания контракта называют только реальные условия.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/statistics/presentation/intention_statistics_overview.dart", "lib/src/statistics/application/intention_statistics_read_contract.dart", "lib/src/statistics/application/intention_statistics_breakdown.dart"]
 
 ### F12 · Low — Тесты без собственной регрессии: повторы другого слоя, мёртвое измерение и перезапуск без записи
 
