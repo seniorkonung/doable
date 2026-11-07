@@ -115,13 +115,14 @@ final class ActionEditorDraft {
   ActionEditorDraft copyWith({
     String? title,
     String? description,
+    ActionDraftPath? path,
     CalendarDate? date,
     ActionSchedule? schedule,
     ActionPriority? priority,
   }) => ActionEditorDraft(
     title: title ?? this.title,
     description: description ?? this.description,
-    path: path,
+    path: path ?? this.path,
     date: date ?? this.date,
     schedule: schedule ?? this.schedule,
     priority: priority ?? this.priority,
@@ -248,6 +249,14 @@ final class ActionEditorState {
   ActionEditorState withDate(CalendarDate value) => _edited(
     draft.copyWith(date: value),
     submission: _failureAfterValueEdit(),
+  );
+
+  ActionEditorState withPath(ActionDraftPath value) => _edited(
+    draft.copyWith(path: value),
+    submission: switch (submission) {
+      ActionEditorFailed() => const ActionEditorEditing(),
+      _ => submission,
+    },
   );
 
   ActionEditorState withSchedule(ActionSchedule value) => _edited(

@@ -5,7 +5,9 @@ import 'package:flutter/material.dart' hide TextField;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
-import '../../../design_system/components/action_path.dart';
+import '../../../app/routing/app_router.gr.dart';
+import '../../../design_system/components/action_path.dart'
+    show ActionPathRelationKind;
 import '../../../design_system/components/button.dart';
 import '../../../design_system/components/confirm_dialog.dart';
 import '../../../design_system/components/notice.dart';
@@ -20,10 +22,13 @@ import '../../../long_term_relation/domain/long_term_relation.dart';
 import '../../../shared/presentation/local_day/local_date_provider.dart';
 import '../../../shared/presentation/local_day/local_day_observer.dart';
 import '../../domain/action_priority.dart';
+import '../../domain/action_path.dart';
 import '../action_command_failure_message.dart';
 import '../panel/action_date_sheet.dart';
 import '../panel/action_field_labels.dart';
 import '../panel/action_time_sheet.dart';
+import '../path/path_state.dart';
+import '../path_start/path_start_picker_page.dart';
 import 'action_editor_state.dart';
 import 'action_editor_view_model.dart';
 import 'action_priority_sheet.dart';
@@ -153,6 +158,62 @@ final class _ActionEditorPageState extends ConsumerState<ActionEditorPage> {
     }
   }
 
+  Future<void> _pickPath(ActionEditorDraft draft) async {
+    final router = context.router;
+    PathStartChoice? choice;
+    if (draft.path == null) {
+      choice = await router.push<PathStartChoice>(
+        PathStartPickerRoute(flow: PathStartFlow.newAction),
+      );
+      if (!mounted || choice == null) return;
+    }
+    if (!mounted) return;
+    await router.push<ActionPath>(
+      PathRoute(
+        purpose: NewActionPathPurpose(
+          draft.path?.path,
+          start: choice == null ? null : ActionPath([choice.intention]),
+          createdIntention: choice is PathStartCreated,
+          onSaved: (loaded) {
+            if (!mounted) return;
+            final segment = loaded.segment;
+            final appended = loaded.appended;
+            ref
+                .read(_provider.notifier)
+                .changePath(
+                  ActionDraftPath(
+                    root: ActionDraftIntention(
+                      id: segment.root.id,
+                      title: segment.root.title,
+                    ),
+                    steps: [
+                      for (final step in segment.steps)
+                        ActionDraftPathStep(
+                          relation: step.relation.type,
+                          intention: ActionDraftIntention(
+                            id: step.intention.id,
+                            title: step.intention.title,
+                          ),
+                        ),
+                      if (appended != null)
+                        ActionDraftPathStep(
+                          relation: appended.relation.type,
+                          intention: ActionDraftIntention(
+                            id: appended.relation.relatedIntentionId,
+                            title: appended.title,
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+          },
+        ),
+        actionTitle: draft.title,
+        actionPriority: draft.priority,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
@@ -234,7 +295,11 @@ final class _ActionEditorPageState extends ConsumerState<ActionEditorPage> {
                 },
               ),
               const SizedBox(height: DoableMetrics.space2),
-              _PathBrief(path: draft.path, priority: draft.priority),
+              _PathBrief(
+                path: draft.path,
+                priority: draft.priority,
+                onPressed: editable ? () => unawaited(_pickPath(draft)) : null,
+              ),
               const SizedBox(height: 6),
               Wrap(
                 spacing: 6,
@@ -295,12 +360,17 @@ final class _ActionEditorPageState extends ConsumerState<ActionEditorPage> {
   }
 }
 
-/// Свёрнутый путь черновика. Переходы с него подключает экран пути.
+/// Свёрнутый путь черновика и переход к его изменению.
 final class _PathBrief extends StatelessWidget {
-  const _PathBrief({required this.path, required this.priority});
+  const _PathBrief({
+    required this.path,
+    required this.priority,
+    required this.onPressed,
+  });
 
   final ActionDraftPath? path;
   final ActionPriority priority;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -338,7 +408,7 @@ final class _PathBrief extends StatelessWidget {
                         localizations.actionEditorPathThen(previous, next),
                   ),
             ),
-      onPressed: null,
+      onPressed: onPressed,
     );
   }
 }

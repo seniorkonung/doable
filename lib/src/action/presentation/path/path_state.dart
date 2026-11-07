@@ -32,13 +32,21 @@ sealed class PathPurpose {
 
 /// Путь листа нового действия: «Сохранить» возвращает его в лист.
 final class NewActionPathPurpose extends PathPurpose {
-  const NewActionPathPurpose(this.original);
+  const NewActionPathPurpose(
+    this.original, {
+    ActionPath? start,
+    this.createdIntention = false,
+    this.onSaved,
+  }) : start = start ?? original;
 
   @override
   final ActionPath? original;
 
   @override
-  ActionPath? get start => original;
+  final ActionPath? start;
+
+  final bool createdIntention;
+  final void Function(LoadedPathDraft draft)? onSaved;
 }
 
 /// Сохранённый путь действия: «Сохранить» сам заменяет его. Путь с разрывом

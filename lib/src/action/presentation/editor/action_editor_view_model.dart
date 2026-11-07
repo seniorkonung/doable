@@ -73,6 +73,10 @@ final class ActionEditorViewModel extends _$ActionEditorViewModel {
     }
   }
 
+  void changePath(ActionDraftPath value) {
+    if (_isEditable) state = state.withPath(value);
+  }
+
   void changeSchedule(ActionSchedule value) {
     if (_isEditable && state.draft.schedule != value) {
       state = state.withSchedule(value);

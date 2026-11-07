@@ -437,8 +437,15 @@ final class _PathPageState extends ConsumerState<PathPage> {
 
   /// Экран, с которого ушли до исхода замены, ничего не закрывает.
   Future<void> _save() async {
-    final saved = await ref.read(_provider.notifier).save();
-    if (saved != null && mounted) context.router.pop(saved);
+    final model = ref.read(_provider.notifier);
+    final draft = ref.read(_provider).draft;
+    final saved = await model.save();
+    if (saved != null && mounted) {
+      if (widget.purpose case NewActionPathPurpose(:final onSaved)) {
+        onSaved?.call(draft as LoadedPathDraft);
+      }
+      context.router.pop(saved);
+    }
   }
 
   Future<void> _askDiscard() async {

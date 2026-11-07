@@ -4,6 +4,8 @@ import 'dart:ui' show CheckedState, Tristate;
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/action/application/action_day.dart';
+import 'package:doable/src/action/presentation/path/path_page.dart';
+import 'package:doable/src/action/presentation/path_start/path_start_picker_page.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
@@ -11,6 +13,7 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
+import 'package:doable/src/design_system/components/time_dial.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -40,6 +43,7 @@ import '../support/graph_durability_fixture.dart';
 import '../support/graph_seed.dart';
 import '../support/intention_catalog_controls.dart';
 import '../support/intention_creation_origin.dart';
+import '../support/intention_actions_tab.dart';
 import '../support/local_database_harness.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/quick_creation.dart';
@@ -58,6 +62,177 @@ void main() {
   _registerAccessibilityTests();
   _registerQuickCreationFlowTests();
   _registerRelationPickerIntentionTest();
+  testWidgets('выбор причины сохраняет путь в листе и его введённые поля', (
+    tester,
+  ) async {
+    final app = await _start(tester);
+    await _until(
+      tester,
+      () => find.text('Новое действие').evaluate().isNotEmpty,
+    );
+    await _tap(tester, find.text('Новое действие'));
+    await tester.enterText(actionEditorTitleField, 'Прогулка');
+    await tester.enterText(actionEditorDescriptionField, 'В парке');
+    await _tap(tester, actionEditorValue('Весь день'));
+    await _tap(
+      tester,
+      find.descendant(of: find.byType(TimeDial), matching: find.text('18')),
+    );
+    await _tap(tester, actionEditorValue('P4'));
+    await _tap(tester, find.text('P2').last);
+    await _tap(tester, actionEditorValue('Выберите причину'));
+    await _until(
+      tester,
+      () => find.byType(PathStartPickerPage).evaluate().isNotEmpty,
+    );
+    expect(find.text('Новое действие: с чего начинается путь'), findsOneWidget);
+    await _until(tester, () => find.text('Намерение 1').evaluate().isNotEmpty);
+    await _tap(tester, find.text('Намерение 1'));
+    await _until(tester, () => find.byType(PathPage).evaluate().isNotEmpty);
+    await _until(tester, () => find.text('Намерение 2').evaluate().isNotEmpty);
+    await _tap(tester, find.text('Намерение 2'));
+    await _tap(tester, find.text('Сохранить'));
+    await _until(
+      tester,
+      () => actionEditorValue('Намерение 2').evaluate().isNotEmpty,
+    );
+    expect(actionEditorValue('Намерение 1'), findsOneWidget);
+    expect(
+      tester.widget<EditableText>(actionEditorTitleField).controller.text,
+      'Прогулка',
+    );
+    expect(
+      tester.widget<EditableText>(actionEditorDescriptionField).controller.text,
+      'В парке',
+    );
+    expect(actionEditorCanCreate(tester), isTrue);
+    expect(actionEditorValue('Вчера'), findsOneWidget);
+    expect(actionEditorValue('18:00'), findsOneWidget);
+    expect(actionEditorValue('P2'), findsOneWidget);
+    expect(
+      await tester.runAsync(() => durabilityRows(app.database, 'actions')),
+      isEmpty,
+    );
+    await _tap(tester, actionEditorValue('Намерение 1'));
+    await _until(tester, () => find.byType(PathPage).evaluate().isNotEmpty);
+    expect(find.text('Прогулка'), findsOneWidget);
+    await _tap(tester, find.text('Намерение 1'));
+    await _until(
+      tester,
+      () => find.byType(PathStartPickerPage).evaluate().isNotEmpty,
+    );
+    await _tap(tester, find.text('Намерение 4'));
+    await _until(tester, () => find.text('Намерение 4').evaluate().isNotEmpty);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await _tap(tester, find.text('Отменить'));
+    expect(actionEditorValue('Намерение 1'), findsOneWidget);
+    expect(actionEditorValue('Намерение 2'), findsOneWidget);
+    await _tap(tester, actionEditorCreateButton);
+    await _until(
+      tester,
+      () => actionEditorValue('Прогулка').evaluate().isEmpty,
+    );
+    final rows = await tester.runAsync(
+      () => durabilityRows(app.database, 'action_path_items'),
+    );
+    expect(rows!.map((row) => row['intention_id']), [
+      durabilityUuid(1),
+      durabilityUuid(2),
+    ]);
+  });
+
+  testWidgets('закрытие поиска возвращает пустой путь и черновик', (
+    tester,
+  ) async {
+    await _start(tester);
+    await _tap(tester, find.text('Новое действие'));
+    await tester.enterText(actionEditorTitleField, 'Прогулка');
+    await _tap(tester, actionEditorValue('Выберите причину'));
+    await _until(
+      tester,
+      () => find.byType(PathStartPickerPage).evaluate().isNotEmpty,
+    );
+    await _tap(tester, _key('path-start-picker-cancel'));
+    expect(actionEditorValue('Выберите причину'), findsOneWidget);
+    expect(
+      tester.widget<EditableText>(actionEditorTitleField).controller.text,
+      'Прогулка',
+    );
+  });
+
+  testWidgets(
+    'созданное в поиске намерение начинает путь и остаётся при отмене',
+    (tester) async {
+      final app = await _start(tester);
+      await _tap(tester, find.text('Новое действие'));
+      await _tap(tester, actionEditorValue('Выберите причину'));
+      await _until(
+        tester,
+        () => find.bySemanticsLabel('Создать намерение').evaluate().isNotEmpty,
+      );
+      await _tap(tester, find.bySemanticsLabel('Создать намерение'));
+      await tester.enterText(_key('intention-editor-title'), 'Новый корень');
+      app.observer.observe('intentions');
+      await _submit(tester, app);
+      await _until(tester, () => find.byType(PathPage).evaluate().isNotEmpty);
+      await _until(
+        tester,
+        () => find.text('Новый корень').evaluate().isNotEmpty,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Созданное 1 намерение останется.'),
+        findsOneWidget,
+      );
+      await _tap(tester, find.text('Отменить'));
+      expect(actionEditorValue('Выберите причину'), findsOneWidget);
+      final rows = await tester.runAsync(
+        () => durabilityRows(app.database, 'intentions'),
+      );
+      expect(rows!.any((row) => row['title'] == 'Новый корень'), isTrue);
+    },
+  );
+
+  testWidgets('второй лист со страницы намерения не меняет первый черновик', (
+    tester,
+  ) async {
+    await _start(tester);
+    await _tap(tester, find.text('Новое действие'));
+    await tester.enterText(actionEditorTitleField, 'Первый черновик');
+    await _tap(tester, actionEditorValue('Выберите причину'));
+    await _until(
+      tester,
+      () => find
+          .bySemanticsLabel('Открыть страницу намерения «Намерение 1»')
+          .evaluate()
+          .isNotEmpty,
+    );
+    await _tap(
+      tester,
+      find.bySemanticsLabel('Открыть страницу намерения «Намерение 1»'),
+    );
+    await openIntentionActionsTab(
+      tester,
+      waitFor: (tester, finder) =>
+          _until(tester, () => finder.evaluate().isNotEmpty),
+      tap: _tap,
+    );
+    await _tap(tester, find.text('Добавить'));
+    expect(actionEditorValue('Намерение 1'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Намерение 1'), findsWidgets);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await _tap(tester, _key('path-start-picker-cancel'));
+    expect(actionEditorValue('Выберите причину'), findsOneWidget);
+    expect(
+      tester.widget<EditableText>(actionEditorTitleField).controller.text,
+      'Первый черновик',
+    );
+  });
   testWidgets('пустой день открывает лист с выбранной датой и без пути', (
     tester,
   ) async {

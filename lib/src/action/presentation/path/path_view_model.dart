@@ -56,7 +56,13 @@ final class PathViewModel extends _$PathViewModel {
     }
     final draft = LoadingPathDraft(start.intentions);
     unawaited(Future.microtask(() => _read(draft.intentions)));
-    return PathState(original: purpose.original, draft: draft);
+    final state = PathState(original: purpose.original, draft: draft);
+    return switch (purpose) {
+      NewActionPathPurpose(createdIntention: true) => state.withCreations(
+        const PathCreations(intentions: 1),
+      ),
+      _ => state,
+    };
   }
 
   void selectRoot(PathStartChoice choice) {
