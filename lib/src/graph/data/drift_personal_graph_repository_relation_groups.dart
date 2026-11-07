@@ -2,7 +2,7 @@ part of 'drift_personal_graph_repository.dart';
 
 extension _RelationGroupPageReading on DriftPersonalGraphRepository {
   Future<RelationGroupPageResult> _readRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) async {
     final stopwatch = Stopwatch()..start();
     final isContinuation = query.cursor != null;
@@ -41,14 +41,6 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
   }
 
   Future<RelationGroupPage> _readRelationGroupPageOnCurrentSnapshot(
-    RelationGroupPageQuery query,
-  ) => switch (query) {
-    RelationGroupQuery() => _readLongTermRelationGroupPageOnCurrentSnapshot(
-      query,
-    ),
-  };
-
-  Future<RelationGroupPage> _readLongTermRelationGroupPageOnCurrentSnapshot(
     RelationGroupQuery query,
   ) async {
     final _DriftRelationGroupCursor? cursor = switch (query.cursor) {
@@ -351,7 +343,7 @@ final class _DriftRelationGroupCursor implements RelationGroupCursor {
 
 RelationGroupReadFailure _classifyRelationGroupReadFailure(
   Object error,
-  RelationGroupPageQuery query,
+  RelationGroupQuery query,
 ) {
   if (error is _RelationGroupSnapshotHasExpired) {
     return const RelationGroupSnapshotExpired();

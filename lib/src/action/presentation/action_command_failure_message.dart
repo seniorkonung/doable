@@ -7,10 +7,6 @@ String actionCommandFailureMessage(
   AppLocalizations localizations,
   ActionCommandFailure failure,
 ) => switch (failure) {
-  ActionValidationFailure(:final field) => switch (field) {
-    ActionValidationField.title => localizations.actionTitleInvalid,
-    ActionValidationField.description => localizations.actionDescriptionInvalid,
-  },
   ActionNotFoundFailure() => localizations.actionOperationNotFound,
   ActionConflictFailure() => localizations.actionOperationConflict,
   ActionUnavailableFailure() => localizations.actionOperationUnavailable,

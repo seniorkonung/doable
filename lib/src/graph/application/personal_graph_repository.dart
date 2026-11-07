@@ -32,7 +32,7 @@ abstract interface class PersonalGraphRepository
   /// Первая порция и полная сводка получены на одной ревизии; продолжение
   /// относится к снимку графа первой порции.
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   );
 
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id);

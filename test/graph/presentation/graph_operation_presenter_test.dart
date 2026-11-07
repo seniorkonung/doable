@@ -779,14 +779,6 @@ void main() {
 
   for (final scenario in <({ActionCommandFailure failure, String ru})>[
     (
-      failure: const ActionValidationFailure(ActionValidationField.title),
-      ru: 'Проверьте название действия.',
-    ),
-    (
-      failure: const ActionValidationFailure(ActionValidationField.description),
-      ru: 'Проверьте описание действия.',
-    ),
-    (
       failure: const ActionNotFoundFailure(),
       ru: 'Действие больше не существует.',
     ),

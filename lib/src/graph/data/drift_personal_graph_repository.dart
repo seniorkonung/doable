@@ -366,7 +366,7 @@ final class DriftPersonalGraphRepository
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) => _readRelationGroupPage(query);
 
   @override

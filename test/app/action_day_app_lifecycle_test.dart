@@ -790,7 +790,7 @@ final class _ObservedRepository implements PersonalGraphRepository {
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) => _delegate.getRelationGroupPage(query);
 
   @override

@@ -648,7 +648,12 @@ final class _ControlledApp {
       return GraphResultSuccess(
         RelationGroupFirstPage(
           items: [
-            if (counts.forSelection(query.group) > 0)
+            if (counts.forGroup(
+                  scope: query.scope,
+                  type: query.type,
+                  direction: query.direction,
+                ) >
+                0)
               testDetailsRelationRow(
                 ownerId: intention.id,
                 index: 1,

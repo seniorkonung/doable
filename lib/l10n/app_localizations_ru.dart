@@ -517,9 +517,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Намерение для просмотра связей больше не существует.';
 
   @override
-  String get relationNeighborhoodEmpty => 'В этой группе связей нет.';
-
-  @override
   String get relationNeighborhoodLoadingMore => 'Загружаем ещё связи…';
 
   @override
@@ -1929,9 +1926,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get actionDeleted => 'Действие удалено.';
-
-  @override
-  String get actionTitleInvalid => 'Проверьте название действия.';
 
   @override
   String get actionDescriptionInvalid => 'Проверьте описание действия.';

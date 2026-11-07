@@ -799,7 +799,7 @@ final class _DelayedPersonalGraphRepository
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) => Future.value(
     GraphResultSuccess(
       RelationGroupFirstPage(

@@ -788,12 +788,6 @@ abstract class AppLocalizations {
   /// **'The intention whose relations were being viewed no longer exists.'**
   String get relationNeighborhoodIntentionNotFound;
 
-  /// Подтверждённо пустая выбранная группа
-  ///
-  /// In en, this message translates to:
-  /// **'There are no relations in this group.'**
-  String get relationNeighborhoodEmpty;
-
   /// Подгрузка следующей порции выбранной группы
   ///
   /// In en, this message translates to:
@@ -2940,12 +2934,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Action deleted.'**
   String get actionDeleted;
-
-  /// Ошибка названия действия
-  ///
-  /// In en, this message translates to:
-  /// **'Check the action title.'**
-  String get actionTitleInvalid;
 
   /// Ошибка описания действия
   ///

@@ -166,11 +166,10 @@ final class ControlledDetailsRepository
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) {
-    final relationQuery = query as RelationGroupQuery;
-    relationGroupQueries.add(relationQuery);
-    final result = onRelationGroupPage?.call(relationQuery);
+    relationGroupQueries.add(query);
+    final result = onRelationGroupPage?.call(query);
     return Future.value(
       result ??
           GraphResultSuccess(

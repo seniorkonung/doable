@@ -6,19 +6,6 @@ sealed class ActionCommandFailure implements GraphCommandFailure {
   const ActionCommandFailure();
 }
 
-enum ActionValidationField { title, description }
-
-/// Ошибка ввода. Типы команд делают недопустимое значение непредставимым,
-/// поэтому отказ выдаёт экран, который проверяет введённый текст.
-final class ActionValidationFailure extends ActionCommandFailure {
-  const ActionValidationFailure(this.field);
-
-  final ActionValidationField field;
-
-  @override
-  GraphFailureCategory get category => GraphFailureCategory.validation;
-}
-
 final class ActionNotFoundFailure extends ActionCommandFailure {
   const ActionNotFoundFailure();
 

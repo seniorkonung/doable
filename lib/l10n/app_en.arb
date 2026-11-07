@@ -293,7 +293,6 @@
   "relationNeighborhoodInitialUnexpected": "The relations couldn’t be loaded because of an unexpected error.",
   "relationNeighborhoodInitialInvalid": "The selected relation group can no longer be opened.",
   "relationNeighborhoodIntentionNotFound": "The intention whose relations were being viewed no longer exists.",
-  "relationNeighborhoodEmpty": "There are no relations in this group.",
   "relationNeighborhoodLoadingMore": "Loading more relations…",
   "relationNeighborhoodLoadMoreUnavailable": "The next relations couldn’t be loaded.",
   "relationNeighborhoodLoadMoreCorruption": "Stored data is damaged; the next relations can’t be shown.",
@@ -344,9 +343,6 @@
   },
   "@relationNeighborhoodIntentionNotFound": {
     "description": "Владелец соседства подтверждённо отсутствует"
-  },
-  "@relationNeighborhoodEmpty": {
-    "description": "Подтверждённо пустая выбранная группа"
   },
   "@relationNeighborhoodLoadingMore": {
     "description": "Подгрузка следующей порции выбранной группы"
@@ -1349,10 +1345,6 @@
   "actionDeleted": "Action deleted.",
   "@actionDeleted": {
     "description": "Подтверждение удаления действия"
-  },
-  "actionTitleInvalid": "Check the action title.",
-  "@actionTitleInvalid": {
-    "description": "Ошибка названия действия"
   },
   "actionDescriptionInvalid": "Check the action description.",
   "@actionDescriptionInvalid": {

@@ -165,9 +165,9 @@ final class ControlledRelationDetailsRepository
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) {
-    groupQueries.add(query as RelationGroupQuery);
+    groupQueries.add(query);
     final request = Completer<RelationGroupPageResult>();
     _groupRequests.add(request);
     return request.future;

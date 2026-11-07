@@ -29,8 +29,7 @@ final class ControlledRelationGraphRepository
         StatisticsReadContractTestFallback,
         TagReadContractTestFallback
     implements PersonalGraphRepository {
-  final queries = <RelationGroupQuery>[];
-  final pageQueries = <RelationGroupPageQuery>[];
+  final pageQueries = <RelationGroupQuery>[];
   final _requests = <Completer<RelationGroupPageResult>>[];
   final intentionIds = <IntentionId>[];
   final intentionCommands = <IntentionCommand>[];
@@ -50,10 +49,7 @@ final class ControlledRelationGraphRepository
 
   int get requestCount => _requests.length;
 
-  RelationGroupQuery queryAt(int index) =>
-      pageQueries[index] as RelationGroupQuery;
-
-  RelationGroupPageQuery pageQueryAt(int index) => pageQueries[index];
+  RelationGroupQuery queryAt(int index) => pageQueries[index];
 
   void complete(int index, RelationGroupPageResult result) {
     _requests[index].complete(result);
@@ -131,10 +127,9 @@ final class ControlledRelationGraphRepository
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) {
     pageQueries.add(query);
-    if (query is RelationGroupQuery) queries.add(query);
     final request = Completer<RelationGroupPageResult>();
     _requests.add(request);
     return request.future;

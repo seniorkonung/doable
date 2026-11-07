@@ -515,10 +515,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'The intention whose relations were being viewed no longer exists.';
 
   @override
-  String get relationNeighborhoodEmpty =>
-      'There are no relations in this group.';
-
-  @override
   String get relationNeighborhoodLoadingMore => 'Loading more relations…';
 
   @override
@@ -1906,9 +1902,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get actionDeleted => 'Action deleted.';
-
-  @override
-  String get actionTitleInvalid => 'Check the action title.';
 
   @override
   String get actionDescriptionInvalid => 'Check the action description.';

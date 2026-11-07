@@ -4,9 +4,6 @@ import '../../intention/domain/intention_id.dart';
 import '../domain/long_term_relation.dart';
 import 'long_term_relation_projection.dart';
 import 'relation_counts.dart';
-import 'relation_group.dart';
-
-export 'relation_group.dart';
 
 enum RelationGroupQueryValidationFailure { pageSizeOutOfRange }
 
@@ -19,14 +16,7 @@ final class RelationGroupQueryValidationException implements Exception {
 /// Непрозрачное продолжение одной согласованной группы связей.
 abstract interface class RelationGroupCursor {}
 
-sealed class RelationGroupPageQuery {
-  IntentionId get intentionId;
-  RelationGroup get group;
-  int get pageSize;
-  RelationGroupCursor? get cursor;
-}
-
-final class RelationGroupQuery implements RelationGroupPageQuery {
+final class RelationGroupQuery {
   factory RelationGroupQuery({
     required IntentionId intentionId,
     required LongTermRelationType type,
@@ -62,19 +52,12 @@ final class RelationGroupQuery implements RelationGroupPageQuery {
   static const minPageSize = 1;
   static const maxPageSize = 100;
 
-  @override
   final IntentionId intentionId;
   final LongTermRelationType type;
   final RelationDirection direction;
   final RelationScope scope;
-  @override
   final int pageSize;
-  @override
   final RelationGroupCursor? cursor;
-
-  @override
-  RelationGroup get group =>
-      LongTermRelationGroup(type: type, direction: direction, scope: scope);
 }
 
 /// Первая порция содержит полную сводку восьми групп на своей ревизии.

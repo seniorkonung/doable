@@ -463,7 +463,7 @@
   - **Предполагаемые файлы:** `test/app/quick_creation/quick_creation_mode_controller_test.dart`, `file_quick_creation_mode_store_test.dart`, `quick_creation_mode_process_test.dart`, `quick_creation_runtime_restart_test.dart`, `test/app/bootstrap/app_runtime_quick_creation_mode_test.dart`, `test/app/routing/app_router_test.dart`.
   - **Размер:** S по логике: шесть тестовых файлов, изменения сводятся к удалениям.
 
-- [ ] 1.37 Чтение групп связей и отказы команд действий не содержат элементов без потребителей
+- [x] 1.37 Чтение групп связей и отказы команд действий не содержат элементов без потребителей
   - **Критерии приёмки:**
     - Закрытой иерархии `RelationGroup` в `lib/src/long_term_relation/application/relation_group.dart` нет: потребители используют `LongTermRelationGroup` напрямую, без надтипа. Если после удаления `forSelection` и `RelationGroupQuery.group` у `LongTermRelationGroup` не остаётся потребителей, удалены и он, и файл `relation_group.dart` с его импортом и реэкспортом.
     - Закрытого `RelationGroupPageQuery` в `relation_group_page.dart` нет: репозиторий, его реализация на Drift и тестовые подмены принимают `RelationGroupQuery`, а группа строится из полей запроса без промежуточного типа. В `relation_counts.dart` нет `forSelection`, в `lib/src/graph/data/drift_personal_graph_repository_relation_groups.dart` нет переключений с одной ветвью; тест `test/app/navigation/app_shell_operation_reset_test.dart` берёт число группы через `forGroup` по полям запроса.

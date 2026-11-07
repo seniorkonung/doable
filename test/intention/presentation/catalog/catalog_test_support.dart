@@ -118,7 +118,7 @@ final class ControlledCatalogRepository
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) =>
       throw UnsupportedError('Группы связей не используются в тесте каталога.');
 
