@@ -4,11 +4,6 @@
 
 Файл ведёт оркестратор. Решения приняты пользователем в сессии решений и исполняются автономно, по одной finding за сессию. Сессия исполнения удаляет раздел своей finding в коммите её устранения.
 
-## F7 · Medium — При переносе на действия потеряны регрессионные проверки экрана дня и вкладки «Действия»
-
-- **Решение:** Устранить
-- **Как устранить:** Восстановить регрессионные проверки без изменения поведения: test/action/presentation/day/action_day_calendar_utc_dates_test.dart проверяет все несгенерированные файлы календаря и отметок экрана дня (action_day_calendar*.dart и action_day_marks_*.dart, без .g.dart), а комментарий теста соответствует охвату; добавить тест, что две страницы одного намерения не делят выбранную плитку роли и подгруженные порции вкладки «Действия» (test/intention/presentation/details/intention_details_actions_test.dart или тест модели вкладки), и тест, что подтверждённое изменение корневого намерения (переименование, ветвь IntentionCatalogMutation в lib/src/action/presentation/intention_actions/intention_actions_view_model.dart) обновляет строки вкладки (test/action/presentation/intention_actions/intention_actions_view_model_test.dart). Названия тестов — на русском, в канонических терминах CONTEXT.md. Проверка: тесты test/action/presentation/day/action_day_calendar_utc_dates_test.dart, test/action/presentation/intention_actions, test/intention/presentation/details. Отдельная новая задача Фазы 1 со следующим свободным номером, дописанная в конец списка после всех существующих задач; номера других задач не указывать.
-
 ## F10 · Low — Названия тестов и вспомогательных параметров сохраняют прежнюю терминологию
 
 - **Решение:** Устранить

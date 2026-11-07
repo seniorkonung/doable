@@ -491,3 +491,15 @@
   - **Зависимости:** нет.
   - **Предполагаемые файлы:** `lib/l10n/app_ru.arb`, `app_en.arb` и сгенерированные `app_localizations*.dart`, `lib/src/graph_backups/graph_backups.dart`, `graph_backups_provider.dart`, `graph_backup_registry.dart`, `lib/src/graph/data/drift_personal_graph_repository_backups.dart`, `lib/src/app/app_runtime.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, тесты в `test/data_transfer`, `test/graph_backups`, `test/graph/data/drift_graph_backup_registry_test.dart`, `test/app` (копии, восстановление, импорт, `bootstrap/app_runtime_graph_backups_test.dart`), `test/shared/diagnostics/diagnostics_sink_test.dart`, `test/support/graph_history_rows.dart`.
   - **Размер:** S по логике: файлов больше нормы, но меняются только формулировки.
+
+- [ ] 1.39 Регрессионные тесты закрепляют даты отметок экрана дня в UTC и принадлежность вкладки «Действия» странице намерения
+  - **Критерии приёмки:**
+    - `test/action/presentation/day/action_day_calendar_utc_dates_test.dart` проверяет каждый несгенерированный файл `lib/src/action/presentation/day/` с префиксом `action_day_calendar` или `action_day_marks_`, в том числе добавленный позже, вместе с `lib/src/shared/domain/calendar_date.dart`; сгенерированные `.g.dart` не проверяются. Обязательный набор путей включает `action_day_calendar.dart` и `action_day_marks_window.dart`. Комментарий к каталогу и название теста называют календарь и отметки экрана дня; поиск конструкций местного времени не меняется.
+    - Тест в `test/intention/presentation/details/intention_details_actions_test.dart` или `test/action/presentation/intention_actions/intention_actions_view_model_test.dart` показывает, что две страницы одного намерения не делят состояние вкладки «Действия»: выбор плитки роли и подгрузка порции на одной странице не меняют плитку, строки и продолжение другой (требование «Цель открытия страницы намерения» из `intention-management`).
+    - Тест в `test/action/presentation/intention_actions/intention_actions_view_model_test.dart` показывает, что подтверждённое переименование корневого намерения загруженной строки (ветвь `IntentionCatalogMutation` в `lib/src/action/presentation/intention_actions/intention_actions_view_model.dart`) перечитывает вкладку, и её строки показывают новое название корня (требование «Вкладка «Действия» страницы намерения» из `action-management`).
+    - Код `lib/` и продуктовое поведение не меняются. Названия тестов — на русском, в канонических терминах `CONTEXT.md`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/action/presentation/day/action_day_calendar_utc_dates_test.dart test/action/presentation/intention_actions test/intention/presentation/details`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `test/action/presentation/day/action_day_calendar_utc_dates_test.dart`, `test/action/presentation/intention_actions/intention_actions_view_model_test.dart`, `test/intention/presentation/details/intention_details_actions_test.dart`.
+  - **Размер:** S.

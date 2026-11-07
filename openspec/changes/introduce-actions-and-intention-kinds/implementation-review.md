@@ -5,7 +5,7 @@
 **Format version:** 1
 **Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Фаза 1 по существу выполнена: дневные выборы заменены действиями в хранилище, формате, журнале фактов, копиях, интерфейсе и статистике. Полные проверки проекта проходят, `openspec validate --strict` — valid. Остаётся одна находка средней важности: при переносе потеряны регрессионные проверки дат в UTC и вкладки «Действия» (F7). Ещё три находки низкой важности касаются обработки недостижимого состояния в статистике намерения, тестов без собственной регрессии и устаревшей терминологии. Принятых остаточных рисков нет.
+**Summary:** Фаза 1 по существу выполнена: дневные выборы заменены действиями в хранилище, формате, журнале фактов, копиях, интерфейсе и статистике. Полные проверки проекта проходят, `openspec validate --strict` — valid. Остаются три находки низкой важности; они касаются обработки недостижимого состояния в статистике намерения, тестов без собственной регрессии и устаревшей терминологии. Принятых остаточных рисков нет.
 
 ## Review target
 
@@ -87,15 +87,6 @@
 | Code quality | Complete | Те же пять проходов применили линзы корректности, читаемости, архитектуры, безопасности и производительности `code-review-and-quality` ко всем путям поставки своих блоков с проверкой вызывающих, тестов, схемы и границ выполнения. На `70603dd3` в этом рабочем дереве `mise run check` — EXIT 0: `dart format` без изменений (845 файлов), `flutter analyze` — No issues found, все 3931 обычных теста и 18 процессных тестов прошли. Каждая находка ниже перепроверена координатором по коду головы. |
 
 ## Findings
-
-### F7 · Medium — При переносе на действия потеряны регрессионные проверки экрана дня и вкладки «Действия»
-
-- **Evidence:** `test/action/presentation/day/action_day_calendar_utc_dates_test.dart:6-9, 22-31` проверяет только файлы с префиксом `action_day_calendar`; в базе префикс `daily_choice_calendar` охватывал и `daily_choice_calendar_day_marks_{window,view_model,state}.dart`, а после переименования `action_day_marks_*.dart` (в том числе `action_day_marks_window.dart` с арифметикой `DateTime.utc`) не проверяются, хотя комментарий теста обещает «каждый файл… в том числе добавленный позже». Базовые тесты «две страницы одного намерения не меняют друг у друга роль и строки выборов» (`a89df6eb:test/intention/presentation/details/intention_details_choices_test.dart:220`), «две страницы одного намерения не делят роль и порции» и «переименование показанного участника пересобирает роль» (`a89df6eb:test/daily_choice/presentation/intention_choices/intention_choices_view_model_test.dart:100, 389`) не перенесены: в `test/intention/presentation/details/intention_details_actions_test.dart`, `test/action/presentation/intention_actions/intention_actions_view_model_test.dart` и `test/app/intention_actions_app_flow_test.dart` нет ни двух страниц одного намерения, ни изменения корневого намерения, хотя требования «Цель открытия страницы намерения» (`specs/intention-management/spec.md:1344`) и «Вкладка «Действия» страницы намерения» (`specs/action-management/spec.md:624`) этого требуют, а ветвь `IntentionCatalogMutation` в `lib/src/action/presentation/intention_actions/intention_actions_view_model.dart:324-331` не исполняется ни одним тестом.
-- **Evidence revisions:** ["70603dd3735a93a26734d943c29d42e099e2e98d", "a89df6ebb58e799b61f61d2d5230e58da973f08e"]
-- **Impact:** Дата в местном времени в коде отметок календаря, общий для страниц ключ плитки «Действия» или устаревший корень в строках вкладки пройдут все тесты; первая ошибка проявится только в отдельных часовых поясах.
-- **Required outcome:** Проверка дат в UTC охватывает все несгенерированные файлы календаря и отметок; тесты показывают, что плитка «Действия» принадлежит отдельной странице и что вкладка согласуется с подтверждённым изменением корневого намерения.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["test/action/presentation/day/action_day_calendar_utc_dates_test.dart", "test/intention/presentation/details/intention_details_actions_test.dart", "test/action/presentation/intention_actions/intention_actions_view_model_test.dart"]
 
 ### F10 · Low — Названия тестов и вспомогательных параметров сохраняют прежнюю терминологию
 
