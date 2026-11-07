@@ -1,4 +1,5 @@
 import 'package:doable/src/action/domain/action_id.dart';
+import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -54,29 +55,63 @@ void seedAction(
   bool isCompleted = false,
   int timestamp = 1,
 }) {
-  db.execute(
-    '''INSERT INTO actions
-       (id, title, description, date, scheduled_hour, priority, is_completed,
-        created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-    [
-      id,
-      title,
-      description,
-      date,
-      hour,
-      priority,
-      isCompleted ? 1 : 0,
-      timestamp,
-      timestamp,
-    ],
-  );
+  db.execute(_insertAction, [
+    id,
+    title,
+    description,
+    date,
+    hour,
+    priority,
+    isCompleted ? 1 : 0,
+    timestamp,
+    timestamp,
+  ]);
   for (final (position, intention) in path.indexed) {
-    db.execute(
-      '''INSERT INTO action_path_items
-         (action_id, position, intention_id, previous_intention_id)
-         VALUES (?, ?, ?, ?)''',
-      [id, position, intention, position == 0 ? null : path[position - 1]],
-    );
+    db.execute(_insertPathItem, [
+      id,
+      position,
+      intention,
+      position == 0 ? null : path[position - 1],
+    ]);
   }
 }
+
+/// [seedAction] через соединение базы приложения. Вызывать внутри
+/// `seedGraph` или `recordGraphChange`.
+Future<void> insertAction(
+  AppDatabase database, {
+  required String id,
+  required List<String> path,
+  String title = 'Пробежка',
+  String date = '2026-10-08',
+  int timestamp = 1,
+}) async {
+  await database.customStatement(_insertAction, [
+    id,
+    title,
+    null,
+    date,
+    null,
+    4,
+    0,
+    timestamp,
+    timestamp,
+  ]);
+  for (final (position, intention) in path.indexed) {
+    await database.customStatement(_insertPathItem, [
+      id,
+      position,
+      intention,
+      position == 0 ? null : path[position - 1],
+    ]);
+  }
+}
+
+const _insertAction = '''INSERT INTO actions
+   (id, title, description, date, scheduled_hour, priority, is_completed,
+    created_at, updated_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''';
+
+const _insertPathItem = '''INSERT INTO action_path_items
+   (action_id, position, intention_id, previous_intention_id)
+   VALUES (?, ?, ?, ?)''';

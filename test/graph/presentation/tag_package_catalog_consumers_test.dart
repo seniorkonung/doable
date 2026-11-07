@@ -25,7 +25,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/action_panel_fixture.dart';
 import '../../support/action_seed.dart';
-import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/graph_durability_fixture.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import 'package_consumers_test_support.dart';

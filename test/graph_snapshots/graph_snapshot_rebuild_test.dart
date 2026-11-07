@@ -4,8 +4,6 @@ import 'dart:io';
 
 import 'package:doable/src/action/application/action_command.dart';
 import 'package:doable/src/action/domain/action_id.dart';
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/data/local/app_database.dart' show AppDatabase;
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -23,7 +21,6 @@ import 'package:doable/src/long_term_relation/application/intention_relation_gro
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
-import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -32,7 +29,7 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uuid/uuid.dart';
 
-import '../support/action_seed.dart' show seedUuid;
+import '../support/action_seed.dart' show insertAction, seedUuid;
 import '../support/encoded_diagnostics_log.dart';
 import '../support/failing_snapshot_temporary_files.dart';
 import '../support/forwarding_graph_fact_log.dart';
@@ -130,9 +127,10 @@ void main() {
     ),
   )).intention;
 
-  /// Связь [source] → [related] и дневной выбор [related] по ней: записи
-  /// последних секций формата.
-  Future<void> relateAndChoose(Intention source, Intention related) async {
+  /// Связь [source] → [related] и действие с путём по ней: записи последних
+  /// секций формата. Команды создания действия нет, поэтому оно заполняется
+  /// в обход лога и попадает только в снимки, собранные из базы.
+  Future<void> relateAndAct(Intention source, Intention related) async {
     final relation = (await confirm<LongTermRelationsAdded>(
       AddLongTermRelations(
         pageIntentionId: source.id,
@@ -152,21 +150,12 @@ void main() {
         ),
       ),
     );
-    await confirm(
-      CreateDailyChoice(
-        sourceIntentionId: source.id,
-        selectedIntentionId: related.id,
-        path: ConfirmedChoicePath([
-          ConfirmedChoicePathStep(
-            relationId: relation.id,
-            sourceIntentionId: source.id,
-            type: relation.type,
-            relatedIntentionId: related.id,
-          ),
-        ]),
-        date: CalendarDate.fromParts(2026, 10, 17),
-        description: null,
-        isCompleted: false,
+    await seedGraph(
+      database,
+      () => insertAction(
+        database,
+        id: seedUuid(100),
+        path: [source.id.toCanonicalString(), related.id.toCanonicalString()],
       ),
     );
   }
@@ -210,7 +199,7 @@ void main() {
         'состояние из него и последующих пакетов совпадает с базой', () async {
       final home = await createTag('Дом');
       final health = await createIntention('Здоровье', tagIds: {home.id});
-      await relateAndChoose(health, await createIntention('Бегать'));
+      await relateAndAct(health, await createIntention('Бегать'));
       final damaged = await storeOver(repository)
           .writeSnapshot(await repository.readCurrentPosition());
       await corrupt(snapshotFile(damaged));
@@ -311,7 +300,7 @@ void main() {
       for (var index = 0; index < 60; index++)
         await createIntention('Намерение $index', tagIds: {home.id}),
     ];
-    await relateAndChoose(intentions[0], intentions[1]);
+    await relateAndAct(intentions[0], intentions[1]);
     final damaged = await storeOver(repository)
         .writeSnapshot(await repository.readCurrentPosition());
     await snapshotFile(damaged).delete();

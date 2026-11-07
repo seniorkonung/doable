@@ -18,17 +18,7 @@ import '../../action/domain/action_schedule.dart';
 import '../../data/local/app_database.dart' as local;
 import '../../data/local/fts_query.dart';
 import '../../data/local/sqlite_failure_classifier.dart';
-import '../../daily_choice/application/daily_choice_details.dart';
-import '../../daily_choice/application/daily_choice_catalog.dart';
-import '../../daily_choice/application/confirmed_choice_path.dart';
-import '../../daily_choice/application/daily_choice_command.dart';
-import '../../daily_choice/application/daily_choice_day_statuses.dart';
-import '../../daily_choice/application/daily_choice_id_generator.dart';
-import '../../daily_choice/application/daily_choice_result.dart';
-import '../../daily_choice/domain/choice_path_step_id.dart';
 import '../../daily_choice/domain/daily_choice.dart';
-import '../../daily_choice/domain/daily_choice_id.dart';
-import '../../daily_choice/domain/daily_choice_priority.dart';
 import '../../daily_choice/domain/daily_choice_schedule.dart';
 import '../../data_transfer/application/graph_composition.dart';
 import '../../data_transfer/application/graph_replacement.dart';
@@ -107,11 +97,6 @@ import 'stored_graph_rows.dart';
 import 'package:drift/drift.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-part 'drift_daily_choice_path_validation.dart';
-part 'drift_personal_graph_repository_daily_choice_reads.dart';
-part 'drift_personal_graph_repository_daily_choice_catalog.dart';
-part 'drift_personal_graph_repository_daily_choice_day_statuses.dart';
-part 'drift_personal_graph_repository_daily_choice_commands.dart';
 part 'drift_personal_graph_repository_action_commands.dart';
 part 'drift_personal_graph_repository_action_day.dart';
 part 'drift_personal_graph_repository_action_day_statuses.dart';
@@ -146,17 +131,11 @@ final class DriftPersonalGraphRepository
     this._now,
     this._diagnosticsSink, {
     LongTermRelationIdGenerator? relationIdGenerator,
-    DailyChoiceIdGenerator? dailyChoiceIdGenerator,
-    ChoicePathStepIdGenerator? choicePathStepIdGenerator,
     TagIdGenerator? tagIdGenerator,
     this._statisticsReachabilityRunner = runContributionReachabilityInIsolate,
     this._intentionStatisticsRunner = runIntentionContributionInIsolate,
   }) : _relationIdGenerator =
            relationIdGenerator ?? UuidV7LongTermRelationIdGenerator(),
-       _dailyChoiceIdGenerator =
-           dailyChoiceIdGenerator ?? UuidV7DailyChoiceIdGenerator(),
-       _choicePathStepIdGenerator =
-           choicePathStepIdGenerator ?? UuidV7ChoicePathStepIdGenerator(),
        _tagIdGenerator = tagIdGenerator ?? UuidV7TagIdGenerator();
 
   final local.AppDatabase _database;
@@ -164,8 +143,6 @@ final class DriftPersonalGraphRepository
   final DateTime Function() _now;
   final DiagnosticsSink _diagnosticsSink;
   final LongTermRelationIdGenerator _relationIdGenerator;
-  final DailyChoiceIdGenerator _dailyChoiceIdGenerator;
-  final ChoicePathStepIdGenerator _choicePathStepIdGenerator;
   final TagIdGenerator _tagIdGenerator;
   var _epoch = _GraphEpoch();
   final _AsyncSequencer _sequencer = _AsyncSequencer();
@@ -175,8 +152,6 @@ final class DriftPersonalGraphRepository
   /// Сигнал подтверждённой записи реестра копий.
   final StreamController<void> _backupsChanged = StreamController.broadcast();
   final Map<IntentionId, Set<StreamController<void>>> _intentionWatchers = {};
-  final Map<DailyChoiceId, Set<_DailyChoiceWatchRegistration>>
-  _dailyChoiceWatchers = {};
   final Map<ActionId, Set<_ActionWatchRegistration>> _actionWatchers = {};
   final Map<LongTermRelationId, Set<_RelationWatchRegistration>>
   _relationWatchers = {};
@@ -318,14 +293,6 @@ final class DriftPersonalGraphRepository
       DriftRelationCountAggregates(_database);
 
   @override
-  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
-      _readDailyChoice(id);
-
-  @override
-  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
-      _watchDailyChoice(id);
-
-  @override
   Future<ActionDayPageResult> getActionDayPage(ActionDayQuery query) =>
       _readActionDayPage(query);
 
@@ -341,16 +308,6 @@ final class DriftPersonalGraphRepository
   Future<IntentionActionsPageResult> getIntentionActionsPage(
     IntentionActionsQuery query,
   ) => _readIntentionActionsPage(query);
-
-  @override
-  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
-    DailyChoiceCatalogQuery query,
-  ) => _readDailyChoiceCatalogPage(query);
-
-  @override
-  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
-    DailyChoiceDayStatusQuery query,
-  ) => _readDailyChoiceDayStatuses(query);
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -551,9 +508,6 @@ final class DriftPersonalGraphRepository
       ),
       final LongTermRelationCommand relationCommand =>
         await _executeLongTermRelation(relationCommand),
-      final DailyChoiceCommand dailyChoiceCommand => await _executeDailyChoice(
-        dailyChoiceCommand,
-      ),
       final ActionCommand actionCommand => await _executeAction(actionCommand),
       final CreateTag createTag => await _executeTag(createTag),
       final UpdateTag updateTag => await _executeTag(updateTag),
@@ -727,8 +681,6 @@ final class DriftPersonalGraphRepository
           final afterId = after?.summary.id;
           if (beforeId != null) affected.add(beforeId);
           if (afterId != null) affected.add(afterId);
-        case DailyChoiceChange(:final intentionCounts):
-          affected.addAll(intentionCounts.keys);
         case GraphChange():
           break;
       }
@@ -742,7 +694,6 @@ final class DriftPersonalGraphRepository
     final stableChanges = List<GraphChange>.unmodifiable(changes);
     _invalidateStatisticsRelationSnapshot(stableChanges);
     _notifyIntentionWatchersFor(stableChanges);
-    _notifyDailyChoiceWatchersFor(stableChanges);
     _notifyActionWatchersFor(stableChanges);
     _notifyRelationWatchersFor(stableChanges);
   }

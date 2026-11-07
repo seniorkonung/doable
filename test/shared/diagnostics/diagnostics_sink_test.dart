@@ -81,13 +81,13 @@ void main() {
       final sink = DeveloperDiagnosticsSink(messages.add);
 
       sink.record(
-        const DailyChoiceDayStatusesReadDiagnosticsEvent(
+        const ActionDayStatusesReadDiagnosticsEvent(
           status: DiagnosticsStarted(),
         ),
       );
 
       expect(jsonDecode(messages.single), {
-        'operation': 'dailyChoiceDayStatusesRead',
+        'operation': 'actionDayStatusesRead',
         'stage': 'read',
         'outcome': 'started',
       });
@@ -98,13 +98,13 @@ void main() {
       final sink = DeveloperDiagnosticsSink(messages.add);
 
       sink.record(
-        const DailyChoiceDayStatusesReadDiagnosticsEvent(
+        const ActionDayStatusesReadDiagnosticsEvent(
           status: DiagnosticsSucceeded(Duration(microseconds: 1234)),
         ),
       );
 
       expect(jsonDecode(messages.single), {
-        'operation': 'dailyChoiceDayStatusesRead',
+        'operation': 'actionDayStatusesRead',
         'stage': 'read',
         'outcome': 'succeeded',
         'durationMicros': 1234,
@@ -119,7 +119,7 @@ void main() {
         final sink = DeveloperDiagnosticsSink(messages.add);
 
         sink.record(
-          const DailyChoiceDayStatusesReadDiagnosticsEvent(
+          const ActionDayStatusesReadDiagnosticsEvent(
             status: DiagnosticsFailed(
               duration: Duration(microseconds: 5678),
               code: DiagnosticsFailureCode.corruption,
@@ -128,7 +128,7 @@ void main() {
         );
 
         expect(jsonDecode(messages.single), {
-          'operation': 'dailyChoiceDayStatusesRead',
+          'operation': 'actionDayStatusesRead',
           'stage': 'read',
           'outcome': 'failed',
           'durationMicros': 5678,

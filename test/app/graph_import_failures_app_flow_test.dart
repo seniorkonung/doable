@@ -130,7 +130,7 @@ Future<ImportAppHarness> _startApp(WidgetTester tester) async {
   final app = await ImportAppHarness.start(
     tester,
     at: _now,
-    seed: (graph) async {
+    seed: (graph, _) async {
       expect(
         await graph.execute(
           CreateTag(

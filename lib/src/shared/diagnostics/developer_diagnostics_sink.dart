@@ -52,41 +52,9 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     'stage': stage.name,
     ..._encodeStatus(event.status),
   },
-  DailyChoiceReadDiagnosticsEvent() => {
-    'operation': 'dailyChoiceDetailRead',
-    'stage': 'read',
-    ..._encodeStatus(event.status),
-  },
-  DailyChoiceDayStatusesReadDiagnosticsEvent() => {
-    'operation': 'dailyChoiceDayStatusesRead',
-    'stage': 'read',
-    ..._encodeStatus(event.status),
-  },
   StatisticsReadDiagnosticsEvent(:final readType, :final stage) => {
     'operation': 'statisticsRead',
     'readType': readType.name,
-    'stage': stage.name,
-    ..._encodeStatus(event.status),
-  },
-  DailyChoiceCatalogPageReadDiagnosticsEvent(
-    :final pageSize,
-    :final isContinuation,
-  ) =>
-    {
-      'operation': 'dailyChoiceCatalogPageRead',
-      'stage': 'read',
-      'pageSize': pageSize,
-      'isContinuation': isContinuation,
-      ..._encodeStatus(event.status),
-    },
-  DailyChoicePathValidationDiagnosticsEvent() => {
-    'operation': 'dailyChoicePathValidation',
-    'stage': 'validation',
-    ..._encodeStatus(event.status),
-  },
-  DailyChoiceCommandDiagnosticsEvent(:final commandType, :final stage) => {
-    'operation': 'dailyChoiceCommand',
-    'commandType': commandType.name,
     'stage': stage.name,
     ..._encodeStatus(event.status),
   },

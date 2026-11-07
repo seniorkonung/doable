@@ -33,7 +33,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../support/action_seed.dart';
 import '../support/app_root_pages.dart';
 import '../support/controlled_local_date.dart';
-import '../support/daily_choice_durability_fixture.dart';
+import '../support/graph_durability_fixture.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';

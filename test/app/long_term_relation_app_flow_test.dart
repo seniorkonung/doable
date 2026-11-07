@@ -46,7 +46,7 @@ import '../support/action_seed.dart';
 import '../support/app_root_pages.dart';
 import '../support/controlled_local_date.dart';
 import '../support/action_day_controls.dart';
-import '../support/daily_choice_durability_fixture.dart';
+import '../support/graph_durability_fixture.dart';
 import '../support/graph_seed.dart';
 import '../support/intention_catalog_controls.dart';
 import '../support/quick_creation.dart';

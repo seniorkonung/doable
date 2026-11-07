@@ -1239,9 +1239,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationRelation => 'связь';
 
   @override
-  String get graphOperationDailyChoice => 'дневной выбор';
-
-  @override
   String get graphOperationAction => 'действие';
 
   @override
@@ -1929,67 +1926,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get tagUnexpected =>
       'Действие с тегом не выполнено из-за непредвиденной ошибки.';
-
-  @override
-  String get dailyChoiceCreated => 'Дневной выбор создан.';
-
-  @override
-  String get dailyChoiceDeleted => 'Дневной выбор удалён.';
-
-  @override
-  String get dailyChoiceSheetOptionEditDescription => 'Изменить описание';
-
-  @override
-  String get dailyChoiceSheetOptionDelete => 'Удалить дневной выбор';
-
-  @override
-  String get dailyChoiceDeleteDialogTitle => 'Удалить дневной выбор?';
-
-  @override
-  String get dailyChoiceDeleteDialogBefore => 'Выбор ';
-
-  @override
-  String dailyChoiceDeleteDialogAfter(String date) {
-    return ' на $date будет удалён. Это действие нельзя отменить.';
-  }
-
-  @override
-  String get dailyChoiceDeleteDialogAction => 'Удалить';
-
-  @override
-  String get dailyChoiceSourceInvalid =>
-      'Проверьте исходное намерение дневного выбора.';
-
-  @override
-  String get dailyChoiceSelectedInvalid =>
-      'Проверьте выбранное намерение дневного выбора.';
-
-  @override
-  String get dailyChoiceDateInvalid => 'Проверьте дату дневного выбора.';
-
-  @override
-  String get dailyChoiceDescriptionInvalid =>
-      'Проверьте описание дневного выбора.';
-
-  @override
-  String get dailyChoiceOperationNotFound =>
-      'Дневной выбор больше не существует.';
-
-  @override
-  String get dailyChoiceOperationConflict =>
-      'Данные изменились. Обновите их и подтвердите снова.';
-
-  @override
-  String get dailyChoiceOperationUnavailable =>
-      'Не удалось выполнить действие с дневным выбором. Повторите попытку.';
-
-  @override
-  String get dailyChoiceOperationCorruption =>
-      'Сохранённые данные повреждены. Дневной выбор не изменён.';
-
-  @override
-  String get dailyChoiceOperationUnexpected =>
-      'Действие с дневным выбором не выполнено из-за непредвиденной ошибки.';
 
   @override
   String get actionDeleted => 'Действие удалено.';
@@ -2844,24 +2780,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Введите корректный Unicode-текст без NUL.';
 
   @override
-  String get dailyChoiceAllDay => 'Весь день';
-
-  @override
-  String get dailyChoicePriorityLabel => 'Приоритет';
-
-  @override
-  String dailyChoicePriorityOption(String priority) {
-    return 'Приоритет $priority';
-  }
-
-  @override
-  String get dailyChoiceCreateFromAction => 'Создать выбор от действия';
-
-  @override
   String get actionDayLoading => 'Загружаем действия…';
-
-  @override
-  String get dailyChoiceCalendarToday => 'Сегодня';
 
   @override
   String get actionCalendarDayMarksUnavailable => 'Отметки дней не загружены.';
@@ -2961,171 +2880,10 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get dailyChoiceDetailsTitle => 'Дневной выбор';
-
-  @override
-  String get dailyChoiceDetailsLoading => 'Загружаем дневной выбор…';
-
-  @override
-  String get dailyChoiceDetailsNotFound =>
-      'Дневной выбор больше не существует.';
-
-  @override
-  String get dailyChoiceDetailsUnavailable =>
-      'Не удалось загрузить дневной выбор. Повторите попытку.';
-
-  @override
-  String get dailyChoiceDetailsCorruption =>
-      'Сохранённый путь повреждён и не может быть показан.';
-
-  @override
-  String get dailyChoiceDetailsUnexpected =>
-      'Не удалось загрузить дневной выбор из-за непредвиденной ошибки.';
-
-  @override
-  String dailyChoiceDetailsPhrase(String source, String selected) {
-    return 'Чтобы $source, я сегодня $selected';
-  }
-
-  @override
-  String dailyChoiceDetailsDate(String date) {
-    return 'Дата дневного выбора: $date';
-  }
-
-  @override
   String get actionCompleted => 'Выполнено';
 
   @override
   String get actionNotCompleted => 'Не выполнено';
-
-  @override
-  String get dailyChoiceDetailsSource => 'Основание';
-
-  @override
-  String get dailyChoiceDetailsIntermediate => 'Промежуточное намерение';
-
-  @override
-  String get dailyChoiceDetailsSelectedAction => 'Выбранное действие';
-
-  @override
-  String get dailyChoiceDetailsArchived => 'Архивировано';
-
-  @override
-  String get dailyChoiceDetailsActive => 'Активно';
-
-  @override
-  String dailyChoiceDetailsStep(int number) {
-    return 'Переход $number';
-  }
-
-  @override
-  String get dailyChoiceSheetExpand => 'Раскрыть панель дневного выбора';
-
-  @override
-  String get dailyChoiceSheetCollapse => 'Свернуть панель дневного выбора';
-
-  @override
-  String dailyChoiceSheetCompletionLabel(String action, String priority) {
-    return 'Выполнение выбора. $action. $priority';
-  }
-
-  @override
-  String get dailyChoiceSheetOptionsLabel => 'Параметры дневного выбора';
-
-  @override
-  String get dailyChoiceSheetTabsLabel => 'Разделы дневного выбора';
-
-  @override
-  String get dailyChoiceSheetPathTab => 'Путь';
-
-  @override
-  String dailyChoiceSheetPathTabLabel(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Путь, $count шага',
-      many: 'Путь, $count шагов',
-      few: 'Путь, $count шага',
-      one: 'Путь, $count шаг',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String dailyChoiceSheetPathTabArchivedLabel(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Путь, $count шага, в пути есть архив',
-      many: 'Путь, $count шагов, в пути есть архив',
-      few: 'Путь, $count шага, в пути есть архив',
-      one: 'Путь, $count шаг, в пути есть архив',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get dailyChoiceSheetPathArchivedNote =>
-      'В пути есть архивированные намерения или связи.';
-
-  @override
-  String get dailyChoiceSheetDescriptionTitle => 'Описание';
-
-  @override
-  String get dailyChoiceSheetDescriptionBack => 'Назад к дневному выбору';
-
-  @override
-  String get dailyChoiceSheetDescriptionSave => 'Сохранить';
-
-  @override
-  String get dailyChoiceSheetDescriptionDiscardTitle => 'Отменить изменения?';
-
-  @override
-  String get dailyChoiceSheetDescriptionDiscardMessage =>
-      'Изменения описания не сохранятся.';
-
-  @override
-  String get dailyChoiceSheetDescriptionDiscardAction => 'Отменить';
-
-  @override
-  String get dailyChoiceSheetDescriptionContinueAction => 'Продолжить правку';
-
-  @override
-  String get dailyChoiceFieldDate => 'Дата';
-
-  @override
-  String get dailyChoiceFieldTime => 'Время';
-
-  @override
-  String dailyChoiceFieldDateLabel(String date) {
-    return 'Дата: $date. Изменить дату';
-  }
-
-  @override
-  String dailyChoiceFieldTimeLabel(String time) {
-    return 'Время: $time. Изменить время';
-  }
-
-  @override
-  String get dailyChoiceDateSheetLabel => 'Дата дневного выбора';
-
-  @override
-  String get dailyChoiceTimeSheetLabel => 'Время дневного выбора';
-
-  @override
-  String get dailyChoiceTimeHalfSwitchLabel => 'Половина суток';
-
-  @override
-  String get dailyChoiceTimeAmLabel => 'До полудня';
-
-  @override
-  String get dailyChoiceTimePmLabel => 'После полудня';
-
-  @override
-  String get dailyChoiceDateTomorrow => 'Завтра';
-
-  @override
-  String get dailyChoiceDateYesterday => 'Вчера';
 
   @override
   String get creationCancelAction => 'Отменить создание';

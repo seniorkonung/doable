@@ -1,10 +1,5 @@
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
-
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -67,25 +62,6 @@ final class ControlledRelationDetailsRepository
         StatisticsReadContractTestFallback,
         TagReadContractTestFallback
     implements PersonalGraphRepository {
-  @override
-  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
-    DailyChoiceDayStatusQuery query,
-  ) => throw UnsupportedError(
-    'Чтение состояний дней не используется в этом тесте.',
-  );
-
-  @override
-  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Чтение дневного выбора не используется этим тестом.',
-      );
-
-  @override
-  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Наблюдение дневного выбора не используется этим тестом.',
-      );
-
   final relationWatches = <ControlledRelationWatch>[];
   final watchedIntentionIds = <IntentionId>[];
   final groupQueries = <RelationGroupQuery>[];
@@ -186,13 +162,6 @@ final class ControlledRelationDetailsRepository
     watchedIntentionIds.add(id);
     return _intentionControllerFor(id).stream;
   }
-
-  @override
-  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
-    DailyChoiceCatalogQuery query,
-  ) => throw UnsupportedError(
-    'Каталог дневных выборов не используется в этом тесте.',
-  );
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(

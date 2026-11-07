@@ -5,9 +5,7 @@ import 'dart:io';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/settings/settings_page.dart';
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
+import 'package:doable/src/data/local/app_database.dart' show AppDatabase;
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -22,7 +20,6 @@ import 'package:doable/src/intention/presentation/catalog/intention_tag_conditio
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/presentation/home_statistics_state.dart';
 import 'package:doable/src/statistics/presentation/home_statistics_view_model.dart';
@@ -35,10 +32,12 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/action_seed.dart';
 import '../support/app_flow_wait.dart' as app_flow;
 import '../support/app_root_pages.dart';
 import '../support/graph_import_app_harness.dart';
 import '../support/graph_import_files.dart';
+import '../support/graph_seed.dart';
 import '../support/intention_catalog_controls.dart';
 import '../support/temporary_import_document.dart';
 
@@ -54,7 +53,8 @@ void main() {
       final source = await ImportAppHarness.start(
         tester,
         at: DateTime(2026, 10, 3, 12),
-        seed: (graph) async => exported = await _seedExportedGraph(graph),
+        seed: (graph, database) async =>
+            exported = await _seedExportedGraph(graph, database),
       );
       final sourceGraph = await source.graphState();
       await source.openSettings();
@@ -97,7 +97,7 @@ void main() {
     final app = await ImportAppHarness.start(
       tester,
       at: DateTime(2026, 10, 5, 9),
-      seed: (graph) => _createTag(graph, 'Дом'),
+      seed: (graph, _) => _createTag(graph, 'Дом'),
     );
     await app.waitForBackups(1);
     app.now = DateTime(2026, 10, 5, 14);
@@ -168,7 +168,7 @@ void main() {
     final app = await ImportAppHarness.start(
       tester,
       at: DateTime(2026, 10, 6, 8, 15),
-      seed: (graph) async {
+      seed: (graph, _) async {
         health = await _createTag(graph, 'Здоровье');
         for (var number = 1; number <= 40; number++) {
           await _createIntention(graph, 'Намерение $number', tags: {health.id});
@@ -292,10 +292,15 @@ typedef _ExportedGraph = ({
 /// Создаёт командами граф сценария «Импорт экспорта воспроизводит граф»:
 /// архивированное намерение «Читать», две связи «нужно» намерения «Здоровье»
 /// с P2, созданные одна за другой, сначала к «Бегать», затем к созданному
-/// раньше «Плавать», дневной выбор, путь которого проходит через ныне
+/// раньше «Плавать», действие, путь которого проходит через ныне
 /// архивированную связь «Здоровье» → «Бегать», синий тег «Утро», назначенный
 /// сначала «Бегать», затем «Плавать», и отдельный тег «Вечер» без цвета.
-Future<_ExportedGraph> _seedExportedGraph(PersonalGraphRepository graph) async {
+/// Команды создания действия нет, поэтому действие записывается в [database]
+/// с фактом создания в логе.
+Future<_ExportedGraph> _seedExportedGraph(
+  PersonalGraphRepository graph,
+  AppDatabase database,
+) async {
   final health = await _createIntention(graph, 'Здоровье');
   final swimming = await _createIntention(
     graph,
@@ -311,23 +316,15 @@ Future<_ExportedGraph> _seedExportedGraph(PersonalGraphRepository graph) async {
   await _execute(graph, ArchiveIntention(reading.id));
   final needsRunning = await _createNeed(graph, health, running);
   await _createNeed(graph, health, swimming);
-  await _confirm<DailyChoiceCreated>(
-    graph,
-    CreateDailyChoice(
-      sourceIntentionId: health.id,
-      selectedIntentionId: running.id,
-      path: ConfirmedChoicePath([
-        ConfirmedChoicePathStep(
-          relationId: needsRunning.id,
-          sourceIntentionId: health.id,
-          type: LongTermRelationType.need,
-          relatedIntentionId: running.id,
-        ),
-      ]),
-      date: CalendarDate.fromParts(2026, 10, 3),
-      description: null,
-      isCompleted: false,
+  await recordGraphChange(
+    database,
+    () => insertAction(
+      database,
+      id: seedUuid(1),
+      path: [health.id.toCanonicalString(), running.id.toCanonicalString()],
+      date: '2026-10-03',
     ),
+    recordedAt: DateTime.utc(2026, 10, 3, 9),
   );
   await _execute(graph, ArchiveLongTermRelation(needsRunning.id));
   final morning = await _createTag(graph, 'Утро', color: TagColor.blue);

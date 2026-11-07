@@ -5,9 +5,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../action/application/action_command.dart';
 import '../../action/application/action_result.dart';
 import '../../action/domain/action_id.dart';
-import '../../daily_choice/application/daily_choice_command.dart';
-import '../../daily_choice/application/daily_choice_result.dart';
-import '../../daily_choice/domain/daily_choice_id.dart';
 import '../../graph_backups/graph_backups.dart';
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_catalog.dart';
@@ -75,23 +72,6 @@ final class ExistingLongTermRelationKey extends GraphCommandKey {
   int get hashCode => relationId.hashCode;
 }
 
-final class DailyChoiceCreationFormKey extends GraphCommandKey {
-  DailyChoiceCreationFormKey();
-}
-
-final class ExistingDailyChoiceKey extends GraphCommandKey {
-  const ExistingDailyChoiceKey(this.choiceId);
-
-  final DailyChoiceId choiceId;
-
-  @override
-  bool operator ==(Object other) =>
-      other is ExistingDailyChoiceKey && other.choiceId == choiceId;
-
-  @override
-  int get hashCode => Object.hash(ExistingDailyChoiceKey, choiceId);
-}
-
 final class ExistingActionKey extends GraphCommandKey {
   const ExistingActionKey(this.actionId);
 
@@ -138,13 +118,6 @@ final class LongTermRelationOperationToken extends GraphOperationToken {
 
   @override
   String toString() => 'LongTermRelationOperationToken';
-}
-
-final class DailyChoiceOperationToken extends GraphOperationToken {
-  DailyChoiceOperationToken._();
-
-  @override
-  String toString() => 'DailyChoiceOperationToken';
 }
 
 final class ActionOperationToken extends GraphOperationToken {
@@ -343,64 +316,6 @@ final class LongTermRelationUnannouncedSuccessCompletion
     required GraphCommandSucceeded<
       LongTermRelationCommandSuccess,
       LongTermRelationCommandFailure
-    >
-    result,
-  }) : super._(confirmedResult: result);
-}
-
-enum DailyChoiceCommandKind { create, update, delete }
-
-sealed class DailyChoiceCommandCompletion extends GraphCommandCompletion {
-  const DailyChoiceCommandCompletion._({
-    required this.token,
-    required this.kind,
-    required this.confirmedResult,
-  });
-
-  @override
-  final DailyChoiceOperationToken token;
-  final DailyChoiceCommandKind kind;
-  final DailyChoiceCommandResult confirmedResult;
-
-  GraphResult<DailyChoiceCommandSuccess, DailyChoiceCommandFailure>
-  get result => switch (confirmedResult) {
-    GraphResultSuccess(:final value) => GraphResultSuccess(value.value),
-    GraphResultFailure(:final failure) => GraphResultFailure(failure),
-  };
-
-  @override
-  ConfirmedGraphChangePackage? get confirmedChange => switch (confirmedResult) {
-    GraphResultSuccess(:final value) => value,
-    GraphResultFailure() => null,
-  };
-
-  @override
-  bool get isFailure => confirmedResult is GraphResultFailure;
-}
-
-final class DailyChoicePresentableCompletion
-    extends DailyChoiceCommandCompletion
-    implements GraphPresentableCompletion {
-  const DailyChoicePresentableCompletion._({
-    required super.token,
-    required super.kind,
-    required super.confirmedResult,
-  }) : super._();
-}
-
-/// Успех изменения дневного выбора публикуется только для согласования данных.
-///
-/// Изменение следует политике «успех без сообщения» по ADR-0046: результат
-/// виден в открытой панели или карточке каталога, а отказ сохраняет протокол
-/// ADR-0012.
-final class DailyChoiceUnannouncedSuccessCompletion
-    extends DailyChoiceCommandCompletion {
-  const DailyChoiceUnannouncedSuccessCompletion._({
-    required super.token,
-    required super.kind,
-    required GraphCommandSucceeded<
-      DailyChoiceCommandSuccess,
-      DailyChoiceCommandFailure
     >
     result,
   }) : super._(confirmedResult: result);
@@ -836,21 +751,6 @@ final class LongTermRelationCommandAlreadyRunning
   const LongTermRelationCommandAlreadyRunning();
 }
 
-sealed class DailyChoiceCommandStart {
-  const DailyChoiceCommandStart();
-}
-
-final class DailyChoiceCommandAccepted extends DailyChoiceCommandStart {
-  const DailyChoiceCommandAccepted({required this.token, required this.future});
-
-  final DailyChoiceOperationToken token;
-  final Future<DailyChoiceCommandCompletion> future;
-}
-
-final class DailyChoiceCommandAlreadyRunning extends DailyChoiceCommandStart {
-  const DailyChoiceCommandAlreadyRunning();
-}
-
 sealed class ActionCommandStart {
   const ActionCommandStart();
 }
@@ -950,7 +850,6 @@ final class GraphManualBackupAlreadyRunning extends GraphManualBackupStart {
 final class GraphCommandCoordinatorDraining extends IntentionCommandStart
     implements
         LongTermRelationCommandStart,
-        DailyChoiceCommandStart,
         ActionCommandStart,
         TagCommandStart,
         GraphExportStart,
@@ -1060,9 +959,6 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   bool isRelationRunning(LongTermRelationId relationId) =>
       isKeyRunning(ExistingLongTermRelationKey(relationId));
 
-  bool isDailyChoiceRunning(DailyChoiceId choiceId) =>
-      isKeyRunning(ExistingDailyChoiceKey(choiceId));
-
   bool isActionRunning(ActionId actionId) =>
       isKeyRunning(ExistingActionKey(actionId));
 
@@ -1160,26 +1056,6 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     policy: _PresentationPolicy.standard,
   );
 
-  DailyChoiceCommandStart acceptDailyChoiceCreation(
-    DailyChoiceCreationFormKey formKey,
-    CreateDailyChoice command,
-  ) => _acceptDailyChoice(formKey, command, DailyChoiceCommandKind.create);
-
-  DailyChoiceCommandStart acceptDailyChoiceUpdate(
-    UpdateDailyChoiceFields command,
-  ) => _acceptDailyChoice(
-    ExistingDailyChoiceKey(command.choiceId),
-    command,
-    DailyChoiceCommandKind.update,
-  );
-
-  DailyChoiceCommandStart acceptDailyChoiceDelete(DeleteDailyChoice command) =>
-      _acceptDailyChoice(
-        ExistingDailyChoiceKey(command.choiceId),
-        command,
-        DailyChoiceCommandKind.delete,
-      );
-
   /// Принимает изменение полей действия с политикой «успех без сообщения» по
   /// ADR-0046. Пока принятое изменение или удаление этого действия
   /// выполняется, другое его изменение, удаление и повтор той же команды не
@@ -1257,49 +1133,6 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
         future: future.then((completion) => completion as TagCommandCompletion),
       ),
       _GraphCommandAlreadyRunning() => const TagCommandAlreadyRunning(),
-      _GraphCommandDraining() => const GraphCommandCoordinatorDraining(),
-    };
-  }
-
-  DailyChoiceCommandStart _acceptDailyChoice(
-    GraphCommandKey key,
-    DailyChoiceCommand command,
-    DailyChoiceCommandKind kind,
-  ) {
-    final token = DailyChoiceOperationToken._();
-    final policy = _dailyChoicePresentationPolicyOf(kind);
-    final acceptance = _acceptOperation(
-      keys: {key},
-      entry: _PresentationEntry(token),
-      execute: () async {
-        final result = await _executeDailyChoice(command);
-        if (policy != _PresentationPolicy.standard &&
-            result
-                is GraphCommandSucceeded<
-                  DailyChoiceCommandSuccess,
-                  DailyChoiceCommandFailure
-                >) {
-          return DailyChoiceUnannouncedSuccessCompletion._(
-            token: token,
-            kind: kind,
-            result: result,
-          );
-        }
-        return DailyChoicePresentableCompletion._(
-          token: token,
-          kind: kind,
-          confirmedResult: result,
-        );
-      },
-    );
-    return switch (acceptance) {
-      _GraphCommandAccepted(:final future) => DailyChoiceCommandAccepted(
-        token: token,
-        future: future.then(
-          (completion) => completion as DailyChoiceCommandCompletion,
-        ),
-      ),
-      _GraphCommandAlreadyRunning() => const DailyChoiceCommandAlreadyRunning(),
       _GraphCommandDraining() => const GraphCommandCoordinatorDraining(),
     };
   }
@@ -1981,19 +1814,6 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     }
   }
 
-  Future<DailyChoiceCommandResult> _executeDailyChoice(
-    DailyChoiceCommand command,
-  ) async {
-    try {
-      return await _repository.execute(command);
-    } on Object {
-      return const GraphCommandFailed<
-        DailyChoiceCommandSuccess,
-        DailyChoiceCommandFailure
-      >(DailyChoiceUnexpectedFailure());
-    }
-  }
-
   Future<ActionCommandResult> _executeAction(ActionCommand command) async {
     try {
       return await _repository.execute(command);
@@ -2093,14 +1913,6 @@ _PresentationPolicy _intentionPresentationPolicyOf(IntentionCommandKind kind) =>
       IntentionCommandKind.archive ||
       IntentionCommandKind.restore => _PresentationPolicy.failureOnly,
     };
-
-_PresentationPolicy _dailyChoicePresentationPolicyOf(
-  DailyChoiceCommandKind kind,
-) => switch (kind) {
-  DailyChoiceCommandKind.create ||
-  DailyChoiceCommandKind.delete => _PresentationPolicy.standard,
-  DailyChoiceCommandKind.update => _PresentationPolicy.silentSuccess,
-};
 
 _PresentationPolicy _actionPresentationPolicyOf(ActionCommandKind kind) =>
     switch (kind) {

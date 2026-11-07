@@ -349,9 +349,6 @@ final class IntentionRelationsViewModel extends _$IntentionRelationsViewModel {
       case IntentionRelationCountsChanged(:final intentionId, :final counts)
           when intentionId == _intentionId:
         return differsFromPublished(counts);
-      case DailyChoiceChange(:final intentionCounts):
-        final counts = intentionCounts[_intentionId];
-        return counts != null && differsFromPublished(counts);
       case LongTermRelationChange(:final id, :final before, :final after):
         final partBefore = before == null
             ? null

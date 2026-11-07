@@ -2,9 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
 import 'package:doable/src/data/local/app_database.dart' show AppDatabase;
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -23,7 +20,6 @@ import 'package:doable/src/long_term_relation/application/intention_relation_gro
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
-import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -31,9 +27,11 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/action_seed.dart';
 import '../support/failing_snapshot_temporary_files.dart';
 import '../support/forwarding_graph_fact_log.dart';
 import '../support/graph_log_completeness_reference.dart';
+import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 
@@ -190,25 +188,17 @@ void main() {
         readiness: IntentionReadiness.ready,
       );
       final swimming = await createIntention('Плавать');
-      final needRunning = await relate(health, running);
+      await relate(health, running);
       await relate(health, swimming, type: LongTermRelationType.can);
       await relate(swimming, running);
-      await confirm<DailyChoiceCreated>(
-        CreateDailyChoice(
-          sourceIntentionId: health.id,
-          selectedIntentionId: running.id,
-          path: ConfirmedChoicePath([
-            ConfirmedChoicePathStep(
-              relationId: needRunning.id,
-              sourceIntentionId: health.id,
-              type: needRunning.type,
-              relatedIntentionId: running.id,
-            ),
-          ]),
-          date: CalendarDate.fromParts(2026, 10, 18),
-          description: null,
-          isCompleted: false,
+      await recordGraphChange(
+        database,
+        () => insertAction(
+          database,
+          id: seedUuid(1),
+          path: [health.id.toCanonicalString(), running.id.toCanonicalString()],
         ),
+        recordedAt: now,
       );
       await store().writeSnapshot(await repository.readCurrentPosition());
       await confirm(

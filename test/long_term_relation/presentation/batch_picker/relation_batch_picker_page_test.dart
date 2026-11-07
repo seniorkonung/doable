@@ -1863,7 +1863,6 @@ void _expectNoCommands(
   expect(repository.tagCommands, hasLength(tagCommands));
   expect(repository.commands, isEmpty);
   expect(repository.relationCommands, isEmpty);
-  expect(repository.dailyChoiceCommands, isEmpty);
 }
 
 Result<IntentionCatalogFirstPage> _page(

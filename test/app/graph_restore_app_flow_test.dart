@@ -45,7 +45,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_flow_wait.dart' as app_flow;
 import '../support/app_root_pages.dart';
-import '../support/daily_choice_durability_fixture.dart';
+import '../support/graph_durability_fixture.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';

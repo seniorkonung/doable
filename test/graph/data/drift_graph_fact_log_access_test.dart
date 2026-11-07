@@ -1,8 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show AppDatabase, GraphLogPackagesCompanion, GraphSnapshotsCompanion;
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -17,7 +15,6 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
-import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -26,7 +23,7 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../support/action_seed.dart' show seedUuid;
+import '../../support/action_seed.dart' show insertAction, seedUuid;
 import '../../support/graph_log_completeness_reference.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
@@ -271,7 +268,7 @@ void main() {
       'границами внутри каждой секции и группы намерений с одним временем '
       'создания', () async {
     // По 100 записей в порции границы приходятся на середину секции тегов,
-    // намерений, назначений, связей и дневных выборов. После 149 тегов
+    // намерений, назначений, связей и действий. После 149 тегов
     // граница в секции намерений проходит внутри пары с одним временем
     // создания.
     expect(graphFactLogPortionLimit, 100);
@@ -305,31 +302,23 @@ void main() {
       );
     }
     for (final intention in related) {
-      final relation = (await confirm<LongTermRelationsAdded>(
+      await confirm<LongTermRelationsAdded>(
         AddLongTermRelations(
           pageIntentionId: root.id,
           group: IntentionRelationGroup.needs,
           candidateIds: [intention.id],
         ),
-      )).relations.single;
-      await confirm(
-        CreateDailyChoice(
-          sourceIntentionId: root.id,
-          selectedIntentionId: intention.id,
-          path: ConfirmedChoicePath([
-            ConfirmedChoicePathStep(
-              relationId: relation.id,
-              sourceIntentionId: root.id,
-              type: relation.type,
-              relatedIntentionId: intention.id,
-            ),
-          ]),
-          date: CalendarDate.fromParts(2026, 10, 17),
-          description: null,
-          isCompleted: false,
-        ),
       );
     }
+    await seedGraph(database, () async {
+      for (final (index, intention) in related.indexed) {
+        await insertAction(
+          database,
+          id: seedUuid(5000 + index),
+          path: [root.id.toCanonicalString(), intention.id.toCanonicalString()],
+        );
+      }
+    });
 
     final portions = await readAllRecordPortions();
 

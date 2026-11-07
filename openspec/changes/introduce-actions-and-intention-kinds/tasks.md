@@ -344,7 +344,7 @@
   - **Предполагаемые файлы:** `benchmark/support/contribution_statistics_fixture.dart`, `intention_statistics_fixture.dart`, `graph_log_fixture.dart`, `graph_log_database.dart`, `graph_log_memory_worker.dart`, `graph_replacement_timing.dart`, `benchmark/statistics/drift_statistics_benchmark.dart`, `drift_intention_statistics_benchmark.dart`, `drift_through_relations_statistics_benchmark.dart`, `benchmark/graph_log/graph_log_benchmark.dart`.
   - **Размер:** M.
 
-- [ ] 1.28 Граф больше не читает и не меняет дневные выборы
+- [x] 1.28 Граф больше не читает и не меняет дневные выборы
   - **Критерии приёмки:**
     - Чтения, каталог, состояния дней, наблюдение, команды и проверка пути дневных выборов, их контракты в `PersonalGraphRepository` и координаторе, `DailyChoiceChange`, завершения и сообщения представителя, события диагностики и строки удалены.
     - В `lib/src/daily_choice/` остаются только типы, которые нужны хранилищу, формату и журналу фактов до задачи 1.29; тесты, готовившие данные командой создания дневного выбора, готовят действия.

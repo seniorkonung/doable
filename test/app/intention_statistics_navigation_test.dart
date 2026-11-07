@@ -28,7 +28,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_root_pages.dart';
-import '../support/daily_choice_durability_fixture.dart';
+import '../support/graph_durability_fixture.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';

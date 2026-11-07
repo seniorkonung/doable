@@ -1,15 +1,9 @@
 import 'package:doable/src/action/application/action_command.dart';
 import 'package:doable/src/action/application/action_result.dart';
 import 'package:doable/src/action/application/intention_actions.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -88,25 +82,6 @@ final class ControlledDetailsRepository
         StatisticsReadContractTestFallback,
         TagReadContractTestFallback
     implements PersonalGraphRepository {
-  @override
-  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
-    DailyChoiceDayStatusQuery query,
-  ) => throw UnsupportedError(
-    'Чтение состояний дней не используется в этом тесте.',
-  );
-
-  @override
-  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Чтение дневного выбора не используется этим тестом.',
-      );
-
-  @override
-  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Наблюдение дневного выбора не используется этим тестом.',
-      );
-
   ControlledDetailsRepository({this.shareSecondWatch = false});
 
   /// Страница подробностей и вкладка «Связи» наблюдают одно намерение
@@ -117,13 +92,11 @@ final class ControlledDetailsRepository
   final catalogQueries = <IntentionCatalogQuery>[];
   final commands = <IntentionCommand>[];
   final relationCommands = <LongTermRelationCommand>[];
-  final dailyChoiceCommands = <DailyChoiceCommand>[];
   final actionCommands = <ActionCommand>[];
   final tagCommands = <TagCommand>[];
   final _commandRequests =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
-  final _dailyChoiceCommandRequests = <Completer<DailyChoiceCommandResult>>[];
   final _actionCommandRequests = <Completer<ActionCommandResult>>[];
   final _tagCommandRequests = <Completer<TagCommandResult>>[];
   var _watchCallCount = 0;
@@ -192,13 +165,6 @@ final class ControlledDetailsRepository
   }
 
   @override
-  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
-    DailyChoiceCatalogQuery query,
-  ) => throw UnsupportedError(
-    'Каталог дневных выборов не используется в этом тесте.',
-  );
-
-  @override
   Future<RelationGroupPageResult> getRelationGroupPage(
     RelationGroupPageQuery query,
   ) {
@@ -249,7 +215,6 @@ final class ControlledDetailsRepository
       final LongTermRelationCommand relation => await _executeRelation(
         relation,
       ),
-      final DailyChoiceCommand choice => await _executeDailyChoice(choice),
       final ActionCommand action => await _executeAction(action),
       final TagCommand tag => await _executeTag(tag),
       _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
@@ -265,18 +230,6 @@ final class ControlledDetailsRepository
     _relationCommandRequests.add(request);
     return request.future;
   }
-
-  Future<DailyChoiceCommandResult> _executeDailyChoice(
-    DailyChoiceCommand command,
-  ) {
-    dailyChoiceCommands.add(command);
-    final request = Completer<DailyChoiceCommandResult>();
-    _dailyChoiceCommandRequests.add(request);
-    return request.future;
-  }
-
-  void completeDailyChoiceCommand(int index, DailyChoiceCommandResult result) =>
-      _dailyChoiceCommandRequests[index].complete(result);
 
   Future<ActionCommandResult> _executeAction(ActionCommand command) {
     actionCommands.add(command);

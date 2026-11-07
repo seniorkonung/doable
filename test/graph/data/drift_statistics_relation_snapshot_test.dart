@@ -15,7 +15,7 @@ import 'package:doable/src/statistics/application/statistics_read_contract.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/action_seed.dart';
-import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/graph_durability_fixture.dart';
 import '../../support/graph_seed.dart';
 import '../../support/local_database_harness.dart';
 
@@ -319,7 +319,6 @@ void main() {
         ['  Описание связи\n'],
       );
     });
-    await repository.execute(durabilityCreate());
     await repository.loadStatisticsRelationSnapshot();
     final reads = probe.reads;
     probe.cascadedRelationRows = [];

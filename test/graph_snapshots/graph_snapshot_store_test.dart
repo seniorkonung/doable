@@ -3,9 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
+import 'package:doable/src/action/application/action_command.dart';
 import 'package:doable/src/data/local/app_database.dart' show AppDatabase;
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -21,7 +19,6 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -31,9 +28,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:uuid/uuid.dart';
 
+import '../support/action_seed.dart';
 import '../support/encoded_diagnostics_log.dart';
 import '../support/forwarding_graph_fact_log.dart';
 import '../support/graph_log_completeness_reference.dart';
+import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 
@@ -145,25 +144,18 @@ void main() {
       readiness: IntentionReadiness.ready,
     );
     final swimming = await createIntention('Плавать');
-    final needRunning = await relate(health, running);
+    await relate(health, running);
     await relate(health, swimming, type: LongTermRelationType.can);
-    final choice = (await confirm<DailyChoiceCreated>(
-      CreateDailyChoice(
-        sourceIntentionId: health.id,
-        selectedIntentionId: running.id,
-        path: ConfirmedChoicePath([
-          ConfirmedChoicePathStep(
-            relationId: needRunning.id,
-            sourceIntentionId: health.id,
-            type: needRunning.type,
-            relatedIntentionId: running.id,
-          ),
-        ]),
-        date: CalendarDate.fromParts(2026, 10, 17),
-        description: null,
-        isCompleted: false,
+    final action = seedActionId(1);
+    await recordGraphChange(
+      database,
+      () => insertAction(
+        database,
+        id: action.toCanonicalString(),
+        path: [health.id.toCanonicalString(), running.id.toCanonicalString()],
       ),
-    )).choice;
+      recordedAt: now,
+    );
     await store.writeSnapshot(await repository.readCurrentPosition());
 
     await confirm(
@@ -175,7 +167,7 @@ void main() {
     );
     await confirm(RemoveTagAssignment(tagId: home.id, intentionId: health.id));
     await confirm(AssignTag(tagId: home.id, intentionId: health.id));
-    await confirm(DeleteDailyChoice(choice.id));
+    await confirm(DeleteAction(action));
     await confirm(ArchiveIntention(swimming.id));
     await createIntention('Читать');
     final position = await repository.readCurrentPosition();

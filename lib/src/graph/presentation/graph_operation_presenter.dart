@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../action/presentation/action_command_failure_message.dart';
-import '../../daily_choice/presentation/daily_choice_command_failure_message.dart';
 import '../../data_transfer/presentation/graph_import_failure_message.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
@@ -314,9 +313,6 @@ GraphOperationMessage _messageFor(
   LongTermRelationPresentableCompletion() => GraphOperationMessage(
     _relationMessage(localizations, completion),
   ),
-  DailyChoicePresentableCompletion() => GraphOperationMessage(
-    _dailyChoiceMessage(localizations, completion),
-  ),
   ActionPresentableCompletion() => GraphOperationMessage(
     _actionMessage(localizations, completion),
   ),
@@ -401,31 +397,6 @@ String _tagFailureMessage(
     TagCommandKind.assign || TagCommandKind.removeAssignment =>
       tagAssignmentFailureMessage(localizations, completion.failure),
     _ => tagFailureMessage(localizations, completion.failure),
-  },
-);
-
-String _dailyChoiceMessage(
-  AppLocalizations localizations,
-  DailyChoicePresentableCompletion completion,
-) => localizations.graphOperationMessage(
-  switch (completion.kind) {
-    DailyChoiceCommandKind.create => localizations.graphOperationCreate,
-    DailyChoiceCommandKind.update => localizations.graphOperationUpdate,
-    DailyChoiceCommandKind.delete => localizations.graphOperationDelete,
-  },
-  localizations.graphOperationDailyChoice,
-  switch (completion.result) {
-    GraphResultSuccess() => switch (completion.kind) {
-      DailyChoiceCommandKind.create => localizations.dailyChoiceCreated,
-      DailyChoiceCommandKind.update => throw StateError(
-        'Успех изменения дневного выбора не образует права предъявления.',
-      ),
-      DailyChoiceCommandKind.delete => localizations.dailyChoiceDeleted,
-    },
-    GraphResultFailure(:final failure) => dailyChoiceCommandFailureMessage(
-      localizations,
-      failure,
-    ),
   },
 );
 

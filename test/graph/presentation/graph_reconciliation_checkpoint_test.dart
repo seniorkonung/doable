@@ -7,10 +7,6 @@ import 'package:doable/src/action/presentation/day/action_day_state.dart';
 import 'package:doable/src/action/presentation/day/action_day_view_model.dart';
 import 'package:doable/src/action/presentation/panel/action_panel_state.dart';
 import 'package:doable/src/action/presentation/panel/action_panel_view_model.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart'
     hide Intention, LongTermRelation, TagAssignment;
 import 'package:doable/src/graph/application/graph_change.dart';
@@ -64,7 +60,7 @@ import '../../intention/presentation/catalog/catalog_test_support.dart'
     as catalog_support;
 import '../../support/action_panel_fixture.dart';
 import '../../support/action_seed.dart';
-import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/graph_durability_fixture.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/intention_type_counts.dart';
@@ -1668,32 +1664,6 @@ final class _CheckpointGraphRepository
         StatisticsReadContractTestFallback,
         TagReadContractTestFallback
     implements PersonalGraphRepository {
-  @override
-  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
-    DailyChoiceCatalogQuery query,
-  ) => throw UnsupportedError(
-    'Каталог дневных выборов не используется в этом тесте.',
-  );
-
-  @override
-  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
-    DailyChoiceDayStatusQuery query,
-  ) => throw UnsupportedError(
-    'Чтение состояний дней не используется в этом тесте.',
-  );
-
-  @override
-  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Чтение дневного выбора не используется этим тестом.',
-      );
-
-  @override
-  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Наблюдение дневного выбора не используется этим тестом.',
-      );
-
   final catalogQueries = <IntentionCatalogQuery>[];
   final _catalogRequests = <Completer<Result<IntentionCatalogPage>>>[];
   final groupQueries = <RelationGroupQuery>[];

@@ -4,7 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/action/domain/action_id.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show AppDatabase, LocalDatabaseSqlOperation, LocalDatabaseSqlStatement;
 import 'package:doable/src/data/local/sqlite_failure_classifier.dart';
@@ -57,7 +57,7 @@ const _goldenRunningId = '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f12';
 const _goldenFiveKilometersId = '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f13';
 const _goldenSportTagId = '7b0e2f4c-1d3a-4c5e-8f60-0a1b2c3d4e12';
 const _goldenHealthRunningRelationId = '2a3b4c5d-6e7f-4a80-b91c-0d1e2f3a4b11';
-const _goldenDailyChoiceId = '3c4d5e6f-7a8b-4c9d-a0e1-1f2a3b4c5d12';
+const _goldenActionId = '5e6f7a8b-9c0d-4eaf-b012-3a4b5c6d7e11';
 
 /// Количества записей эталонного файла.
 final _goldenCounts = _goldenCountsWith();
@@ -402,7 +402,7 @@ void main() {
       );
     });
 
-    test('после замены наблюдатели намерения, дневного выбора, '
+    test('после замены наблюдатели намерения, действия, '
         'долговременной связи и тега перечитывают их на '
         'ревизии новой эпохи', () async {
       await createPreviousGraph();
@@ -411,8 +411,8 @@ void main() {
         'намерение': StreamIterator(
           repository.watchIntention(_intentionId(_goldenRunningId)),
         ),
-        'дневной выбор': StreamIterator(
-          repository.watchDailyChoice(_dailyChoiceId(_goldenDailyChoiceId)),
+        'действие': StreamIterator(
+          repository.watchAction(_actionId(_goldenActionId)),
         ),
         'долговременная связь': StreamIterator(
           repository.watchRelation(relation),
@@ -954,8 +954,8 @@ IntentionId _intentionId(String id) =>
 LongTermRelationId _relationId(String id) =>
     (LongTermRelationId.decode(id) as LongTermRelationIdDecodingSuccess).id;
 
-DailyChoiceId _dailyChoiceId(String id) =>
-    (DailyChoiceId.decode(id) as DailyChoiceIdDecodingSuccess).id;
+ActionId _actionId(String id) =>
+    (ActionId.decode(id) as ActionIdDecodingSuccess).id;
 
 TagId _tagId(String id) => (TagId.decode(id) as TagIdDecodingSuccess).id;
 

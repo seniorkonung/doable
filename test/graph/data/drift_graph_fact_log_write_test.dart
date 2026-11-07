@@ -1,6 +1,5 @@
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
+import 'package:doable/src/action/application/action_command.dart';
+import 'package:doable/src/action/application/action_result.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show AppDatabase, GraphLogPackage;
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -13,12 +12,8 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
@@ -26,6 +21,7 @@ import 'package:drift/drift.dart' show OrderingTerm;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/action_seed.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
@@ -161,33 +157,28 @@ void main() {
       ),
       ['создание связи'],
     )).relations.single;
-    final choice = (await expectOnePackage<DailyChoiceCreated>(
-      repository.execute(
-        CreateDailyChoice(
-          sourceIntentionId: source.id,
-          selectedIntentionId: selected.id,
-          path: _path(relation.id, source.id, selected.id),
-          date: CalendarDate.fromParts(2026, 10, 17),
-          description: null,
-          isCompleted: false,
-        ),
+    final action = seedActionId(1);
+    // Команды создания действия нет: действие заполняется в обход лога.
+    await seedGraph(
+      database,
+      () => insertAction(
+        database,
+        id: action.toCanonicalString(),
+        path: [source.id.toCanonicalString(), selected.id.toCanonicalString()],
       ),
-      ['создание дневного выбора'],
-    )).choice;
-    await expectOnePackage<DailyChoiceFieldsUpdated>(
-      repository.execute(
-        UpdateDailyChoiceFields(
-          choiceId: choice.id,
-          patch: const DailyChoiceFieldsPatch(
-            isCompleted: DailyChoiceFieldSet(true),
-          ),
-        ),
-      ),
-      ['изменение дневного выбора'],
     );
-    await expectOnePackage<DailyChoiceDeleted>(
-      repository.execute(DeleteDailyChoice(choice.id)),
-      ['удаление дневного выбора'],
+    await expectOnePackage<ActionFieldsUpdated>(
+      repository.execute(
+        UpdateActionFields(
+          actionId: action,
+          patch: const ActionFieldsPatch(isCompleted: ActionFieldSet(true)),
+        ),
+      ),
+      ['изменение действия'],
+    );
+    await expectOnePackage<ActionDeleted>(
+      repository.execute(DeleteAction(action)),
+      ['удаление действия'],
     );
     await expectOnePackage<LongTermRelationDeleted>(
       repository.execute(DeleteLongTermRelation(relation.id)),
@@ -360,19 +351,6 @@ T _confirmed<T>(Object result) {
       (result as GraphResultSuccess<Object?, GraphCommandFailure>).value;
   return (confirmed! as ConfirmedGraphResult).value as T;
 }
-
-ConfirmedChoicePath _path(
-  LongTermRelationId relationId,
-  IntentionId sourceId,
-  IntentionId relatedId,
-) => ConfirmedChoicePath([
-  ConfirmedChoicePathStep(
-    relationId: relationId,
-    sourceIntentionId: sourceId,
-    type: LongTermRelationType.need,
-    relatedIntentionId: relatedId,
-  ),
-]);
 
 List<GraphFact> _decodeFacts(GraphLogPackage package) =>
     GraphFormatCodec.decodePackage(

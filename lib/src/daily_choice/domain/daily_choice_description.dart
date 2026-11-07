@@ -33,13 +33,6 @@ final class DailyChoiceDescription {
 
   final String value;
 
-  static DailyChoiceDescription? fromInput(String value) {
-    if (_validate(value) == null) {
-      return null;
-    }
-    return DailyChoiceDescription._(value);
-  }
-
   static DailyChoiceDescription fromStored(String value) {
     if (_validate(value) == null) {
       throw const DailyChoiceDescriptionValidationException(

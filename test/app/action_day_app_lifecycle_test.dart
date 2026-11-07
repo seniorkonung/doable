@@ -17,10 +17,6 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/day_mark.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -58,7 +54,7 @@ import '../support/action_panel_fixture.dart';
 import '../support/action_seed.dart';
 import '../support/app_root_pages.dart';
 import '../support/controlled_local_date.dart';
-import '../support/daily_choice_durability_fixture.dart';
+import '../support/graph_durability_fixture.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
@@ -774,16 +770,6 @@ final class _ObservedRepository implements PersonalGraphRepository {
       _delegate.getIntentionStatisticsBreakdown(cursor);
 
   @override
-  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
-    DailyChoiceCatalogQuery query,
-  ) => throw UnsupportedError('Экран дня читает действия.');
-
-  @override
-  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
-    DailyChoiceDayStatusQuery query,
-  ) => _delegate.getDailyChoiceDayStatuses(query);
-
-  @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
     TSuccess extends GraphCommandOutcome,
     TFailure extends GraphCommandFailure
@@ -810,14 +796,6 @@ final class _ObservedRepository implements PersonalGraphRepository {
   @override
   Stream<LongTermRelationReadResult> watchRelation(LongTermRelationId id) =>
       _delegate.watchRelation(id);
-
-  @override
-  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
-      _delegate.getDailyChoice(id);
-
-  @override
-  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
-      _delegate.watchDailyChoice(id);
 
   @override
   Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) =>

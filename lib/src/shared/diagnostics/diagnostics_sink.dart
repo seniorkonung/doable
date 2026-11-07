@@ -118,10 +118,6 @@ enum LongTermRelationCommandDiagnosticsType {
   delete,
 }
 
-enum DailyChoiceCommandDiagnosticsType { create, updateFields, delete }
-
-enum DailyChoiceCommandDiagnosticsStage { validation, write, resultRead }
-
 enum ActionCommandDiagnosticsType { updateFields, delete }
 
 /// Проверка состояния действия, запись и чтение подтверждённого результата.
@@ -178,22 +174,6 @@ final class TagDetailReadDiagnosticsEvent extends DiagnosticsEvent {
   final TagReadDiagnosticsStage stage;
 }
 
-final class DailyChoiceReadDiagnosticsEvent extends DiagnosticsEvent {
-  const DailyChoiceReadDiagnosticsEvent({required DiagnosticsStatus status})
-    : super(status);
-}
-
-/// Чтение состояний дней: исход, длительность и безопасная категория отказа.
-///
-/// Даты, диапазон, идентификаторы, пользовательский текст и исходное исключение
-/// не входят в контракт события.
-final class DailyChoiceDayStatusesReadDiagnosticsEvent
-    extends DiagnosticsEvent {
-  const DailyChoiceDayStatusesReadDiagnosticsEvent({
-    required DiagnosticsStatus status,
-  }) : super(status);
-}
-
 /// Вид чтения статистики, без его условий и пользовательских данных.
 enum StatisticsReadDiagnosticsType { homePage, intentionSection, breakdown }
 
@@ -222,36 +202,6 @@ final class StatisticsReadDiagnosticsEvent extends DiagnosticsEvent {
 
   final StatisticsReadDiagnosticsType readType;
   final StatisticsReadDiagnosticsStage stage;
-}
-
-final class DailyChoiceCatalogPageReadDiagnosticsEvent
-    extends DiagnosticsEvent {
-  const DailyChoiceCatalogPageReadDiagnosticsEvent({
-    required this.pageSize,
-    required this.isContinuation,
-    required DiagnosticsStatus status,
-  }) : super(status);
-
-  final int pageSize;
-  final bool isContinuation;
-}
-
-/// Проверка подтверждённого пути при создании дневного выбора.
-final class DailyChoicePathValidationDiagnosticsEvent extends DiagnosticsEvent {
-  const DailyChoicePathValidationDiagnosticsEvent({
-    required DiagnosticsStatus status,
-  }) : super(status);
-}
-
-final class DailyChoiceCommandDiagnosticsEvent extends DiagnosticsEvent {
-  const DailyChoiceCommandDiagnosticsEvent({
-    required this.commandType,
-    required this.stage,
-    required DiagnosticsStatus status,
-  }) : super(status);
-
-  final DailyChoiceCommandDiagnosticsType commandType;
-  final DailyChoiceCommandDiagnosticsStage stage;
 }
 
 /// Команда действия. Событие не несёт ни содержимого действия, ни его

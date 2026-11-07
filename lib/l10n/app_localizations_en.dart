@@ -1233,9 +1233,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationRelation => 'relation';
 
   @override
-  String get graphOperationDailyChoice => 'daily choice';
-
-  @override
   String get graphOperationAction => 'action';
 
   @override
@@ -1906,67 +1903,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get tagUnexpected =>
       'The tag operation failed because of an unexpected error.';
-
-  @override
-  String get dailyChoiceCreated => 'Daily choice created.';
-
-  @override
-  String get dailyChoiceDeleted => 'Daily choice deleted.';
-
-  @override
-  String get dailyChoiceSheetOptionEditDescription => 'Edit the description';
-
-  @override
-  String get dailyChoiceSheetOptionDelete => 'Delete daily choice';
-
-  @override
-  String get dailyChoiceDeleteDialogTitle => 'Delete daily choice?';
-
-  @override
-  String get dailyChoiceDeleteDialogBefore => 'The choice ';
-
-  @override
-  String dailyChoiceDeleteDialogAfter(String date) {
-    return ' for $date will be deleted. This cannot be undone.';
-  }
-
-  @override
-  String get dailyChoiceDeleteDialogAction => 'Delete';
-
-  @override
-  String get dailyChoiceSourceInvalid =>
-      'Check the source intention of the daily choice.';
-
-  @override
-  String get dailyChoiceSelectedInvalid =>
-      'Check the selected intention of the daily choice.';
-
-  @override
-  String get dailyChoiceDateInvalid => 'Check the daily choice date.';
-
-  @override
-  String get dailyChoiceDescriptionInvalid =>
-      'Check the daily choice description.';
-
-  @override
-  String get dailyChoiceOperationNotFound =>
-      'This daily choice no longer exists.';
-
-  @override
-  String get dailyChoiceOperationConflict =>
-      'The data changed. Refresh it and confirm again.';
-
-  @override
-  String get dailyChoiceOperationUnavailable =>
-      'Could not complete the daily choice operation. Try again.';
-
-  @override
-  String get dailyChoiceOperationCorruption =>
-      'Stored data is damaged. The daily choice was not changed.';
-
-  @override
-  String get dailyChoiceOperationUnexpected =>
-      'The daily choice operation failed because of an unexpected error.';
 
   @override
   String get actionDeleted => 'Action deleted.';
@@ -2814,24 +2750,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enter valid Unicode text without NUL.';
 
   @override
-  String get dailyChoiceAllDay => 'All day';
-
-  @override
-  String get dailyChoicePriorityLabel => 'Priority';
-
-  @override
-  String dailyChoicePriorityOption(String priority) {
-    return 'Priority $priority';
-  }
-
-  @override
-  String get dailyChoiceCreateFromAction => 'Create a choice from an action';
-
-  @override
   String get actionDayLoading => 'Loading actions…';
-
-  @override
-  String get dailyChoiceCalendarToday => 'Today';
 
   @override
   String get actionCalendarDayMarksUnavailable =>
@@ -2929,167 +2848,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get dailyChoiceDetailsTitle => 'Daily choice';
-
-  @override
-  String get dailyChoiceDetailsLoading => 'Loading daily choice…';
-
-  @override
-  String get dailyChoiceDetailsNotFound =>
-      'This daily choice no longer exists.';
-
-  @override
-  String get dailyChoiceDetailsUnavailable =>
-      'Could not load this daily choice. Try again.';
-
-  @override
-  String get dailyChoiceDetailsCorruption =>
-      'The stored path is damaged and cannot be shown.';
-
-  @override
-  String get dailyChoiceDetailsUnexpected =>
-      'Could not load this daily choice because of an unexpected error.';
-
-  @override
-  String dailyChoiceDetailsPhrase(String source, String selected) {
-    return 'To $source, today I $selected';
-  }
-
-  @override
-  String dailyChoiceDetailsDate(String date) {
-    return 'Daily choice date: $date';
-  }
-
-  @override
   String get actionCompleted => 'Completed';
 
   @override
   String get actionNotCompleted => 'Not completed';
-
-  @override
-  String get dailyChoiceDetailsSource => 'Source intention';
-
-  @override
-  String get dailyChoiceDetailsIntermediate => 'Intermediate intention';
-
-  @override
-  String get dailyChoiceDetailsSelectedAction => 'Selected action';
-
-  @override
-  String get dailyChoiceDetailsArchived => 'Archived';
-
-  @override
-  String get dailyChoiceDetailsActive => 'Active';
-
-  @override
-  String dailyChoiceDetailsStep(int number) {
-    return 'Transition $number';
-  }
-
-  @override
-  String get dailyChoiceSheetExpand => 'Expand daily choice sheet';
-
-  @override
-  String get dailyChoiceSheetCollapse => 'Collapse daily choice sheet';
-
-  @override
-  String dailyChoiceSheetCompletionLabel(String action, String priority) {
-    return 'Completion of the choice. $action. $priority';
-  }
-
-  @override
-  String get dailyChoiceSheetOptionsLabel => 'Daily choice options';
-
-  @override
-  String get dailyChoiceSheetTabsLabel => 'Daily choice sections';
-
-  @override
-  String get dailyChoiceSheetPathTab => 'Path';
-
-  @override
-  String dailyChoiceSheetPathTabLabel(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Path, $count steps',
-      one: 'Path, $count step',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String dailyChoiceSheetPathTabArchivedLabel(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Path, $count steps, something in it is archived',
-      one: 'Path, $count step, something in it is archived',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get dailyChoiceSheetPathArchivedNote =>
-      'The path contains archived intentions or relations.';
-
-  @override
-  String get dailyChoiceSheetDescriptionTitle => 'Description';
-
-  @override
-  String get dailyChoiceSheetDescriptionBack => 'Back to the daily choice';
-
-  @override
-  String get dailyChoiceSheetDescriptionSave => 'Save';
-
-  @override
-  String get dailyChoiceSheetDescriptionDiscardTitle => 'Discard changes?';
-
-  @override
-  String get dailyChoiceSheetDescriptionDiscardMessage =>
-      'Your changes to the description won’t be saved.';
-
-  @override
-  String get dailyChoiceSheetDescriptionDiscardAction => 'Discard';
-
-  @override
-  String get dailyChoiceSheetDescriptionContinueAction => 'Keep editing';
-
-  @override
-  String get dailyChoiceFieldDate => 'Date';
-
-  @override
-  String get dailyChoiceFieldTime => 'Time';
-
-  @override
-  String dailyChoiceFieldDateLabel(String date) {
-    return 'Date: $date. Change date';
-  }
-
-  @override
-  String dailyChoiceFieldTimeLabel(String time) {
-    return 'Time: $time. Change time';
-  }
-
-  @override
-  String get dailyChoiceDateSheetLabel => 'Daily choice date';
-
-  @override
-  String get dailyChoiceTimeSheetLabel => 'Daily choice time';
-
-  @override
-  String get dailyChoiceTimeHalfSwitchLabel => 'Half of the day';
-
-  @override
-  String get dailyChoiceTimeAmLabel => 'Before noon';
-
-  @override
-  String get dailyChoiceTimePmLabel => 'After noon';
-
-  @override
-  String get dailyChoiceDateTomorrow => 'Tomorrow';
-
-  @override
-  String get dailyChoiceDateYesterday => 'Yesterday';
 
   @override
   String get creationCancelAction => 'Cancel creation';

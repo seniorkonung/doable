@@ -1,99 +1,9 @@
 import '../../action/domain/action.dart';
-import '../../daily_choice/domain/daily_choice.dart';
 import '../../intention/domain/intention_id.dart';
 import '../../long_term_relation/application/relation_counts.dart';
 import '../../long_term_relation/domain/long_term_relation.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
 import 'graph_revision.dart';
-
-enum DailyChoiceChangeValidationFailure {
-  missingChoice,
-  identityMismatch,
-  invalidPathDelta,
-  missingCounts,
-}
-
-final class DailyChoiceChangeValidationException implements Exception {
-  const DailyChoiceChangeValidationException(this.failure);
-
-  final DailyChoiceChangeValidationFailure failure;
-}
-
-/// Изменение выбора и подтверждённые зависимости одной ревизии графа.
-final class DailyChoiceChange implements GraphChange {
-  factory DailyChoiceChange({
-    required GraphRevision revision,
-    required DailyChoice? before,
-    required DailyChoice? after,
-    required Iterable<LongTermRelationId> releasedRelationIds,
-    required Iterable<LongTermRelationId> occupiedRelationIds,
-    required Map<IntentionId, RelationCounts> intentionCounts,
-  }) {
-    if (before == null && after == null) {
-      throw const DailyChoiceChangeValidationException(
-        DailyChoiceChangeValidationFailure.missingChoice,
-      );
-    }
-    if (before != null && after != null && before.id != after.id) {
-      throw const DailyChoiceChangeValidationException(
-        DailyChoiceChangeValidationFailure.identityMismatch,
-      );
-    }
-    final released = Set<LongTermRelationId>.unmodifiable(releasedRelationIds);
-    final occupied = Set<LongTermRelationId>.unmodifiable(occupiedRelationIds);
-    if ((before == null && released.isNotEmpty) ||
-        (after == null && occupied.isNotEmpty) ||
-        (before == null && occupied.isEmpty) ||
-        (after == null && released.isEmpty)) {
-      throw const DailyChoiceChangeValidationException(
-        DailyChoiceChangeValidationFailure.invalidPathDelta,
-      );
-    }
-    final counts = Map<IntentionId, RelationCounts>.unmodifiable(
-      intentionCounts,
-    );
-    if (!counts.keys.toSet().containsAll({
-      ..._participants(before),
-      ..._participants(after),
-    })) {
-      throw const DailyChoiceChangeValidationException(
-        DailyChoiceChangeValidationFailure.missingCounts,
-      );
-    }
-    return DailyChoiceChange._(
-      revision: revision,
-      before: before,
-      after: after,
-      releasedRelationIds: released,
-      occupiedRelationIds: occupied,
-      intentionCounts: counts,
-    );
-  }
-
-  const DailyChoiceChange._({
-    required this.revision,
-    required this.before,
-    required this.after,
-    required this.releasedRelationIds,
-    required this.occupiedRelationIds,
-    required this.intentionCounts,
-  });
-
-  @override
-  final GraphRevision revision;
-  final DailyChoice? before;
-  final DailyChoice? after;
-  final Set<LongTermRelationId> releasedRelationIds;
-  final Set<LongTermRelationId> occupiedRelationIds;
-  final Map<IntentionId, RelationCounts> intentionCounts;
-
-  static Set<IntentionId> _participants(DailyChoice? choice) =>
-      Set<IntentionId>.unmodifiable(
-        choice == null
-            ? <IntentionId>{}
-            : {choice.sourceIntentionId, choice.selectedIntentionId},
-      );
-}
 
 /// Изменение действия одной ревизии графа с состоянием до и после, по
 /// которому потребители находят затронутые даты и намерения пути.

@@ -144,11 +144,6 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
         watcher.add(null);
       }
     }
-    for (final registrations in List.of(_dailyChoiceWatchers.values)) {
-      for (final registration in List.of(registrations)) {
-        registration.invalidations.add(null);
-      }
-    }
     for (final registrations in List.of(_actionWatchers.values)) {
       for (final registration in List.of(registrations)) {
         registration.invalidations.add(null);

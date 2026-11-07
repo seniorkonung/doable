@@ -5,12 +5,6 @@ import 'package:doable/src/action/domain/action_id.dart';
 import 'package:doable/src/action/domain/action_priority.dart';
 import 'package:doable/src/action/domain/action_schedule.dart';
 import 'package:doable/src/action/domain/action_text.dart';
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/data/local/app_database.dart' show AppDatabase;
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -367,69 +361,7 @@ void main() {
       reason: 'удаление последнего пути снимает надгробия',
     );
   });
-
-  test('команды дневных выборов: создание, изменение полей и удаление '
-      'вместе с шагами', () async {
-    final health = await createIntention('Здоровье');
-    final running = await createIntention(
-      'Бегать',
-      readiness: IntentionReadiness.ready,
-    );
-    final morning = await createIntention(
-      'Пробежка утром',
-      readiness: IntentionReadiness.ready,
-    );
-    final needRunning = await relate(health, running);
-    final needMorning = await relate(running, morning);
-    final choice = (await confirm<DailyChoiceCreated>(
-      CreateDailyChoice(
-        sourceIntentionId: health.id,
-        selectedIntentionId: morning.id,
-        path: _path([needRunning, needMorning]),
-        date: CalendarDate.fromParts(2026, 10, 17),
-        description: DailyChoiceDescription.fromInput('До работы'),
-        isCompleted: false,
-        schedule: DailyChoiceTime(hour: 7, minute: 30),
-        priority: DailyChoicePriority.p2,
-      ),
-    )).choice;
-    await confirm(
-      CreateDailyChoice(
-        sourceIntentionId: health.id,
-        selectedIntentionId: running.id,
-        path: _path([needRunning]),
-        date: CalendarDate.fromParts(2026, 10, 18),
-        description: null,
-        isCompleted: false,
-      ),
-    );
-
-    await confirm(
-      UpdateDailyChoiceFields(
-        choiceId: choice.id,
-        patch: DailyChoiceFieldsPatch(
-          date: DailyChoiceFieldSet(CalendarDate.fromParts(2026, 10, 19)),
-          description: const DailyChoiceDescriptionCleared(),
-          isCompleted: const DailyChoiceFieldSet(true),
-          schedule: const DailyChoiceFieldSet(DailyChoiceAllDay()),
-          priority: const DailyChoiceFieldSet(DailyChoicePriority.p1),
-        ),
-      ),
-    );
-    await confirm(DeleteDailyChoice(choice.id));
-  });
 }
-
-ConfirmedChoicePath _path(List<LongTermRelation> relations) =>
-    ConfirmedChoicePath([
-      for (final relation in relations)
-        ConfirmedChoicePathStep(
-          relationId: relation.id,
-          sourceIntentionId: relation.sourceIntentionId,
-          type: relation.type,
-          relatedIntentionId: relation.relatedIntentionId,
-        ),
-    ]);
 
 GraphStateBase _baseOf(_GraphCheckpoint checkpoint) => GraphStateBase(
   position: checkpoint.position,

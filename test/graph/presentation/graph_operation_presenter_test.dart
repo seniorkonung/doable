@@ -9,12 +9,6 @@ import 'package:doable/src/action/domain/action_path.dart';
 import 'package:doable/src/action/domain/action_priority.dart';
 import 'package:doable/src/action/domain/action_schedule.dart';
 import 'package:doable/src/action/domain/action_text.dart';
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
-import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -753,133 +747,6 @@ void main() {
     });
   }
 
-  for (final scenario in <({DailyChoiceValidationField field, String ru})>[
-    (
-      field: DailyChoiceValidationField.sourceIntention,
-      ru: 'Проверьте исходное намерение дневного выбора.',
-    ),
-    (
-      field: DailyChoiceValidationField.selectedIntention,
-      ru: 'Проверьте выбранное намерение дневного выбора.',
-    ),
-    (
-      field: DailyChoiceValidationField.date,
-      ru: 'Проверьте дату дневного выбора.',
-    ),
-    (
-      field: DailyChoiceValidationField.description,
-      ru: 'Проверьте описание дневного выбора.',
-    ),
-  ]) {
-    testWidgets('ошибка поля ${scenario.field.name} объяснена', (tester) async {
-      final harness = await _pumpPresenterApp(
-        tester,
-        locale: const Locale('ru'),
-      );
-      final update = harness.startDailyChoiceUpdate();
-      harness.completeDailyChoiceFailure(
-        update,
-        DailyChoiceValidationFailure(scenario.field),
-      );
-      await tester.pumpAndSettle();
-
-      final message = 'Изменение — «дневной выбор»: ${scenario.ru}';
-      expect(find.text(message), findsOneWidget);
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-    });
-  }
-
-  for (final scenario in <({DailyChoiceCommandFailure failure, String ru})>[
-    (
-      failure: const DailyChoiceNotFoundFailure(),
-      ru: 'Дневной выбор больше не существует.',
-    ),
-    (
-      failure: const DailyChoiceConflictFailure(
-        DailyChoiceConflictReason.dependencyChanged,
-      ),
-      ru: 'Данные изменились. Обновите их и подтвердите снова.',
-    ),
-    (
-      failure: const DailyChoiceUnavailableFailure(),
-      ru: 'Не удалось выполнить действие с дневным выбором. Повторите попытку.',
-    ),
-    (
-      failure: const DailyChoiceCorruptionFailure(),
-      ru: 'Сохранённые данные повреждены. Дневной выбор не изменён.',
-    ),
-    (
-      failure: const DailyChoiceUnexpectedFailure(),
-      ru: 'Действие с дневным выбором не выполнено из-за непредвиденной ошибки.',
-    ),
-  ]) {
-    testWidgets('отказ ${scenario.failure.runtimeType} безопасен', (
-      tester,
-    ) async {
-      final harness = await _pumpPresenterApp(
-        tester,
-        locale: const Locale('ru'),
-      );
-      final update = harness.startDailyChoiceUpdate();
-      harness.completeDailyChoiceFailure(update, scenario.failure);
-      await tester.pumpAndSettle();
-
-      final message = 'Изменение — «дневной выбор»: ${scenario.ru}';
-      expect(find.text(message), findsOneWidget);
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-    });
-  }
-
-  testWidgets(
-    'дневной выбор предъявляет успех лишь после подтверждения записи',
-    (tester) async {
-      final harness = await _pumpPresenterApp(
-        tester,
-        locale: const Locale('ru'),
-      );
-      final deletion = harness.startDailyChoiceDelete(releaseInitiator: false);
-      await tester.pump();
-      expect(find.byType(SnackBar), findsNothing);
-
-      harness.completeDailyChoiceDeleted(deletion);
-      await tester.pumpAndSettle();
-      expect(
-        find.text('Удаление — «дневной выбор»: Дневной выбор удалён.'),
-        findsOneWidget,
-      );
-      expect(
-        tester.getSemantics(
-          find.byKey(const ValueKey('graph-operation-message')),
-        ),
-        matchesSemantics(
-          label: 'Удаление — «дневной выбор»: Дневной выбор удалён.',
-          isLiveRegion: true,
-          textDirection: TextDirection.ltr,
-        ),
-      );
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-    },
-  );
-
-  testWidgets('успех создания дневного выбора предъявляется один раз', (
-    tester,
-  ) async {
-    final harness = await _pumpPresenterApp(tester);
-    final accepted = harness.startDailyChoice(DailyChoiceCommandKind.create);
-    harness.completeDailyChoiceSuccess(accepted, DailyChoiceCommandKind.create);
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text('Create — “daily choice”: Daily choice created.'),
-      findsOneWidget,
-    );
-    await _closeMessage(tester);
-    expect(find.byType(SnackBar), findsNothing);
-  });
-
   testWidgets('действие предъявляет удаление лишь после подтверждения записи', (
     tester,
   ) async {
@@ -961,14 +828,14 @@ void main() {
   }
 
   testWidgets(
-    'успех изменения дневного выбора не объявляется сообщением и не занимает '
+    'успех изменения действия не объявляется сообщением и не занимает '
     'очередь',
     (tester) async {
       final harness = await _pumpPresenterApp(tester);
       final intention = harness.startDelete(index: 1, title: 'Намерение');
-      final update = harness.startDailyChoice(DailyChoiceCommandKind.update);
+      final update = harness.startActionUpdate();
       harness.completeDeleted(intention);
-      harness.completeDailyChoiceSuccess(update, DailyChoiceCommandKind.update);
+      harness.completeActionUpdated(update);
       await update.future;
       await tester.pumpAndSettle();
 
@@ -1918,15 +1785,6 @@ final _otherRelationId = switch (LongTermRelationId.decode(
   ),
 };
 
-final _dailyChoiceId = switch (DailyChoiceId.decode(
-  '018f1400-0000-7000-8000-000000000001',
-)) {
-  DailyChoiceIdDecodingSuccess(:final id) => id,
-  InvalidDailyChoiceIdDecoding() => throw StateError(
-    'Некорректный ID дневного выбора.',
-  ),
-};
-
 final _actionId = switch (ActionId.decode(
   '018f1400-0000-7000-8000-000000000005',
 )) {
@@ -1955,22 +1813,6 @@ final class _CreatedCatalogEntrySnapshot
 
   @override
   bool matches(IntentionCatalogQuery query) => query.includes(summary);
-}
-
-final _choicePathStepId = switch (ChoicePathStepId.decode(
-  '018f1400-0000-7000-8000-000000000002',
-)) {
-  ChoicePathStepIdDecodingSuccess(:final id) => id,
-  InvalidChoicePathStepIdDecoding() => throw StateError(
-    'Некорректный ID шага пути.',
-  ),
-};
-
-final class _PresentationOnlyChange implements GraphChange {
-  const _PresentationOnlyChange(this.revision);
-
-  @override
-  final GraphRevision revision;
 }
 
 Future<void> _openSheet(BuildContext context) => showDoableSheet<void>(
@@ -2028,7 +1870,6 @@ final class _PresenterHarness {
   final _commandIndexes = <IntentionCommandAccepted, int>{};
   final _titles = <IntentionCommandAccepted, (int, String)>{};
   final _relationIndexes = <LongTermRelationCommandAccepted, int>{};
-  final _dailyChoiceIndexes = <DailyChoiceCommandAccepted, int>{};
   final _actionIndexes = <ActionCommandAccepted, int>{};
   final _tagIndexes = <TagCommandAccepted, int>{};
   final _exports = <GraphExportAccepted, Completer<GraphExportOutcome>>{};
@@ -2096,151 +1937,6 @@ final class _PresenterHarness {
   void releaseInitiatorPresentation(GraphOperationToken token) =>
       _coordinator.releaseInitiatorPresentation(token);
 
-  DailyChoiceCommandAccepted startDailyChoice(DailyChoiceCommandKind kind) =>
-      switch (kind) {
-        DailyChoiceCommandKind.create => _startDailyChoiceCreate(),
-        DailyChoiceCommandKind.update => startDailyChoiceUpdate(),
-        DailyChoiceCommandKind.delete => startDailyChoiceDelete(),
-      };
-
-  ConfirmedChoicePath _confirmedChoicePath() => ConfirmedChoicePath([
-    ConfirmedChoicePathStep(
-      relationId: _relationId,
-      sourceIntentionId: testDetailsIntentionId(1),
-      type: LongTermRelationType.need,
-      relatedIntentionId: testDetailsIntentionId(2),
-    ),
-  ]);
-
-  DailyChoiceCommandAccepted _startDailyChoiceCreate() {
-    final commandIndex = repository.dailyChoiceCommands.length;
-    final accepted = _coordinator.acceptDailyChoiceCreation(
-      DailyChoiceCreationFormKey(),
-      CreateDailyChoice(
-        sourceIntentionId: testDetailsIntentionId(1),
-        selectedIntentionId: testDetailsIntentionId(2),
-        path: _confirmedChoicePath(),
-        date: CalendarDate.fromParts(2026, 9, 23),
-        description: null,
-        isCompleted: false,
-      ),
-    ) as DailyChoiceCommandAccepted;
-    _coordinator.releaseInitiatorPresentation(accepted.token);
-    _dailyChoiceIndexes[accepted] = commandIndex;
-    return accepted;
-  }
-
-  DailyChoiceCommandAccepted startDailyChoiceUpdate({
-    bool releaseInitiator = true,
-  }) {
-    final commandIndex = repository.dailyChoiceCommands.length;
-    final accepted = _coordinator.acceptDailyChoiceUpdate(
-      UpdateDailyChoiceFields(
-        choiceId: _dailyChoiceId,
-        patch: const DailyChoiceFieldsPatch(
-          isCompleted: DailyChoiceFieldSet(true),
-        ),
-      ),
-    ) as DailyChoiceCommandAccepted;
-    if (releaseInitiator) {
-      _coordinator.releaseInitiatorPresentation(accepted.token);
-    }
-    _dailyChoiceIndexes[accepted] = commandIndex;
-    return accepted;
-  }
-
-  DailyChoiceCommandAccepted startDailyChoiceDelete({
-    bool releaseInitiator = true,
-  }) {
-    final commandIndex = repository.dailyChoiceCommands.length;
-    final accepted = _coordinator.acceptDailyChoiceDelete(
-      DeleteDailyChoice(_dailyChoiceId),
-    ) as DailyChoiceCommandAccepted;
-    if (releaseInitiator) {
-      _coordinator.releaseInitiatorPresentation(accepted.token);
-    }
-    _dailyChoiceIndexes[accepted] = commandIndex;
-    return accepted;
-  }
-
-  void completeDailyChoiceDeleted(DailyChoiceCommandAccepted accepted) {
-    const revision = TestDetailsRevision(7);
-    repository.completeDailyChoiceCommand(
-      _dailyChoiceIndexes[accepted]!,
-      GraphCommandSucceeded(
-        ConfirmedGraphResult(
-          revision: revision,
-          value: DailyChoiceDeleted(
-            choice: DailyChoice(
-              id: _dailyChoiceId,
-              sourceIntentionId: testDetailsIntentionId(1),
-              selectedIntentionId: testDetailsIntentionId(2),
-              date: CalendarDate.fromParts(2026, 9, 23),
-              description: null,
-              isCompleted: false,
-            ),
-            changes: const [_PresentationOnlyChange(revision)],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void completeDailyChoiceSuccess(
-    DailyChoiceCommandAccepted accepted,
-    DailyChoiceCommandKind kind,
-  ) {
-    const revision = TestDetailsRevision(7);
-    final choice = DailyChoice(
-      id: _dailyChoiceId,
-      sourceIntentionId: testDetailsIntentionId(1),
-      selectedIntentionId: testDetailsIntentionId(2),
-      date: CalendarDate.fromParts(2026, 9, 23),
-      description: null,
-      isCompleted: false,
-    );
-    final path = StoredChoicePath([
-      ChoicePathStep(
-        id: _choicePathStepId,
-        dailyChoiceId: _dailyChoiceId,
-        relationId: _relationId,
-        previousStepId: null,
-      ),
-    ]);
-    final changes = <GraphChange>[const _PresentationOnlyChange(revision)];
-    final success = switch (kind) {
-      DailyChoiceCommandKind.create => DailyChoiceCreated(
-        choice: choice,
-        path: path,
-        changes: changes,
-      ),
-      DailyChoiceCommandKind.update => DailyChoiceFieldsUpdated(
-        before: choice,
-        choice: choice,
-        path: path,
-        changes: changes,
-      ),
-      DailyChoiceCommandKind.delete => DailyChoiceDeleted(
-        choice: choice,
-        changes: changes,
-      ),
-    };
-    repository.completeDailyChoiceCommand(
-      _dailyChoiceIndexes[accepted]!,
-      GraphCommandSucceeded(
-        ConfirmedGraphResult(revision: revision, value: success),
-      ),
-    );
-  }
-
-  void completeDailyChoiceFailure(
-    DailyChoiceCommandAccepted accepted,
-    DailyChoiceCommandFailure failure,
-  ) => repository.completeDailyChoiceCommand(
-    _dailyChoiceIndexes[accepted]!,
-    GraphCommandFailed(failure),
-  );
-
   ActionCommandAccepted startActionUpdate() {
     final commandIndex = repository.actionCommands.length;
     final accepted = _coordinator.acceptActionUpdate(
@@ -2264,21 +1960,32 @@ final class _PresenterHarness {
     return accepted;
   }
 
+  void completeActionUpdated(ActionCommandAccepted accepted) {
+    const revision = TestDetailsRevision(7);
+    final action = _action();
+    repository.completeActionCommand(
+      _actionIndexes[accepted]!,
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: ActionFieldsUpdated(
+            action: action,
+            changes: [
+              ActionUpdatedChange(
+                revision: revision,
+                before: action,
+                after: action,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void completeActionDeleted(ActionCommandAccepted accepted) {
     const revision = TestDetailsRevision(7);
-    final action = action_domain.Action(
-      id: _actionId,
-      title: ActionTitle('Пробежка'),
-      description: null,
-      path: ActionPath([testDetailsIntentionId(1)]),
-      date: CalendarDate.fromParts(2026, 9, 23),
-      schedule: const ActionAllDay(),
-      priority: ActionPriority.p4,
-      isCompleted: false,
-      creationSequence: action_domain.ActionCreationSequence(1),
-      createdAt: action_domain.ActionTimestamp(DateTime.utc(2026, 9, 23)),
-      updatedAt: action_domain.ActionTimestamp(DateTime.utc(2026, 9, 23)),
-    );
+    final action = _action();
     repository.completeActionCommand(
       _actionIndexes[accepted]!,
       GraphCommandSucceeded(
@@ -2292,6 +1999,20 @@ final class _PresenterHarness {
       ),
     );
   }
+
+  action_domain.Action _action() => action_domain.Action(
+    id: _actionId,
+    title: ActionTitle('Пробежка'),
+    description: null,
+    path: ActionPath([testDetailsIntentionId(1)]),
+    date: CalendarDate.fromParts(2026, 9, 23),
+    schedule: const ActionAllDay(),
+    priority: ActionPriority.p4,
+    isCompleted: false,
+    creationSequence: action_domain.ActionCreationSequence(1),
+    createdAt: action_domain.ActionTimestamp(DateTime.utc(2026, 9, 23)),
+    updatedAt: action_domain.ActionTimestamp(DateTime.utc(2026, 9, 23)),
+  );
 
   void completeActionFailure(
     ActionCommandAccepted accepted,
