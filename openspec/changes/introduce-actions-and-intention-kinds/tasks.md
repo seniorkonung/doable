@@ -928,7 +928,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/graph/data/drift_personal_graph_repository_action_reads.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, `developer_diagnostics_sink.dart`, `test/graph/data/drift_action_path_state_read_test.dart`, при необходимости `test/shared/diagnostics/diagnostics_sink_test.dart`.
   - **Размер:** S.
 
-- [ ] 2.28 Варианты строки `OptionRow`, связь шага `PathBuilder` и загруженный черновик при сохранении пути выражены типами
+- [x] 2.28 Варианты строки `OptionRow`, связь шага `PathBuilder` и загруженный черновик при сохранении пути выражены типами
   - **Критерии приёмки:**
     - `OptionRow` (`lib/src/design_system/components/option_row.dart`) хранит ведущий элемент одним полем запечатанного типа с вариантами «значок» (`DoableIconData`) и «метка» (`Widget`) вместо пары необязательных полей `icon` и `mark`; отрисовка исчерпывающе сопоставляет варианты, разыменования `icon!` нет. Конструкторы `OptionRow` и `OptionRow.marked` и их вызывающий код (`action_priority_sheet.dart` и др.) обновлены, если меняется их форма.
     - `PathBuilder` (`lib/src/design_system/components/path_builder.dart`) получает путь так, что корневой шаг не имеет связи, а каждый следующий шаг несёт обязательную `PathBuilderRelation` — например отдельные типы корневого и следующего шага или корень плюс список шагов со связью; `step.relation!` и прочих разыменований связи нет. Вызывающий код (`path_page.dart`) и тесты компонента обновлены.

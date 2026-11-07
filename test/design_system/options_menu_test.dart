@@ -40,11 +40,16 @@ void main() {
           'Архивировать',
           'Удалить',
         ]);
-        expect(rows.map((row) => row.icon), [
-          DoableIconData.edit,
-          DoableIconData.archive,
-          DoableIconData.delete,
-        ]);
+        expect(
+          find.byType(OptionRow).evaluate().map((element) {
+            final icon = find.descendant(
+              of: find.byWidget(element.widget),
+              matching: find.byType(DoableIcon),
+            );
+            return tester.widget<DoableIcon>(icon).icon;
+          }),
+          [DoableIconData.edit, DoableIconData.archive, DoableIconData.delete],
+        );
         expect(rows.last.tone, OptionRowTone.danger);
         expect(
           tester.getTopLeft(find.text('Изменить')).dy,

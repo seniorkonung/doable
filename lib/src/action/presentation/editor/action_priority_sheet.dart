@@ -37,7 +37,9 @@ final class _ActionPrioritySheet extends StatelessWidget {
         children: [
           for (final priority in ActionPriority.values)
             OptionRow.marked(
-              mark: ActionCheck(priority: actionDesignPriority(priority)),
+              mark: OptionRowMark(
+                ActionCheck(priority: actionDesignPriority(priority)),
+              ),
               name: actionPriorityName(actionDesignPriority(priority)),
               hint: switch (priority) {
                 ActionPriority.p1 => localizations.actionPriorityHighest,

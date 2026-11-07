@@ -189,13 +189,15 @@ final class _PathPageState extends ConsumerState<PathPage> {
     PathCandidate? appended,
   }) {
     final candidates = path.candidates;
-    final steps = segment == null
-        ? const <PathBuilderStep>[]
+    final builderPath = segment == null
+        ? null
         : _steps(l10n, segment, appended);
-    final lastTitle = steps.lastOrNull?.name ?? '';
+    final lastTitle = builderPath == null
+        ? ''
+        : builderPath.links.lastOrNull?.step.name ?? builderPath.root.name;
     final half = candidates?.half ?? LongTermRelationType.need;
     return PathBuilder(
-      steps: steps,
+      path: builderPath,
       priority: actionDesignPriority(widget.actionPriority),
       actionName: widget.actionTitle,
       actionLabel: widget.actionTitle.isEmpty
@@ -207,9 +209,9 @@ final class _PathPageState extends ConsumerState<PathPage> {
       onChooseRoot: () => unawaited(_chooseRoot(ids.firstOrNull)),
       onStep: (key) =>
           model.endAt(ids.firstWhere((id) => id.toCanonicalString() == key)),
-      hint: switch (steps.length) {
-        0 => l10n.pathEmptyHint,
-        1 => '',
+      hint: switch (builderPath) {
+        null => l10n.pathEmptyHint,
+        PathBuilderPath(links: []) => '',
         _ => l10n.pathShortenHint,
       },
       switcher: candidates == null
@@ -331,18 +333,13 @@ final class _PathPageState extends ConsumerState<PathPage> {
     );
   }
 
-  List<PathBuilderStep> _steps(
+  PathBuilderPath _steps(
     AppLocalizations l10n,
     PathSegment segment,
     PathCandidate? appended,
   ) {
     final last = segment.steps.length + (appended == null ? 0 : 1);
-    PathBuilderStep step(
-      IntentionId id,
-      String title,
-      int index, [
-      PathBuilderRelation? relation,
-    ]) {
+    PathBuilderStep step(IntentionId id, String title, int index) {
       return PathBuilderStep(
         id: id.toCanonicalString(),
         name: title,
@@ -355,39 +352,40 @@ final class _PathPageState extends ConsumerState<PathPage> {
         onOpen: () => unawaited(
           context.router.push(IntentionDetailsRoute(intentionId: id)),
         ),
-        relation: relation,
       );
     }
 
-    return [
-      step(segment.root.id, segment.root.title, 0),
-      for (final (index, item) in segment.steps.indexed)
-        step(
-          item.intention.id,
-          item.intention.title,
-          index + 1,
-          _relation(
-            l10n,
-            item.relation,
-            source: index == 0
-                ? segment.root.title
-                : segment.steps[index - 1].intention.title,
-            related: item.intention.title,
+    return PathBuilderPath(
+      root: step(segment.root.id, segment.root.title, 0),
+      links: [
+        for (final (index, item) in segment.steps.indexed)
+          PathBuilderLink(
+            step: step(item.intention.id, item.intention.title, index + 1),
+            relation: _relation(
+              l10n,
+              item.relation,
+              source: index == 0
+                  ? segment.root.title
+                  : segment.steps[index - 1].intention.title,
+              related: item.intention.title,
+            ),
           ),
-        ),
-      if (appended != null)
-        step(
-          appended.relation.relatedIntentionId,
-          appended.title,
-          last,
-          _relation(
-            l10n,
-            appended.relation,
-            source: segment.last.title,
-            related: appended.title,
+        if (appended != null)
+          PathBuilderLink(
+            step: step(
+              appended.relation.relatedIntentionId,
+              appended.title,
+              last,
+            ),
+            relation: _relation(
+              l10n,
+              appended.relation,
+              source: segment.last.title,
+              related: appended.title,
+            ),
           ),
-        ),
-    ];
+      ],
+    );
   }
 
   PathBuilderRelation _relation(

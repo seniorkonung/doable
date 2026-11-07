@@ -52,7 +52,7 @@ Future<void> showStatisticsViewSheet(
         children: [
           for (final view in StatisticsView.values)
             OptionRow(
-              icon: view.icon,
+              icon: OptionRowIcon(view.icon),
               name: view.title(texts),
               hint: view.hint(texts),
               trailing: view == selected

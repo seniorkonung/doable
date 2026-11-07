@@ -10,13 +10,13 @@ void main() {
     'единственный корень и промежуточный шаг нажимаются, конечный — нет',
     (tester) async {
       final selected = <String>[];
-      Future<void> pump(List<PathBuilderStep> steps) => tester.pumpWidget(
+      Future<void> pump(PathBuilderPath? path) => tester.pumpWidget(
         MaterialApp(
           theme: doableTheme(Brightness.light),
           home: Scaffold(
             body: SingleChildScrollView(
               child: PathBuilder(
-                steps: steps,
+                path: path,
                 priority: DoablePriority.p4,
                 actionName: 'Действие',
                 actionLabel: 'Путь ведёт к действию',
@@ -42,40 +42,48 @@ void main() {
         openLabel: 'Открыть корень',
         onOpen: _noop,
       );
-      await pump([root]);
+      await pump(const PathBuilderPath(root: root));
       await tester.tap(find.text('Корень'));
       expect(selected, ['root']);
-      await pump([
-        root,
-        PathBuilderStep(
-          id: 'b',
-          name: 'Промежуточное',
-          label: 'Обрезать путь',
-          openLabel: 'Открыть промежуточное',
-          onOpen: _noop,
-          relation: PathBuilderRelation(
-            kind: PathBuilderRelationKind.need,
-            priority: DoablePriority.p1,
-            word: 'нужно',
-            label: 'Связь',
-            onOpen: _noop,
-          ),
+      await pump(
+        PathBuilderPath(
+          root: root,
+          links: [
+            PathBuilderLink(
+              step: PathBuilderStep(
+                id: 'b',
+                name: 'Промежуточное',
+                label: 'Обрезать путь',
+                openLabel: 'Открыть промежуточное',
+                onOpen: _noop,
+              ),
+              relation: PathBuilderRelation(
+                kind: PathBuilderRelationKind.need,
+                priority: DoablePriority.p1,
+                word: 'нужно',
+                label: 'Связь',
+                onOpen: _noop,
+              ),
+            ),
+            PathBuilderLink(
+              step: PathBuilderStep(
+                id: 'c',
+                name: 'Конечное',
+                label: 'Конечное',
+                openLabel: 'Открыть конечное',
+                onOpen: _noop,
+              ),
+              relation: PathBuilderRelation(
+                kind: PathBuilderRelationKind.can,
+                priority: DoablePriority.p4,
+                word: 'можно',
+                label: 'Связь 2',
+                onOpen: _noop,
+              ),
+            ),
+          ],
         ),
-        PathBuilderStep(
-          id: 'c',
-          name: 'Конечное',
-          label: 'Конечное',
-          openLabel: 'Открыть конечное',
-          onOpen: _noop,
-          relation: PathBuilderRelation(
-            kind: PathBuilderRelationKind.can,
-            priority: DoablePriority.p4,
-            word: 'можно',
-            label: 'Связь 2',
-            onOpen: _noop,
-          ),
-        ),
-      ]);
+      );
       for (final name in ['Корень', 'Промежуточное']) {
         final ink = find
             .ancestor(of: find.text(name), matching: find.byType(InkWell))
@@ -100,9 +108,9 @@ void main() {
     (tester) async {
       var rootChosen = false;
       var half = 'need';
-      Widget build(List<PathBuilderStep> steps) => StatefulBuilder(
+      Widget build(PathBuilderPath? path) => StatefulBuilder(
         builder: (context, setState) => PathBuilder(
-          steps: steps,
+          path: path,
           priority: DoablePriority.p4,
           actionName: '',
           actionLabel: 'Путь ведёт к новому действию',
@@ -141,13 +149,13 @@ void main() {
           ),
         ),
       );
-      Future<void> pump(List<PathBuilderStep> steps) => tester.pumpWidget(
+      Future<void> pump(PathBuilderPath? path) => tester.pumpWidget(
         MaterialApp(
           theme: doableTheme(Brightness.light),
-          home: Scaffold(body: SingleChildScrollView(child: build(steps))),
+          home: Scaffold(body: SingleChildScrollView(child: build(path))),
         ),
       );
-      await pump([]);
+      await pump(null);
       expect(find.text('Новое действие'), findsOneWidget);
       final slotInk = find
           .ancestor(
@@ -164,15 +172,17 @@ void main() {
       expect(slotBounds.height, 40);
       await tester.tapAt(Offset(slotBounds.right - 8, slotBounds.center.dy));
       expect(rootChosen, isTrue);
-      await pump([
-        const PathBuilderStep(
-          id: 'a',
-          name: 'Корень',
-          label: 'Выбрать корень',
-          openLabel: 'Открыть корень',
-          onOpen: _noop,
+      await pump(
+        const PathBuilderPath(
+          root: PathBuilderStep(
+            id: 'a',
+            name: 'Корень',
+            label: 'Выбрать корень',
+            openLabel: 'Открыть корень',
+            onOpen: _noop,
+          ),
         ),
-      ]);
+      );
       expect(find.text('0'), findsOneWidget);
       expect(find.text('Пока ничего не нужно'), findsOneWidget);
       await tester.tap(find.text('Можно'));

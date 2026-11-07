@@ -36,7 +36,7 @@ final class _QuickCreationModeMenu extends ConsumerWidget {
       options: [
         for (final mode in QuickCreationMode.values)
           OptionRow(
-            icon: mode.icon,
+            icon: OptionRowIcon(mode.icon),
             name: mode.title(localizations),
             hint: mode.hint(localizations),
             trailing: mode == selected

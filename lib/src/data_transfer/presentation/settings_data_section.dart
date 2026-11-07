@@ -233,7 +233,7 @@ final class _BackupsRowState extends ConsumerState<_BackupsRow> {
   /// Строка по прочитанным копиям и составу графа.
   OptionRow _row(AppLocalizations localizations) {
     OptionRow row({String? hint, VoidCallback? onPressed}) => OptionRow(
-      icon: DoableIconData.backups,
+      icon: OptionRowIcon(DoableIconData.backups),
       name: localizations.dataBackupsTitle,
       hint: hint,
       onPressed: onPressed,
@@ -307,7 +307,7 @@ final class _ExportRow extends ConsumerWidget {
       VoidCallback? onPressed,
       OptionRowProgress? progress,
     }) => OptionRow(
-      icon: DoableIconData.export,
+      icon: OptionRowIcon(DoableIconData.export),
       name: localizations.dataExportTitle,
       hint: hint,
       onPressed: onPressed,
@@ -435,7 +435,7 @@ final class _ImportRowState extends ConsumerState<_ImportRow> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         OptionRow(
-          icon: DoableIconData.import,
+          icon: OptionRowIcon(DoableIconData.import),
           name: localizations.dataImportTitle,
           hint: switch (ref.watch(graphCompositionProvider).value) {
             GraphCompositionReadSucceeded(:final composition)

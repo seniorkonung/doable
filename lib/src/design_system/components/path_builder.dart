@@ -36,20 +36,34 @@ final class PathBuilderStep {
     required this.label,
     required this.openLabel,
     required this.onOpen,
-    this.relation,
   });
   final String id;
   final String name;
   final String label;
   final String openLabel;
   final VoidCallback onOpen;
-  final PathBuilderRelation? relation;
+}
+
+/// Следующее намерение и ведущая к нему связь.
+final class PathBuilderLink {
+  const PathBuilderLink({required this.step, required this.relation});
+
+  final PathBuilderStep step;
+  final PathBuilderRelation relation;
+}
+
+/// Непустой путь начинается корнем, остальные шаги несут связи.
+final class PathBuilderPath {
+  const PathBuilderPath({required this.root, this.links = const []});
+
+  final PathBuilderStep root;
+  final List<PathBuilderLink> links;
 }
 
 /// Путь, действие и кандидаты; состоянием и текстами управляет экран.
 final class PathBuilder extends StatelessWidget {
   const PathBuilder({
-    required this.steps,
+    required this.path,
     required this.priority,
     required this.actionName,
     required this.actionLabel,
@@ -68,7 +82,7 @@ final class PathBuilder extends StatelessWidget {
     this.children = const [],
     super.key,
   });
-  final List<PathBuilderStep> steps;
+  final PathBuilderPath? path;
   final DoablePriority priority;
   final String actionName;
   final String actionLabel;
@@ -88,6 +102,10 @@ final class PathBuilder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currentPath = path;
+    final steps = currentPath == null
+        ? const <PathBuilderStep>[]
+        : [currentPath.root, ...currentPath.links.map((link) => link.step)];
     final colors = Theme.of(context).extension<DoableColors>()!;
     final end = priority.color(colors);
     final tone = Color.lerp(end, colors.grip, .5)!;
@@ -114,7 +132,7 @@ final class PathBuilder extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (steps.isEmpty)
+        if (currentPath == null)
           SizedBox(
             height: 40,
             child: Row(
@@ -157,7 +175,10 @@ final class PathBuilder extends StatelessWidget {
         else ...[
           for (final (i, step) in steps.indexed) ...[
             if (i > 0)
-              _Relation(relation: step.relation!, line: line(step.relation!)),
+              _Relation(
+                relation: currentPath.links[i - 1].relation,
+                line: line(currentPath.links[i - 1].relation),
+              ),
             IntrinsicHeight(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -174,10 +195,12 @@ final class PathBuilder extends StatelessWidget {
                       size: 14,
                       color: i == 0 || i == steps.length - 1 ? end : tone,
                     ),
-                    above: i == 0 ? null : line(step.relation!),
+                    above: i == 0
+                        ? null
+                        : line(currentPath.links[i - 1].relation),
                     below: i + 1 == steps.length
                         ? RelationStrokeKind.can(colors.grip)
-                        : line(steps[i + 1].relation!),
+                        : line(currentPath.links[i].relation),
                   ),
                   const SizedBox(width: 10),
                   Expanded(

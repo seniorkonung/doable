@@ -22,11 +22,25 @@ final class OptionRowProgress {
   final String label;
 }
 
+sealed class OptionRowLeading {
+  const OptionRowLeading();
+}
+
+final class OptionRowIcon extends OptionRowLeading {
+  const OptionRowIcon(this.icon);
+  final DoableIconData icon;
+}
+
+final class OptionRowMark extends OptionRowLeading {
+  const OptionRowMark(this.mark);
+  final Widget mark;
+}
+
 /// Вариант со значком, названием и пояснением; выбор обрабатывает потребитель.
 /// Текст переносится, а высота строки растёт от минимальных 60 dp.
 final class OptionRow extends StatelessWidget {
   const OptionRow({
-    required this.icon,
+    required OptionRowIcon icon,
     required this.name,
     required this.onPressed,
     this.hint,
@@ -35,26 +49,24 @@ final class OptionRow extends StatelessWidget {
     this.progress,
     this.autofocus = false,
     super.key,
-  }) : mark = null;
+  }) : _leading = icon;
 
   /// Вариант-значение со своей меткой на месте плитки, например кольцом
   /// приоритета. Метка стоит в квадрате плитки без её круга и не меняется
   /// выбором: выбранность показывают строка и галочка.
   const OptionRow.marked({
-    required Widget this.mark,
+    required OptionRowMark mark,
     required this.name,
     required this.onPressed,
     this.hint,
     this.trailing = OptionRowTrailing.none,
     super.key,
-  }) : icon = null,
+  }) : _leading = mark,
        tone = OptionRowTone.normal,
        progress = null,
        autofocus = false;
 
-  /// Значок плитки; у варианта с [mark] его нет.
-  final DoableIconData? icon;
-  final Widget? mark;
+  final OptionRowLeading _leading;
   final String name;
 
   /// Пояснение под названием; без него строка показывает только название.
@@ -129,13 +141,12 @@ final class OptionRow extends StatelessWidget {
                 padding: const EdgeInsets.all(DoableMetrics.space2),
                 child: Row(
                   children: [
-                    if (mark case final mark?)
-                      SizedBox.square(
+                    switch (_leading) {
+                      OptionRowMark(:final mark) => SizedBox.square(
                         dimension: DoableMetrics.controlHeight,
                         child: Center(child: mark),
-                      )
-                    else
-                      Container(
+                      ),
+                      OptionRowIcon(:final icon) => Container(
                         width: DoableMetrics.controlHeight,
                         height: DoableMetrics.controlHeight,
                         decoration: BoxDecoration(
@@ -150,7 +161,7 @@ final class OptionRow extends StatelessWidget {
                           alignment: Alignment.center,
                           children: [
                             DoableIcon(
-                              icon!,
+                              icon,
                               size: 22,
                               color: selected ? colors.onAccent : ink,
                             ),
@@ -166,6 +177,7 @@ final class OptionRow extends StatelessWidget {
                           ],
                         ),
                       ),
+                    },
                     const SizedBox(width: DoableMetrics.space3),
                     Expanded(
                       child: Column(
