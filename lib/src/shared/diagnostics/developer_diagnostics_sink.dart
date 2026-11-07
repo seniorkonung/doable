@@ -81,6 +81,11 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     'stage': 'read',
     ..._encodeStatus(event.status),
   },
+  ActionPathStateReadDiagnosticsEvent() => {
+    'operation': 'actionPathStateRead',
+    'stage': 'read',
+    ..._encodeStatus(event.status),
+  },
   IntentionActionsPageReadDiagnosticsEvent(
     :final pageSize,
     :final isContinuation,

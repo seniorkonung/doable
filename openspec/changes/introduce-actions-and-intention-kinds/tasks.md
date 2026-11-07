@@ -916,7 +916,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart`, `relation_batch_view_model.dart` и/или `relation_batch_picker_purpose.dart`, `lib/src/action/presentation/path/path_view_model.dart`, при необходимости `path_page.dart`, тесты в `test/action/presentation/path/`, `test/long_term_relation/presentation/batch_picker/`, `test/app/action_path_app_flow_test.dart`.
   - **Размер:** S.
 
-- [ ] 2.27 Диагностика чтения пути черновика отличается от чтения сохранённого действия видом операции
+- [x] 2.27 Диагностика чтения пути черновика отличается от чтения сохранённого действия видом операции
   - **Критерии приёмки:**
     - Чтение состояния пути черновика (`_watchActionPathState` в `lib/src/graph/data/drift_personal_graph_repository_action_reads.dart`) записывает диагностику своим видом операции — отдельным событием (например `ActionPathStateReadDiagnosticsEvent`) или видом чтения у события в `lib/src/shared/diagnostics/diagnostics_sink.dart` — с отдельным значением `operation` (например `actionPathStateRead`) в `developer_diagnostics_sink.dart` (требование «Диагностика действий без пользовательского содержимого» в `action-management`: различать вид операции).
     - Чтение панели действия (`_watchAction`) по-прежнему записывается как `operation: actionRead`.

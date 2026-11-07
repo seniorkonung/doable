@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:doable/src/action/application/action_details.dart';
 import 'package:doable/src/data/local/app_database.dart'
@@ -17,7 +18,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/action_seed.dart';
 import '../../support/graph_seed.dart';
-import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/encoded_diagnostics_log.dart';
 
 IntentionId _intention(int number) =>
     (IntentionId.decode(seedUuid(number)) as IntentionIdDecodingSuccess).id;
@@ -28,19 +29,41 @@ LongTermRelationId _relation(int number) => (LongTermRelationId.decode(
 ActionDraftIntention _draftIntention(int number, String title) =>
     ActionDraftIntention(id: _intention(number), title: title);
 
+final class _PathReadFailure extends LocalDatabaseConnectionObserver {
+  Object? failure;
+
+  @override
+  void beforeStatement(LocalDatabaseSqlStatement statement) {
+    if (failure case final error?
+        when statement.operation == LocalDatabaseSqlOperation.select &&
+            statement.statements.single.contains('FROM path_state p')) {
+      throw error;
+    }
+  }
+}
+
 void main() {
   late sqlite.Database raw;
   late AppDatabase database;
   late DriftPersonalGraphRepository repository;
+  late EncodedDiagnosticsLog diagnostics;
+  late _PathReadFailure readFailure;
 
   setUp(() async {
-    database = AppDatabase(openInMemoryLocalDatabase(setup: (db) => raw = db));
+    diagnostics = EncodedDiagnosticsLog();
+    readFailure = _PathReadFailure();
+    database = AppDatabase(
+      observeConfiguredLocalDatabaseConnection(
+        openInMemoryLocalDatabase(setup: (db) => raw = db),
+        readFailure,
+      ),
+    );
     await database.open();
     repository = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),
       () => DateTime.utc(2026, 10, 7, 12),
-      InMemoryDiagnosticsSink(),
+      diagnostics,
     );
     seedRawGraph(raw, () {
       for (var number = 1; number <= 3; number++) {
@@ -52,6 +75,76 @@ void main() {
   });
 
   tearDown(() => database.close());
+
+  test(
+    'успешное чтение черновика записывает отдельную операцию без названий',
+    () async {
+      final result = await repository
+          .watchActionPathState(
+            ActionDraftPath(root: _draftIntention(1, 'CANARY-название')),
+          )
+          .first;
+
+      expect(result, isA<ActionPathStateReadSuccess>());
+      expect(diagnostics.events, [
+        {
+          'operation': 'actionPathStateRead',
+          'stage': 'read',
+          'outcome': 'started',
+        },
+        {
+          'operation': 'actionPathStateRead',
+          'stage': 'read',
+          'outcome': 'succeeded',
+        },
+      ]);
+      expect(jsonEncode(diagnostics.events), isNot(contains('CANARY')));
+    },
+  );
+
+  for (final (error, failure, code) in <(Object, Type, String)>[
+    (
+      sqlite.SqliteException(
+        extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
+        message: 'CANARY-ошибка',
+        causingStatement: 'CANARY-запрос',
+        parametersToStatement: ['CANARY-название'],
+      ),
+      ActionReadUnavailableFailure,
+      'unavailable',
+    ),
+    (
+      StateError('CANARY-исключение'),
+      ActionReadUnexpectedFailure,
+      'unexpected',
+    ),
+  ]) {
+    test('отказ чтения черновика ($code) записывает отдельную операцию '
+        'без пользовательских данных', () async {
+      readFailure.failure = error;
+      final result = await repository
+          .watchActionPathState(
+            ActionDraftPath(root: _draftIntention(1, 'CANARY-название')),
+          )
+          .first;
+
+      expect((result as ActionPathStateReadError).failure.runtimeType, failure);
+      expect(diagnostics.events, [
+        {
+          'operation': 'actionPathStateRead',
+          'stage': 'read',
+          'outcome': 'started',
+        },
+        {
+          'operation': 'actionPathStateRead',
+          'stage': 'read',
+          'outcome': 'failed',
+          'failureCode': code,
+        },
+      ]);
+      expect(jsonEncode(diagnostics.events), isNot(contains('CANARY')));
+    });
+  }
 
   Future<void> confirm(Object command) async {
     final result = await switch (command) {

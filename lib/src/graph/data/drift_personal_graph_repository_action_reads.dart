@@ -3,6 +3,7 @@ part of 'drift_personal_graph_repository.dart';
 extension _ActionReading on DriftPersonalGraphRepository {
   Stream<ActionReadResult> _watchAction(ActionId id) => _observeActionRead(
     _ActionWatchRegistration(actionId: id),
+    ActionReadDiagnosticsEvent.new,
     (registration) async {
       final details = await _readActionDetails(id);
       registration.setDependencies(details?.action.path);
@@ -16,12 +17,16 @@ extension _ActionReading on DriftPersonalGraphRepository {
     // Удалённое без надгробия несёт последние прочитанные данные: надгробия
     // ведутся только для сохранённых путей.
     var known = draft;
-    return _observeActionRead(_ActionWatchRegistration(), (registration) async {
-      registration.setDependencies(draft.path);
-      final path = await _readActionPathState(draft.path, missing: known);
-      known = _draftPathOf(path);
-      return path;
-    });
+    return _observeActionRead(
+      _ActionWatchRegistration(),
+      ActionPathStateReadDiagnosticsEvent.new,
+      (registration) async {
+        registration.setDependencies(draft.path);
+        final path = await _readActionPathState(draft.path, missing: known);
+        known = _draftPathOf(path);
+        return path;
+      },
+    );
   }
 
   /// Наблюдение чтения действия или пути: первое чтение и перечитывание при
@@ -30,6 +35,7 @@ extension _ActionReading on DriftPersonalGraphRepository {
   Stream<GraphResult<GraphSnapshot<T>, ActionReadFailure>>
   _observeActionRead<T>(
     _ActionWatchRegistration registration,
+    DiagnosticsEvent Function({required DiagnosticsStatus status}) event,
     Future<T> Function(_ActionWatchRegistration registration) read,
   ) {
     var cancelled = false;
@@ -42,7 +48,10 @@ extension _ActionReading on DriftPersonalGraphRepository {
     Future<GraphResult<GraphSnapshot<T>, ActionReadFailure>>
     readCurrent() async {
       while (true) {
-        final result = await _readActionSnapshot(() => read(registration));
+        final result = await _readActionSnapshot(
+          () => read(registration),
+          event,
+        );
         if (cancelled ||
             result
                 is! GraphResultSuccess<GraphSnapshot<T>, ActionReadFailure> ||
@@ -106,11 +115,12 @@ extension _ActionReading on DriftPersonalGraphRepository {
   /// Одно чтение в транзакции общего исполнителя графа с диагностикой и
   /// безопасной категорией отказа.
   Future<GraphResult<GraphSnapshot<T>, ActionReadFailure>>
-  _readActionSnapshot<T>(Future<T> Function() read) async {
+  _readActionSnapshot<T>(
+    Future<T> Function() read,
+    DiagnosticsEvent Function({required DiagnosticsStatus status}) event,
+  ) async {
     final stopwatch = Stopwatch()..start();
-    _recordDiagnostics(
-      const ActionReadDiagnosticsEvent(status: DiagnosticsStarted()),
-    );
+    _recordDiagnostics(event(status: const DiagnosticsStarted()));
     try {
       final snapshot = await _sequencer.run(
         () => _database.transaction(
@@ -119,9 +129,7 @@ extension _ActionReading on DriftPersonalGraphRepository {
         ),
       );
       _recordDiagnostics(
-        ActionReadDiagnosticsEvent(
-          status: DiagnosticsSucceeded(stopwatch.elapsed),
-        ),
+        event(status: DiagnosticsSucceeded(stopwatch.elapsed)),
       );
       return GraphResultSuccess(snapshot);
     } on Object catch (error) {
@@ -136,7 +144,7 @@ extension _ActionReading on DriftPersonalGraphRepository {
               SqliteUnexpectedFailure() => const ActionReadUnexpectedFailure(),
             };
       _recordDiagnostics(
-        ActionReadDiagnosticsEvent(
+        event(
           status: DiagnosticsFailed(
             duration: stopwatch.elapsed,
             code: _graphCommandDiagnosticsFailureCode(failure),
