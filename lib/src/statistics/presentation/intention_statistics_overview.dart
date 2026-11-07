@@ -316,7 +316,7 @@ final class _Summary extends StatelessWidget {
             ),
           ),
         ),
-        if (share != null) Text(share),
+        Text(share),
         if (section.details case IntentionStatisticsThroughRelationsDetails(
           :final explicitPathActions,
         ))
@@ -331,13 +331,10 @@ final class _Summary extends StatelessWidget {
   }
 }
 
-/// Доля действий вида среди всех действий периода; без действий периода
-/// доли нет.
-String? _shareLabel(
+/// Доля действий вида среди всех действий периода.
+String _shareLabel(
   AppLocalizations texts,
   IntentionStatisticsSection section,
-) => section.periodCounts.planned == 0
-    ? null
-    : texts.statisticsPeriodActionsShare(
-        section.selectedCounts.planned / section.periodCounts.planned,
-      );
+) => texts.statisticsPeriodActionsShare(
+  section.selectedCounts.planned / section.periodCounts.planned,
+);

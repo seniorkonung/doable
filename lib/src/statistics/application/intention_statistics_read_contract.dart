@@ -214,7 +214,7 @@ final class IntentionStatisticsSection {
   final IntentionStatisticsCards cards;
 
   /// Все действия периода, каждое один раз. Знаменатель доли сводки
-  /// раздела — [ContributionCounts.planned] этих мер; при нуле доли нет.
+  /// раздела — [ContributionCounts.planned] этих мер.
   final ContributionCounts periodCounts;
   final IntentionStatisticsViewDetails details;
   final IntentionStatisticsCalendar calendar;
