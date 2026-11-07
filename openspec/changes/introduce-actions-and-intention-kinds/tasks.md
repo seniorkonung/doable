@@ -560,3 +560,16 @@
   - **Зависимости:** нет.
   - **Предполагаемые файлы:** `test/graph/data/drift_intention_actions_read_test.dart`.
   - **Размер:** XS.
+
+- [ ] 1.44 Тесты экрана дня называют экран дня, а не «каталог»
+  - **Критерии приёмки:**
+    - В `test/action/presentation/day/action_day_layout_test.dart` переменная `catalog` («экран дня на дату» или «корневой экран дня»), которая подставляется в названия тестов, переименована по образцу `action_day_root_page_test.dart` (например, в `screen`) вместе со всеми подстановками в названия тестов.
+    - В `test/action/presentation/day/action_day_supported_layout_test.dart` помощники `_expectUsableCatalog` и `_catalogContent` переименованы в термины экрана дня (например, `_expectUsableScreen` и `_screenContent`) вместе со всеми вызовами и использованиями.
+    - После переименования в тестах `test/action/presentation/day` «catalog» и «каталог» встречаются только в значении каталога намерений (`IntentionCatalog*`, `getCatalogPage`, `catalogMutation`, `answerCatalogQuery` и т. п. не переименовываются) или каталога файловой системы (`_catalogDirectory` в `action_day_calendar_utc_dates_test.dart` остаётся).
+    - Имена берутся по текущему содержимому файлов, даже если к началу задачи они изменились. Проверки тестов, их данные и код `lib/` не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/action/presentation/day/action_day_layout_test.dart test/action/presentation/day/action_day_supported_layout_test.dart`.
+    - `mise exec --no-deps -- flutter analyze test` — без замечаний.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `test/action/presentation/day/action_day_layout_test.dart`, `test/action/presentation/day/action_day_supported_layout_test.dart`.
+  - **Размер:** XS.

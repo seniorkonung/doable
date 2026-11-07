@@ -4,11 +4,6 @@
 
 Файл ведёт оркестратор. Решения приняты пользователем в сессии решений и исполняются автономно, по одной finding за сессию. Сессия исполнения удаляет раздел своей finding в коммите её устранения.
 
-## F14 · Low — тесты экрана дня всё ещё называют экран «каталогом»
-
-- **Решение:** Устранить
-- **Как устранить:** Устранить переименованием в тестах, без изменения проверок, данных тестов и кода lib/. Добавить в конец Фазы 1 tasks.md (после задачи по F13, до задачи по F15) новую задачу со следующим свободным номером 1.N через openspec-update-change; затем реализовать её. Результат: в тестах экрана дня «catalog»/«каталог» встречаются только в значении каталога намерений (идентификаторы IntentionCatalog*, getCatalogPage и т. п. не трогать) или каталога файловой системы. Конкретно: в test/action/presentation/day/action_day_layout_test.dart переменная `catalog` (строка ~54, подставляется в названия тестов на строках ~57, 93, 154, 219, 249) переименована по образцу action_day_root_page_test.dart (например `screen`); в test/action/presentation/day/action_day_supported_layout_test.dart помощники `_expectUsableCatalog` (объявление ~140, вызов ~44) и `_catalogContent` (~407 и все использования) переименованы в термины экрана дня (например `_expectUsableScreen`, `_screenContent`). `_catalogDirectory` в action_day_calendar_utc_dates_test.dart обозначает каталог файловой системы и остаётся. Имена брать по текущему содержимому файлов. Проверка задачи: mise exec --no-deps -- flutter test test/action/presentation/day/action_day_layout_test.dart test/action/presentation/day/action_day_supported_layout_test.dart; mise exec --no-deps -- flutter analyze test. Ожидаемые изменяемые артефакты: openspec/changes/introduce-actions-and-intention-kinds/tasks.md, test/action/presentation/day/action_day_layout_test.dart, test/action/presentation/day/action_day_supported_layout_test.dart.
-
 ## F15 · Low — после удаления тестов в тесте контроллера быстрого создания остался псевдоним исхода
 
 - **Решение:** Устранить
