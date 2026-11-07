@@ -3,9 +3,9 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** Changes needed
+**Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Фаза 1 по существу выполнена: дневные выборы заменены действиями в хранилище, формате, журнале фактов, копиях, интерфейсе и статистике. Полные проверки проекта проходят, `openspec validate --strict` — valid. Остаётся одна находка низкой важности: тесты без собственной регрессии. Принятых остаточных рисков нет.
+**Summary:** Фаза 1 по существу выполнена: дневные выборы заменены действиями в хранилище, формате, журнале фактов, копиях, интерфейсе и статистике. Полные проверки проекта проходят, `openspec validate --strict` — valid. Неустранённых находок нет: исправления по прежним находкам закреплены незавершёнными задачами Фазы 1, последней из них — 1.42. Принятых остаточных рисков нет.
 
 ## Review target
 
@@ -88,14 +88,7 @@
 
 ## Findings
 
-### F12 · Low — Тесты без собственной регрессии: повторы другого слоя, мёртвое измерение и перезапуск без записи
-
-- **Evidence:** `test/graph_format/graph_format_file_test.dart:284-293` («пустой путь действия», «повтор намерения в пути действия») проходят через то же отклонение `ActionPath`, что и `test/graph_format/graph_format_codec_test.dart:248-252`, не добавляя поведения уровня файла. `test/statistics/presentation/home_statistics_content_test.dart:197-219` подаёт готовые данные трёх элементов и проверяет текст «1 из 1» и 100%: показ чисел и доли уже проверяют строки 60-107, а суть сценария — полный вклад одного действия каждому намерению — проверяет `test/graph/data/drift_through_relations_statistics_read_test.dart` на уровне чтения. `test/long_term_relation/presentation/details/relation_details_tags_test.dart:36-80` перебирает признак `usedByAction`, удаляя или добавляя действие с путём через связь, хотя панель связи больше не читает пути действий и ни одна проверка от признака не зависит. `test/app/action_day_app_flow_test.dart:199-290` засевает оба действия прямо в SQLite и до первого перезапуска ничего не пишет через приложение, поэтому сравнение пути после этого перезапуска с прочитанным до него (`createdPath`) проверяет только повторное чтение засеянных данных.
-- **Evidence revisions:** ["70603dd3735a93a26734d943c29d42e099e2e98d"]
-- **Impact:** Тесты без собственной регрессии увеличивают стоимость изменений и затеняют проверки, которые действительно защищают поведение (proven-necessity).
-- **Required outcome:** Каждый тест этих наборов ловит регрессию, которую не ловит другой тест.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["test/graph_format/graph_format_file_test.dart", "test/statistics/presentation/home_statistics_content_test.dart", "test/long_term_relation/presentation/details/relation_details_tags_test.dart", "test/app/action_day_app_flow_test.dart"]
+No unresolved findings remain in the implementation review.
 
 ## Review coverage
 

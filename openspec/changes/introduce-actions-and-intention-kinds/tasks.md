@@ -534,3 +534,16 @@
   - **Зависимости:** нет.
   - **Предполагаемые файлы:** `lib/src/statistics/presentation/intention_statistics_overview.dart`, `lib/src/statistics/application/intention_statistics_read_contract.dart`, `lib/src/statistics/application/intention_statistics_breakdown.dart`.
   - **Размер:** XS.
+
+- [ ] 1.42 Тесты формата, статистики Главной, тегов связи и сохранности действий проверяют только собственные регрессии
+  - **Критерии приёмки:**
+    - В `test/graph_format/graph_format_file_test.dart` нет случаев «пустой путь действия» и «повтор намерения в пути действия»: оба проходят через то же отклонение `ActionPath`, которое проверяет `test/graph_format/graph_format_codec_test.dart`, и не добавляют поведения уровня файла. Остальные случаи отказа файла сохраняются.
+    - В `test/statistics/presentation/home_statistics_content_test.dart` нет теста «в виде «Через связи» одно действие даёт каждому намерению полный вклад и долю 100%»: показ чисел и доли проверяют другие тесты этого файла, а полный вклад одного действия каждому намерению — `test/graph/data/drift_through_relations_statistics_read_test.dart`.
+    - В `test/long_term_relation/presentation/details/relation_details_tags_test.dart` нет признака `usedByAction`: перебор, название теста и комментарий к перебору говорят только об активности и типе связи, а засев не удаляет действие фикстуры и не создаёт действие с путём через связь, потому что панель связи не читает пути действий. Перебор активности и типа связи и проверки отсутствия собственных тегов сохраняются.
+    - В тесте «сохранённые действия переживают перезапуск, правки и удаление дубликата» из `test/app/action_day_app_flow_test.dart` нет перезапуска между засевом и первыми проверками и нет `createdPath`: сохранность засеянных данных при повторном открытии проверяет `test/graph/data/file_backed_action_durability_test.dart`. Путь действия проверяется по засеянным идентификаторам намерений и связей, а перезапуск после правок через панель и удаления дубликата с проверками после него сохраняется.
+    - Имена вспомогательных функций и параметров берутся по текущему содержимому файлов, даже если к началу задачи они изменились. Код `lib/` и продуктовое поведение не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph_format/graph_format_file_test.dart test/statistics/presentation/home_statistics_content_test.dart test/long_term_relation/presentation/details/relation_details_tags_test.dart test/app/action_day_app_flow_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `test/graph_format/graph_format_file_test.dart`, `test/statistics/presentation/home_statistics_content_test.dart`, `test/long_term_relation/presentation/details/relation_details_tags_test.dart`, `test/app/action_day_app_flow_test.dart`.
+  - **Размер:** XS.
