@@ -236,13 +236,13 @@ void main() {
 
     final facts = await capture(() async {
       await write("UPDATE intentions SET title = 'Черновик' WHERE id = ?", [
-        _source,
+        _selected,
       ]);
       await write(
         "UPDATE intentions SET title = 'Новое название', "
-        "description = 'Описание', is_action_ready = 1, updated_at = ? "
+        "description = 'Описание', kind = 'supporting', is_action_ready = 1, updated_at = ? "
         'WHERE id = ?',
-        [_updatedAt.microsecondsSinceEpoch, _source],
+        [_updatedAt.microsecondsSinceEpoch, _selected],
       );
     });
 
@@ -251,9 +251,10 @@ void main() {
       _lines([
         GraphEntityChanged(
           _intention(
-            _source,
+            _selected,
             'Новое название',
             description: 'Описание',
+            kind: IntentionKind.supporting,
             ready: true,
             updatedAt: _updatedAt,
           ),
@@ -540,6 +541,7 @@ IntentionRecord _intention(
   String id,
   String title, {
   String? description,
+  IntentionKind kind = IntentionKind.main,
   bool ready = false,
   bool archived = false,
   DateTime? createdAt,
@@ -549,6 +551,7 @@ IntentionRecord _intention(
     id: _intentionId(id),
     title: title,
     description: description,
+    kind: kind,
     readiness: ready ? IntentionReadiness.ready : IntentionReadiness.notReady,
     archiveState: archived
         ? IntentionArchiveState.archived

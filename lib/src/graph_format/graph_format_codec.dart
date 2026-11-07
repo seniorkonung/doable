@@ -302,6 +302,7 @@ Map<String, Object?> _writeRecord(GraphEntityRecord record) => switch (record) {
     'id': intention.id.toCanonicalString(),
     'title': intention.title,
     'description': intention.description,
+    'intentionKind': intention.kind.name,
     'actionReady': switch (intention.readiness) {
       IntentionReadiness.notReady => false,
       IntentionReadiness.ready => true,
@@ -495,6 +496,11 @@ Intention _readIntention(_JsonFields fields) {
     id: _readIntentionId(fields.string('id')),
     title: _readIntentionTitle(fields.string('title')),
     description: description,
+    kind: switch (fields.string('intentionKind')) {
+      'main' => IntentionKind.main,
+      'supporting' => IntentionKind.supporting,
+      _ => throw const GraphFormatCorruption(),
+    },
     readiness: fields.boolean('actionReady')
         ? IntentionReadiness.ready
         : IntentionReadiness.notReady,

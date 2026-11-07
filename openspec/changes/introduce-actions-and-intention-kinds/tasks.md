@@ -1024,7 +1024,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/data/local/schema/intention_schema.drift`, `lib/src/data/local/app_database.g.dart`, `drift_schemas/drift_schema_v8.json`, `lib/src/intention/domain/intention.dart`, `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/stored_graph_rows.dart`, `drift_personal_graph_repository.dart`, `drift_personal_graph_repository_action_reads.dart`, `drift_personal_graph_repository_path_candidates.dart`, `graph_fact_capture.dart`, `drift_personal_graph_repository_fact_log.dart` и тесты `test/data/local/app_database_schema_test.dart`, `test/intention/data/drift_intention_repository_command_test.dart`, `file_backed_drift_intention_repository_test.dart`.
   - **Размер:** M.
 
-- [ ] 3.2 Формат данных, журнал фактов, снимки и замена графа переносят вид намерения и отклоняют нарушение его правила
+- [x] 3.2 Формат данных, журнал фактов, снимки и замена графа переносят вид намерения и отклоняют нарушение его правила
   - **Критерии приёмки:**
     - Запись намерения формата версии 1 несёт поле `intentionKind` со значением `main` или `supporting` (D4, ADR-0035): экспорт, снимки, резервные копии и факты журнала содержат вид, а импорт и восстановление воспроизводят вид каждого намерения (сценарий требования «Состав файла экспорта»). Эталонные файлы `test/graph_format/golden/*.jsonl` обновлены.
     - Замена графа отклоняет файл, в котором активное вспомогательное намерение не имеет активной входящей связи или архивированное вспомогательное — никакой входящей связи, а также неизвестное значение `intentionKind`, существующим отказом «не экспорт Doable или повреждён» без изменения данных графа и копий (требование «Импорт с заменой графа»).

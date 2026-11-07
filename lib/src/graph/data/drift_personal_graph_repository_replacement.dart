@@ -47,6 +47,7 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
         cancellation,
       );
       await _verifyInsertedActionPaths();
+      await _verifyIntentionKinds();
       if (!_sameRecordCounts(await _selectRecordCounts(), snapshot.counts)) {
         throw const GraphReplacementRecordsRejected();
       }
@@ -254,6 +255,7 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
                 id: intention.id.toCanonicalString(),
                 title: intention.title,
                 description: Value(intention.description),
+                kind: Value(intention.kind.name),
                 isActionReady: Value(
                   intention.readiness == domain.IntentionReadiness.ready,
                 ),
@@ -404,6 +406,25 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
             _database.deletedIntentions,
             _database.deletedRelationPairs,
           },
+        )
+        .getSingle();
+    if (row.read<bool>('is_violated')) {
+      throw const GraphReplacementRecordsRejected();
+    }
+  }
+
+  Future<void> _verifyIntentionKinds() async {
+    final row = await _database
+        .customSelect(
+          '''SELECT EXISTS (
+        SELECT 1 FROM intentions AS intention
+        WHERE intention.kind = 'supporting' AND NOT EXISTS (
+          SELECT 1 FROM long_term_relations AS relation
+          WHERE relation.related_intention_id = intention.id
+            AND (intention.is_archived = 1 OR relation.is_archived = 0)
+        )
+      ) AS is_violated''',
+          readsFrom: {_database.intentions, _database.longTermRelations},
         )
         .getSingle();
     if (row.read<bool>('is_violated')) {

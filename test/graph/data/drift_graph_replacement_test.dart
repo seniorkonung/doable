@@ -216,6 +216,63 @@ void main() {
     await repository.readCurrentPosition(),
   ];
 
+  group('правило входящей связи вспомогательного намерения', () {
+    for (final violation in [
+      'нет связи',
+      'только архивная связь',
+      'архивное без связи',
+    ]) {
+      test('$violation отклоняется без изменения графа и копий', () async {
+        await createPreviousGraph();
+        final before = await storedState();
+        final snapshot = await goldenSnapshot(
+          edit: (jsonl) {
+            return jsonl
+                .split('\n')
+                .map((line) {
+                  if (line.isEmpty) return line;
+                  final record = jsonDecode(line) as Map<String, dynamic>;
+                  if (violation == 'нет связи' &&
+                      record['id'] == _goldenHealthId) {
+                    record['intentionKind'] = 'supporting';
+                  }
+                  if (violation == 'только архивная связь') {
+                    if (record['id'] == _goldenFiveKilometersId) {
+                      record['intentionKind'] = 'supporting';
+                    }
+                    if (record['kind'] == 'longTermRelation' &&
+                        record['relatedIntentionId'] ==
+                            _goldenFiveKilometersId) {
+                      record['archived'] = true;
+                    }
+                  }
+                  if (violation == 'архивное без связи') {
+                    if (record['kind'] == 'longTermRelation' &&
+                        record['relatedIntentionId'] ==
+                            '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f14') {
+                      record['relatedIntentionId'] = _goldenHealthId;
+                    }
+                    if (record['kind'] == 'action' &&
+                        (record['path'] as List).contains(
+                          '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f14',
+                        )) {
+                      (record['path'] as List).removeLast();
+                    }
+                  }
+                  return jsonEncode(record);
+                })
+                .join('\n');
+          },
+        );
+        await expectLater(
+          replace(snapshot),
+          throwsA(isA<GraphReplacementRecordsRejected>()),
+        );
+        expect(await storedState(), before);
+      });
+    }
+  });
+
   test('замена непустого графа снимком со всеми видами записей даёт граф '
       'снимка и пакет «сброс» с этим снимком, а выгрузка базы совпадает с '
       'состоянием из снимка замены и последующих пакетов', () async {
@@ -844,8 +901,8 @@ void main() {
       // Длинные описания занимают страницы переполнения, которых в базе нет.
       final snapshot = await goldenSnapshot(
         edit: (jsonl) => jsonl.replaceAll(
-          '"description":null,"actionReady"',
-          '"description":"${'ж' * 4000}","actionReady"',
+          '"description":null,"intentionKind"',
+          '"description":"${'ж' * 4000}","intentionKind"',
         ),
       );
       final pageCount = await database

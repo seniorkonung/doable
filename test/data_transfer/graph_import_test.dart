@@ -341,6 +341,14 @@ void main() {
         edited(11, (relation) => relation['priority'] = 'P5'),
         (_Detection.snapshotWrite, GraphImportFailure.invalidFile),
       ),
+      'неизвестный вид намерения': (
+        edited(3, (intention) => intention['intentionKind'] = 'unknown'),
+        (_Detection.snapshotWrite, GraphImportFailure.invalidFile),
+      ),
+      'активное вспомогательное без входящей связи': (
+        edited(3, (intention) => intention['intentionKind'] = 'supporting'),
+        (_Detection.replacement, GraphImportFailure.invalidFile),
+      ),
       'намерения не по каноническому порядку': (
         graphExportFileOf([
           ...reference.take(3),

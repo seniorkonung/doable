@@ -620,6 +620,7 @@ List<GraphEntityRecord> _expectedGoldenRecords() {
       Intention(
         id: running,
         title: 'Бегать по утрам 🏃',
+        kind: IntentionKind.supporting,
         description: '  Первая строка\n\tвторая "строка"  \n',
         readiness: IntentionReadiness.ready,
         archiveState: IntentionArchiveState.active,
@@ -644,6 +645,7 @@ List<GraphEntityRecord> _expectedGoldenRecords() {
       Intention(
         id: swimming,
         title: 'Плавать в бассейне',
+        kind: IntentionKind.supporting,
         description: null,
         readiness: IntentionReadiness.notReady,
         archiveState: IntentionArchiveState.archived,

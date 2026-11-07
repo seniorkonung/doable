@@ -28,6 +28,35 @@ void main() {
   final version1 = GraphFormatVersion.ofCarrier(1);
 
   group('формат данных графа версии 1', () {
+    test('вид намерения сохраняется и неизвестный вид отклоняется', () {
+      final intention = Intention(
+        id: _intentionId(_intentionIds[0]),
+        title: 'Здоровье',
+        description: null,
+        kind: IntentionKind.supporting,
+        readiness: IntentionReadiness.notReady,
+        archiveState: IntentionArchiveState.active,
+        createdAt: IntentionTimestamp(DateTime.utc(2026)),
+        updatedAt: IntentionTimestamp(DateTime.utc(2026)),
+      );
+      final encoded = GraphFormatCodec.encode(IntentionRecord(intention));
+      final decoded =
+          GraphFormatCodec.decodeEntityRecord(encoded, version1).single
+              as IntentionRecord;
+      expect(decoded.intention.kind, IntentionKind.supporting);
+      final invalid = utf8.encode(
+        utf8
+            .decode(encoded)
+            .replaceFirst(
+              '"intentionKind":"supporting"',
+              '"intentionKind":"unknown"',
+            ),
+      );
+      expect(
+        () => GraphFormatCodec.decodeEntityRecord(invalid, version1),
+        throwsA(isA<GraphFormatCorruption>()),
+      );
+    });
     test('эталонный пакет фактов читается в ожидаемые факты каждого вида и '
         'повторно кодируется в те же байты', () {
       final golden = File(
@@ -102,7 +131,7 @@ void main() {
       final intention =
           '$created,"kind":"intention","id":"${_intentionIds[0]}",'
           '"title":"Здоровье","description":null,'
-          '"actionReady":false,"archived":false';
+          '"intentionKind":"main","actionReady":false,"archived":false';
       const createdAt = '"createdAt":"2026-03-29T00:00:00.000000Z"';
       const updatedAt = '"updatedAt":"2026-10-17T21:04:05.123456Z"';
       const relationRest =
@@ -381,6 +410,7 @@ List<GraphFact> _expectedGoldenFacts() {
         Intention(
           id: running,
           title: 'Бегать по утрам 🏃',
+          kind: IntentionKind.supporting,
           description: '  Первая строка\n\tвторая "строка"  \n',
           readiness: IntentionReadiness.ready,
           archiveState: IntentionArchiveState.archived,

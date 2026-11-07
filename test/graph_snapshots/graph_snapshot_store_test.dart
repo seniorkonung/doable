@@ -158,6 +158,15 @@ void main() {
     );
     await store.writeSnapshot(await repository.readCurrentPosition());
 
+    await recordGraphChange(
+      database,
+      () => database.customStatement(
+        "UPDATE intentions SET kind = 'supporting' WHERE id = ?",
+        [running.id.toCanonicalString()],
+      ),
+      recordedAt: now,
+    );
+
     await confirm(
       UpdateTag(
         tagId: sport.id,

@@ -112,6 +112,7 @@ Intention _intention(local.Intention row) => Intention(
   id: _intentionId(row.id),
   title: row.title,
   description: row.description,
+  kind: IntentionKind.values.byName(row.kind),
   readiness: row.isActionReady
       ? IntentionReadiness.ready
       : IntentionReadiness.notReady,
