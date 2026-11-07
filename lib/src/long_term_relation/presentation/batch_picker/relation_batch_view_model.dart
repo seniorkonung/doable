@@ -110,16 +110,7 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
       case LongTermRelationCommandAccepted(:final token, :final future):
         _activeToken = token;
         _publish(const RelationBatchSubmitting());
-        unawaited(_finish(future));
-        return future.then(
-          (completion) => switch (completion.result) {
-            GraphResultSuccess(
-              value: LongTermRelationsAdded(:final relations),
-            ) =>
-              relations,
-            GraphResultSuccess() || GraphResultFailure() => null,
-          },
-        );
+        return _finish(future);
       case LongTermRelationCommandAlreadyRunning():
         return Future.value();
       case GraphCommandCoordinatorDraining():
@@ -142,21 +133,32 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
     if (token != null) _coordinator.releaseInitiatorPresentation(token);
   }
 
-  Future<void> _finish(Future<LongTermRelationCommandCompletion> future) async {
+  Future<List<LongTermRelation>?> _finish(
+    Future<LongTermRelationCommandCompletion> future,
+  ) async {
     final completion = await future;
-    if (!ref.mounted || !identical(_activeToken, completion.token)) return;
-    _activeToken = null;
-    _publish(switch (completion.result) {
-      GraphResultSuccess(value: LongTermRelationsAdded(:final relations)) =>
-        RelationBatchAdded(relations),
+    final canPublish = ref.mounted && identical(_activeToken, completion.token);
+    if (canPublish) _activeToken = null;
+    switch (completion.result) {
+      case GraphResultSuccess(value: LongTermRelationsAdded(:final relations)):
+        if (canPublish) _publish(const RelationBatchAdded());
+        return relations;
       // Добавление другим успехом не завершается; оболочка назовёт его
       // непредвиденным.
-      GraphResultSuccess() => RelationBatchAdded(const []),
-      GraphResultFailure(:final failure) => RelationBatchFailed(
-        failure: failure,
-        claim: _coordinator.claimInitiatorFailure(completion.token),
-      ),
-    });
+      case GraphResultSuccess():
+        if (canPublish) _publish(const RelationBatchAdded());
+        return null;
+      case GraphResultFailure(:final failure):
+        if (canPublish) {
+          _publish(
+            RelationBatchFailed(
+              failure: failure,
+              claim: _coordinator.claimInitiatorFailure(completion.token),
+            ),
+          );
+        }
+        return null;
+    }
   }
 
   void _publish(RelationBatchOperation operation) {

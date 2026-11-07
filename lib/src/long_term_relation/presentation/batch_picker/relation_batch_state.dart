@@ -1,7 +1,6 @@
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../application/long_term_relation_command.dart';
-import '../../domain/long_term_relation.dart';
 
 /// Отмеченное намерение и его актуальное название.
 final class RelationBatchSelection {
@@ -34,12 +33,8 @@ final class RelationBatchFailed extends RelationBatchOperation {
 }
 
 /// Связи подтверждены, и поиск закрывается.
-/// Связи пачки в порядке отметок.
 final class RelationBatchAdded extends RelationBatchOperation {
-  RelationBatchAdded(Iterable<LongTermRelation> relations)
-    : relations = List.unmodifiable(relations);
-
-  final List<LongTermRelation> relations;
+  const RelationBatchAdded();
 }
 
 /// Состояние отметок одного экземпляра поиска.

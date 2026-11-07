@@ -994,7 +994,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/action/presentation/path/path_state.dart`, `path_view_model.dart`, `path_view_model.g.dart`, `path_page.dart`, `test/action/presentation/path/path_view_model_test.dart`.
   - **Размер:** S.
 
-- [ ] 2.33 Исход подтверждённого добавления связей разбирается в одном месте, а `RelationBatchAdded` не несёт данных без потребителя
+- [x] 2.33 Исход подтверждённого добавления связей разбирается в одном месте, а `RelationBatchAdded` не несёт данных без потребителя
   - **Критерии приёмки:**
     - `RelationBatchAdded` в `lib/src/long_term_relation/presentation/batch_picker/relation_batch_state.dart` — маркер подтверждённого добавления без поля `relations`; doc-комментарий описывает только подтверждённое добавление и закрытие поиска.
     - Результат завершения принятой команды `AddLongTermRelations` (`LongTermRelationsAdded` и прочие исходы) разбирается в `relation_batch_view_model.dart` один раз: `submit()` и `_finish` не повторяют сопоставление результата. Конкретная форма выбирается по месту.
