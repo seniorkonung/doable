@@ -185,9 +185,6 @@ void main() {
           '{"format":"doable-graph","version":1,'
           '"writtenAt":"2026-10-03T18:42:07.654321Z","counts":{"tags":2,'
           '"intentions":4,"tagAssignments":3,"longTermRelations":3}}';
-      final firstActionPath =
-          '"path":["${_intentionIds[0]}","${_intentionIds[1]}",'
-          '"${_intentionIds[3]}"]';
 
       final invalidFiles = <String, List<int>>{
         'не gzip': [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
@@ -280,20 +277,6 @@ void main() {
             '"relatedIntentionId":"$unknownIntentionId"',
           ),
           ...lines.skip(deletedPair + 1),
-        ]),
-        'пустой путь действия': file([
-          ...lines.take(firstAction),
-          lines[firstAction].replaceFirst(firstActionPath, '"path":[]'),
-          ...lines.skip(firstAction + 1),
-        ]),
-        'повтор намерения в пути действия': file([
-          ...lines.take(firstAction),
-          lines[firstAction].replaceFirst(
-            firstActionPath,
-            '"path":["${_intentionIds[0]}","${_intentionIds[1]}",'
-            '"${_intentionIds[0]}"]',
-          ),
-          ...lines.skip(firstAction + 1),
         ]),
       };
 

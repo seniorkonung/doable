@@ -248,26 +248,17 @@ void main() {
       expect(ids.toSet(), hasLength(2));
       final firstId = ids.first;
       final editedId = ids.last;
-      final createdRepository = (await runtime.bootstrap() as AppRuntimeReady)
-          .container
-          .read(personalGraphRepositoryProvider);
-      final createdPath = (await _read(
-        createdRepository,
-        editedId,
-      )).action.path.intentions;
-
-      await tester.pumpWidget(const SizedBox.shrink());
-      await runtime.shutdown();
-      runtime = start();
-      await tester.pumpWidget(MainApp(runtime: runtime));
-      await openIntentionGraph(tester, waitFor: _until);
       final ready = await runtime.bootstrap() as AppRuntimeReady;
       final repository = ready.container.read(personalGraphRepositoryProvider);
       final persisted = await _read(repository, editedId);
       expect(persisted.action.date, _actionDate);
       expect(persisted.action.description?.value, 'Выбранный путь');
       expect(persisted.action.isCompleted, isTrue);
-      expect(persisted.action.path.intentions, createdPath);
+      expect(persisted.action.path.intentions, [
+        intentionIdOf(1),
+        intentionIdOf(2),
+        intentionIdOf(3),
+      ]);
       expect(persisted.path.steps.map((step) => step.link), [
         isA<ExistingActionPathLink>().having(
           (link) => link.relation.id,
@@ -365,7 +356,11 @@ void main() {
       expect(changed.action.date, movedDate);
       expect(changed.action.description?.value, 'После архивирования');
       expect(changed.action.isCompleted, isFalse);
-      expect(changed.action.path.intentions, createdPath);
+      expect(changed.action.path.intentions, [
+        intentionIdOf(1),
+        intentionIdOf(2),
+        intentionIdOf(3),
+      ]);
       expect(
         changed.path.steps.map(
           (step) => (step.link as ExistingActionPathLink).relation.scope,

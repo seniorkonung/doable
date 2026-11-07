@@ -535,7 +535,7 @@
   - **Предполагаемые файлы:** `lib/src/statistics/presentation/intention_statistics_overview.dart`, `lib/src/statistics/application/intention_statistics_read_contract.dart`, `lib/src/statistics/application/intention_statistics_breakdown.dart`.
   - **Размер:** XS.
 
-- [ ] 1.42 Тесты формата, статистики Главной, тегов связи и сохранности действий проверяют только собственные регрессии
+- [x] 1.42 Тесты формата, статистики Главной, тегов связи и сохранности действий проверяют только собственные регрессии
   - **Критерии приёмки:**
     - В `test/graph_format/graph_format_file_test.dart` нет случаев «пустой путь действия» и «повтор намерения в пути действия»: оба проходят через то же отклонение `ActionPath`, которое проверяет `test/graph_format/graph_format_codec_test.dart`, и не добавляют поведения уровня файла. Остальные случаи отказа файла сохраняются.
     - В `test/statistics/presentation/home_statistics_content_test.dart` нет теста «в виде «Через связи» одно действие даёт каждому намерению полный вклад и долю 100%»: показ чисел и доли проверяют другие тесты этого файла, а полный вклад одного действия каждому намерению — `test/graph/data/drift_through_relations_statistics_read_test.dart`.

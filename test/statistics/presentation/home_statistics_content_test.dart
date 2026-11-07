@@ -195,29 +195,6 @@ void main() {
   );
 
   testWidgets(
-    'в виде «Через связи» одно действие даёт каждому намерению полный вклад и долю 100%',
-    (tester) async {
-      final harness = _Harness(
-        _data([
-          _item(1, 'Лечь до полуночи', 1, 1),
-          _item(2, 'Высыпаться', 1, 1),
-          _item(3, 'Быть здоровым', 1, 1),
-        ], summary: _summary(1, 1)),
-        view: StatisticsView.throughRelations,
-      );
-      await harness.pump(tester);
-      final texts = harness.texts(tester);
-      expect(
-        find.text(texts.statisticsContributionCounts(1, 1)),
-        findsNWidgets(3),
-      );
-      expect(
-        find.text(texts.statisticsPeriodActionsShare(1)),
-        findsNWidgets(3),
-      );
-    },
-  );
-  testWidgets(
     'загрузка, пустой период, пустой вид и обновление различаются без ложных нулей',
     (tester) async {
       final harness = _Harness(

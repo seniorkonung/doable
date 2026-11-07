@@ -18,7 +18,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
-import '../../../support/action_seed.dart';
 import '../../../support/app_root_pages.dart';
 import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
@@ -30,15 +29,10 @@ LongTermRelationId _relationId(int number) => (LongTermRelationId.decode(
 ) as LongTermRelationIdDecodingSuccess).id;
 
 void main() {
-  // Активность связи и вход в путь действия не влияют на
-  // отсутствие её тегов, а тип меняет только шапку: двух комбинаций хватает на
-  // все значения.
-  for (final (number, usedByAction, type) in [
-    (101, false, 'need'),
-    (102, true, 'can'),
-  ]) {
+  // Активность и тип связи не влияют на отсутствие её собственных тегов.
+  for (final (number, type) in [(101, 'need'), (102, 'can')]) {
     testWidgets(
-      'связь «${type == 'need' ? 'нужно' : 'можно'}» ${number == 101 ? 'активна' : 'в архиве'}, ${usedByAction ? 'в пути действия' : 'без пути'}: собственных тегов нет',
+      'связь «${type == 'need' ? 'нужно' : 'можно'}» ${number == 101 ? 'активна' : 'в архиве'}: собственных тегов нет',
       (tester) async {
         final semantics = tester.ensureSemantics();
         tester.view.physicalSize = const Size(1200, 6000);
@@ -52,24 +46,10 @@ void main() {
         addTearDown(database.close);
         seedTagStorageFixture(raw);
         seedRawGraph(raw, () {
-          // Путь действия фикстуры проходит через связь 101.
-          if (!usedByAction) {
-            raw.execute('DELETE FROM actions WHERE id = ?', [
-              tagFixtureId(201),
-            ]);
-          }
           raw.execute(
             'UPDATE long_term_relations SET type = ?, description = ? WHERE id = ?',
             [type, 'Описание связи $number', tagFixtureId(number)],
           );
-          if (usedByAction) {
-            seedAction(
-              raw,
-              id: tagFixtureId(203),
-              path: [tagFixtureId(1), tagFixtureId(2)],
-              isCompleted: true,
-            );
-          }
         });
         final graphBefore = _storedGraph(raw);
         final repository = DriftPersonalGraphRepository(
