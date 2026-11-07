@@ -415,3 +415,14 @@
   - **Зависимости:** 1.20, 1.27, 1.31.
   - **Предполагаемые файлы:** `lib/src/data/local/schema/action_schema.drift`, `graph_log_schema.drift` (комментарий о неизменности строк пути), `lib/src/data/local/app_database.dart` с `.g.dart`, `drift_schemas/drift_schema_v8.json`, `lib/src/graph/data/drift_personal_graph_repository_intention_actions.dart`, `drift_personal_graph_repository_replacement.dart`, `test/support/action_seed.dart`, `benchmark/support/intention_statistics_fixture.dart` и другие фикстуры с прямой вставкой строк пути, `test/data/local/action_schema_test.dart`, `test/graph/data/drift_intention_actions_read_cost_test.dart`, новый `benchmark/intention/intention_actions_benchmark.dart`.
   - **Размер:** M.
+
+- [ ] 1.33 Закрытая во время удаления панель действия не меняет освобождённую модель
+  - **Критерии приёмки:**
+    - После `dispose()` модель `ActionPanelViewModel` не меняет состояние и не вызывает `notifyListeners()` при любом исходе идущей записи, в том числе в `delete()` после ожидания записи: подтверждённое удаление, отказ и отсутствие действия, пришедшее во время удаления, не трогают освобождённую модель. Продуктовое поведение не меняется.
+    - `delete()` по-прежнему возвращает вызывающему исход своей записи, а отказ удаления после закрытия панели доходит до общей поверхности результатов, как при закрытии панели во время любой другой записи (требование «Подтверждённое удаление действия», задача 1.17).
+    - Тест в `test/action/presentation/panel/action_panel_view_model_test.dart`: удаление стоит в очереди за другой операцией графа, модель освобождается до завершения записи; при успехе и при отказе записи нет ошибки освобождённого `ChangeNotifier`, `delete()` возвращает `true` и `false` соответственно, а отказ передан общей поверхности результатов.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/action/presentation/panel`.
+  - **Зависимости:** 1.17.
+  - **Предполагаемые файлы:** `lib/src/action/presentation/panel/action_panel_view_model.dart`, `test/action/presentation/panel/action_panel_view_model_test.dart`.
+  - **Размер:** XS.
