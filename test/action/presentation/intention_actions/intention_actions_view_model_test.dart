@@ -18,6 +18,9 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
+import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
@@ -25,10 +28,133 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
+import '../../../intention/presentation/catalog/catalog_test_support.dart';
 
 final _today = CalendarDate.fromParts(2026, 10, 8);
 
 void main() {
+  test(
+    'страницы одного намерения независимо выбирают роль и загружают порции',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      final secondInstance = IntentionPageInstance(
+        target: const ActionsTarget(),
+      );
+      final secondProvider = intentionActionsViewModelProvider(
+        _intentionId(1),
+        secondInstance,
+      );
+      final secondSubscription = h.container.listen(secondProvider, (_, _) {});
+      addTearDown(secondSubscription.close);
+      final secondModel = h.container.read(secondProvider.notifier);
+      h.instance.actionsRole = IntentionActionRole.root;
+      secondInstance.actionsRole = IntentionActionRole.root;
+      h.model.setVisible(true);
+      secondModel.setVisible(true);
+      final secondCursor = _Cursor();
+      h.repository.first(
+        0,
+        [_item(1)],
+        counts: _counts(root: 2, terminal: 2),
+        cursor: _Cursor(),
+      );
+      h.repository.first(
+        1,
+        [_item(1)],
+        counts: _counts(root: 2, terminal: 2),
+        cursor: secondCursor,
+      );
+      await pumpEventQueue();
+
+      h.model.selectRole(IntentionActionRole.terminal);
+      h.repository.first(
+        2,
+        [_item(2)],
+        counts: _counts(root: 2, terminal: 2),
+        cursor: _Cursor(),
+      );
+      await pumpEventQueue();
+      final more = h.model.loadMore();
+      h.repository.more(3, [_item(3)]);
+      await more;
+
+      final first = h.state as IntentionActionsLoaded;
+      final second = h.container.read(secondProvider) as IntentionActionsLoaded;
+      expect(first.role, IntentionActionRole.terminal);
+      expect(first.items.map((item) => item.id), [_actionId(2), _actionId(3)]);
+      expect(second.role, IntentionActionRole.root);
+      expect(secondInstance.actionsRole, IntentionActionRole.root);
+      expect(second.items.map((item) => item.id), [_actionId(1)]);
+      expect(second.nextCursor, same(secondCursor));
+      final secondMore = secondModel.loadMore();
+      expect(h.repository.queries.last.cursor, same(secondCursor));
+      h.repository.more(4, [_item(4)]);
+      await secondMore;
+      expect(
+        (h.container.read(secondProvider) as IntentionActionsLoaded).items.map(
+          (item) => item.id,
+        ),
+        [_actionId(1), _actionId(4)],
+      );
+      expect((h.state as IntentionActionsLoaded).items.map((item) => item.id), [
+        _actionId(2),
+        _actionId(3),
+      ]);
+    },
+  );
+
+  test(
+    'переименование корневого намерения перечитывает название в строке',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.instance.actionsRole = IntentionActionRole.terminal;
+      final before = testSummary(index: 2, title: 'Прежний корень');
+      final after = testSummary(index: 2, title: 'Новый корень');
+      h.model.setVisible(true);
+      h.repository.first(0, [
+        _item(1, rootId: before.id, rootTitle: before.title),
+      ], counts: _counts(terminal: 1));
+      await pumpEventQueue();
+
+      final start = h.coordinator.acceptExisting(
+        UpdateIntention(id: before.id, title: after.title, description: null),
+        presentationTitle: before.title,
+      ) as IntentionCommandAccepted;
+      final revision = _Revision(2);
+      h.repository.completeIntentionCommand(
+        GraphCommandSucceeded(
+          ConfirmedGraphResult(
+            revision: revision,
+            value: IntentionSaved(
+              testIntention(index: 2, title: after.title),
+              catalogMutation: IntentionCatalogUpdated(
+                revision: revision,
+                before: TestCatalogEntrySnapshot(before),
+                after: TestCatalogEntrySnapshot(after),
+              ),
+            ),
+          ),
+        ),
+      );
+      await start.future;
+      await pumpEventQueue();
+      expect(h.repository.queries, hasLength(2));
+      h.repository.first(
+        1,
+        [_item(1, rootId: after.id, rootTitle: after.title)],
+        counts: _counts(terminal: 1),
+        revision: 2,
+      );
+      await pumpEventQueue();
+      expect(
+        (h.state as IntentionActionsLoaded).items.single.rootTitle,
+        'Новый корень',
+      );
+    },
+  );
+
   test(
     'до показа вкладки читаются только числа, а строк и курсора нет',
     () async {
@@ -469,6 +595,8 @@ final class _Repository
   final queries = <IntentionActionsQuery>[];
   final _pages = <Completer<IntentionActionsPageResult>>[];
   Completer<ActionCommandResult>? _command;
+  Completer<GraphCommandResult<IntentionCommandSuccess, IntentionFailure>>?
+  _intentionCommand;
 
   @override
   Future<IntentionActionsPageResult> getIntentionActionsPage(
@@ -518,6 +646,10 @@ final class _Repository
   void completeCommand(ActionCommandResult result) =>
       _command!.complete(result);
 
+  void completeIntentionCommand(
+    GraphCommandResult<IntentionCommandSuccess, IntentionFailure> result,
+  ) => _intentionCommand!.complete(result);
+
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
     TSuccess extends GraphCommandOutcome,
@@ -526,6 +658,14 @@ final class _Repository
     if (command is ActionCommand) {
       _command = Completer<ActionCommandResult>();
       return await _command!.future as GraphCommandResult<TSuccess, TFailure>;
+    }
+    if (command is IntentionCommand) {
+      _intentionCommand =
+          Completer<
+            GraphCommandResult<IntentionCommandSuccess, IntentionFailure>
+          >();
+      return await _intentionCommand!.future
+          as GraphCommandResult<TSuccess, TFailure>;
     }
     throw UnsupportedError('Команда не предусмотрена сценарием.');
   }
@@ -561,7 +701,12 @@ IntentionActionCounts _counts({
   total: total ?? root + intermediate + terminal,
 );
 
-ActionListItem _item(int id, {bool completed = false}) => ActionListItem(
+ActionListItem _item(
+  int id, {
+  bool completed = false,
+  IntentionId? rootId,
+  String rootTitle = 'Основание',
+}) => ActionListItem(
   id: _actionId(id),
   title: ActionTitle('Действие'),
   description: null,
@@ -569,8 +714,8 @@ ActionListItem _item(int id, {bool completed = false}) => ActionListItem(
   schedule: const ActionAllDay(),
   priority: ActionPriority.p4,
   isCompleted: completed,
-  rootIntentionId: _intentionId(1),
-  rootTitle: 'Основание',
+  rootIntentionId: rootId ?? _intentionId(1),
+  rootTitle: rootTitle,
   pathIntentionCount: 2,
 );
 

@@ -3,10 +3,10 @@ import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
 
-/// Каталог файлов календарного компонента относительно корня пакета: проверяется
-/// каждый файл `action_day_calendar*.dart`, в том числе добавленный позже.
+/// Каталог календаря и отметок экрана дня: проверяются и добавленные файлы.
 const _catalogDirectory = 'lib/src/action/presentation/day/';
 const _calendarFilePrefix = 'action_day_calendar';
+const _marksFilePrefix = 'action_day_marks_';
 
 /// Предметная дата, части которой компонент переводит в технические даты
 /// библиотеки и обратно.
@@ -18,15 +18,17 @@ const _calendarDatePath = 'lib/src/shared/domain/calendar_date.dart';
 // проверка ищет такие конструкции в исходниках и не зависит от часового пояса,
 // в котором выполняется.
 void main() {
-  test('исходники календарного компонента не получают даты в местном времени процесса', () {
+  test('календарь и отметки экрана дня не получают даты в местном времени процесса', () {
     final root = Directory.current.uri;
     final paths = [
       for (final entity in Directory.fromUri(
         root.resolve(_catalogDirectory),
       ).listSync())
         if (entity is File &&
-            entity.uri.pathSegments.last.startsWith(_calendarFilePrefix) &&
-            entity.uri.pathSegments.last.endsWith('.dart'))
+            (entity.uri.pathSegments.last.startsWith(_calendarFilePrefix) ||
+                entity.uri.pathSegments.last.startsWith(_marksFilePrefix)) &&
+            entity.uri.pathSegments.last.endsWith('.dart') &&
+            !entity.uri.pathSegments.last.endsWith('.g.dart'))
           '$_catalogDirectory${entity.uri.pathSegments.last}',
       _calendarDatePath,
     ]..sort();
@@ -34,6 +36,7 @@ void main() {
       paths,
       containsAll([
         '${_catalogDirectory}action_day_calendar.dart',
+        '${_catalogDirectory}action_day_marks_window.dart',
         _calendarDatePath,
       ]),
     );
