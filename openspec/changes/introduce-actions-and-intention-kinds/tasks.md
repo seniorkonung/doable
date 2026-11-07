@@ -770,9 +770,9 @@
     - Вкладка «Действия» страницы активного намерения, как бы страница ни была открыта, показывает над списком «Добавить», которое открывает лист с путём из этого намерения и сегодняшней датой; у архивированного намерения «Добавить» нет.
     - Создание из листа не меняет выбранные дату, секции, плитку и позицию прокрутки страницы под листом (требование «Создание действия без закрытия листа»).
   - **Проверка:**
-    - `mise exec --no-deps -- flutter test test/action/presentation/day test/action/presentation/intention_actions test/app/action_creation_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter test test/action/presentation/day test/action/presentation/intention_actions test/app/creation_flows_integration_test.dart test/app/intention_actions_app_flow_test.dart`.
   - **Зависимости:** 2.13.
-  - **Предполагаемые файлы:** меняются `lib/src/action/presentation/day/action_day_body.dart`, `lib/src/action/presentation/intention_actions/intention_actions_sliver.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и тесты в `test/action/presentation/day/`, `test/action/presentation/intention_actions/`; добавляется `test/app/action_creation_app_flow_test.dart`.
+  - **Предполагаемые файлы:** меняются `lib/src/action/presentation/day/action_day_body.dart`, `lib/src/action/presentation/intention_actions/intention_actions_sliver.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и тесты в `test/action/presentation/day/`, `test/action/presentation/intention_actions/`, `test/app/creation_flows_integration_test.dart`, `test/app/intention_actions_app_flow_test.dart`.
   - **Размер:** M.
 
 - [x] 2.16 Свёрнутый путь листа выбирает причину через поиск начала пути и экран пути
@@ -781,9 +781,9 @@
     - Непустой путь открывает экран «Путь» с путём листа и названием действия из листа; «Сохранить» возвращает лист с новым путём и прежними названием, описанием, датой, временем и приоритетом без создания действия, а «Назад» и «Отменить» оставляют прежний путь листа. Поиск и экран пути над листом — страницы-задачи без панели, и их закрытие возвращает тот же лист, не завершая поток (требования «Лист нового действия над обычной страницей» и «Выход из потока создания»).
     - «Добавить» на странице намерения, открытой стрелкой из поиска начала пути листа, открывает второй лист с путём из этого намерения; после его закрытия видна та же страница, а первый лист ниже сохраняет свои данные без изменений.
   - **Проверка:**
-    - `mise exec --no-deps -- flutter test test/action/presentation/editor test/action/presentation/path test/app/action_creation_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter test test/action/presentation/editor test/action/presentation/path test/app/creation_flows_integration_test.dart`.
   - **Зависимости:** 2.9, 2.15.
-  - **Предполагаемые файлы:** меняются `lib/src/action/presentation/editor/action_editor_page.dart`, `action_editor_view_model.dart`, `lib/src/action/presentation/path/path_page.dart`, `lib/src/action/presentation/path_start/path_start_picker_page.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и тесты в `test/action/presentation/editor/`, `test/app/action_creation_app_flow_test.dart`.
+  - **Предполагаемые файлы:** меняются `lib/src/action/presentation/editor/action_editor_page.dart`, `action_editor_view_model.dart`, `lib/src/action/presentation/path/path_page.dart`, `lib/src/action/presentation/path_start/path_start_picker_page.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и тесты в `test/action/presentation/editor/`, `test/app/creation_flows_integration_test.dart`.
   - **Размер:** M.
 
 - [x] 2.17 Разорванный путь черновика отмечается в листе и открывается с первого целого участка
@@ -792,7 +792,7 @@
     - Архивное или удалённое звено черновика даёт отметку «В архиве», «Удалено» или обе после названия корневого или конечного намерения либо на самом свёрнутом пути для промежуточных намерений и связей; «Создать действие» остаётся доступной, а создание завершается конфликтом с сохранением полей и пути (требования «Свёрнутый путь в листе нового действия» и «Допустимый путь действия»).
     - Нажатие на такой путь открывает экран «Путь» с первого целого участка по правилу задачи 2.10; путь листа меняется только по «Сохранить».
   - **Проверка:**
-    - `mise exec --no-deps -- flutter test test/graph/data/drift_action_path_state_read_test.dart test/action/presentation/editor test/app/action_creation_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_action_path_state_read_test.dart test/action/presentation/editor test/app/creation_flows_integration_test.dart`.
   - **Зависимости:** 2.10, 2.16.
   - **Предполагаемые файлы:** меняются `lib/src/action/application/action_read_contract.dart`, `action_details.dart`, `lib/src/graph/data/drift_personal_graph_repository_action_reads.dart`, `test/support/action_read_contract_test_fallback.dart`, `lib/src/action/presentation/editor/action_editor_page.dart`, `action_editor_state.dart`, `action_editor_view_model.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`; добавляется `test/graph/data/drift_action_path_state_read_test.dart`; меняются тесты в `test/action/presentation/editor/`.
   - **Размер:** M.
@@ -802,9 +802,9 @@
     - Выбор любого пункта панели — в оболочке или на обычной странице — перед сбросом просматривает стек корневого маршрутизатора и, если хоть один лист нового действия при закрытии спросил бы «Отменить новое действие?», один раз задаёт этот вопрос (D11, ADR-0058, требование «Сброс истории выбором пункта панели»).
     - «Продолжить ввод» оставляет историю, листы с их данными и выбранный пункт без изменений, «Сбросить» выполняет сброс и показывает корневую страницу выбранного пункта; без таких листов сброс идёт без вопроса, как прежде.
   - **Проверка:**
-    - `mise exec --no-deps -- flutter test test/app/navigation test/action/presentation/editor test/app/action_creation_app_flow_test.dart`.
+    - `mise exec --no-deps -- flutter test test/app/navigation test/action/presentation/editor test/app/creation_flows_integration_test.dart`.
   - **Зависимости:** 2.16.
-  - **Предполагаемые файлы:** меняются `lib/src/app/navigation/app_navigation.dart`, `lib/src/action/presentation/editor/action_editor_page.dart`, `action_editor_view_model.dart` и тесты в `test/app/navigation/`, `test/app/action_creation_app_flow_test.dart`.
+  - **Предполагаемые файлы:** меняются `lib/src/app/navigation/app_navigation.dart`, `lib/src/action/presentation/editor/action_editor_page.dart`, `action_editor_view_model.dart` и тесты в `test/app/navigation/`, `test/app/creation_flows_integration_test.dart`.
   - **Размер:** S.
 
 - [x] 2.19 Фаза 2 готова: действия создаются, а их пути меняются из всех входов спек
