@@ -426,3 +426,13 @@
   - **Зависимости:** 1.17.
   - **Предполагаемые файлы:** `lib/src/action/presentation/panel/action_panel_view_model.dart`, `test/action/presentation/panel/action_panel_view_model_test.dart`.
   - **Размер:** XS.
+
+- [ ] 1.34 Устаревший список вкладки «Действия» не показывает подгрузку, которая не начнётся
+  - **Критерии приёмки:**
+    - Подвал списка вкладки «Действия» (`_pageFooter` в `intention_actions_sliver.dart`) показывает индикатор «Загружаем ещё действия…», только когда подгрузка может начаться — часть списка свежая (`IntentionActionsCurrent`). В устаревшей части, где `loadMore` порцию не запрашивает, индикатора подгрузки нет, а отказ обновления по-прежнему показывается над списком — так же, как экран дня не показывает подгрузку при отказе обновления (`action_day_body.dart`). Отказ продолжения и его повтор показываются как прежде.
+    - Тест в `test/action/presentation/intention_actions`: у загруженной роли есть следующая порция, и в свежей части подвал показывает «Загружаем ещё действия…»; после отказа обновления этой части индикатор не показан, а отказ обновления виден.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/action/presentation/intention_actions test/intention/presentation/details/intention_details_actions_test.dart`.
+  - **Зависимости:** 1.20.
+  - **Предполагаемые файлы:** `lib/src/action/presentation/intention_actions/intention_actions_sliver.dart`, новый тест в `test/action/presentation/intention_actions/`.
+  - **Размер:** XS.
