@@ -940,3 +940,15 @@
   - **Зависимости:** 2.4, 2.8, 2.13, 2.21, 2.22.
   - **Предполагаемые файлы:** меняются `lib/src/design_system/components/option_row.dart`, `path_builder.dart`, `lib/src/action/presentation/path/path_page.dart`, при необходимости `lib/src/action/presentation/editor/action_priority_sheet.dart` и другой вызывающий код `OptionRow`, `test/design_system/option_row_test.dart`, `path_builder_test.dart`.
   - **Размер:** S.
+
+- [ ] 2.29 У `PathBuilder` нет опции конечного места `showEndSlot` без вызывающего кода
+  - **Критерии приёмки:**
+    - Параметр и поле `showEndSlot` и ветвь отрисовки места в конце непустого пути удалены из `PathBuilder` (`lib/src/design_system/components/path_builder.dart`); место «Выберите причину» пустого пути остаётся.
+    - Вызывающий код `PathBuilder` (`path_page.dart`) и тесты компонента `showEndSlot` не передают, поэтому не меняются; поведение, доступные имена и внешний вид экрана пути прежние.
+    - Изменения `path_builder.dart` по другим задачам (2.22, 2.28) сохраняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- flutter test test/design_system/path_builder_test.dart test/action/presentation/path`.
+  - **Зависимости:** 2.4.
+  - **Предполагаемые файлы:** меняется `lib/src/design_system/components/path_builder.dart`.
+  - **Размер:** XS.
