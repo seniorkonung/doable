@@ -4,11 +4,6 @@
 
 Файл ведёт оркестратор. Решения приняты пользователем в сессии решений и исполняются автономно, по одной finding за сессию. Сессия исполнения удаляет раздел своей finding в коммите её устранения.
 
-## F5 · Low — Удаление дневных выборов оставило элементы без потребителей
-
-- **Решение:** Устранить
-- **Как устранить:** Удалить элементы без потребителей, сохранив поведение: убрать закрытую иерархию RelationGroup в lib/src/long_term_relation/application/relation_group.dart (потребители используют LongTermRelationGroup напрямую), закрытый RelationGroupPageQuery с единственной реализацией в relation_group_page.dart (группа строится без промежуточного типа), forSelection в lib/src/long_term_relation/application/relation_counts.dart и переключения с одной ветвью в lib/src/graph/data/drift_personal_graph_repository_relation_groups.dart; удалить вариант ActionValidationFailure (и ActionValidationField, если он остаётся без потребителей) из lib/src/action/application/action_result.dart вместе с его сообщением в lib/src/action/presentation/action_command_failure_message.dart и случаями в test/graph/presentation/graph_operation_presenter_test.dart; удалить строку relationNeighborhoodEmpty из lib/l10n/app_ru.arb и app_en.arb и перегенерировать локализацию. Проверка: анализатор, mise run codegen-check, тесты затронутых модулей (test/long_term_relation, test/graph/data с группами связей, test/graph/presentation/graph_operation_presenter_test.dart, test/action). Отдельная новая задача Фазы 1 со следующим свободным номером, дописанная в конец списка после всех существующих задач; номера других задач не указывать.
-
 ## F6 · Medium — Текст панели резервных копий переписан из «ежедневных» в «суточные» вопреки спеке
 
 - **Решение:** Устранить

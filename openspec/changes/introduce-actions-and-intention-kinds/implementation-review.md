@@ -5,7 +5,7 @@
 **Format version:** 1
 **Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Фаза 1 по существу выполнена: дневные выборы заменены действиями в хранилище, формате, журнале фактов, копиях, интерфейсе и статистике. Полные проверки проекта проходят, `openspec validate --strict` — valid. Остаются две находки средней важности. Текст панели резервных копий переписан вопреки спеке, чтобы пройти слишком широкую проверку задачи 1.30 (F6). При переносе потеряны регрессионные проверки дат в UTC и вкладки «Действия» (F7). Ещё четыре находки низкой важности касаются мёртвых остатков, тестов без собственной регрессии и устаревшей терминологии. Принятых остаточных рисков нет.
+**Summary:** Фаза 1 по существу выполнена: дневные выборы заменены действиями в хранилище, формате, журнале фактов, копиях, интерфейсе и статистике. Полные проверки проекта проходят, `openspec validate --strict` — valid. Остаются две находки средней важности. Текст панели резервных копий переписан вопреки спеке, чтобы пройти слишком широкую проверку задачи 1.30 (F6). При переносе потеряны регрессионные проверки дат в UTC и вкладки «Действия» (F7). Ещё три находки низкой важности касаются обработки недостижимого состояния в статистике намерения, тестов без собственной регрессии и устаревшей терминологии. Принятых остаточных рисков нет.
 
 ## Review target
 
@@ -87,15 +87,6 @@
 | Code quality | Complete | Те же пять проходов применили линзы корректности, читаемости, архитектуры, безопасности и производительности `code-review-and-quality` ко всем путям поставки своих блоков с проверкой вызывающих, тестов, схемы и границ выполнения. На `70603dd3` в этом рабочем дереве `mise run check` — EXIT 0: `dart format` без изменений (845 файлов), `flutter analyze` — No issues found, все 3931 обычных теста и 18 процессных тестов прошли. Каждая находка ниже перепроверена координатором по коду головы. |
 
 ## Findings
-
-### F5 · Low — Удаление дневных выборов оставило элементы без потребителей
-
-- **Evidence:** `lib/src/long_term_relation/application/relation_group.dart:1-28`: у закрытого `RelationGroup` остался один подтип `LongTermRelationGroup`; `lib/src/long_term_relation/application/relation_group_page.dart:22-29, 75-77`: у закрытого `RelationGroupPageQuery` один реализующий класс, а его `group` строит `RelationGroup`; `lib/src/long_term_relation/application/relation_counts.dart:110-113` (`forSelection`) и `lib/src/graph/data/drift_personal_graph_repository_relation_groups.dart:43-48` — переключения с одной ветвью. Единственным производственным читателем `query.group` и `forSelection` был удалённый читатель групп дневных выборов; в `lib/` на голове их никто не вызывает. `lib/src/action/application/action_result.dart:9-20`: `ActionValidationFailure` нигде в `lib/` не создаётся — входы команд уже типизированы `ActionTitle` и `ActionDescription`, а комментарий «отказ выдаёт экран» не соответствует коду; вариант живёт только в `action_command_failure_message.dart:10` и строках `graph_operation_presenter_test.dart`. Строка `relationNeighborhoodEmpty` в `lib/l10n/app_ru.arb` и `app_en.arb` использовалась только удалённым `a89df6eb:lib/src/daily_choice/presentation/intention_choices/intention_choices_sliver.dart:358` и теперь не используется.
-- **Evidence revisions:** ["70603dd3735a93a26734d943c29d42e099e2e98d", "a89df6ebb58e799b61f61d2d5230e58da973f08e"]
-- **Impact:** Абстракции, варианты отказов и строки без текущего потребителя заставляют читателя выяснять, какие случаи реальны, и сохраняют обработку недостижимых состояний вопреки правилу proven-necessity.
-- **Required outcome:** Путь чтения групп связей не различает несуществующий вид групп, у каждого варианта отказа действия есть достижимый источник, а строки локализации без потребителей удалены; поведение потребителей сохраняется.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/long_term_relation/application/relation_group.dart", "lib/src/long_term_relation/application/relation_group_page.dart", "lib/src/long_term_relation/application/relation_counts.dart", "lib/src/graph/data/drift_personal_graph_repository_relation_groups.dart", "lib/src/action/application/action_result.dart", "lib/src/action/presentation/action_command_failure_message.dart", "lib/l10n/app_ru.arb", "lib/l10n/app_en.arb"]
 
 ### F6 · Medium — Текст панели резервных копий переписан из «ежедневных» в «суточные» вопреки спеке
 

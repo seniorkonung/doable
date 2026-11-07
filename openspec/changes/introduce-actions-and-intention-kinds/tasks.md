@@ -462,3 +462,18 @@
   - **Зависимости:** нет.
   - **Предполагаемые файлы:** `test/app/quick_creation/quick_creation_mode_controller_test.dart`, `file_quick_creation_mode_store_test.dart`, `quick_creation_mode_process_test.dart`, `quick_creation_runtime_restart_test.dart`, `test/app/bootstrap/app_runtime_quick_creation_mode_test.dart`, `test/app/routing/app_router_test.dart`.
   - **Размер:** S по логике: шесть тестовых файлов, изменения сводятся к удалениям.
+
+- [ ] 1.37 Чтение групп связей и отказы команд действий не содержат элементов без потребителей
+  - **Критерии приёмки:**
+    - Закрытой иерархии `RelationGroup` в `lib/src/long_term_relation/application/relation_group.dart` нет: потребители используют `LongTermRelationGroup` напрямую, без надтипа. Если после удаления `forSelection` и `RelationGroupQuery.group` у `LongTermRelationGroup` не остаётся потребителей, удалены и он, и файл `relation_group.dart` с его импортом и реэкспортом.
+    - Закрытого `RelationGroupPageQuery` в `relation_group_page.dart` нет: репозиторий, его реализация на Drift и тестовые подмены принимают `RelationGroupQuery`, а группа строится из полей запроса без промежуточного типа. В `relation_counts.dart` нет `forSelection`, в `lib/src/graph/data/drift_personal_graph_repository_relation_groups.dart` нет переключений с одной ветвью; тест `test/app/navigation/app_shell_operation_reset_test.dart` берёт число группы через `forGroup` по полям запроса.
+    - В `lib/src/action/application/action_result.dart` нет `ActionValidationFailure` и его комментария; `ActionValidationField` удалён, если у него не остаётся потребителей. Сообщение этого отказа удалено из `lib/src/action/presentation/action_command_failure_message.dart`, а его случаи — из `test/graph/presentation/graph_operation_presenter_test.dart`. Строка `actionTitleInvalid` удалена из `lib/l10n/app_ru.arb` и `app_en.arb`, если её единственным потребителем было это сообщение; `actionDescriptionInvalid`, которую использует редактор текста действия, сохраняется.
+    - Строка `relationNeighborhoodEmpty` удалена из `lib/l10n/app_ru.arb` и `app_en.arb` вместе с описанием, локализация перегенерирована.
+    - Поведение не меняется: чтение групп связей, их числа и показ отказов команд действий остаются прежними.
+  - **Проверка:**
+    - `mise run codegen`, затем `mise run codegen-check` и `mise exec --no-deps -- flutter analyze`.
+    - `grep -rnE 'sealed class RelationGroup\b|RelationGroupPageQuery|forSelection|ActionValidationFailure|relationNeighborhoodEmpty' lib test benchmark` ничего не находит.
+    - `mise exec --no-deps -- flutter test test/long_term_relation test/graph/data/drift_relation_group_page_test.dart test/graph/data/drift_relation_group_large_fixture_test.dart test/graph/presentation/graph_operation_presenter_test.dart test/action test/app/navigation/app_shell_operation_reset_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/long_term_relation/application/relation_group.dart`, `relation_group_page.dart`, `relation_counts.dart`, `lib/src/graph/application/personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `drift_personal_graph_repository_relation_groups.dart`, `lib/src/action/application/action_result.dart`, `lib/src/action/presentation/action_command_failure_message.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и сгенерированные `app_localizations*.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/app/navigation/app_shell_operation_reset_test.dart` и тестовые подмены репозитория с сигнатурой `RelationGroupPageQuery` в `test/`.
+  - **Размер:** S.
