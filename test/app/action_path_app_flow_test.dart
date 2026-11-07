@@ -282,4 +282,30 @@ void main() {
     expect(_shownChain(tester), 2);
     expect(_storedPath(harness), [seedUuid(1), seedUuid(2)]);
   });
+
+  testWidgets('успех во время анимации ухода не закрывает панель действия', (
+    tester,
+  ) async {
+    final (harness, gate) = await _openPanel(tester);
+    await _extendPath(tester);
+
+    gate.arm(fail: false);
+    await _tap(tester, pathSave);
+    await _untilTrue(tester, () => gate.hasEntered);
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(find.byType(PathPage, skipOffstage: false), findsOneWidget);
+
+    gate.release();
+    await _untilTrue(tester, () => _storedPath(harness).length == 3);
+    expect(find.byType(PathPage, skipOffstage: false), findsOneWidget);
+    await tester.pumpAndSettle();
+
+    expect(actionPanel, findsOneWidget);
+    expect(actionPanelField('Выйти до заката'), findsOneWidget);
+    expect(_shownChain(tester), 3);
+    expect(_storedPath(harness), [seedUuid(1), seedUuid(2), seedUuid(3)]);
+    expect(_message, findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }

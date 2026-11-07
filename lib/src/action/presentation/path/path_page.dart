@@ -441,10 +441,15 @@ final class _PathPageState extends ConsumerState<PathPage> {
     final draft = ref.read(_provider).draft;
     final saved = await model.save();
     if (saved != null && mounted) {
-      if (widget.purpose case NewActionPathPurpose(:final onSaved)) {
-        onSaved?.call(draft as LoadedPathDraft);
+      if ((widget.purpose, draft) case (
+        NewActionPathPurpose(:final onSaved),
+        final LoadedPathDraft loaded,
+      )) {
+        onSaved?.call(loaded);
       }
-      context.router.pop(saved);
+      if (ModalRoute.of(context)?.isCurrent ?? false) {
+        context.router.pop(saved);
+      }
     }
   }
 
