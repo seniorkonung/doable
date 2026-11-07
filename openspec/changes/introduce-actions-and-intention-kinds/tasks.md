@@ -448,3 +448,17 @@
   - **Зависимости:** 1.19, 1.30.
   - **Предполагаемые файлы:** `tool/check_android_display_transfer.py`.
   - **Размер:** XS.
+
+- [ ] 1.36 Тесты быстрого создания и маршрутизатора проверяют только регрессии, при которых могут упасть
+  - **Критерии приёмки:**
+    - В `test/app/quick_creation/quick_creation_mode_controller_test.dart` удалены тесты «поздние исходы отказ → отказ не меняют режим» и «повторный выбор текущего режима получает собственный исход»: при одном режиме `intention` они проходят и при откате, и при перезаписи режима. Тесты отката с двумя режимами появятся в Фазе 2 вместе со вторым режимом.
+    - В `test/app/routing/app_router_test.dart` удалена отрицательная проверка ключа `catalog-open-daily-choices`, которого в `lib/` нет.
+    - Тесты и случаи прежнего ключа удалённого режима — разрезанные литералы вида `'daily' '-choice'` и `'daily' 'Choice'` и значения `daily-choice-from-intention`, `daily-choice-from-action` — удалены из `file_quick_creation_mode_store_test.dart`, `quick_creation_mode_controller_test.dart`, `quick_creation_mode_process_test.dart`, `quick_creation_runtime_restart_test.dart` в `test/app/quick_creation/` и из `test/app/bootstrap/app_runtime_quick_creation_mode_test.dart`: по D13 `design.md` прежний ключ читается общим правилом неизвестного ключа, которое проверяет тест «неизвестный ключ возвращает начальный режим с категорией повреждения» в `file_quick_creation_mode_store_test.dart`; этот тест сохраняется.
+    - Если тест смешивает прежний ключ с другой проверкой, остаётся только другая проверка: там, где прежний ключ служил начальным содержимым файла, отличающим нетронутую настройку от записанной, это различие проверяется без прежнего ключа.
+    - Продуктовое поведение не меняется; ни один литерал не разрезан ради обхода текстовой проверки, и исключений в проверках не требуется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/quick_creation test/app/bootstrap/app_runtime_quick_creation_mode_test.dart test/app/routing`.
+    - `grep -rn "'daily'" test/app/quick_creation test/app/bootstrap test/app/routing` ничего не находит.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `test/app/quick_creation/quick_creation_mode_controller_test.dart`, `file_quick_creation_mode_store_test.dart`, `quick_creation_mode_process_test.dart`, `quick_creation_runtime_restart_test.dart`, `test/app/bootstrap/app_runtime_quick_creation_mode_test.dart`, `test/app/routing/app_router_test.dart`.
+  - **Размер:** S по логике: шесть тестовых файлов, изменения сводятся к удалениям.
