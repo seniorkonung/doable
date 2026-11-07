@@ -1008,3 +1008,184 @@
   - **Зависимости:** 2.26, 2.31.
   - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/batch_picker/relation_batch_state.dart`, `relation_batch_view_model.dart`, `relation_batch_view_model.g.dart`, при необходимости `relation_batch_picker_page.dart`.
   - **Размер:** XS.
+
+## Phase 3: Вид намерения заменяет готовность к действию
+
+- [ ] 3.1 Намерение хранит вид «главное» или «вспомогательное», а чтения графа отдают его вместе с данными намерения
+  - **Критерии приёмки:**
+    - Таблица `intentions` базовой схемы версии 8 без миграции получает столбец вида со значениями `main` и `supporting`: `NOT NULL`, по умолчанию `main`, с `CHECK`, который отклоняет другие значения (D4, D14); снимок `drift_schema_v8.json` перегенерирован. Столбец готовности остаётся до задачи 3.14.
+    - Закрытое перечисление `IntentionKind` входит в `Intention` и `IntentionSummary`: подробные данные, выдача каталога и поисков для выбора и снимки команд отдают вид, а неизвестное хранимое значение даёт существующий отказ повреждения, а не главное намерение.
+    - Любое созданное намерение главное, архивирование и восстановление вид не меняют, а подтверждённый вид переживает полный перезапуск (требования «Вид намерения», «Сохранение результата операций с намерениями» и сценарий архивирования вспомогательного намерения в «Архивирование активного намерения»).
+  - **Проверка:**
+    - `mise run codegen`, затем `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- flutter test test/data/local test/intention/data test/intention/application`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** меняются `lib/src/data/local/schema/intention_schema.drift`, `lib/src/data/local/app_database.g.dart`, `drift_schemas/drift_schema_v8.json`, `lib/src/intention/domain/intention.dart`, `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/stored_graph_rows.dart`, `drift_personal_graph_repository.dart` и тесты `test/data/local/app_database_schema_test.dart`, `test/intention/data/drift_intention_repository_command_test.dart`, `file_backed_drift_intention_repository_test.dart`.
+  - **Размер:** M.
+
+- [ ] 3.2 Формат данных, журнал фактов, снимки и замена графа переносят вид намерения и отклоняют нарушение его правила
+  - **Критерии приёмки:**
+    - Запись намерения формата версии 1 несёт поле `intentionKind` со значением `main` или `supporting` (D4, ADR-0035): экспорт, снимки, резервные копии и факты журнала содержат вид, а импорт и восстановление воспроизводят вид каждого намерения (сценарий требования «Состав файла экспорта»). Эталонные файлы `test/graph_format/golden/*.jsonl` обновлены.
+    - Замена графа отклоняет файл, в котором активное вспомогательное намерение не имеет активной входящей связи или архивированное вспомогательное — никакой входящей связи, а также неизвестное значение `intentionKind`, существующим отказом «не экспорт Doable или повреждён» без изменения данных графа и копий (требование «Импорт с заменой графа»).
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph_format test/graph_snapshots test/graph/data/graph_fact_capture_test.dart test/graph/data/drift_graph_fact_log_completeness_test.dart test/graph/data/drift_graph_replacement_test.dart test/data_transfer test/graph_backups`.
+  - **Зависимости:** 3.1.
+  - **Предполагаемые файлы:** меняются `lib/src/graph_format/graph_format_records.dart`, `graph_format_codec.dart`, `lib/src/graph/data/graph_fact_capture.dart`, `drift_personal_graph_repository_fact_log.dart`, `drift_personal_graph_repository_replacement.dart`, `lib/src/graph_snapshots/graph_state_assembly.dart`, `test/graph_format/golden/graph_format_v1.jsonl`, `graph_fact_package_v1.jsonl`, `test/support/graph_log_completeness_reference.dart` и тесты формата, замены графа и снимков.
+  - **Размер:** M.
+
+- [ ] 3.3 Вид намерения меняется командой графа только при допустимой входящей связи
+  - **Критерии приёмки:**
+    - `ChangeIntentionKind(id, kind)` выполняется `GraphCommandCoordinator` одной транзакцией с одной ревизией (ADR-0009, D9) для активного и архивированного намерения. Вспомогательным намерение становится, только если у активного есть активная входящая связь, а у архивированного — любая входящая; иначе команда завершается типизированным отказом без записи. Другие намерения и связи не меняются (требование «Вид намерения»).
+    - Показание времени изменения обновляется только при действительной смене вида, а повтор текущего вида завершается без изменений; пакет несёт `IntentionCatalogUpdated` со снимками до и после.
+    - Координатор не принимает команду одновременно с другой изменяющей операцией того же намерения («Последовательное изменение одного намерения»). Успех не объявляется сообщением (ADR-0016), отказ предъявляется общей поверхностью как несохранённая операция «Изменение вида» (ADR-0012), а диагностика различает смену вида и категорию отказа без пользовательского содержимого.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/data/drift_intention_repository_command_test.dart test/intention/presentation/operation test/graph/presentation test/shared/diagnostics`.
+  - **Зависимости:** 3.1.
+  - **Предполагаемые файлы:** меняются `lib/src/intention/application/intention_command.dart`, `intention_result.dart`, `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, `developer_diagnostics_sink.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и их тесты.
+  - **Размер:** M.
+
+- [ ] 3.4 Индекс удержания на ревизию графа вычисляет удерживаемые вспомогательные намерения вне очереди записи
+  - **Критерии приёмки:**
+    - Чистая функция над компактной смежностью связей с признаком архива, видом и архивным состоянием намерений возвращает удерживаемые намерения: обход в ширину от всех активных главных по активным связям через активные вспомогательные (ADR-0056, D5, требование «Удержание вспомогательных намерений»). На случайных графах с циклами она совпадает с эталонным обходом, а вспомогательные, которые ведут только друг к другу или до которых доходит только архивное главное или архивная связь, не удерживаются.
+    - Адаптер строит индекс для текущей ревизии короткими чтениями очереди и вычислением в изоляте по образцу снимка связей статистики (ADR-0026). Контракт чтения удержания подмешивается в `PersonalGraphRepository` и по идентификаторам отдаёт «удерживается» или «не удерживается» только для ревизии, на которой построен индекс, либо типизированный отказ, отличимый от «не удерживается»; построенный для устаревшей ревизии результат отбрасывается. Индекс держит только идентификаторы и признаки, а этапы и отказы построения пишутся в диагностику без пользовательского содержимого.
+    - Подтверждённые изменения связей, смена вида, архивирование, восстановление и удаление намерений и замена графа сбрасывают индекс, и пакеты этих операций несут `IntentionHoldingChanged`; создание намерений, изменение их текста, теги и действия индекс не сбрасывают. Потребители пакетов, которым удержание не нужно, работают без изменений.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/intention_holding_computation_test.dart test/graph/data/drift_intention_holding_index_test.dart test/graph/data/drift_add_long_term_relations_test.dart test/graph/data/drift_relation_archive_restore_test.dart test/graph/data/drift_relation_delete_test.dart test/graph/data/drift_graph_replacement_test.dart test/intention/data/drift_intention_repository_command_test.dart test/graph/application test/graph/presentation test/intention/presentation/catalog test/shared/diagnostics`.
+  - **Зависимости:** 3.3.
+  - **Предполагаемые файлы:** добавляются `lib/src/intention/application/intention_holding.dart`, `lib/src/graph/data/intention_holding_computation.dart`, `drift_intention_holding_index.dart`, `test/graph/data/intention_holding_computation_test.dart`, `drift_intention_holding_index_test.dart`, `test/support/intention_holding_reference.dart`, `intention_holding_read_contract_test_fallback.dart`; меняются `lib/src/graph/application/graph_change.dart`, `personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `drift_personal_graph_repository_relation_commands.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, `developer_diagnostics_sink.dart`.
+  - **Размер:** M по логике: новый механизм повторяет образец снимка связей статистики.
+
+- [ ] 3.5 Бенчмарк подтверждает бюджет построения индекса удержания на предельном графе
+  - **Критерии приёмки:**
+    - Новый бенчмарк наполняет профиль ADR-0005 и ADR-0026 — 50 000 намерений и 150 000 связей с циклами — главными и вспомогательными намерениями, в том числе неудерживаемыми циклами вспомогательных, и измеряет построение индекса с нуля и после изменения одной связи, занятость очереди записи при построении, команду графа во время построения и чтение удержания 100 загруженных строк.
+    - Бюджеты по образцу снимка связей статистики соблюдаются: p95 построения не больше 800 мс, самое долгое занятие очереди одним чтением не больше 100 мс, p95 команды во время построения не больше 50 мс, p95 чтения удержания при построенном индексе не больше 10 мс.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test --no-pub benchmark/intention/intention_holding_index_benchmark.dart --concurrency=1 --reporter=expanded` сообщает `withinBudget` для каждого бюджета.
+  - **Зависимости:** 3.4.
+  - **Предполагаемые файлы:** добавляется `benchmark/intention/intention_holding_index_benchmark.dart`; меняется `benchmark/support/contribution_statistics_fixture.dart`.
+  - **Размер:** S.
+
+- [ ] 3.6 Дизайн-система рисует вид намерения компонентом `SegmentedControl` и метку неудерживаемого вспомогательного намерения
+  - **Критерии приёмки:**
+    - `SegmentedControl` следует `context/doable-design-system/components/SegmentedControl/README.md`: две равные половины на дорожке, выбранная — приподнятый ползунок; нажатие на другую половину сразу сообщает выбор, на выбранную ничего не делает; исключённая контекстом половина остаётся на месте, не нажимается и несёт собственное доступное название. Семантика — группа взаимоисключающих переключателей с отмеченной и недоступной половиной, а выбор отличим не только цветом (ADR-0030).
+    - Появляются значок `supporting` и акцентный тон метки `Badge` на `accent-soft` для неудерживаемого вспомогательного намерения по `CatalogRow/README.md`; прежние тона меток не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** добавляются `lib/src/design_system/components/segmented_control.dart`, `lib/src/design_system/icons/assets/supporting.svg`, `test/design_system/segmented_control_test.dart`; меняются `lib/src/design_system/components/badge.dart`, `lib/src/design_system/doable_icon.dart`, `test/design_system/badge_test.dart`, `doable_icon_test.dart`.
+  - **Размер:** S.
+
+- [ ] 3.7 Вкладка «Обзор» меняет вид намерения переключателем «Главное» и «Вспомогательное»
+  - **Критерии приёмки:**
+    - Между описанием и блоком «Теги» обзора активного и архивированного намерения стоит `SegmentedControl` «Главное» и «Вспомогательное» с выбранным текущим видом. Нажатие на невыбранную половину сразу принимает `ChangeIntentionKind` без подтверждения и сообщения, а пока выполняется любая изменяющая операция этого намерения, половины недоступны; отказ оставляет последнее подтверждённое состояние (требования «Вид намерения», «Обзор намерения», «Последовательное изменение одного намерения»).
+    - По сводке количеств связей половина «Вспомогательное» недоступна, пока у активного намерения нет активной входящей связи, а у архивированного — никакой входящей. Её доступное название — «Возможно, когда другому намерению оно нужно или его можно использовать», а доступные названия половин объясняют смысл видов.
+    - Верхняя панель всегда называет тип «Намерение» со значком намерения. Переключатель готовности, тип «Действие», компонент `OptionTiles`, у которого не остаётся потребителей, и строки `detailsType*` удалены.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/details test/design_system test/app/intention_app_lifecycle_test.dart`.
+  - **Зависимости:** 3.3, 3.6.
+  - **Предполагаемые файлы:** меняются `lib/src/intention/presentation/details/intention_details_page.dart`, `intention_details_view_model.dart`, `intention_details_state.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и тесты в `test/intention/presentation/details/`; удаляются `lib/src/design_system/components/option_tiles.dart`, `test/design_system/option_tiles_test.dart`.
+  - **Размер:** M.
+
+- [ ] 3.8 Панель создания намерения показывает вид вместо готовности к действию
+  - **Критерии приёмки:**
+    - Под полем описания панели стоит `SegmentedControl` вида. При запуске кнопкой быстрого создания и из поиска начала пути выбрано «Главное», а «Вспомогательное» недоступно с объяснением в доступном названии; переключатель передаёт смысл, выбор и недоступность половин в семантике (требование «Панель создания намерения»).
+    - Вид черновика не делает черновик изменённым, сохраняется при открытии и закрытии панели тегов и при ошибках, а новое открытие начинает с вида по месту запуска (требование «Черновик создания намерения»). `CreateIntention` всегда создаёт главное намерение и готовности не принимает.
+    - Опция «Создать готовым к действию», её диалог подтверждения и строки `editorReadiness*` удалены.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/editor test/intention/application test/app/intention_creation_sheet_integration_test.dart test/app/intention_creation_sheet_failure_integration_test.dart test/app/quick_creation`.
+  - **Зависимости:** 3.6.
+  - **Предполагаемые файлы:** меняются `lib/src/intention/presentation/editor/intention_editor_page.dart`, `intention_editor_state.dart`, `intention_editor_view_model.dart`, `intention_creation_launch.dart`, `lib/src/intention/application/intention_command.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и тесты в `test/intention/presentation/editor/`.
+  - **Размер:** M.
+
+- [ ] 3.9 Намерение, созданное в поиске участника, становится вспомогательным вместе со связью
+  - **Критерии приёмки:**
+    - Панель создания из поиска участника групп «Нужно» и «Можно использовать», в том числе открытого «Добавить» экрана пути, начинает с «Вспомогательное», и обе половины доступны; в группах «Нужно для» и «Можно использовать для» выбрано «Главное», а «Вспомогательное» недоступно (требование «Создание намерения из поиска участника»).
+    - Намерение создаётся главным, а поиск запоминает выбранный вид отмеченного созданного намерения. `AddLongTermRelations` для групп «Нужно» и «Можно использовать» принимает кандидатов, которые становятся вспомогательными, и делает их вспомогательными в той же транзакции, что и связи, с обновлением времени изменения и мутацией каталога (D4, требование «Добавление отмеченных намерений в группу»); для групп «Нужно для» и «Можно использовать для» такой кандидат непредставим.
+    - Если связь с созданным намерением не создана — отметка снята, поиск закрыт или сброшен, добавление отклонено, — намерение остаётся главным.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_add_long_term_relations_test.dart test/graph/application/graph_command_coordinator_relation_creation_test.dart test/long_term_relation/presentation/batch_picker test/action/presentation/path test/app/long_term_relation_app_flow_test.dart`.
+  - **Зависимости:** 3.8.
+  - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/application/long_term_relation_command.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_commands.dart`, `lib/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart`, `relation_batch_view_model.dart`, `lib/src/intention/presentation/editor/intention_creation_launch.dart`, `intention_editor_view_model.dart` и тесты.
+  - **Размер:** M.
+
+- [ ] 3.10 Строки каталога и поисков для выбора несут метку вспомогательного намерения по удержанию
+  - **Критерии приёмки:**
+    - Строка вспомогательного намерения в каталоге при любом выбранном виде и в поисках для выбора несёт метку вспомогательного перед меткой архива: серую у удерживаемого, красную у неудерживаемого активного, приглушённую вместе с названием у архивированного; у главного метки вида нет. Прежняя метка готовности удалена (требование «Карточка намерения в каталоге и поисках»).
+    - Пока удержание текущей ревизии не получено или его чтение отказало, метка серая, без красного состояния (D5). После подтверждённого пакета с `IntentionHoldingChanged` видимые каталог и поиски перечитывают удержание загруженных вспомогательных строк, и строки, оставшиеся в выдаче, меняют метку на месте (сценарий «Метка меняется у намерения, оставшегося в выдаче»).
+    - Доступное название строки называет вид словами «главное» или «вспомогательное», а у неудерживаемого активного — что его не удерживает ни одно главное намерение; метки не создают отдельных элементов экранного диктора.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/catalog test/intention/presentation/picker test/intention/presentation/search test/intention/presentation/intention_tag_search_accessibility_test.dart`.
+  - **Зависимости:** 3.4, 3.6.
+  - **Предполагаемые файлы:** меняются `lib/src/intention/presentation/search/intention_row_content.dart`, `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `intention_catalog_view_model.dart`, `intention_catalog_row.dart`, `lib/src/intention/presentation/picker/intention_picker_row.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и тесты.
+  - **Размер:** M.
+
+- [ ] 3.11 Строка «Тип» каталога выбирает вид намерения вместо готовности
+  - **Критерии приёмки:**
+    - Запрос каталога отбирает намерения по виду — «Только главные», «Только вспомогательные», «Главные и вспомогательные» — через «И» с охватом, названием и тегами до подсчёта и разбиения на порции; точные счётчики строк «Показать» и «Тип» считаются по виду, а согласование загруженных строк и счётчиков с подтверждёнными изменениями учитывает вид, в том числе смену вида строки (требования «Вид намерения в каталоге намерений», «Параметры показа в поиске намерений», «Живое применение параметров каталога»).
+    - Каталог открывается с «Только главные», заголовок называет охват и ограниченный вид («Активные главные»), меню «Тип» показывает число каждого вида, а «Сбросить» возвращает «Активные», «Только главные» и сортировку по созданию. Поиски для выбора не показывают строк «Показать» и «Тип» и выдают оба вида (требования «Заголовок списка поиска намерений», «Меню параметров показа в поиске намерений»).
+    - Пустой выбранный вид без названия и тегов называет охват и вид («Нет активных главных намерений», «В архиве нет вспомогательных намерений», «Главных намерений пока нет»), объясняет, как намерение становится этого вида, и предлагает «Показать оба типа»; сообщения пустой выдачи по фильтру называют искомое словом «намерения» (требование «Пустая выдача поиска намерений»). Фильтр готовности, его счётчики и строки удалены.
+    - Бенчмарк каталога на 50 000 намерениях обоих видов читает первую порцию и счётчики каждого вида в пределах прежнего бюджета 100 мс на запрос.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/data/drift_intention_catalog_test.dart test/intention/presentation test/app/navigation`.
+    - `mise exec --no-deps -- flutter test --no-pub benchmark/intention/intention_catalog_benchmark.dart --concurrency=1 --reporter=expanded` сообщает `withinBudget` для каждого случая.
+  - **Зависимости:** 3.3.
+  - **Предполагаемые файлы:** меняются `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `intention_catalog_view_model.dart`, `lib/src/intention/presentation/search/show_and_sort_sheet.dart`, `intention_list_header.dart`, `intention_search_list.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`, `benchmark/intention/intention_catalog_benchmark.dart`, `test/support/intention_catalog_large_fixture.dart`, `intention_type_counts.dart` и тесты каталога.
+  - **Размер:** M по логике: один фильтр заменяется во всех слоях каталога.
+
+- [ ] 3.12 Пустая выдача по фильтру в каталоге подсказывает совпадения другого вида
+  - **Критерии приёмки:**
+    - В каталоге с «Только главные» или «Только вспомогательные», когда при том же названии, тех же условиях по тегам и том же охвате совпадения есть у намерений другого вида, сообщение пустой выдачи по фильтру дополнительно говорит об этом, а под ним стоят «Показать оба типа» и «Сбросить фильтры». «Показать оба типа» выбирает «Главные и вспомогательные» и сохраняет фильтр названия и условия по тегам (требование «Пустая выдача поиска намерений», сценарий «Совпадения есть только у другого типа»).
+    - Без совпадений другого вида и в поисках для выбора сообщение даёт только «Сбросить фильтры».
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/search test/intention/presentation/catalog`.
+  - **Зависимости:** 3.11.
+  - **Предполагаемые файлы:** меняются `lib/src/intention/presentation/search/intention_search_list.dart`, `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и тесты.
+  - **Размер:** S.
+
+- [ ] 3.13 Вкладка «Связи» выбирает группу по сводке связей, а не по готовности
+  - **Критерии приёмки:**
+    - Если цель открытия страницы не задаёт группу, вкладка открывает первую группу с активными связями в порядке «Нужно», «Можно использовать», «Нужно для», «Можно использовать для», иначе первую группу с архивированными связями, а у намерения без связей — «Нужно». Группа определяется по сводке количеств без загрузки групп, а последующие изменения связей её не меняют (требование «Порционное получение группы связей намерения»).
+    - Пустая группа «Нужно» активного намерения показывает один текст для любого намерения, а строки групп и данные соседнего намерения не несут готовности; текст для действия `detailsRelationsEmptyNeedsActionText` удалён.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation test/graph/data/drift_relation_group_page_test.dart test/intention/presentation/details/intention_details_relations_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/intention_relations/intention_relations_view_model.dart`, `intention_relations_sliver.dart`, `lib/src/long_term_relation/application/long_term_relation_projection.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_groups.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и тесты в `test/long_term_relation/`.
+  - **Размер:** M.
+
+- [ ] 3.14 Готовности к действию больше нет в командах, хранилище, формате и тестах
+  - **Критерии приёмки:**
+    - Команды `EnableIntentionReadiness` и `DisableIntentionReadiness`, их виды в координаторе, тело записи, сообщения представителя, типы диагностики и строки удалены, как и `IntentionReadiness` и поля готовности в `Intention` и `IntentionSummary` (D17).
+    - Столбец `is_action_ready` удалён из базовой схемы версии 8, `drift_schema_v8.json` перегенерирован, а поле `actionReady` удалено из формата, фактов, снимков, замены графа и эталонных файлов; чтения кандидатов пути и состояния пути его не выбирают.
+    - Фикстуры и вспомогательные файлы тестов и бенчмарков готовят намерения с видом вместо готовности.
+  - **Проверка:**
+    - `mise run codegen`, затем `mise run codegen-check` и `mise exec --no-deps -- flutter analyze`.
+    - `grep -rnE 'Readiness|readiness|is_action_ready|isActionReady|actionReady|notReady|readyOnly' lib test benchmark drift_schemas` ничего не находит, а `grep -rniE 'готовност|готовым' lib test benchmark` находит только комментарий о готовности новой пары в `lib/src/long_term_relation/presentation/relation_list_reconciliation.dart`.
+    - `mise exec --no-deps -- flutter test test/data test/graph test/graph_format test/graph_snapshots test/graph_backups test/data_transfer test/intention test/long_term_relation test/tag test/action test/app test/shared`.
+  - **Зависимости:** 3.2, 3.7, 3.8, 3.10, 3.11, 3.13.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/data/local/schema/intention_schema.drift`, `lib/src/data/local/app_database.g.dart`, `drift_schemas/drift_schema_v8.json`, `lib/src/intention/domain/intention.dart`, `lib/src/intention/application/intention_command.dart`, `intention_catalog.dart`, `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `drift_personal_graph_repository_path_candidates.dart`, `drift_personal_graph_repository_action_reads.dart`, `drift_personal_graph_repository_replacement.dart`, `drift_personal_graph_repository_fact_log.dart`, `graph_fact_capture.dart`, `stored_graph_rows.dart`, `lib/src/graph_format/graph_format_codec.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`;
+    - меняются `test/graph_format/golden/*.jsonl`, вспомогательные файлы `test/support/`, `test/intention/presentation/catalog/*_test_support.dart`, `test/intention/presentation/details/details_test_support.dart`, `test/long_term_relation/presentation/relation_graph_test_support.dart`, `test/graph/presentation/package_consumers_test_support.dart`, фикстуры `benchmark/support/` и `benchmark/graph_log/graph_log_benchmark.dart`.
+  - **Размер:** M по логике: файлов больше нормы, но почти всё — удаление.
+
+- [ ] 3.15 README и ADR описывают вид намерения вместо готовности к действию
+  - **Критерии приёмки:**
+    - Вводная часть `README.md` перечисляет вид намерения — главное или вспомогательное — вместо явной готовности к действию.
+    - Предложенная ADR-0047 называет данные соседнего намерения без готовности к действию, как терминологическую правку из `adr.md`; принятая ADR-0001 сохраняет исходное обоснование по `ADR-FORMAT.md`.
+  - **Проверка:**
+    - `grep -rniE 'готовност[а-я]* к действию|action readiness' README.md docs/adr` находит только обоснование ADR-0001.
+  - **Зависимости:** 3.14.
+  - **Предполагаемые файлы:** `README.md`, `docs/adr/0047-publish-active-and-archived-parts-of-relation-group-together.md`.
+  - **Размер:** XS.
+
+- [ ] 3.16 Фаза 3 готова: вид намерения заменил готовность к действию
+  - **Критерии приёмки:**
+    - Выполнено условие «Ready to advance» фазы 3 из `plan.md`: ни один поток не зависит от готовности к действию, отметки удержания соответствуют графу, бюджет построения индекса удержания на предельном графе подтверждён бенчмарком, и приложение проходит полные проверки проекта.
+    - Сгенерированный код согласован с исходниками, а изменение проходит строгую проверку OpenSpec.
+    - Собран APK, а результаты команд сообщены в сессии; ручная проверка на устройстве перенесена в конец изменения, после Фазы 4, и здесь не перечисляется.
+  - **Проверка:**
+    - `mise run codegen-check`, `mise run check`, `mise run benchmark`.
+    - `mise exec --no-deps -- openspec validate introduce-actions-and-intention-kinds --strict --no-interactive`.
+    - `mise exec --no-deps -- flutter build apk --release`; передать `build/app/outputs/flutter-apk/app-release.apk`.
+  - **Зависимости:** 3.1–3.15.
+  - **Предполагаемые файлы:** нет, только проверка.
+  - **Размер:** XS.
