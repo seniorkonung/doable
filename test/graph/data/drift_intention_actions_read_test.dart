@@ -224,6 +224,40 @@ void main() {
     },
   );
 
+  test('порции корневых сливают путь из одного намерения с многозвенным '
+      'путём без повторов и пропусков', () async {
+    // Последовательность создания растёт в порядке добавления.
+    addAction(32, path: [1, 2], date: '2026-10-12', hour: 9);
+    addAction(31, path: [1], date: '2026-10-12', hour: 9);
+    addAction(33, path: [1], date: '2026-10-12'); // весь день
+    addAction(34, path: [1, 2, 3], date: '2026-10-10', hour: 20);
+    addAction(36, path: [1, 2], date: '2026-10-10', hour: 7);
+    addAction(35, path: [1], date: '2026-10-10', hour: 7); // новее 36
+    addAction(37, path: [1], date: '2026-09-01', hour: 23);
+
+    final first = await read(1, IntentionActionRole.root, pageSize: 3);
+    final second = await read(
+      1,
+      IntentionActionRole.root,
+      pageSize: 3,
+      cursor: first.nextCursor,
+    );
+    final last = await read(
+      1,
+      IntentionActionRole.root,
+      pageSize: 3,
+      cursor: second.nextCursor,
+    );
+
+    // Границы порций — действие 33 из одного намерения и многозвенное 36.
+    expect([first, second, last].map(ids), [
+      [_action(31), _action(32), _action(33)],
+      [_action(34), _action(35), _action(36)],
+      [_action(37)],
+    ]);
+    expect(last.nextCursor, isNull);
+  });
+
   test('архивное намерение читается так же, как активное', () async {
     addAction(11, path: [1, 2]);
     addAction(12, path: [4, 2, 3]);
