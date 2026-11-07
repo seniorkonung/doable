@@ -339,7 +339,6 @@ void main() {
             field == _description ? 'Исправлено' : draft.description,
           );
           expect(command.tagIds, draft.tagIds);
-          expect(command.readiness, IntentionReadiness.notReady);
           repository.completeCommand(
             1,
             const ResultFailure(IntentionUnavailableFailure()),
@@ -734,12 +733,7 @@ void main() {
                     .having((command) => command.tagIds, 'теги', [
                       _tagId(1),
                       _tagId(2),
-                    ])
-                    .having(
-                      (command) => command.readiness,
-                      'готовность',
-                      IntentionReadiness.notReady,
-                    ),
+                    ]),
               );
               expect(find.byKey(_failure), findsNothing);
               repository.completeCommand(1, ResultFailure(failure));
@@ -954,12 +948,7 @@ void main() {
             isA<CreateIntention>()
                 .having((command) => command.title, 'название', title)
                 .having((command) => command.description, 'описание', _lines(8))
-                .having((command) => command.tagIds, 'теги', [_tagId(2)])
-                .having(
-                  (command) => command.readiness,
-                  'готовность',
-                  IntentionReadiness.notReady,
-                ),
+                .having((command) => command.tagIds, 'теги', [_tagId(2)]),
           );
           expect(sessions.added, hasLength(1));
           expect(tester.takeException(), isNull);

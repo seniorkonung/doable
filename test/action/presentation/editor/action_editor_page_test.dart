@@ -499,7 +499,7 @@ Intention _archived(ActionPathIntention intention, {String? title}) {
     id: current.id,
     title: title ?? current.title,
     description: current.description,
-    readiness: current.readiness,
+    kind: current.kind,
     archiveState: IntentionArchiveState.archived,
     createdAt: current.createdAt,
     updatedAt: current.updatedAt,

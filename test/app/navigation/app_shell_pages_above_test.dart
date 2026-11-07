@@ -57,11 +57,11 @@ import '../../support/tag_positions.dart';
 part 'app_shell_page_matrix.dart';
 part 'app_shell_unnamed_page_scenarios.dart';
 
-/// Активное готовое намерение «Читать» с тегом «Дом»: исходный
+/// Активное главное намерение «Читать» с тегом «Дом»: исходный
 /// участник связи и первое намерение пути действия.
 const _read = 1;
 
-/// Активное готовое намерение «Бегать»: связанный участник связи и
+/// Активное главное намерение «Бегать»: связанный участник связи и
 /// последнее намерение пути действия.
 const _run = 2;
 
@@ -334,9 +334,9 @@ void _seed(sqlite.Database database) {
       (_walk, 'Гулять'),
     ]) {
       database.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, '
+        'INSERT INTO intentions (id, title, kind, is_archived, '
         'created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [tagFixtureId(number), title, 1, 0, number, number],
+        [tagFixtureId(number), title, 'main', 0, number, number],
       );
     }
     database.execute(

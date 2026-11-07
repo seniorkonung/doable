@@ -279,20 +279,17 @@ Future<ActionId> _seedGraph(AppDatabase database) async {
     return confirmed.value as T;
   }
 
-  Future<Intention> createIntention(
-    String title,
-    IntentionReadiness readiness,
-  ) async => (await confirm<IntentionSaved>(
-    CreateIntention.withInitialState(
-      title: title,
-      description: null,
-      readiness: readiness,
-      tagIds: const {},
-    ),
-  )).intention;
+  Future<Intention> createIntention(String title) async =>
+      (await confirm<IntentionSaved>(
+        CreateIntention.withInitialState(
+          title: title,
+          description: null,
+          tagIds: const {},
+        ),
+      )).intention;
 
-  final health = await createIntention('Здоровье', IntentionReadiness.notReady);
-  final running = await createIntention('Бегать', IntentionReadiness.ready);
+  final health = await createIntention('Здоровье');
+  final running = await createIntention('Бегать');
   final relation = (await confirm<LongTermRelationsAdded>(
     AddLongTermRelations(
       pageIntentionId: health.id,

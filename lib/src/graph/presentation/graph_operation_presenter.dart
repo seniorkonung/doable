@@ -433,10 +433,6 @@ String _intentionMessage(
     IntentionCommandKind.create => localizations.graphOperationCreate,
     IntentionCommandKind.update => localizations.graphOperationUpdate,
     IntentionCommandKind.changeKind => localizations.graphOperationChangeKind,
-    IntentionCommandKind.enableReadiness =>
-      localizations.graphOperationEnableReadiness,
-    IntentionCommandKind.disableReadiness =>
-      localizations.graphOperationDisableReadiness,
     IntentionCommandKind.archive => localizations.graphOperationArchive,
     IntentionCommandKind.restore => localizations.graphOperationRestore,
     IntentionCommandKind.delete => localizations.graphOperationDelete,
@@ -552,8 +548,6 @@ String _successFor(
   (
     IntentionCommandKind.update ||
         IntentionCommandKind.changeKind ||
-        IntentionCommandKind.enableReadiness ||
-        IntentionCommandKind.disableReadiness ||
         IntentionCommandKind.archive ||
         IntentionCommandKind.restore,
     _,
@@ -595,8 +589,6 @@ String _failureFor(
     IntentionUnexpectedFailure() => localizations.detailsUpdateUnexpected,
   },
   IntentionCommandKind.changeKind ||
-  IntentionCommandKind.enableReadiness ||
-  IntentionCommandKind.disableReadiness ||
   IntentionCommandKind.archive ||
   IntentionCommandKind.restore => switch (failure) {
     IntentionValidationFailure() => localizations.detailsStateChangeInvalid,

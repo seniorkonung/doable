@@ -58,7 +58,6 @@ Future<void> _insertIntention(
   required String id,
   required String title,
   String? description,
-  bool isActionReady = false,
   bool isArchived = false,
   required int createdAt,
   required int updatedAt,
@@ -71,21 +70,13 @@ Future<void> _insertIntention(
         id,
         title,
         description,
-        is_action_ready,
+        kind,
         is_archived,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, 'main', ?, ?, ?)
     ''',
-      [
-        id,
-        title,
-        description,
-        isActionReady ? 1 : 0,
-        isArchived ? 1 : 0,
-        createdAt,
-        updatedAt,
-      ],
+      [id, title, description, isArchived ? 1 : 0, createdAt, updatedAt],
     ),
   );
 }

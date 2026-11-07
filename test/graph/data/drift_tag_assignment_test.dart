@@ -35,7 +35,7 @@ void main() {
     seedRawGraph(raw, () {
       raw.execute(
         'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
-        [tagFixtureId(4), 'Намерение без готовности', 104, 204],
+        [tagFixtureId(4), 'Намерение без назначений', 104, 204],
       );
     });
     repository = DriftPersonalGraphRepository(

@@ -205,9 +205,9 @@ void _seed(sqlite.Database database) {
       final id = tagFixtureId(_firstPrevious + number - 1);
       database
         ..execute(
-          'INSERT INTO intentions (id, title, is_action_ready, is_archived, '
+          'INSERT INTO intentions (id, title, kind, is_archived, '
           'created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-          [id, _previousTitle(number), 1, 0, number, number],
+          [id, _previousTitle(number), 'main', 0, number, number],
         )
         ..execute(
           'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
@@ -382,7 +382,6 @@ Future<UnregisteredGraphSnapshot> _writeReplacementSnapshot(
         'title': _replacedTitle(number),
         'description': null,
         'intentionKind': 'main',
-        'actionReady': true,
         'archived': false,
         'createdAt': moment(number),
         'updatedAt': moment(number),

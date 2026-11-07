@@ -182,11 +182,7 @@ void main() {
       ResultSuccess(
         IntentionCatalogFirstPage(
           items: [
-            testSummary(
-              title: 'Доступное намерение',
-              description: 'Описание',
-              readiness: IntentionReadiness.ready,
-            ),
+            testSummary(title: 'Доступное намерение', description: 'Описание'),
           ],
           totalCount: 1,
           nextCursor: null,

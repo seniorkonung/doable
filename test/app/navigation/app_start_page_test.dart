@@ -214,8 +214,8 @@ void _storeIntention(
 }) {
   seedRawGraph(database, () {
     database.execute(
-      'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [tagFixtureId(number), title, 1, archived ? 1 : 0, number, number],
+      'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [tagFixtureId(number), title, 'main', archived ? 1 : 0, number, number],
     );
   });
 }

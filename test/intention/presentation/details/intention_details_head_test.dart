@@ -71,40 +71,38 @@ void main() {
     testWidgets('после загрузки панель называет тип и показывает его значок: '
         '${locale.languageCode}', (tester) async {
       final semantics = tester.ensureSemantics();
-      for (final readiness in IntentionReadiness.values) {
-        final repository = ControlledDetailsRepository();
-        final intention = testDetailsIntention(readiness: readiness);
-        await _pumpPage(tester, repository, intention, locale: locale);
-        await waitForDetailRequests(repository, 1);
-        repository.detailRequests.single.add(ResultSuccess(intention));
-        await tester.pumpAndSettle();
+      final repository = ControlledDetailsRepository();
+      final intention = testDetailsIntention();
+      await _pumpPage(tester, repository, intention, locale: locale);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests.single.add(ResultSuccess(intention));
+      await tester.pumpAndSettle();
 
-        final type = russian ? 'Намерение' : 'Intention';
-        final bar = tester.widget<TopBar>(find.byType(TopBar));
-        expect(bar.title, type);
-        expect(bar.titleIcon, DoableIconData.intention);
-        expect(
-          tester.getSemantics(_barText),
-          isSemantics(
-            label: type,
-            namesRoute: true,
-            isHeader: true,
-            children: const [],
-          ),
-        );
-        expect(
-          find.bySemanticsLabel(
-            russian ? 'Подробности намерения' : 'Intention details',
-          ),
-          findsNothing,
-        );
-        expect(
-          tester.widget<PageHead>(find.byType(PageHead)).name,
-          intention.title,
-        );
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pump();
-      }
+      final type = russian ? 'Намерение' : 'Intention';
+      final bar = tester.widget<TopBar>(find.byType(TopBar));
+      expect(bar.title, type);
+      expect(bar.titleIcon, DoableIconData.intention);
+      expect(
+        tester.getSemantics(_barText),
+        isSemantics(
+          label: type,
+          namesRoute: true,
+          isHeader: true,
+          children: const [],
+        ),
+      );
+      expect(
+        find.bySemanticsLabel(
+          russian ? 'Подробности намерения' : 'Intention details',
+        ),
+        findsNothing,
+      );
+      expect(
+        tester.widget<PageHead>(find.byType(PageHead)).name,
+        intention.title,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
       semantics.dispose();
     });
   }

@@ -514,7 +514,6 @@ void main() {
       expect(command.title, 'Название');
       expect(command.description, 'Описание');
       expect(command.tagIds, {_tagId(1)});
-      expect(command.readiness, IntentionReadiness.notReady);
       expect(repository.tagCommands, isEmpty);
 
       // Результат снимает фиксацию черновика, но не меняет принятую команду.
@@ -687,11 +686,6 @@ void main() {
         command,
         isA<CreateIntention>()
             .having((command) => command.title, 'название', 'Полное намерение')
-            .having(
-              (command) => command.readiness,
-              'готовность',
-              IntentionReadiness.notReady,
-            )
             .having((command) => command.tagIds, 'теги', {_tagId(1)}),
       );
 
@@ -885,12 +879,7 @@ void main() {
               'описание',
               _rawDescription,
             )
-            .having((command) => command.tagIds, 'теги', {_tagId(2)})
-            .having(
-              (command) => command.readiness,
-              'готовность',
-              IntentionReadiness.notReady,
-            ),
+            .having((command) => command.tagIds, 'теги', {_tagId(2)}),
       );
       session.repository.completeCommand(1, _savedResult());
       await _settle(session.container);
@@ -1072,12 +1061,10 @@ void main() {
         isA<CreateIntention>()
             .having((command) => command.title, 'название', '  Второе  ')
             .having((command) => command.description, 'описание', isNull)
-            .having((command) => command.tagIds, 'теги', {_tagId(2), _tagId(1)})
-            .having(
-              (command) => command.readiness,
-              'готовность',
-              IntentionReadiness.notReady,
-            ),
+            .having((command) => command.tagIds, 'теги', {
+              _tagId(2),
+              _tagId(1),
+            }),
       ]);
       expect(firstCommand.tagIds, {_tagId(1)});
       expect(repository.tagCommands, isEmpty);
@@ -2279,7 +2266,7 @@ Result<IntentionCommandSuccess> _savedResult({Intention? intention}) {
             id: intention.id,
             title: intention.title,
             descriptionPreview: testDescriptionPreview(intention.description),
-            readiness: intention.readiness,
+            kind: intention.kind,
             archiveState: intention.archiveState,
             createdAt: intention.createdAt,
             updatedAt: intention.updatedAt,

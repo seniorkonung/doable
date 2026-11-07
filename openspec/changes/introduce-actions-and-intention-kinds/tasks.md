@@ -1158,7 +1158,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/intention_relations/intention_relations_view_model.dart`, `intention_relations_sliver.dart`, `lib/src/long_term_relation/application/long_term_relation_projection.dart`, `lib/src/graph/data/drift_personal_graph_repository_relation_groups.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и тесты в `test/long_term_relation/`.
   - **Размер:** M.
 
-- [ ] 3.14 Готовности к действию больше нет в командах, хранилище, формате и тестах
+- [x] 3.14 Готовности к действию больше нет в командах, хранилище, формате и тестах
   - **Критерии приёмки:**
     - Команды `EnableIntentionReadiness` и `DisableIntentionReadiness`, их виды в координаторе, тело записи, сообщения представителя, типы диагностики и строки удалены, как и `IntentionReadiness` и поля готовности в `Intention` и `IntentionSummary` (D17).
     - Столбец `is_action_ready` удалён из базовой схемы версии 8, `drift_schema_v8.json` перегенерирован, а поле `actionReady` удалено из формата, фактов, снимков, замены графа и эталонных файлов; чтения кандидатов пути и состояния пути его не выбирают.

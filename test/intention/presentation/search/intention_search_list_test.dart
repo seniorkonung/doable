@@ -805,7 +805,6 @@ void main() {
                     CreateIntention.withInitialState(
                       title: created.title,
                       description: null,
-                      readiness: created.readiness,
                       tagIds: [],
                     ),
                   )
@@ -943,14 +942,10 @@ Finder _icon(DoableIconData icon) => find.byWidgetPredicate(
   (widget) => widget is DoableIcon && widget.icon == icon,
 );
 
-IntentionSummary _action(int index, {List<Tag> tags = const []}) => testSummary(
-  index: index,
-  title: 'Действие $index',
-  readiness: IntentionReadiness.ready,
-  tags: tags,
-);
+IntentionSummary _action(int index, {List<Tag> tags = const []}) =>
+    testSummary(index: index, title: 'Действие $index', tags: tags);
 
-/// Готовые к действию сводки в порядке выдачи: от новых к старым.
+/// Сводки главных намерений в порядке выдачи: от новых к старым.
 List<IntentionSummary> _actions(int count) => [
   for (var index = count; index >= 1; index--) _action(index),
 ];

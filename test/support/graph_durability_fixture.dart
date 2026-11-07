@@ -34,13 +34,9 @@ Future<void> seedDurabilityGraph(AppDatabase database) =>
       for (var number = 1; number <= 5; number++) {
         await database.customStatement(
           '''INSERT INTO intentions
-         (id, title, is_action_ready, is_archived, created_at, updated_at)
-         VALUES (?, ?, ?, 0, 1, 1)''',
-          [
-            durabilityUuid(number),
-            'Намерение $number',
-            number == 3 || number == 4 ? 1 : 0,
-          ],
+         (id, title, kind, is_archived, created_at, updated_at)
+         VALUES (?, ?, 'main', 0, 1, 1)''',
+          [durabilityUuid(number), 'Намерение $number'],
         );
       }
       for (final (number, source, related, type) in [

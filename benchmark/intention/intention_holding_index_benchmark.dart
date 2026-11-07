@@ -84,7 +84,7 @@ void main() {
           "SELECT is_archived FROM long_term_relations WHERE id = '${relationId.toCanonicalString()}'",
         ) ==
         1;
-    // Оба эталона готовятся по сырым данным до создания репозитория.
+    // Оба эталона вычисляются по сырым данным до создания репозитория.
     final expected = <bool, Map<IntentionId, IntentionHolding>>{};
     var heldIntentions = 0;
     for (final archived in [true, false]) {

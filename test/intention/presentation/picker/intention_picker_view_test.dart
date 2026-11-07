@@ -625,7 +625,6 @@ void main() {
     final summary = testSummary(
       index: 1,
       title: 'Бегать по утрам',
-      readiness: IntentionReadiness.ready,
       tags: [sport],
     );
     h.repository.complete(0, _firstPage([summary]));
@@ -893,11 +892,8 @@ Finder _row(int index) => find.byKey(
 Finder _panelRow(Tag tag) =>
     find.byKey(ValueKey('tags-panel-row-${tag.id.toCanonicalString()}'));
 
-IntentionSummary _action(int index) => testSummary(
-  index: index,
-  title: 'Действие $index',
-  readiness: IntentionReadiness.ready,
-);
+IntentionSummary _action(int index) =>
+    testSummary(index: index, title: 'Действие $index');
 
 /// Сводки действий в порядке выдачи: от новых к старым.
 List<IntentionSummary> _actions(int count) => [

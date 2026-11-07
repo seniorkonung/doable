@@ -180,7 +180,7 @@ void main() {
         'id': _unrelatedIdValue,
         'title': 'Архивное намерение',
         'description': '  Сохранённый текст  ',
-        'is_action_ready': 1,
+        'kind': 'main',
         'is_archived': 1,
         'created_at': 1704067200000000,
         'updated_at': 1704153600000000,
@@ -276,7 +276,7 @@ void main() {
         'id': _unrelatedIdValue,
         'title': 'Архивное намерение',
         'description': '  Сохранённый текст  ',
-        'is_action_ready': 1,
+        'kind': 'main',
         'is_archived': 1,
         'created_at': 1704067200000000,
         'updated_at': 1704153600000000,
@@ -482,7 +482,7 @@ Future<List<Map<String, Object?>>> _intentionRows(AppDatabase database) async =>
           id,
           title,
           description,
-          is_action_ready,
+          kind,
           is_archived,
           created_at,
           updated_at
@@ -553,7 +553,7 @@ void _seedStoredIntentions(sqlite.Database database) {
       id,
       title,
       description,
-      is_action_ready,
+      kind,
       is_archived,
       created_at,
       updated_at
@@ -562,7 +562,7 @@ void _seedStoredIntentions(sqlite.Database database) {
         '$_sourceIdValue',
         'Изучать язык',
         NULL,
-        0,
+        'main',
         0,
         1704067200000000,
         1704067200000000
@@ -571,7 +571,7 @@ void _seedStoredIntentions(sqlite.Database database) {
         '$_firstNeighborIdValue',
         'Читать',
         NULL,
-        0,
+        'main',
         0,
         1704067200000000,
         1704067200000000
@@ -580,7 +580,7 @@ void _seedStoredIntentions(sqlite.Database database) {
         '$_secondNeighborIdValue',
         'Говорить',
         NULL,
-        0,
+        'main',
         0,
         1704067200000000,
         1704067200000000
@@ -589,7 +589,7 @@ void _seedStoredIntentions(sqlite.Database database) {
         '$_unrelatedIdValue',
         'Архивное намерение',
         '  Сохранённый текст  ',
-        1,
+        'main',
         1,
         1704067200000000,
         1704153600000000

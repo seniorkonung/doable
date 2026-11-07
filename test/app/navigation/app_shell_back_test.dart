@@ -380,9 +380,9 @@ void _seed(sqlite.Database database) {
           ? 'Прочее'
           : 'Намерение ${number.toString().padLeft(2, '0')}';
       database.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, '
+        'INSERT INTO intentions (id, title, kind, is_archived, '
         'created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [tagFixtureId(number), title, 1, 0, number, number],
+        [tagFixtureId(number), title, 'main', 0, number, number],
       );
     }
     database.execute(

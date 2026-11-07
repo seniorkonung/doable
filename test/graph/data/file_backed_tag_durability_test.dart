@@ -317,7 +317,7 @@ void _seedAssignmentRecipients(sqlite.Database raw) {
   seedTagRecipientGraphFixture(raw);
   seedRawGraph(raw, () {
     raw.execute(
-      'INSERT INTO intentions (id, title, is_action_ready, created_at, updated_at) VALUES (?, ?, 1, 104, 204)',
+      'INSERT INTO intentions (id, title, kind, created_at, updated_at) VALUES (?, ?, \'main\', 104, 204)',
       [tagFixtureId(4), 'Удаляемое намерение'],
     );
     raw.execute(

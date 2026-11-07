@@ -57,8 +57,8 @@ final class ContributionStatisticsFixture {
 
   void populate(sqlite.Database database) {
     final insertIntention = database.prepare('''INSERT INTO intentions
-      (id, title, is_action_ready, created_at, updated_at)
-      VALUES (?, ?, 1, 0, 0)''');
+      (id, title, kind, created_at, updated_at)
+      VALUES (?, ?, 'main', 0, 0)''');
     final insertRelation = database.prepare('''INSERT INTO long_term_relations
       (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at)
       VALUES (?, ?, ?, 'need', 2, 0, 0)''');

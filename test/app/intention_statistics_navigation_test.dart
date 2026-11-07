@@ -526,7 +526,7 @@ Future<void> _seed(AppDatabase database) => seedGraph(database, () async {
     for (var i = 1; i <= 120; i++) ...[1000 + i, 2000 + i],
   ]) {
     await database.customStatement(
-      'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 1, 0, 1, 1)',
+      'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', 0, 1, 1)',
       [durabilityUuid(id), 'Намерение $id'],
     );
   }

@@ -143,7 +143,6 @@ void main() {
     CreateIntention.withInitialState(
       title: title,
       description: null,
-      readiness: IntentionReadiness.notReady,
       tagIds: tagIds,
     ),
   )).intention;

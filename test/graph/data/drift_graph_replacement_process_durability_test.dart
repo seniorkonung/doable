@@ -192,7 +192,6 @@ Future<Intention> _createIntention(
   CreateIntention.withInitialState(
     title: title,
     description: null,
-    readiness: IntentionReadiness.notReady,
     tagIds: {for (final tag in tags) tag.id},
   ),
 )).intention;

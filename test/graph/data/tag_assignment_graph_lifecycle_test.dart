@@ -136,7 +136,6 @@ void main() {
         required int minute,
         required String title,
         required String description,
-        required int readiness,
         required int archived,
         required int directRelationArchive,
       }) async {
@@ -145,7 +144,6 @@ void main() {
         final intention = row('intentions', 1);
         expect(intention['title'], title);
         expect(intention['description'], description);
-        expect(intention['is_action_ready'], readiness);
         expect(intention['is_archived'], archived);
         expect(intention['created_at'], createdAt);
         expect(intention['updated_at'], now.microsecondsSinceEpoch);
@@ -198,7 +196,6 @@ void main() {
         minute: 1,
         title: 'Новое название',
         description: 'Описание 1',
-        readiness: 1,
         archived: 0,
         directRelationArchive: 0,
       );
@@ -211,40 +208,28 @@ void main() {
         minute: 2,
         title: 'Новое название',
         description: 'Новое описание',
-        readiness: 1,
-        archived: 0,
-        directRelationArchive: 0,
-      );
-      await expectStep(
-        DisableIntentionReadiness(_intention(1)),
-        minute: 3,
-        title: 'Новое название',
-        description: 'Новое описание',
-        readiness: 0,
         archived: 0,
         directRelationArchive: 0,
       );
       await expectStep(
         ArchiveIntention(_intention(1)),
-        minute: 4,
+        minute: 3,
         title: 'Новое название',
         description: 'Новое описание',
-        readiness: 0,
         archived: 1,
         directRelationArchive: 1,
       );
       await expectStep(
         RestoreIntention(_intention(1)),
-        minute: 5,
+        minute: 4,
         title: 'Новое название',
         description: 'Новое описание',
-        readiness: 0,
         archived: 0,
         directRelationArchive: 1,
       );
 
       final beforeUnchangedAndRejected = graph();
-      now = DateTime.utc(2026, 9, 25, 12, 6);
+      now = DateTime.utc(2026, 9, 25, 12, 5);
       expect(
         await repository.execute(
           UpdateIntention(
@@ -272,7 +257,7 @@ void main() {
       seedRawGraph(raw, () {
         for (final number in [4, 5]) {
           raw.execute(
-            'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, 100, 200)',
+            'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', 0, 100, 200)',
             [tagFixtureId(number), 'Намерение $number'],
           );
         }

@@ -1947,7 +1947,7 @@ Future<void> _pumpUntilQueries(
 }
 
 /// Запрос поиска сохраняет активный охват и пробу пары при любых условиях;
-/// готовность поиск не ограничивает.
+/// вид намерения поиск не ограничивает.
 void _expectParticipantQuery(
   IntentionCatalogQuery query,
   IntentionTagFilter tagFilter,

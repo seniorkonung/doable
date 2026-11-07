@@ -967,7 +967,7 @@ Future<void> _seedCatalog(AppDatabase database) =>
         final middle = 1000 + index;
         final firstRelation = 2000 + index * 2;
         await database.customStatement(
-          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, 1, 1)',
+          'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', 0, 1, 1)',
           [
             durabilityUuid(middle),
             'Промежуточное ${index.toString().padLeft(3, '0')}',

@@ -452,18 +452,18 @@ void _seed(sqlite.Database database) {
         [tagFixtureId(number), name, tagPositionKey(number)],
       );
     }
-    for (final (number, title, ready, archived, tags) in [
-      (1, 'Ходить в парк', 1, 0, [_health, _rest]),
-      (2, 'Ходить до магазина', 1, 0, [_health]),
-      (3, 'Ходить в зал', 1, 0, [_health, _sport, _rest]),
-      (4, 'Читать в тишине', 0, 0, [_health, _rest]),
-      (5, 'Ходить в парк', 1, 1, [_health, _rest]),
-      (6, 'Гулять без тегов', 0, 0, <int>[]),
-      (7, 'Ходить в парк', 0, 0, [_health, _rest]),
+    for (final (number, title, archived, tags) in [
+      (1, 'Ходить в парк', 0, [_health, _rest]),
+      (2, 'Ходить до магазина', 0, [_health]),
+      (3, 'Ходить в зал', 0, [_health, _sport, _rest]),
+      (4, 'Читать в тишине', 0, [_health, _rest]),
+      (5, 'Ходить в парк', 1, [_health, _rest]),
+      (6, 'Гулять без тегов', 0, <int>[]),
+      (7, 'Ходить в парк', 0, [_health, _rest]),
     ]) {
       database.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [tagFixtureId(number), title, ready, archived, number, number],
+        'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', ?, ?, ?)',
+        [tagFixtureId(number), title, archived, number, number],
       );
       for (final tag in tags) {
         database.execute(

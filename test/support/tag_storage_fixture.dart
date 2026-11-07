@@ -44,12 +44,11 @@ void seedTagRecipientGraphFixture(sqlite.Database database) {
 void _writeTagRecipientGraph(sqlite.Database database) {
   for (final (number, archived) in [(1, 0), (2, 1), (3, 0)]) {
     database.execute(
-      'INSERT INTO intentions (id, title, description, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      "INSERT INTO intentions (id, title, description, kind, is_archived, created_at, updated_at) VALUES (?, ?, ?, 'main', ?, ?, ?)",
       [
         tagFixtureId(number),
         'Намерение $number',
         'Описание $number',
-        1,
         archived,
         100 + number,
         200 + number,
@@ -103,11 +102,10 @@ void seedLargeTagReadFixture(
   seedRawGraph(database, () {
     for (final number in [1, 2, 3, if (includeDenseRecipients) 4]) {
       database.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        "INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, 'main', ?, ?, ?)",
         [
           tagFixtureId(number),
           'Намерение $number',
-          0,
           number == 2 ? 1 : 0,
           number,
           number,
@@ -157,8 +155,8 @@ void seedWidelyAssignedTagFixture(
 }) {
   seedRawGraph(database, () {
     database.execute(
-      'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [tagFixtureId(1), 'Исходное намерение', 0, 0, 1, 1],
+      "INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, 'main', ?, ?, ?)",
+      [tagFixtureId(1), 'Исходное намерение', 0, 1, 1],
     );
     for (final (number, name) in [
       (9000, 'Общий тег'),
@@ -178,8 +176,8 @@ void seedWidelyAssignedTagFixture(
       final relationId = tagFixtureId(20000 + index);
       final archived = index.isOdd ? 1 : 0;
       database.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [intentionId, 'Получатель $index', 0, archived, index + 2, index + 2],
+        "INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, 'main', ?, ?, ?)",
+        [intentionId, 'Получатель $index', archived, index + 2, index + 2],
       );
       database.execute(
         'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, 0)',

@@ -289,7 +289,7 @@ void main() {
       id: testDetailsIntentionId(41),
       title: 'Бегать',
       description: null,
-      readiness: IntentionReadiness.notReady,
+      kind: IntentionKind.main,
       archiveState: IntentionArchiveState.active,
       createdAt: createdNow,
       updatedAt: createdNow,

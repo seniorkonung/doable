@@ -89,13 +89,11 @@ void main() {
 
   Future<Intention> createIntention(
     String title, {
-    IntentionReadiness readiness = IntentionReadiness.notReady,
     Set<TagId> tagIds = const {},
   }) async => (await confirm<IntentionSaved>(
     CreateIntention.withInitialState(
       title: title,
       description: null,
-      readiness: readiness,
       tagIds: tagIds,
     ),
   )).intention;
@@ -139,10 +137,7 @@ void main() {
       'Здоровье',
       tagIds: {home.id, sport.id},
     );
-    final running = await createIntention(
-      'Бегать',
-      readiness: IntentionReadiness.ready,
-    );
+    final running = await createIntention('Бегать');
     final swimming = await createIntention('Плавать');
     await relate(health, running);
     await relate(health, swimming, type: LongTermRelationType.can);

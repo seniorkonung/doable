@@ -3,7 +3,6 @@ import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
@@ -36,7 +35,7 @@ void main() {
         fireImmediately: true,
       );
       addTearDown(subscription.close);
-      final action = testSummary(index: 1, readiness: IntentionReadiness.ready);
+      final action = testSummary(index: 1);
       final neighbour = testSummary(index: 2);
       repository.complete(
         0,

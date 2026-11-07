@@ -3807,19 +3807,6 @@ class Intentions extends Table with TableInfo<Intentions, Intention> {
         'NOT NULL DEFAULT \'main\' CHECK (kind IN (\'main\', \'supporting\'))',
     defaultValue: const CustomExpression('\'main\''),
   );
-  static const VerificationMeta _isActionReadyMeta = const VerificationMeta(
-    'isActionReady',
-  );
-  late final GeneratedColumn<bool> isActionReady = GeneratedColumn<bool>(
-    'is_action_ready',
-    aliasedName,
-    false,
-    type: DriftSqlType.bool,
-    requiredDuringInsert: false,
-    $customConstraints:
-        'NOT NULL DEFAULT FALSE CHECK (is_action_ready IN (0, 1))',
-    defaultValue: const CustomExpression('FALSE'),
-  );
   static const VerificationMeta _isArchivedMeta = const VerificationMeta(
     'isArchived',
   );
@@ -3861,7 +3848,6 @@ class Intentions extends Table with TableInfo<Intentions, Intention> {
     titleSearchKey,
     description,
     kind,
-    isActionReady,
     isArchived,
     createdAt,
     updatedAt,
@@ -3915,15 +3901,6 @@ class Intentions extends Table with TableInfo<Intentions, Intention> {
         kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
       );
     }
-    if (data.containsKey('is_action_ready')) {
-      context.handle(
-        _isActionReadyMeta,
-        isActionReady.isAcceptableOrUnknown(
-          data['is_action_ready']!,
-          _isActionReadyMeta,
-        ),
-      );
-    }
     if (data.containsKey('is_archived')) {
       context.handle(
         _isArchivedMeta,
@@ -3975,10 +3952,6 @@ class Intentions extends Table with TableInfo<Intentions, Intention> {
         DriftSqlType.string,
         data['${effectivePrefix}kind'],
       )!,
-      isActionReady: attachedDatabase.typeMapping.read(
-        DriftSqlType.bool,
-        data['${effectivePrefix}is_action_ready'],
-      )!,
       isArchived: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_archived'],
@@ -4009,7 +3982,6 @@ class Intention extends DataClass implements Insertable<Intention> {
   final String titleSearchKey;
   final String? description;
   final String kind;
-  final bool isActionReady;
   final bool isArchived;
   final int createdAt;
   final int updatedAt;
@@ -4019,7 +3991,6 @@ class Intention extends DataClass implements Insertable<Intention> {
     required this.titleSearchKey,
     this.description,
     required this.kind,
-    required this.isActionReady,
     required this.isArchived,
     required this.createdAt,
     required this.updatedAt,
@@ -4033,7 +4004,6 @@ class Intention extends DataClass implements Insertable<Intention> {
       map['description'] = Variable<String>(description);
     }
     map['kind'] = Variable<String>(kind);
-    map['is_action_ready'] = Variable<bool>(isActionReady);
     map['is_archived'] = Variable<bool>(isArchived);
     map['created_at'] = Variable<int>(createdAt);
     map['updated_at'] = Variable<int>(updatedAt);
@@ -4048,7 +4018,6 @@ class Intention extends DataClass implements Insertable<Intention> {
           ? const Value.absent()
           : Value(description),
       kind: Value(kind),
-      isActionReady: Value(isActionReady),
       isArchived: Value(isArchived),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -4066,7 +4035,6 @@ class Intention extends DataClass implements Insertable<Intention> {
       titleSearchKey: serializer.fromJson<String>(json['title_search_key']),
       description: serializer.fromJson<String?>(json['description']),
       kind: serializer.fromJson<String>(json['kind']),
-      isActionReady: serializer.fromJson<bool>(json['is_action_ready']),
       isArchived: serializer.fromJson<bool>(json['is_archived']),
       createdAt: serializer.fromJson<int>(json['created_at']),
       updatedAt: serializer.fromJson<int>(json['updated_at']),
@@ -4081,7 +4049,6 @@ class Intention extends DataClass implements Insertable<Intention> {
       'title_search_key': serializer.toJson<String>(titleSearchKey),
       'description': serializer.toJson<String?>(description),
       'kind': serializer.toJson<String>(kind),
-      'is_action_ready': serializer.toJson<bool>(isActionReady),
       'is_archived': serializer.toJson<bool>(isArchived),
       'created_at': serializer.toJson<int>(createdAt),
       'updated_at': serializer.toJson<int>(updatedAt),
@@ -4094,7 +4061,6 @@ class Intention extends DataClass implements Insertable<Intention> {
     String? titleSearchKey,
     Value<String?> description = const Value.absent(),
     String? kind,
-    bool? isActionReady,
     bool? isArchived,
     int? createdAt,
     int? updatedAt,
@@ -4104,7 +4070,6 @@ class Intention extends DataClass implements Insertable<Intention> {
     titleSearchKey: titleSearchKey ?? this.titleSearchKey,
     description: description.present ? description.value : this.description,
     kind: kind ?? this.kind,
-    isActionReady: isActionReady ?? this.isActionReady,
     isArchived: isArchived ?? this.isArchived,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -4117,7 +4082,6 @@ class Intention extends DataClass implements Insertable<Intention> {
           ..write('titleSearchKey: $titleSearchKey, ')
           ..write('description: $description, ')
           ..write('kind: $kind, ')
-          ..write('isActionReady: $isActionReady, ')
           ..write('isArchived: $isArchived, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -4132,7 +4096,6 @@ class Intention extends DataClass implements Insertable<Intention> {
     titleSearchKey,
     description,
     kind,
-    isActionReady,
     isArchived,
     createdAt,
     updatedAt,
@@ -4146,7 +4109,6 @@ class Intention extends DataClass implements Insertable<Intention> {
           other.titleSearchKey == this.titleSearchKey &&
           other.description == this.description &&
           other.kind == this.kind &&
-          other.isActionReady == this.isActionReady &&
           other.isArchived == this.isArchived &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -4157,7 +4119,6 @@ class IntentionsCompanion extends UpdateCompanion<Intention> {
   final Value<String> title;
   final Value<String?> description;
   final Value<String> kind;
-  final Value<bool> isActionReady;
   final Value<bool> isArchived;
   final Value<int> createdAt;
   final Value<int> updatedAt;
@@ -4167,7 +4128,6 @@ class IntentionsCompanion extends UpdateCompanion<Intention> {
     this.title = const Value.absent(),
     this.description = const Value.absent(),
     this.kind = const Value.absent(),
-    this.isActionReady = const Value.absent(),
     this.isArchived = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -4178,7 +4138,6 @@ class IntentionsCompanion extends UpdateCompanion<Intention> {
     required String title,
     this.description = const Value.absent(),
     this.kind = const Value.absent(),
-    this.isActionReady = const Value.absent(),
     this.isArchived = const Value.absent(),
     required int createdAt,
     required int updatedAt,
@@ -4192,7 +4151,6 @@ class IntentionsCompanion extends UpdateCompanion<Intention> {
     Expression<String>? title,
     Expression<String>? description,
     Expression<String>? kind,
-    Expression<bool>? isActionReady,
     Expression<bool>? isArchived,
     Expression<int>? createdAt,
     Expression<int>? updatedAt,
@@ -4203,7 +4161,6 @@ class IntentionsCompanion extends UpdateCompanion<Intention> {
       if (title != null) 'title': title,
       if (description != null) 'description': description,
       if (kind != null) 'kind': kind,
-      if (isActionReady != null) 'is_action_ready': isActionReady,
       if (isArchived != null) 'is_archived': isArchived,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -4216,7 +4173,6 @@ class IntentionsCompanion extends UpdateCompanion<Intention> {
     Value<String>? title,
     Value<String?>? description,
     Value<String>? kind,
-    Value<bool>? isActionReady,
     Value<bool>? isArchived,
     Value<int>? createdAt,
     Value<int>? updatedAt,
@@ -4227,7 +4183,6 @@ class IntentionsCompanion extends UpdateCompanion<Intention> {
       title: title ?? this.title,
       description: description ?? this.description,
       kind: kind ?? this.kind,
-      isActionReady: isActionReady ?? this.isActionReady,
       isArchived: isArchived ?? this.isArchived,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -4249,9 +4204,6 @@ class IntentionsCompanion extends UpdateCompanion<Intention> {
     }
     if (kind.present) {
       map['kind'] = Variable<String>(kind.value);
-    }
-    if (isActionReady.present) {
-      map['is_action_ready'] = Variable<bool>(isActionReady.value);
     }
     if (isArchived.present) {
       map['is_archived'] = Variable<bool>(isArchived.value);
@@ -4275,7 +4227,6 @@ class IntentionsCompanion extends UpdateCompanion<Intention> {
           ..write('title: $title, ')
           ..write('description: $description, ')
           ..write('kind: $kind, ')
-          ..write('isActionReady: $isActionReady, ')
           ..write('isArchived: $isArchived, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -10386,7 +10337,6 @@ typedef $IntentionsCreateCompanionBuilder = IntentionsCompanion Function({
   required String title,
   Value<String?> description,
   Value<String> kind,
-  Value<bool> isActionReady,
   Value<bool> isArchived,
   required int createdAt,
   required int updatedAt,
@@ -10397,7 +10347,6 @@ typedef $IntentionsUpdateCompanionBuilder = IntentionsCompanion Function({
   Value<String> title,
   Value<String?> description,
   Value<String> kind,
-  Value<bool> isActionReady,
   Value<bool> isArchived,
   Value<int> createdAt,
   Value<int> updatedAt,
@@ -10457,11 +10406,6 @@ class $IntentionsFilterComposer extends Composer<_$AppDatabase, Intentions> {
 
   ColumnFilters<String> get kind => $composableBuilder(
     column: $table.kind,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<bool> get isActionReady => $composableBuilder(
-    column: $table.isActionReady,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10539,11 +10483,6 @@ class $IntentionsOrderingComposer extends Composer<_$AppDatabase, Intentions> {
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<bool> get isActionReady => $composableBuilder(
-    column: $table.isActionReady,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<bool> get isArchived => $composableBuilder(
     column: $table.isArchived,
     builder: (column) => ColumnOrderings(column),
@@ -10587,11 +10526,6 @@ class $IntentionsAnnotationComposer
 
   GeneratedColumn<String> get kind =>
       $composableBuilder(column: $table.kind, builder: (column) => column);
-
-  GeneratedColumn<bool> get isActionReady => $composableBuilder(
-    column: $table.isActionReady,
-    builder: (column) => column,
-  );
 
   GeneratedColumn<bool> get isArchived => $composableBuilder(
     column: $table.isArchived,
@@ -10662,7 +10596,6 @@ class $IntentionsTableManager
                 Value<String> title = const Value.absent(),
                 Value<String?> description = const Value.absent(),
                 Value<String> kind = const Value.absent(),
-                Value<bool> isActionReady = const Value.absent(),
                 Value<bool> isArchived = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
@@ -10672,7 +10605,6 @@ class $IntentionsTableManager
                 title: title,
                 description: description,
                 kind: kind,
-                isActionReady: isActionReady,
                 isArchived: isArchived,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -10684,7 +10616,6 @@ class $IntentionsTableManager
                 required String title,
                 Value<String?> description = const Value.absent(),
                 Value<String> kind = const Value.absent(),
-                Value<bool> isActionReady = const Value.absent(),
                 Value<bool> isArchived = const Value.absent(),
                 required int createdAt,
                 required int updatedAt,
@@ -10694,7 +10625,6 @@ class $IntentionsTableManager
                 title: title,
                 description: description,
                 kind: kind,
-                isActionReady: isActionReady,
                 isArchived: isArchived,
                 createdAt: createdAt,
                 updatedAt: updatedAt,

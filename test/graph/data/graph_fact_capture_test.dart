@@ -79,17 +79,15 @@ void main() {
     String id,
     String title, {
     String? description,
-    bool ready = false,
     DateTime? createdAt,
   }) => write(
     'INSERT INTO intentions '
-    '(id, title, description, is_action_ready, created_at, updated_at) '
-    'VALUES (?, ?, ?, ?, ?, ?)',
+    '(id, title, description, created_at, updated_at) '
+    'VALUES (?, ?, ?, ?, ?)',
     [
       id,
       title,
       description,
-      ready ? 1 : 0,
       (createdAt ?? _createdAt).microsecondsSinceEpoch,
       (createdAt ?? _createdAt).microsecondsSinceEpoch,
     ],
@@ -183,7 +181,6 @@ void main() {
         _created,
         'Новое намерение',
         description: '  Первая строка\nвторая строка  ',
-        ready: true,
       );
       await assign(_tagB, _created);
       await assign(_tagA, _created);
@@ -197,7 +194,6 @@ void main() {
             _created,
             'Новое намерение',
             description: '  Первая строка\nвторая строка  ',
-            ready: true,
           ),
         ),
         GraphEntityCreated(_assignment(_tagB, _created)),
@@ -240,7 +236,7 @@ void main() {
       ]);
       await write(
         "UPDATE intentions SET title = 'Новое название', "
-        "description = 'Описание', kind = 'supporting', is_action_ready = 1, updated_at = ? "
+        "description = 'Описание', kind = 'supporting', updated_at = ? "
         'WHERE id = ?',
         [_updatedAt.microsecondsSinceEpoch, _selected],
       );
@@ -255,7 +251,6 @@ void main() {
             'Новое название',
             description: 'Описание',
             kind: IntentionKind.supporting,
-            ready: true,
             updatedAt: _updatedAt,
           ),
         ),
@@ -542,7 +537,6 @@ IntentionRecord _intention(
   String title, {
   String? description,
   IntentionKind kind = IntentionKind.main,
-  bool ready = false,
   bool archived = false,
   DateTime? createdAt,
   DateTime? updatedAt,
@@ -552,7 +546,6 @@ IntentionRecord _intention(
     title: title,
     description: description,
     kind: kind,
-    readiness: ready ? IntentionReadiness.ready : IntentionReadiness.notReady,
     archiveState: archived
         ? IntentionArchiveState.archived
         : IntentionArchiveState.active,

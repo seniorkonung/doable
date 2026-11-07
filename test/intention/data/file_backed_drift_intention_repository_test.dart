@@ -50,11 +50,10 @@ void main() {
       expect(active!.id, activeId);
       expect(active.title, 'Переписать "статью"');
       expect(active.description, '  Сохранить точный\nтекст  ');
-      expect(active.readiness, IntentionReadiness.ready);
       expect(active.kind, IntentionKind.main);
       expect(active.archiveState, IntentionArchiveState.active);
       expect(active.createdAt.value, DateTime.utc(2026, 9, 3, 10));
-      expect(active.updatedAt.value, DateTime.utc(2026, 9, 3, 12));
+      expect(active.updatedAt.value, DateTime.utc(2026, 9, 3, 11));
 
       final archived = _watched(
         await repository.watchIntention(archivedId).first,
@@ -63,7 +62,6 @@ void main() {
       expect(archived!.id, archivedId);
       expect(archived.title, 'Архивировать журнал');
       expect(archived.description, isNull);
-      expect(archived.readiness, IntentionReadiness.notReady);
       expect(archived.kind, IntentionKind.supporting);
       expect(archived.archiveState, IntentionArchiveState.archived);
       expect(archived.createdAt.value, DateTime.utc(2026, 9, 3, 13));
@@ -280,17 +278,16 @@ void main() {
                 id,
                 title,
                 description,
-                is_action_ready,
+                kind,
                 is_archived,
                 created_at,
                 updated_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?)
+              ) VALUES (?, ?, ?, 'main', ?, ?, ?)
             ''',
             [
               fixture.id,
               'Повреждённое намерение',
               null,
-              0,
               0,
               DateTime.utc(2026, 9, 3, 10).microsecondsSinceEpoch,
               DateTime.utc(2026, 9, 3, 10).microsecondsSinceEpoch,
@@ -338,7 +335,6 @@ Future<void> _createFirstObjectGraph(
     _SequenceClock([
       DateTime.utc(2026, 9, 3, 10),
       DateTime.utc(2026, 9, 3, 11),
-      DateTime.utc(2026, 9, 3, 12),
       DateTime.utc(2026, 9, 3, 13),
       DateTime.utc(2026, 9, 3, 14),
       DateTime.utc(2026, 9, 3, 15),
@@ -364,7 +360,6 @@ Future<void> _createFirstObjectGraph(
       ),
     ),
   );
-  _saved(await repository.execute(EnableIntentionReadiness(activeId)));
 
   _saved(
     await repository.execute(

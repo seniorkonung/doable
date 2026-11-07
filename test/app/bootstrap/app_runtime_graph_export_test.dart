@@ -209,7 +209,6 @@ void main() {
       CreateIntention.withInitialState(
         title: 'Здоровье',
         description: null,
-        readiness: IntentionReadiness.notReady,
         tagIds: {home.id},
       ),
     );

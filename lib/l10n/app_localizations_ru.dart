@@ -1179,12 +1179,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationUpdate => 'Изменение';
 
   @override
-  String get graphOperationEnableReadiness => 'Включение готовности';
-
-  @override
-  String get graphOperationDisableReadiness => 'Отключение готовности';
-
-  @override
   String get graphOperationArchive => 'Архивирование';
 
   @override

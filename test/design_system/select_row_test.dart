@@ -224,7 +224,7 @@ void main() {
       SelectRowItem(value: _Kind.all, label: 'Всё', count: '3'),
       SelectRowItem(
         value: _Kind.intentions,
-        label: 'Только намерения без готовности к действию',
+        label: 'Только главные намерения',
         count: '2',
       ),
       SelectRowItem(value: _Kind.actions, label: 'Только действия', count: '1'),

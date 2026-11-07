@@ -56,7 +56,7 @@ void main() {
         graphCommandCoordinatorProvider.notifier,
       );
       coordinator.acceptExisting(
-        EnableIntentionReadiness(intention.id),
+        ArchiveIntention(intention.id),
         presentationTitle: intention.title,
       );
       final session = _listenSession(container, intention);

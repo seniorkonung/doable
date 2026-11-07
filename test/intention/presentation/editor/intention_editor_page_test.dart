@@ -61,10 +61,6 @@ void main() {
     );
     expect(find.text('Главное'), findsOneWidget);
     expect(find.text('Вспомогательное'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('intention-editor-readiness')),
-      findsNothing,
-    );
   });
 
   testWidgets('поиск начала пути открывает главное намерение', (tester) async {
@@ -1748,12 +1744,7 @@ void main() {
               )
               .having((command) => command.tagIds, 'актуальные теги', [
                 _tagId(1),
-              ])
-              .having(
-                (command) => command.readiness,
-                'готовность',
-                IntentionReadiness.notReady,
-              ),
+              ]),
         );
       },
     );
@@ -2364,7 +2355,7 @@ ResultSuccess<IntentionSaved> _savedResult({required String title}) {
             id: intention.id,
             title: intention.title,
             descriptionPreview: testDescriptionPreview(intention.description),
-            readiness: intention.readiness,
+            kind: intention.kind,
             archiveState: intention.archiveState,
             createdAt: intention.createdAt,
             updatedAt: intention.updatedAt,

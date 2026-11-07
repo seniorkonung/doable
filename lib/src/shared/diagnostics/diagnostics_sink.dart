@@ -91,15 +91,12 @@ enum IntentionCommandDiagnosticsType {
   create,
   update,
   changeKind,
-  enableReadiness,
-  disableReadiness,
   archive,
   restore,
   delete,
 }
 
-/// Этап создания намерения вместе с его начальной готовностью
-/// и назначениями тегов.
+/// Этап создания намерения вместе с назначениями тегов.
 enum IntentionCreationCommandDiagnosticsStage {
   /// Проверка текста и наличия выбранных тегов до любой записи.
   validation,

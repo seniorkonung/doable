@@ -127,17 +127,14 @@ void main() {
         ),
       )).tag;
 
-  Future<Intention> createIntention(
-    String title, {
-    IntentionReadiness readiness = IntentionReadiness.notReady,
-  }) async => (await confirm<IntentionSaved>(
-    CreateIntention.withInitialState(
-      title: title,
-      description: null,
-      readiness: readiness,
-      tagIds: const {},
-    ),
-  )).intention;
+  Future<Intention> createIntention(String title) async =>
+      (await confirm<IntentionSaved>(
+        CreateIntention.withInitialState(
+          title: title,
+          description: null,
+          tagIds: const {},
+        ),
+      )).intention;
 
   Future<LongTermRelation> relate(
     Intention source,
@@ -204,7 +201,7 @@ void main() {
     await expectLogMatchesDatabase(beforeRemoval);
   });
 
-  test('команды намерений: создание с тегами, изменение, готовность, '
+  test('команды намерений: создание с тегами, изменение, '
       'архивирование вместе со связями, восстановление и удаление вместе с '
       'назначениями', () async {
     final home = await createTag('Дом');
@@ -213,7 +210,6 @@ void main() {
       CreateIntention.withInitialState(
         title: 'Здоровье',
         description: 'Каждый день',
-        readiness: IntentionReadiness.ready,
         tagIds: {home.id, sport.id},
       ),
     )).intention;
@@ -225,7 +221,6 @@ void main() {
       CreateIntention.withInitialState(
         title: 'Читать',
         description: null,
-        readiness: IntentionReadiness.notReady,
         tagIds: {home.id},
       ),
     )).intention;
@@ -237,8 +232,6 @@ void main() {
         description: 'Пять километров\nв парке',
       ),
     );
-    await confirm(EnableIntentionReadiness(running.id));
-    await confirm(DisableIntentionReadiness(health.id));
     await confirm(ArchiveIntention(health.id));
     await confirm(RestoreIntention(health.id));
     await confirm(DeleteIntention(reading.id));

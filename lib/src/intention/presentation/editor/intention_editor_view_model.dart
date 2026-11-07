@@ -185,7 +185,6 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
       CreateIntention.withInitialState(
         title: draft.title,
         description: draft.description.isEmpty ? null : draft.description,
-        readiness: IntentionReadiness.notReady,
         tagIds: draft.tagIds,
       ),
       target: target,

@@ -27,8 +27,6 @@ enum IntentionCommandKind {
   create,
   update,
   changeKind,
-  enableReadiness,
-  disableReadiness,
   archive,
   restore,
   delete,
@@ -248,7 +246,7 @@ final class IntentionPresentableCompletion extends IntentionCommandCompletion
 /// для согласования данных.
 ///
 /// Так завершаются изменение текста с политикой «успех без сообщения» по
-/// ADR-0046, а также изменение готовности, архивирование и восстановление с
+/// ADR-0046, а также изменение вида, архивирование и восстановление с
 /// политикой «только отказ» по ADR-0016.
 final class IntentionUnannouncedSuccessCompletion
     extends IntentionCommandCompletion {
@@ -982,10 +980,10 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   /// Пока принятая команда выполняется, повтор той же формы не принимается,
   /// не запускается и не ставится в очередь. Уход формы освобождает только её
   /// право предъявления: команда выполняется один раз, а ограничение формы
-  /// снимается вместе с публикацией окончательного завершения. Готовность
-  /// и назначения входят в пакет этого завершения и отдельных
-  /// результатов не образуют. Успех сразу принадлежит общей поверхности,
-  /// отказ — сначала живой форме по ADR-0012.
+  /// снимается вместе с публикацией окончательного завершения. Назначения
+  /// входят в пакет этого завершения и отдельных результатов не образуют.
+  /// Успех сразу принадлежит общей поверхности, отказ — сначала живой форме
+  /// по ADR-0012.
   IntentionCommandStart acceptCreation(
     IntentionCreationFormKey formKey,
     CreateIntention command, {
@@ -996,7 +994,7 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
   /// Принимает команду существующего намерения.
   ///
   /// Политику предъявления задаёт вид команды: удаление следует ADR-0012,
-  /// изменение текста — ADR-0046, а изменение готовности, архивирование и
+  /// изменение текста — ADR-0046, а изменение вида, архивирование и
   /// восстановление — политике «только отказ» по ADR-0016.
   IntentionCommandStart acceptExisting(
     ExistingIntentionCommand command, {
@@ -1941,8 +1939,6 @@ _PresentationPolicy _intentionPresentationPolicyOf(IntentionCommandKind kind) =>
       IntentionCommandKind.delete => _PresentationPolicy.standard,
       IntentionCommandKind.update => _PresentationPolicy.silentSuccess,
       IntentionCommandKind.changeKind ||
-      IntentionCommandKind.enableReadiness ||
-      IntentionCommandKind.disableReadiness ||
       IntentionCommandKind.archive ||
       IntentionCommandKind.restore => _PresentationPolicy.failureOnly,
     };
@@ -1958,8 +1954,6 @@ IntentionCommandKind _kindOf(IntentionCommand command) => switch (command) {
   CreateIntention() => IntentionCommandKind.create,
   UpdateIntention() => IntentionCommandKind.update,
   ChangeIntentionKind() => IntentionCommandKind.changeKind,
-  EnableIntentionReadiness() => IntentionCommandKind.enableReadiness,
-  DisableIntentionReadiness() => IntentionCommandKind.disableReadiness,
   ArchiveIntention() => IntentionCommandKind.archive,
   RestoreIntention() => IntentionCommandKind.restore,
   DeleteIntention() => IntentionCommandKind.delete,

@@ -51,19 +51,16 @@ void main() {
     database.graphLogPackages,
   )..orderBy([(package) => OrderingTerm.asc(package.position)])).get();
 
-  Future<Intention> createIntention(
-    String title, {
-    IntentionReadiness readiness = IntentionReadiness.notReady,
-  }) async => _confirmed<IntentionSaved>(
-    await repository.execute(
-      CreateIntention.withInitialState(
-        title: title,
-        description: null,
-        readiness: readiness,
-        tagIds: const {},
-      ),
-    ),
-  ).intention;
+  Future<Intention> createIntention(String title) async =>
+      _confirmed<IntentionSaved>(
+        await repository.execute(
+          CreateIntention.withInitialState(
+            title: title,
+            description: null,
+            tagIds: const {},
+          ),
+        ),
+      ).intention;
 
   test('каждый блок записи подтверждает команду одним пакетом фактов со следующей позицией', () async {
     var lastPosition = 0;
@@ -130,7 +127,6 @@ void main() {
         CreateIntention.withInitialState(
           title: 'Изучать язык',
           description: null,
-          readiness: IntentionReadiness.notReady,
           tagIds: {tag.id},
         ),
       ),
@@ -141,7 +137,6 @@ void main() {
         CreateIntention.withInitialState(
           title: 'Читать',
           description: null,
-          readiness: IntentionReadiness.ready,
           tagIds: const {},
         ),
       ),
@@ -395,7 +390,7 @@ String _descriptionForRecordLength(Intention intention, int byteLength) {
         id: intention.id,
         title: intention.title,
         description: 'a',
-        readiness: intention.readiness,
+        kind: intention.kind,
         archiveState: intention.archiveState,
         createdAt: intention.createdAt,
         updatedAt: IntentionTimestamp(_now),

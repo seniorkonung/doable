@@ -149,7 +149,7 @@ void main() {
     );
 
     testWidgets(
-      'экранный диктор без жестов открывает панель, готовит все четыре поля черновика через панель тегов и объяснение готовности и возвращается в ту же панель — $code',
+      'экранный диктор без жестов открывает панель, заполняет все четыре поля черновика через панель тегов и выбор вида намерения и возвращается в ту же панель — $code',
       (tester) async {
         final semantics = tester.ensureSemantics();
         _usePhone(tester);
@@ -462,12 +462,7 @@ void main() {
                 'описание',
                 _userDescription,
               )
-              .having((command) => command.tagIds, 'теги', [_work.id])
-              .having(
-                (command) => command.readiness,
-                'готовность',
-                IntentionReadiness.notReady,
-              ),
+              .having((command) => command.tagIds, 'теги', [_work.id]),
         );
 
         // Успех открывает намерение; возврат делает каталог снова доступным.
@@ -604,12 +599,7 @@ void main() {
           repository.commands.single,
           isA<CreateIntention>()
               .having((command) => command.title, 'название', _userTitle)
-              .having((command) => command.tagIds, 'теги', isEmpty)
-              .having(
-                (command) => command.readiness,
-                'готовность',
-                IntentionReadiness.notReady,
-              ),
+              .having((command) => command.tagIds, 'теги', isEmpty),
         );
         expect(_isFocusedIn(tester, find.byType(IntentionEditorPage)), isTrue);
         expect(tester.takeException(), isNull);
@@ -1077,9 +1067,7 @@ Result<IntentionCommandSuccess> _savedResult() {
       intention,
       catalogMutation: IntentionCatalogCreated(
         revision: const TestCatalogRevision(1),
-        entry: TestCatalogEntrySnapshot(
-          testSummary(title: _userTitle, readiness: IntentionReadiness.ready),
-        ),
+        entry: TestCatalogEntrySnapshot(testSummary(title: _userTitle)),
       ),
     ),
   );

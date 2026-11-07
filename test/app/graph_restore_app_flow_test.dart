@@ -737,7 +737,6 @@ Future<Intention> _createIntention(
   CreateIntention.withInitialState(
     title: title,
     description: description,
-    readiness: IntentionReadiness.notReady,
     tagIds: tags,
   ),
 )).intention;

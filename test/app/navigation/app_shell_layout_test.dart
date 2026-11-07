@@ -629,9 +629,16 @@ void _seed(
   seedRawGraph(database, () {
     for (var number = 1; number <= intentions; number++) {
       database.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, '
+        'INSERT INTO intentions (id, title, kind, is_archived, '
         'created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [tagFixtureId(number), _intentionTitle(number), 1, 0, number, number],
+        [
+          tagFixtureId(number),
+          _intentionTitle(number),
+          'main',
+          0,
+          number,
+          number,
+        ],
       );
     }
     database.execute(

@@ -76,17 +76,14 @@ void main() {
     ),
   )).tag;
 
-  Future<Intention> createIntention(
-    String title, {
-    IntentionReadiness readiness = IntentionReadiness.notReady,
-  }) async => (await confirm<IntentionSaved>(
-    CreateIntention.withInitialState(
-      title: title,
-      description: null,
-      readiness: readiness,
-      tagIds: const {},
-    ),
-  )).intention;
+  Future<Intention> createIntention(String title) async =>
+      (await confirm<IntentionSaved>(
+        CreateIntention.withInitialState(
+          title: title,
+          description: null,
+          tagIds: const {},
+        ),
+      )).intention;
 
   Future<LongTermRelation> relate(
     Intention source,
@@ -136,10 +133,7 @@ void main() {
   test('числа состава включают архивированные намерения и долговременные '
       'связи и действия', () async {
     final health = await createIntention('Здоровье');
-    final running = await createIntention(
-      'Бегать',
-      readiness: IntentionReadiness.ready,
-    );
+    final running = await createIntention('Бегать');
     final swimming = await createIntention('Плавать');
     final needRunning = await relate(health, running);
     await relate(swimming, health, group: IntentionRelationGroup.canUse);
@@ -183,10 +177,7 @@ void main() {
     final health = await createIntention('Здоровье');
     expect(await next(), _composition(1, 0, 0, 1));
     seedPathAction(seedUuid(11), [health]);
-    final running = await createIntention(
-      'Бегать',
-      readiness: IntentionReadiness.ready,
-    );
+    final running = await createIntention('Бегать');
     expect(await next(), _composition(2, 0, 1, 1));
     final needRunning = await relate(health, running);
     expect(await next(), _composition(2, 1, 1, 1));

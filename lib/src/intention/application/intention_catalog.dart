@@ -359,8 +359,7 @@ final class IntentionSummary {
     required this.id,
     required String title,
     required this.descriptionPreview,
-    this.kind = IntentionKind.main,
-    required this.readiness,
+    required this.kind,
     required this.archiveState,
     required this.createdAt,
     required this.updatedAt,
@@ -375,7 +374,6 @@ final class IntentionSummary {
   /// Начало описания; `null` означает отсутствие описания.
   final TextPreview? descriptionPreview;
   final IntentionKind kind;
-  final IntentionReadiness readiness;
   final IntentionArchiveState archiveState;
   final IntentionTimestamp createdAt;
   final IntentionTimestamp updatedAt;
@@ -402,7 +400,6 @@ final class IntentionSummary {
       title: title,
       descriptionPreview: descriptionPreview,
       kind: kind,
-      readiness: readiness,
       archiveState: archiveState,
       createdAt: createdAt,
       updatedAt: updatedAt,
@@ -426,7 +423,6 @@ final class IntentionSummary {
       title: title,
       descriptionPreview: descriptionPreview,
       kind: kind,
-      readiness: readiness,
       archiveState: archiveState,
       createdAt: createdAt,
       updatedAt: updatedAt,
@@ -533,10 +529,10 @@ sealed class IntentionCommandSuccess implements GraphCommandOutcome {
 ///
 /// Для `CreateIntention` это единственный окончательный результат всего
 /// создания: [catalogMutation] — одна [IntentionCatalogCreated] с полным
-/// снимком нового намерения, включая теги и готовность, а
+/// снимком нового намерения, включая теги и вид, а
 /// [additionalChanges] несут по одному `TagAssignmentChangedChange` на каждое
 /// созданное назначение. Все факты принадлежат одной новой ревизии; отдельных
-/// результатов готовности или назначений создание не порождает.
+/// результатов назначений создание не порождает.
 final class IntentionSaved extends IntentionCommandSuccess {
   IntentionSaved(
     this.intention, {

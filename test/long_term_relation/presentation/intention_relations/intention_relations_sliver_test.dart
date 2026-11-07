@@ -586,23 +586,6 @@ void main() {
       }
     });
 
-    testWidgets('[${locale.languageCode}] пустая группа «Нужно» намерения '
-        'показывает общий текст независимо от готовности', (tester) async {
-      final harness = await _Harness.pump(
-        tester,
-        locale: locale,
-        readiness: IntentionReadiness.ready,
-        target: const RelationsTarget(IntentionRelationGroup.needs),
-      );
-      harness.repository.completePage(0, _emptyPage(revision));
-      await tester.pumpAndSettle();
-
-      final empty = tester.widget<EmptyState>(find.byType(EmptyState));
-      expect(empty.title, l10n.detailsRelationsEmptyNeedsTitle);
-      expect(empty.text, l10n.detailsRelationsEmptyNeedsIntentionText);
-      expect(empty.pretty, isTrue);
-    });
-
     testWidgets('[${locale.languageCode}] пустая группа архивированного '
         'намерения просит восстановить его, а плитки и подсказка остаются', (
       tester,
@@ -1297,7 +1280,6 @@ final class _Harness {
     WidgetTester tester, {
     Locale locale = const Locale('en'),
     String ownerTitle = 'Намерение',
-    IntentionReadiness readiness = IntentionReadiness.notReady,
     IntentionArchiveState archiveState = IntentionArchiveState.active,
     RelationCounts? counts,
     IntentionPageTarget target = const OverviewTarget(),
@@ -1366,7 +1348,6 @@ final class _Harness {
       testGraphIntention(
         id: harness.ownerId,
         title: ownerTitle,
-        readiness: readiness,
         archiveState: archiveState,
       ),
       counts: counts ?? testRelationCounts(),

@@ -434,7 +434,7 @@ void main() {
       final (intentionBefore, countsBefore) = initialIntentions[number]!;
       final after = intention(number).intention;
       expect(after.title, intentionBefore.title);
-      expect(after.readiness, intentionBefore.readiness);
+      expect(after.kind, intentionBefore.kind);
       expect(after.archiveState, intentionBefore.archiveState);
       expect(after.updatedAt, intentionBefore.updatedAt);
       expect(intention(number).details.relationCounts, countsBefore);

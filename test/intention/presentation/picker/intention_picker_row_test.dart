@@ -261,7 +261,6 @@ IntentionSummary _summary(
   title: title,
   descriptionPreview: testDescriptionPreview(description),
   kind: kind,
-  readiness: IntentionReadiness.notReady,
   archiveState: archiveState,
   createdAt: IntentionTimestamp(DateTime.utc(2026)),
   updatedAt: IntentionTimestamp(DateTime.utc(2026)),

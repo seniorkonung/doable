@@ -34,59 +34,49 @@ import '../../../support/in_memory_quick_creation_mode_store.dart';
 import 'details_test_support.dart';
 
 void main() {
-  for (final (scenario, readiness, group) in [
-    (
-      'Открытие намерения загружает только активную группу «нужно»',
-      IntentionReadiness.notReady,
-      IntentionRelationGroup.needs,
-    ),
-    (
-      'Готовность не меняет выбор первой группы',
-      IntentionReadiness.ready,
-      IntentionRelationGroup.needs,
-    ),
-  ]) {
-    _testWidgets(scenario, (tester) async {
-      final graph = _Graph();
-      final owner = graph.addIntention(1, 'Быть здоровым', readiness);
-      for (final (index, type, direction, scope) in [
-        (1, LongTermRelationType.need, RelationDirection.outgoing, null),
-        (2, LongTermRelationType.can, RelationDirection.outgoing, null),
-        (3, LongTermRelationType.can, RelationDirection.outgoing, null),
-        (4, LongTermRelationType.need, RelationDirection.incoming, null),
-        (
-          5,
-          LongTermRelationType.need,
-          RelationDirection.outgoing,
-          RelationScope.archived,
-        ),
-      ]) {
-        graph.addRelation(
-          owner,
-          index: index,
-          type: type,
-          direction: direction,
-          scope: scope ?? RelationScope.active,
-        );
-      }
-      await _openPage(tester, graph, owner);
-      await _chooseTab(tester, 'Relations');
-
-      final query = graph.repository.relationGroupQueries.single;
-      expect(query.intentionId, owner.id);
-      expect(query.type, group.type);
-      expect(query.direction, group.direction);
-      expect(query.scope, RelationScope.active);
-      expect(query.cursor, isNull);
-      _expectSelectedGroup(tester, group);
-      // Числа остальных групп доступны без чтения их содержимого.
-      expect(find.bySemanticsLabel('Can use: 2 active'), findsOneWidget);
-      expect(
-        find.bySemanticsLabel('Needs: 1 active, some archived'),
-        findsOneWidget,
+  _testWidgets('Открытие намерения загружает только активную группу «нужно»', (
+    tester,
+  ) async {
+    const group = IntentionRelationGroup.needs;
+    final graph = _Graph();
+    final owner = graph.addIntention(1, 'Быть здоровым');
+    for (final (index, type, direction, scope) in [
+      (1, LongTermRelationType.need, RelationDirection.outgoing, null),
+      (2, LongTermRelationType.can, RelationDirection.outgoing, null),
+      (3, LongTermRelationType.can, RelationDirection.outgoing, null),
+      (4, LongTermRelationType.need, RelationDirection.incoming, null),
+      (
+        5,
+        LongTermRelationType.need,
+        RelationDirection.outgoing,
+        RelationScope.archived,
+      ),
+    ]) {
+      graph.addRelation(
+        owner,
+        index: index,
+        type: type,
+        direction: direction,
+        scope: scope ?? RelationScope.active,
       );
-    });
-  }
+    }
+    await _openPage(tester, graph, owner);
+    await _chooseTab(tester, 'Relations');
+
+    final query = graph.repository.relationGroupQueries.single;
+    expect(query.intentionId, owner.id);
+    expect(query.type, group.type);
+    expect(query.direction, group.direction);
+    expect(query.scope, RelationScope.active);
+    expect(query.cursor, isNull);
+    _expectSelectedGroup(tester, group);
+    // Числа остальных групп доступны без чтения их содержимого.
+    expect(find.bySemanticsLabel('Can use: 2 active'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Needs: 1 active, some archived'),
+      findsOneWidget,
+    );
+  });
 
   _testWidgets('Возвращение к связям сохраняет настройки и начинает список '
       'заново', (tester) async {
@@ -173,11 +163,7 @@ void main() {
     final graph = _Graph();
     final owner = graph.addIntention(1, 'Быть здоровым');
     // Без заданной группы сосед открыл бы входящую группу «Нужно для».
-    final neighbor = graph.addIntention(
-      2,
-      'Наращивать силу',
-      IntentionReadiness.ready,
-    );
+    final neighbor = graph.addIntention(2, 'Наращивать силу');
     graph.addRelation(owner, index: 1, neighbor: neighbor);
     await _openPage(tester, graph, owner);
     await _chooseTab(tester, 'Relations');
@@ -385,15 +371,11 @@ final class _Graph {
   final _watches = <(IntentionId, ControlledDetailRequest)>[];
   var _revision = 0;
 
-  Intention addIntention(
-    int index,
-    String title, [
-    IntentionReadiness readiness = IntentionReadiness.notReady,
-  ]) => _intentions[testDetailsIntentionId(index)] = testDetailsIntention(
-    index: index,
-    title: title,
-    readiness: readiness,
-  );
+  Intention addIntention(int index, String title) =>
+      _intentions[testDetailsIntentionId(index)] = testDetailsIntention(
+        index: index,
+        title: title,
+      );
 
   /// Добавляет связь [owner] с соседом и возвращает её строку для [owner].
   RelationGroupEntry addRelation(

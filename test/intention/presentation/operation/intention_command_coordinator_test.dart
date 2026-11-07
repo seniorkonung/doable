@@ -141,7 +141,6 @@ void main() {
       final command = CreateIntention.withInitialState(
         title: 'Полное намерение',
         description: 'Описание',
-        readiness: IntentionReadiness.ready,
         tagIds: selectedTags,
       );
 
@@ -157,7 +156,6 @@ void main() {
           CreateIntention.withInitialState(
             title: 'Другой набор',
             description: null,
-            readiness: IntentionReadiness.notReady,
             tagIds: [_tagId(_secondTagUuid)],
           ),
         ),
@@ -176,16 +174,10 @@ void main() {
       expect(repository.commands, [same(command)]);
       expect(
         repository.commands.single,
-        isA<CreateIntention>()
-            .having(
-              (command) => command.readiness,
-              'готовность',
-              IntentionReadiness.ready,
-            )
-            .having((command) => command.tagIds, 'теги', {
-              _tagId(_firstTagUuid),
-              _tagId(_secondTagUuid),
-            }),
+        isA<CreateIntention>().having((command) => command.tagIds, 'теги', {
+          _tagId(_firstTagUuid),
+          _tagId(_secondTagUuid),
+        }),
       );
 
       // Уход инициатора не отменяет команду и не снимает ограничение формы.
@@ -212,7 +204,7 @@ void main() {
       expect(completion.target, isA<CreatingIntentionOperationTarget>());
       expect(completion.presentationTitle, 'Полное намерение');
       expect(completion.revision, same(revision));
-      // Готовность и назначения входят в один пакет создания на
+      // Назначения тегов входят в один пакет создания на
       // его ревизии, а не в отдельные завершения.
       final changes = completion.confirmedChange!.changes.toList();
       expect(changes, [
@@ -266,7 +258,6 @@ void main() {
           CreateIntention.withInitialState(
             title: 'Полное намерение',
             description: null,
-            readiness: IntentionReadiness.ready,
             tagIds: [_tagId(_firstTagUuid), missingTag],
           ),
         ) as IntentionCommandAccepted;
@@ -353,7 +344,7 @@ void main() {
         );
         final independent = _acceptExisting(
           coordinator,
-          EnableIntentionReadiness(secondId),
+          ArchiveIntention(secondId),
         );
 
         expect(first, isA<IntentionCommandAccepted>());
@@ -361,7 +352,7 @@ void main() {
         expect(independent, isA<IntentionCommandAccepted>());
         expect(repository.commands, [
           isA<ChangeIntentionKind>(),
-          isA<EnableIntentionReadiness>(),
+          isA<ArchiveIntention>(),
         ]);
 
         repository.complete(
@@ -411,7 +402,7 @@ void main() {
 
         final accepted = _acceptExisting(
           coordinator,
-          EnableIntentionReadiness(_id(_firstUuid)),
+          ArchiveIntention(_id(_firstUuid)),
         ) as IntentionCommandAccepted;
         repository.complete(
           0,
@@ -608,8 +599,6 @@ void main() {
         'изменение вида',
         (IntentionId id) => ChangeIntentionKind(id, IntentionKind.supporting),
       ),
-      ('включение готовности', EnableIntentionReadiness.new),
-      ('выключение готовности', DisableIntentionReadiness.new),
       ('архивирование', ArchiveIntention.new),
       ('восстановление', RestoreIntention.new),
     ]) {
@@ -1046,7 +1035,7 @@ void main() {
 
         final first = _acceptExisting(
           coordinator,
-          EnableIntentionReadiness(intentionId),
+          ChangeIntentionKind(intentionId, IntentionKind.supporting),
         ) as IntentionCommandAccepted;
         repository.complete(
           0,
@@ -1143,8 +1132,8 @@ Result<ConfirmedGraphResult<IntentionCommandSuccess>> _confirmedDeletedResult(
   ),
 );
 
-/// Подтверждённое полное создание: одна каталожная мутация с готовностью
-/// и обоими тегами и по факту на каждое назначение, все на [revision].
+/// Подтверждённое полное создание: одна каталожная мутация с обоими
+/// тегами и по факту на каждое назначение, все на [revision].
 Result<ConfirmedGraphResult<IntentionCommandSuccess>>
 _confirmedFullCreatedResult(GraphRevision revision) {
   final id = _id(_firstUuid);
@@ -1171,7 +1160,7 @@ _confirmedFullCreatedResult(GraphRevision revision) {
           id: id,
           title: 'Полное намерение',
           description: 'Описание',
-          readiness: IntentionReadiness.ready,
+          kind: IntentionKind.main,
           archiveState: IntentionArchiveState.active,
           createdAt: timestamp,
           updatedAt: timestamp,
@@ -1181,7 +1170,6 @@ _confirmedFullCreatedResult(GraphRevision revision) {
           entry: _TestCatalogEntrySnapshot(
             id,
             title: 'Полное намерение',
-            readiness: IntentionReadiness.ready,
             tags: tags,
           ),
         ),
@@ -1374,13 +1362,12 @@ final class _TestCatalogEntrySnapshot implements IntentionCatalogEntrySnapshot {
   _TestCatalogEntrySnapshot(
     IntentionId id, {
     String title = 'Намерение',
-    IntentionReadiness readiness = IntentionReadiness.notReady,
     List<Tag> tags = const [],
   }) : summary = IntentionSummary(
          id: id,
          title: title,
          descriptionPreview: null,
-         readiness: readiness,
+         kind: IntentionKind.main,
          archiveState: IntentionArchiveState.active,
          createdAt: IntentionTimestamp(DateTime.utc(2026)),
          updatedAt: IntentionTimestamp(DateTime.utc(2026)),

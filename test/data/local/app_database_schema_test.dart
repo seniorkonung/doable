@@ -277,14 +277,13 @@ void main() {
           () => database.customStatement(
             '''
           INSERT INTO intentions (
-            id, title, is_action_ready, is_archived, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?)
+            id, title, is_archived, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?)
         ''',
             [
               '018f0b5d-6b2e-7c80-8000-000000000004',
               'Некорректное состояние',
               2,
-              0,
               1000000,
               1000000,
             ],

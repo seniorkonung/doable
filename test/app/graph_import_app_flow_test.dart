@@ -302,16 +302,8 @@ Future<_ExportedGraph> _seedExportedGraph(
   AppDatabase database,
 ) async {
   final health = await _createIntention(graph, 'Здоровье');
-  final swimming = await _createIntention(
-    graph,
-    'Плавать',
-    readiness: IntentionReadiness.ready,
-  );
-  final running = await _createIntention(
-    graph,
-    'Бегать',
-    readiness: IntentionReadiness.ready,
-  );
+  final swimming = await _createIntention(graph, 'Плавать');
+  final running = await _createIntention(graph, 'Бегать');
   final reading = await _createIntention(graph, 'Читать');
   await _execute(graph, ArchiveIntention(reading.id));
   final needsRunning = await _createNeed(graph, health, running);
@@ -390,14 +382,12 @@ Future<Tag> _createTag(
 Future<Intention> _createIntention(
   PersonalGraphRepository graph,
   String title, {
-  IntentionReadiness readiness = IntentionReadiness.notReady,
   Set<TagId> tags = const {},
 }) async => (await _confirm<IntentionSaved>(
   graph,
   CreateIntention.withInitialState(
     title: title,
     description: null,
-    readiness: readiness,
     tagIds: tags,
   ),
 )).intention;

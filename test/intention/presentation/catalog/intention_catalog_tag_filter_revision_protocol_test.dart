@@ -1,7 +1,6 @@
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
@@ -214,7 +213,6 @@ void main() {
     final created = testSummary(
       index: 9,
       title: 'Ходить в лес',
-      readiness: IntentionReadiness.ready,
       tags: [health, rest],
     );
 

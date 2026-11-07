@@ -493,7 +493,7 @@ void main() {
               (4, _sleep),
             ]) {
               await db.customStatement(
-                'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, ?, ?)',
+                'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', 0, ?, ?)',
                 [_id(id), title, id, id],
               );
             }
@@ -662,7 +662,7 @@ void main() {
           (5, 'Бегать'),
         ]) {
           await db.customStatement(
-            'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, ?, ?)',
+            'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', 0, ?, ?)',
             [_id(id), title, id, id],
           );
         }
@@ -909,12 +909,12 @@ void main() {
             [_id(104), _id(2), _id(3), 'need'],
           );
           await db.customStatement(
-            'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, 5, 5)',
+            'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', 0, 5, 5)',
             [_id(5), 'Бегать'],
           );
           for (var id = 6; id <= 14; id++) {
             await db.customStatement(
-              'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, ?, ?)',
+              'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', 0, ?, ?)',
               [_id(id), 'Намерение $id', id, id],
             );
           }
@@ -1257,7 +1257,7 @@ Future<void> _seedOccupiedPairs(AppDatabase database) =>
         (4, _sleep),
       ]) {
         await database.customStatement(
-          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, ?, ?)',
+          'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', 0, ?, ?)',
           [_id(number), title, number, number],
         );
       }

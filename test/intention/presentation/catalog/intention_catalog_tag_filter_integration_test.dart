@@ -481,7 +481,6 @@ void main() {
           CreateIntention.withInitialState(
             title: 'Ходить по лесу',
             description: 'Тропа у реки',
-            readiness: IntentionReadiness.ready,
             tagIds: [_tagId(303), _tagId(301)],
           ),
         );
@@ -509,7 +508,7 @@ void main() {
           final row = current.items.singleWhere((item) => item.id == createdId);
           expect(row.title, 'Ходить по лесу');
           expect(row.descriptionPreview, isNotNull);
-          expect(row.readiness, IntentionReadiness.ready);
+          expect(row.kind, IntentionKind.main);
           expect(row.tags.map((tag) => (tag.id, tag.name.value)), [
             (_tagId(301), 'Здоровье'),
             (_tagId(303), 'Отдых'),
@@ -562,7 +561,6 @@ void main() {
         CreateIntention.withInitialState(
           title: title,
           description: null,
-          readiness: IntentionReadiness.ready,
           tagIds: [for (final number in tagNumbers) _tagId(number)],
         ),
       );
@@ -801,23 +799,23 @@ Future<void> _completeTag(
 
 Future<void> _seedCatalog(AppDatabase database) =>
     seedGraph(database, () async {
-      for (final (number, title, ready, archived, tags) in [
-        (1, 'Ходить в парк', 1, 0, [301, 303]),
-        (2, 'Ходить в парк', 0, 0, [301, 303]),
-        (3, 'Ходить в парк', 1, 1, [301, 303]),
-        (4, 'Ходить в зал', 1, 0, [301, 302, 303]),
-        (5, 'Ходить до магазина', 1, 0, [301]),
-        (6, 'Читать в тишине', 1, 0, [301, 303]),
-        (7, 'Ходить без тегов', 0, 0, <int>[]),
-        (8, 'Ходить на работу', 1, 0, [304]),
-        (9, 'Ходить в парк', 0, 1, [301, 303]),
-        (10, 'Ходить в парк', 1, 0, [301, 303]),
+      for (final (number, title, archived, tags) in [
+        (1, 'Ходить в парк', 0, [301, 303]),
+        (2, 'Ходить в парк', 0, [301, 303]),
+        (3, 'Ходить в парк', 1, [301, 303]),
+        (4, 'Ходить в зал', 0, [301, 302, 303]),
+        (5, 'Ходить до магазина', 0, [301]),
+        (6, 'Читать в тишине', 0, [301, 303]),
+        (7, 'Ходить без тегов', 0, <int>[]),
+        (8, 'Ходить на работу', 0, [304]),
+        (9, 'Ходить в парк', 1, [301, 303]),
+        (10, 'Ходить в парк', 0, [301, 303]),
       ]) {
         await database.customStatement(
           '''INSERT INTO intentions
-         (id, title, is_action_ready, is_archived, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)''',
-          [tagFixtureId(number), title, ready, archived, number, number],
+         (id, title, kind, is_archived, created_at, updated_at)
+         VALUES (?, ?, 'main', ?, ?, ?)''',
+          [tagFixtureId(number), title, archived, number, number],
         );
         for (final tag in tags) {
           await database.customStatement(
@@ -838,8 +836,8 @@ Future<void> _seedExcludedMatches(AppDatabase database) =>
       for (final number in [11, 12, 13]) {
         await database.customStatement(
           '''INSERT INTO intentions
-         (id, title, is_action_ready, is_archived, created_at, updated_at)
-         VALUES (?, ?, 1, 0, ?, ?)''',
+         (id, title, kind, is_archived, created_at, updated_at)
+         VALUES (?, ?, 'main', 0, ?, ?)''',
           [tagFixtureId(number), 'Ходить в бассейн', number, number],
         );
         for (final tag in [301, 302]) {
@@ -900,7 +898,7 @@ IntentionId _createdId(IntentionCommandCompletion completion) =>
 /// состояния.
 List<List<Object?>> _contents(List<IntentionSummary> items) => [
   for (final item in items)
-    [item.id, item.title, item.readiness, ...item.tags.map((tag) => tag.id)],
+    [item.id, item.title, item.kind, ...item.tags.map((tag) => tag.id)],
 ];
 
 /// Читает всю выдачу [query] заново настоящим адаптером.

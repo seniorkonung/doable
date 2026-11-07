@@ -825,7 +825,7 @@ final class _ListHarness {
       id: owner.id,
       title: 'Новое название',
       description: owner.description,
-      readiness: owner.readiness,
+      kind: owner.kind,
       archiveState: owner.archiveState,
       createdAt: owner.createdAt,
       updatedAt: owner.updatedAt,

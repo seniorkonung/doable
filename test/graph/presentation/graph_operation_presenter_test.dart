@@ -460,7 +460,7 @@ void main() {
         : 'при живой форме';
     testWidgets(
       'успех полного создания $initiator предъявляется одним сообщением без '
-      'отдельных исходов готовности и назначений, '
+      'отдельных исходов назначений, '
       '${fullCreation.locale.languageCode}',
       (tester) async {
         final harness = await _pumpPresenterApp(
@@ -2150,7 +2150,7 @@ final class _PresenterHarness {
     return accepted;
   }
 
-  /// Создание с готовностью и двумя тегами из отдельной формы.
+  /// Создание с двумя тегами из отдельной формы.
   IntentionCommandAccepted startFullCreation({
     required bool releaseInitiator,
     IntentionCreationOperationTarget target =
@@ -2162,7 +2162,6 @@ final class _PresenterHarness {
       CreateIntention.withInitialState(
         title: 'Полное намерение',
         description: null,
-        readiness: IntentionReadiness.ready,
         tagIds: [_tagId, _otherTagId],
       ),
       target: target,
@@ -2182,7 +2181,6 @@ final class _PresenterHarness {
       index: 7,
       title: 'Полное намерение',
       description: null,
-      readiness: IntentionReadiness.ready,
     );
     repository.completeCommand(
       _commandIndexes[accepted]!,

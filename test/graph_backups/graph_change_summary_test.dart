@@ -489,7 +489,7 @@ IntentionRecord _intention(int number, String title, {bool archived = false}) =>
         id: _intentionId(number),
         title: title,
         description: null,
-        readiness: IntentionReadiness.ready,
+        kind: IntentionKind.main,
         archiveState: archived
             ? IntentionArchiveState.archived
             : IntentionArchiveState.active,

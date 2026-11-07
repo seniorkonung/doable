@@ -26,7 +26,6 @@ import 'package:doable/src/graph_snapshots/graph_log_compaction.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -105,7 +104,6 @@ void main() {
       CreateIntention.withInitialState(
         title: 'Бегать',
         description: null,
-        readiness: IntentionReadiness.notReady,
         tagIds: const {},
       ),
     );

@@ -389,7 +389,6 @@ final class _Commands {
       _CommandKind.intentionCreation => CreateIntention.withInitialState(
         title: 'Новое намерение $pair · $capture',
         description: 'Зачем: проверить запись нового намерения с тегами.',
-        readiness: IntentionReadiness.notReady,
         tagIds: [for (var tag = 0; tag < 3; tag++) fixture.tagId(tag)],
       ),
       _CommandKind.actionCompletion => UpdateActionFields(
@@ -532,7 +531,7 @@ Future<void> _writeRecordsOfLength(
       ) as IntentionIdDecodingSuccess).id,
       title: 'Заметки $index',
       description: description,
-      readiness: IntentionReadiness.notReady,
+      kind: IntentionKind.main,
       archiveState: IntentionArchiveState.active,
       createdAt: IntentionTimestamp(DateTime.utc(2026, 10, 17)),
       updatedAt: IntentionTimestamp(DateTime.utc(2026, 10, 17)),

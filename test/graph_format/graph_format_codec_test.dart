@@ -34,7 +34,6 @@ void main() {
         title: 'Здоровье',
         description: null,
         kind: IntentionKind.supporting,
-        readiness: IntentionReadiness.notReady,
         archiveState: IntentionArchiveState.active,
         createdAt: IntentionTimestamp(DateTime.utc(2026)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026)),
@@ -93,7 +92,7 @@ void main() {
           id: _intentionId(_intentionIds[0]),
           title: 'Заметки',
           description: description,
-          readiness: IntentionReadiness.notReady,
+          kind: IntentionKind.main,
           archiveState: IntentionArchiveState.active,
           createdAt: IntentionTimestamp(DateTime.utc(2026, 10, 17)),
           updatedAt: IntentionTimestamp(DateTime.utc(2026, 10, 17)),
@@ -131,7 +130,7 @@ void main() {
       final intention =
           '$created,"kind":"intention","id":"${_intentionIds[0]}",'
           '"title":"Здоровье","description":null,'
-          '"intentionKind":"main","actionReady":false,"archived":false';
+          '"intentionKind":"main","archived":false';
       const createdAt = '"createdAt":"2026-03-29T00:00:00.000000Z"';
       const updatedAt = '"updatedAt":"2026-10-17T21:04:05.123456Z"';
       const relationRest =
@@ -215,7 +214,7 @@ void main() {
             '{"fact":"deleted","entity":"note","id":"${_tagIds[0]}"}',
         'значение не того типа JSON':
             '{$created,"kind":"intention","id":"${_intentionIds[0]}",'
-            '"title":"Здоровье","description":null,"actionReady":false,'
+            '"title":"Здоровье","description":null,"intentionKind":"main",'
             '"archived":"false",$createdAt,$updatedAt}',
         'строка не объект JSON': '["kind","tag"]',
         'неполный JSON': '{$tag,"name":"Дом"',
@@ -224,11 +223,11 @@ void main() {
             '"name":"Дом","color":null,"position":"a0"}',
         'название намерения с окружающими пробелами':
             '{$created,"kind":"intention","id":"${_intentionIds[0]}",'
-            '"title":" Здоровье","description":null,"actionReady":false,'
+            '"title":" Здоровье","description":null,"intentionKind":"main",'
             '"archived":false,$createdAt,$updatedAt}',
         'пробельное описание намерения':
             '{$created,"kind":"intention","id":"${_intentionIds[0]}",'
-            '"title":"Здоровье","description":" \\n","actionReady":false,'
+            '"title":"Здоровье","description":" \\n","intentionKind":"main",'
             '"archived":false,$createdAt,$updatedAt}',
         'название тега с окружающими пробелами':
             '{$tag,"name":"Дом ","color":null,"position":"a0"}',
@@ -396,7 +395,7 @@ List<GraphFact> _expectedGoldenFacts() {
           id: health,
           title: 'Здоровье',
           description: null,
-          readiness: IntentionReadiness.notReady,
+          kind: IntentionKind.main,
           archiveState: IntentionArchiveState.active,
           createdAt: IntentionTimestamp(DateTime.utc(2026, 3, 29)),
           updatedAt: IntentionTimestamp(
@@ -412,7 +411,6 @@ List<GraphFact> _expectedGoldenFacts() {
           title: 'Бегать по утрам 🏃',
           kind: IntentionKind.supporting,
           description: '  Первая строка\n\tвторая "строка"  \n',
-          readiness: IntentionReadiness.ready,
           archiveState: IntentionArchiveState.archived,
           createdAt: IntentionTimestamp(
             DateTime.utc(2026, 10, 1, 6, 30, 0, 0, 1),
@@ -429,7 +427,7 @@ List<GraphFact> _expectedGoldenFacts() {
           id: jogging,
           title: 'Пробежка 5 км',
           description: null,
-          readiness: IntentionReadiness.ready,
+          kind: IntentionKind.main,
           archiveState: IntentionArchiveState.active,
           createdAt: IntentionTimestamp(DateTime.utc(2026, 10, 1, 6, 31)),
           updatedAt: IntentionTimestamp(DateTime.utc(2026, 10, 1, 6, 31)),

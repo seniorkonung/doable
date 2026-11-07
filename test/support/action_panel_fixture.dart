@@ -60,7 +60,7 @@ ActionDetails actionDetailsFixture({
     id: intentionIdOf(10 + position),
     title: position == 0 ? rootTitle : 'Намерение ${position + 1}',
     description: null,
-    readiness: IntentionReadiness.ready,
+    kind: IntentionKind.main,
     archiveState: IntentionArchiveState.active,
     createdAt: IntentionTimestamp(created),
     updatedAt: IntentionTimestamp(created),

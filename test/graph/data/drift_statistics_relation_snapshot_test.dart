@@ -155,8 +155,6 @@ void main() {
         title: 'Название',
         description: 'Описание',
       ),
-      EnableIntentionReadiness(durabilityIntention(1)),
-      DisableIntentionReadiness(durabilityIntention(1)),
     ]) {
       expect(await repository.execute(command), isA<GraphCommandSucceeded>());
       await repository.loadStatisticsRelationSnapshot();

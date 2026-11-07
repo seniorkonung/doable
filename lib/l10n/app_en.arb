@@ -930,14 +930,6 @@
   "@graphOperationUpdate": {
     "description": "Вид операции изменения намерения в сообщении оболочки"
   },
-  "graphOperationEnableReadiness": "Mark ready",
-  "@graphOperationEnableReadiness": {
-    "description": "Вид операции включения готовности в сообщении оболочки"
-  },
-  "graphOperationDisableReadiness": "Mark not ready",
-  "@graphOperationDisableReadiness": {
-    "description": "Вид операции отключения готовности в сообщении оболочки"
-  },
   "graphOperationArchive": "Archive",
   "@graphOperationArchive": {
     "description": "Вид операции архивирования намерения в сообщении оболочки"

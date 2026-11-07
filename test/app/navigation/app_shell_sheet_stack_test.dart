@@ -42,7 +42,7 @@ const _origin = 1;
 const _other = 2;
 
 /// Связь «чтобы другое, нужно исходное», которую открывает панель на странице
-/// исходного намерения: готовое к действию намерение открывается на группе
+/// исходного намерения: главное намерение открывается на группе
 /// «Нужно для».
 const _relation = 10;
 
@@ -356,9 +356,9 @@ Future<AppRouter> _start(WidgetTester tester) async {
       (_other, _otherTitle),
     ]) {
       raw.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, '
+        'INSERT INTO intentions (id, title, kind, is_archived, '
         'created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [tagFixtureId(number), title, 1, 0, number, number],
+        [tagFixtureId(number), title, 'main', 0, number, number],
       );
     }
     raw.execute(

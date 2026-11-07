@@ -304,7 +304,6 @@ Intention testDetailsIntention({
   int index = 1,
   String title = 'Намерение',
   String? description = 'Описание',
-  IntentionReadiness readiness = IntentionReadiness.notReady,
   IntentionKind kind = IntentionKind.main,
   IntentionArchiveState archiveState = IntentionArchiveState.active,
 }) {
@@ -314,7 +313,6 @@ Intention testDetailsIntention({
     id: id,
     title: title,
     description: description,
-    readiness: readiness,
     kind: kind,
     archiveState: archiveState,
     createdAt: timestamp,
@@ -337,7 +335,6 @@ IntentionSummary testDetailsSummary(Intention intention) => IntentionSummary(
   id: intention.id,
   title: intention.title,
   descriptionPreview: testDescriptionPreview(intention.description),
-  readiness: intention.readiness,
   kind: intention.kind,
   archiveState: intention.archiveState,
   createdAt: intention.createdAt,

@@ -1173,12 +1173,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationUpdate => 'Edit';
 
   @override
-  String get graphOperationEnableReadiness => 'Mark ready';
-
-  @override
-  String get graphOperationDisableReadiness => 'Mark not ready';
-
-  @override
   String get graphOperationArchive => 'Archive';
 
   @override

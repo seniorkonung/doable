@@ -441,7 +441,7 @@ void main() {
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
         descriptionPreview: TextPreview.fromText('Описание'),
-        readiness: IntentionReadiness.ready,
+        kind: IntentionKind.main,
         archiveState: IntentionArchiveState.archived,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
@@ -481,7 +481,7 @@ void main() {
       expect(copy.id, summary.id);
       expect(copy.title, summary.title);
       expect(copy.descriptionPreview?.text, summary.descriptionPreview?.text);
-      expect(copy.readiness, summary.readiness);
+      expect(copy.kind, summary.kind);
       expect(copy.archiveState, summary.archiveState);
       expect(copy.createdAt, summary.createdAt);
       expect(copy.updatedAt, summary.updatedAt);
@@ -494,7 +494,7 @@ void main() {
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
         descriptionPreview: TextPreview.fromText('Описание'),
-        readiness: IntentionReadiness.ready,
+        kind: IntentionKind.main,
         archiveState: IntentionArchiveState.archived,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
@@ -532,7 +532,7 @@ void main() {
       expect(copy.id, summary.id);
       expect(copy.title, summary.title);
       expect(copy.descriptionPreview?.text, summary.descriptionPreview?.text);
-      expect(copy.readiness, summary.readiness);
+      expect(copy.kind, summary.kind);
       expect(copy.archiveState, summary.archiveState);
       expect(copy.createdAt, summary.createdAt);
       expect(copy.updatedAt, summary.updatedAt);
@@ -543,7 +543,7 @@ void main() {
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
         descriptionPreview: null,
-        readiness: IntentionReadiness.notReady,
+        kind: IntentionKind.main,
         archiveState: IntentionArchiveState.active,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
@@ -580,7 +580,7 @@ void main() {
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
         descriptionPreview: TextPreview.fromText('Описание'),
-        readiness: IntentionReadiness.ready,
+        kind: IntentionKind.main,
         archiveState: IntentionArchiveState.archived,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
@@ -609,7 +609,7 @@ void main() {
       expect(copy.id, summary.id);
       expect(copy.title, summary.title);
       expect(copy.descriptionPreview?.text, summary.descriptionPreview?.text);
-      expect(copy.readiness, summary.readiness);
+      expect(copy.kind, summary.kind);
       expect(copy.archiveState, summary.archiveState);
       expect(copy.createdAt, summary.createdAt);
       expect(copy.updatedAt, summary.updatedAt);
@@ -620,7 +620,7 @@ void main() {
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
         descriptionPreview: null,
-        readiness: IntentionReadiness.notReady,
+        kind: IntentionKind.main,
         archiveState: IntentionArchiveState.active,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
@@ -1044,7 +1044,6 @@ void main() {
       final command = CreateIntention.withInitialState(
         title: 'Прогулка',
         description: null,
-        readiness: IntentionReadiness.notReady,
         tagIds: [home, weekend, _tagId(home.toCanonicalString()), home],
       );
 
@@ -1164,7 +1163,6 @@ IntentionSummary _summary({
   required String id,
   String title = 'Здоровье',
   IntentionKind kind = IntentionKind.main,
-  IntentionReadiness readiness = IntentionReadiness.notReady,
   IntentionArchiveState archiveState = IntentionArchiveState.active,
   DateTime? createdAt,
   DateTime? updatedAt,
@@ -1178,7 +1176,6 @@ IntentionSummary _summary({
     title: title,
     descriptionPreview: null,
     kind: kind,
-    readiness: readiness,
     archiveState: archiveState,
     createdAt: created,
     updatedAt: IntentionTimestamp(updatedAt ?? created.value),
@@ -1193,7 +1190,7 @@ Intention _intention() {
     id: _intentionId('00000000-0000-4000-8000-000000000001'),
     title: 'Здоровье',
     description: null,
-    readiness: IntentionReadiness.notReady,
+    kind: IntentionKind.main,
     archiveState: IntentionArchiveState.active,
     createdAt: timestamp,
     updatedAt: timestamp,

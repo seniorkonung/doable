@@ -1064,9 +1064,9 @@ void main() {
           VALUES(1) UNION ALL SELECT n + 1 FROM ids WHERE n < 50000
         )
         INSERT INTO intentions
-          (id, title, is_action_ready, is_archived, created_at, updated_at)
+          (id, title, kind, is_archived, created_at, updated_at)
         SELECT printf('018f0b5d-6b2e-7c80-8000-%012x', n),
-               'Запись ' || n, 0, n % 2, n, n FROM ids
+               'Запись ' || n, 'main', n % 2, n, n FROM ids
       ''');
         raw.execute(
           'INSERT INTO tag_assignments (tag_id, intention_id) '
@@ -1168,15 +1168,9 @@ void main() {
         for (var number = healthy; number <= resting; number++) {
           raw.execute(
             '''INSERT INTO intentions
-               (id, title, is_action_ready, is_archived, created_at, updated_at)
-               VALUES (?, ?, ?, 0, ?, ?)''',
-            [
-              _uuid(number),
-              'Намерение $number',
-              number.isEven ? 1 : 0,
-              number,
-              number,
-            ],
+               (id, title, kind, is_archived, created_at, updated_at)
+               VALUES (?, ?, 'main', 0, ?, ?)''',
+            [_uuid(number), 'Намерение $number', number, number],
           );
         }
         for (final (number, source, related, archived) in [

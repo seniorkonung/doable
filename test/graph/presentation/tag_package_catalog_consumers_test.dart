@@ -7,7 +7,6 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
@@ -66,8 +65,8 @@ void main() {
       database,
       () => database.customStatement(
         '''INSERT INTO intentions
-         (id, title, is_action_ready, is_archived, created_at, updated_at)
-         VALUES (?, 'Намерение 6', 0, 0, 1, 1)''',
+         (id, title, kind, is_archived, created_at, updated_at)
+         VALUES (?, 'Намерение 6', 'main', 0, 1, 1)''',
         [durabilityUuid(6)],
       ),
     );
@@ -231,7 +230,6 @@ void main() {
         CreateIntention.withInitialState(
           title: 'Ходить пешком',
           description: 'Каждый день',
-          readiness: IntentionReadiness.ready,
           tagIds: [tagId],
         ),
       ) as IntentionCommandAccepted).future;

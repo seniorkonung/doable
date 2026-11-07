@@ -127,10 +127,6 @@ Intention decodeStoredIntention(
       title: title,
       description: description,
       kind: decodeStoredIntentionKind(data, '${prefix}kind'),
-      readiness: decodeStoredIntentionReadiness(
-        data,
-        '${prefix}is_action_ready',
-      ),
       archiveState: decodeStoredIntentionArchiveState(
         data,
         '${prefix}is_archived',
@@ -160,15 +156,6 @@ String decodeStoredIntentionTitle(Map<String, Object?> data, String column) {
   if (normalized != stored) throw const StoredGraphCorruption();
   return stored;
 }
-
-IntentionReadiness decodeStoredIntentionReadiness(
-  Map<String, Object?> data,
-  String column,
-) => switch (requiredStoredInteger(data, column)) {
-  0 => IntentionReadiness.notReady,
-  1 => IntentionReadiness.ready,
-  _ => throw const StoredGraphCorruption(),
-};
 
 IntentionKind decodeStoredIntentionKind(
   Map<String, Object?> data,

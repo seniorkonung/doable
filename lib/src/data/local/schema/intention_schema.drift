@@ -18,8 +18,6 @@ CREATE TABLE intentions (
     )
   ),
   kind TEXT NOT NULL DEFAULT 'main' CHECK (kind IN ('main', 'supporting')),
-  is_action_ready BOOLEAN NOT NULL DEFAULT FALSE
-    CHECK (is_action_ready IN (0, 1)),
   is_archived BOOLEAN NOT NULL DEFAULT FALSE
     CHECK (is_archived IN (0, 1)),
   created_at INTEGER NOT NULL,

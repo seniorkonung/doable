@@ -683,7 +683,6 @@ final class _FailureHarness {
       CreateIntention.withInitialState(
         title: 'Полное намерение',
         description: null,
-        readiness: IntentionReadiness.ready,
         tagIds: [missingTag],
       ),
     ) as IntentionCommandAccepted;

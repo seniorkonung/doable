@@ -21,7 +21,6 @@ import 'package:doable/src/graph_snapshots/graph_log_compaction.dart';
 import 'package:doable/src/graph_snapshots/graph_fact_log.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -221,7 +220,6 @@ void main() {
       CreateIntention.withInitialState(
         title: 'Полить грядки',
         description: null,
-        readiness: IntentionReadiness.notReady,
         tagIds: {garden.id},
       ),
     );

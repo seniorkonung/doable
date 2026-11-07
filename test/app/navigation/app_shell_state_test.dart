@@ -971,9 +971,16 @@ void _seed(sqlite.Database database) {
   seedRawGraph(database, () {
     void insertIntention(int number, String title, {bool archived = false}) =>
         database.execute(
-          'INSERT INTO intentions (id, title, is_action_ready, is_archived, '
+          'INSERT INTO intentions (id, title, kind, is_archived, '
           'created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-          [tagFixtureId(number), title, 1, archived ? 1 : 0, number, number],
+          [
+            tagFixtureId(number),
+            title,
+            'main',
+            archived ? 1 : 0,
+            number,
+            number,
+          ],
         );
     void assignHealth(int number) => database.execute(
       'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',

@@ -466,7 +466,6 @@ final class DriftPersonalGraphRepository
                 title,
                 description,
                 kind,
-                is_action_ready,
                 is_archived,
                 created_at,
                 updated_at
@@ -565,16 +564,6 @@ final class DriftPersonalGraphRepository
           ),
           UpdateIntention() => _updateIntention(command, clock),
           ChangeIntentionKind() => _changeIntentionKind(command, clock),
-          EnableIntentionReadiness() => _changeReadiness(
-            command.id,
-            domain.IntentionReadiness.ready,
-            clock,
-          ),
-          DisableIntentionReadiness() => _changeReadiness(
-            command.id,
-            domain.IntentionReadiness.notReady,
-            clock,
-          ),
           ArchiveIntention() => _changeArchiveState(
             command.id,
             domain.IntentionArchiveState.archived,
@@ -751,7 +740,7 @@ final class DriftPersonalGraphRepository
       id: _idGenerator.generate(),
       title: title,
       description: description,
-      readiness: command.readiness,
+      kind: domain.IntentionKind.main,
       archiveState: domain.IntentionArchiveState.active,
       createdAt: createdAt,
       updatedAt: createdAt,
@@ -765,9 +754,6 @@ final class DriftPersonalGraphRepository
             id: intentionId,
             title: intention.title,
             description: Value(intention.description),
-            isActionReady: Value(
-              intention.readiness == domain.IntentionReadiness.ready,
-            ),
             isArchived: const Value(false),
             createdAt: intention.createdAt.value.microsecondsSinceEpoch,
             updatedAt: intention.updatedAt.value.microsecondsSinceEpoch,
@@ -820,7 +806,7 @@ final class DriftPersonalGraphRepository
       stored.id == expected.id &&
       stored.title == expected.title &&
       stored.description == expected.description &&
-      stored.readiness == expected.readiness &&
+      stored.kind == expected.kind &&
       stored.archiveState == expected.archiveState &&
       stored.createdAt == expected.createdAt &&
       stored.updatedAt == expected.updatedAt;
@@ -847,7 +833,7 @@ final class DriftPersonalGraphRepository
       id: existing.id,
       title: title,
       description: description,
-      readiness: existing.readiness,
+      kind: existing.kind,
       archiveState: existing.archiveState,
       createdAt: existing.createdAt,
       updatedAt: domain.IntentionTimestamp(clock.read()),
@@ -915,47 +901,6 @@ final class DriftPersonalGraphRepository
     );
   }
 
-  Future<_CommittedIntentionCommand> _changeReadiness(
-    IntentionId id,
-    domain.IntentionReadiness readiness,
-    _GraphWriteClock clock,
-  ) async {
-    final storedBefore = await _readCommandSnapshot(id);
-    if (storedBefore == null) throw const _IntentionNotFound();
-
-    final existing = storedBefore.intention;
-    final before = await _catalogEntrySnapshot(storedBefore);
-    if (existing.readiness == readiness) {
-      return _CommittedIntentionUnchanged(intention: existing, entry: before);
-    }
-
-    final updated = domain.Intention(
-      id: existing.id,
-      title: existing.title,
-      description: existing.description,
-      readiness: readiness,
-      archiveState: existing.archiveState,
-      createdAt: existing.createdAt,
-      updatedAt: domain.IntentionTimestamp(clock.read()),
-    );
-    await (_database.update(
-      _database.intentions,
-    )..where((row) => row.id.equals(id.toCanonicalString()))).write(
-      local.IntentionsCompanion(
-        isActionReady: Value(readiness == domain.IntentionReadiness.ready),
-        updatedAt: Value(updated.updatedAt.value.microsecondsSinceEpoch),
-      ),
-    );
-    final stored = await _readCommandSnapshot(id);
-    if (stored == null) throw const StoredGraphCorruption();
-    return _CommittedIntentionUpdated(
-      changesHolding: false,
-      intention: stored.intention,
-      before: before,
-      after: await _catalogEntrySnapshot(stored),
-    );
-  }
-
   Future<_CommittedIntentionCommand> _changeArchiveState(
     IntentionId id,
     domain.IntentionArchiveState archiveState,
@@ -982,7 +927,7 @@ final class DriftPersonalGraphRepository
       id: existing.id,
       title: existing.title,
       description: existing.description,
-      readiness: existing.readiness,
+      kind: existing.kind,
       archiveState: archiveState,
       createdAt: existing.createdAt,
       updatedAt: domain.IntentionTimestamp(clock.read()),
@@ -1139,7 +1084,6 @@ final class DriftPersonalGraphRepository
               title_search_key,
               description,
               kind,
-              is_action_ready,
               is_archived,
               created_at,
               updated_at
@@ -1181,7 +1125,6 @@ final class DriftPersonalGraphRepository
         intentions.titleSearchKey,
         intentions.description,
         intentions.kind,
-        intentions.isActionReady,
         intentions.isArchived,
         intentions.createdAt,
         intentions.updatedAt,
@@ -1287,7 +1230,6 @@ final class DriftPersonalGraphRepository
         intentions.titleSearchKey,
         intentions.description,
         intentions.kind,
-        intentions.isActionReady,
         intentions.isArchived,
         intentions.createdAt,
         intentions.updatedAt,
@@ -1546,7 +1488,6 @@ final class DriftPersonalGraphRepository
       final description? => TextPreview.fromText(description),
       null => null,
     },
-    readiness: intention.readiness,
     kind: intention.kind,
     archiveState: intention.archiveState,
     createdAt: intention.createdAt,
@@ -1987,8 +1928,6 @@ void _validateCommandText(IntentionCommand command) {
         IntentionText.normalizeDescription(description);
       }
     case ChangeIntentionKind() ||
-        EnableIntentionReadiness() ||
-        DisableIntentionReadiness() ||
         ArchiveIntention() ||
         RestoreIntention() ||
         DeleteIntention():
@@ -2017,12 +1956,6 @@ IntentionCommandDiagnosticsEvent _commandDiagnosticsEvent(
     ),
     UpdateIntention() => event(IntentionCommandDiagnosticsType.update),
     ChangeIntentionKind() => event(IntentionCommandDiagnosticsType.changeKind),
-    EnableIntentionReadiness() => event(
-      IntentionCommandDiagnosticsType.enableReadiness,
-    ),
-    DisableIntentionReadiness() => event(
-      IntentionCommandDiagnosticsType.disableReadiness,
-    ),
     ArchiveIntention() => event(IntentionCommandDiagnosticsType.archive),
     RestoreIntention() => event(IntentionCommandDiagnosticsType.restore),
     DeleteIntention() => event(IntentionCommandDiagnosticsType.delete),

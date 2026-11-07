@@ -67,12 +67,12 @@ void main() {
       'назначения', () async {
     seedRawGraph(raw, () {
       raw.execute(
-        'INSERT INTO intentions (id, title, description, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [_uuid(1), 'Исходное', 'Описание', 1, 0, 100, 200],
+        'INSERT INTO intentions (id, title, description, kind, is_archived, created_at, updated_at) VALUES (?, ?, ?, \'main\', ?, ?, ?)',
+        [_uuid(1), 'Исходное', 'Описание', 0, 100, 200],
       );
       raw.execute(
-        'INSERT INTO intentions (id, title, description, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [_uuid(2), 'Выбранное', null, 1, 0, 300, 400],
+        'INSERT INTO intentions (id, title, description, kind, is_archived, created_at, updated_at) VALUES (?, ?, ?, \'main\', ?, ?, ?)',
+        [_uuid(2), 'Выбранное', null, 0, 300, 400],
       );
       raw.execute(
         'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, 0)',

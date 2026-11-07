@@ -50,7 +50,7 @@ void main() {
   void addIntention(int number, {bool archived = false}) {
     seedRawGraph(raw, () {
       raw.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, ?, 100, 200)',
+        'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', ?, 100, 200)',
         [tagFixtureId(number), 'Намерение $number', archived ? 1 : 0],
       );
     });

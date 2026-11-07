@@ -95,7 +95,7 @@ final class IntentionRelationsViewModelProvider
 }
 
 String _$intentionRelationsViewModelHash() =>
-    r'061ecaff92e439d5a9646fc7895f718b606c5362';
+    r'12d857491b2282d3d420b34f845d7fe84a9eb111';
 
 /// Порциями получает активные связи группы, выбранной экземпляром страницы,
 /// и, пока архив группы раскрыт, её архивированные связи.

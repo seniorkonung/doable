@@ -29,7 +29,7 @@ final class _TagAssignmentCatalogEntry
         id: id,
         title: 'Намерение',
         descriptionPreview: null,
-        readiness: IntentionReadiness.notReady,
+        kind: IntentionKind.main,
         archiveState: IntentionArchiveState.active,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),

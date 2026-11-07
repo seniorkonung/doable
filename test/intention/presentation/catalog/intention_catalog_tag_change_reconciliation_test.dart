@@ -3,7 +3,6 @@ import 'package:doable/src/long_term_relation/application/relation_pair_probe.da
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
@@ -274,22 +273,14 @@ void main() {
         addTearDown(subscription.close);
       }
       await waitForCatalogQueries(repository, 2);
-      final ready = testSummary(
-        index: 2,
-        readiness: IntentionReadiness.ready,
-        tags: [health],
-      );
-      final other = testSummary(
-        index: 1,
-        readiness: IntentionReadiness.ready,
-        tags: [health],
-      );
+      final target = testSummary(index: 2, tags: [health]);
+      final other = testSummary(index: 1, tags: [health]);
       for (var index = 0; index < 2; index++) {
         repository.complete(
           index,
           ResultSuccess(
             IntentionCatalogFirstPage(
-              items: [ready, other],
+              items: [target, other],
               totalCount: 2,
               nextCursor: null,
               revision: const TestCatalogRevision(1),
@@ -314,7 +305,7 @@ void main() {
         3,
         ResultSuccess(
           IntentionCatalogFirstPage(
-            items: [ready, other],
+            items: [target, other],
             totalCount: 2,
             nextCursor: null,
             revision: const TestCatalogRevision(1),
@@ -326,22 +317,19 @@ void main() {
         intentionCatalogViewModelProvider(participant).future,
       );
 
-      final readyWithoutHealth = testSummary(
-        index: 2,
-        readiness: IntentionReadiness.ready,
-      );
+      final targetWithoutHealth = testSummary(index: 2);
       await completeIntentionTagAssignment(
         container,
         repository,
         state: TagAssignmentState.absent,
         tagId: health.id,
-        before: ready,
-        after: readyWithoutHealth,
+        before: target,
+        after: targetWithoutHealth,
         revision: const TestCatalogRevision(2),
       );
 
       final browseState = _loaded(container, browse);
-      expect(browseState.items.map((item) => item.id), [ready.id]);
+      expect(browseState.items.map((item) => item.id), [target.id]);
       expect(browseState.totalCount, 1);
       expect(browseState.selection.tagFilter, withoutHealth);
 

@@ -91,13 +91,11 @@ void main() {
 
       await harness.release();
       repository.emitIntention(
-        _intention(harness.intentionId, IntentionReadiness.ready),
+        _intention(harness.intentionId),
         counts: testRelationCounts(activeCanIncoming: 1),
         revision: const TestGraphRevision(2),
       );
       await pumpEventQueue();
-      final details = harness.details as IntentionDetailsLoaded;
-      expect(details.intention.readiness, IntentionReadiness.ready);
       harness.retain();
 
       expect(harness.state.group, IntentionRelationGroup.needs);
@@ -194,7 +192,7 @@ void main() {
     await harness.release();
 
     repository.emitIntention(
-      _intention(harness.intentionId, IntentionReadiness.notReady),
+      _intention(harness.intentionId),
       counts: testRelationCounts(activeNeedOutgoing: 2),
       revision: const TestGraphRevision(9),
     );
@@ -549,7 +547,7 @@ void main() {
       harness.viewModel.rememberVisibleRelation(testRelationId(2));
 
       repository.emitIntention(
-        _intention(harness.intentionId, IntentionReadiness.notReady),
+        _intention(harness.intentionId),
         counts: testRelationCounts(activeNeedOutgoing: 2),
         revision: const TestGraphRevision(9),
       );
@@ -787,11 +785,7 @@ void main() {
 
     await harness.release();
     repository.emitIntention(
-      _intention(
-        ownerId,
-        IntentionReadiness.notReady,
-        archiveState: IntentionArchiveState.archived,
-      ),
+      _intention(ownerId, archiveState: IntentionArchiveState.archived),
       counts: counts,
       revision: const TestGraphRevision(9),
     );
@@ -978,7 +972,7 @@ void main() {
     expect(harness.relationIds, [testRelationId(1), testRelationId(2)]);
     expect(harness.archivedIds, [testRelationId(10)]);
 
-    final owner = _intention(ownerId, IntentionReadiness.notReady);
+    final owner = _intention(ownerId);
     final start = harness.coordinator.acceptExisting(
       ArchiveIntention(ownerId),
       presentationTitle: owner.title,
@@ -989,7 +983,6 @@ void main() {
         before: owner,
         after: _intention(
           ownerId,
-          IntentionReadiness.notReady,
           archiveState: IntentionArchiveState.archived,
         ),
         revision: const TestGraphRevision(13),
@@ -1039,8 +1032,7 @@ void _expectFirstPageOf(
 }
 
 Intention _intention(
-  IntentionId id,
-  IntentionReadiness readiness, {
+  IntentionId id, {
   IntentionArchiveState archiveState = IntentionArchiveState.active,
 }) {
   final timestamp = IntentionTimestamp(DateTime.utc(2026, 9, 20));
@@ -1048,7 +1040,7 @@ Intention _intention(
     id: id,
     title: 'Намерение',
     description: null,
-    readiness: readiness,
+    kind: IntentionKind.main,
     archiveState: archiveState,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -1123,7 +1115,6 @@ final class _RelationsHarness {
   static Future<_RelationsHarness> open(
     ControlledRelationGraphRepository repository, {
     IntentionPageTarget target = const OverviewTarget(),
-    IntentionReadiness readiness = IntentionReadiness.notReady,
     IntentionArchiveState archiveState = IntentionArchiveState.active,
     int pageSize = 50,
     RelationCounts? counts,
@@ -1150,7 +1141,7 @@ final class _RelationsHarness {
       (_, _) {},
     );
     repository.emitIntention(
-      _intention(harness.intentionId, readiness, archiveState: archiveState),
+      _intention(harness.intentionId, archiveState: archiveState),
       counts: counts ?? testRelationCounts(),
       revision: const TestGraphRevision(1),
     );

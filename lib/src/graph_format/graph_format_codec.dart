@@ -303,10 +303,6 @@ Map<String, Object?> _writeRecord(GraphEntityRecord record) => switch (record) {
     'title': intention.title,
     'description': intention.description,
     'intentionKind': intention.kind.name,
-    'actionReady': switch (intention.readiness) {
-      IntentionReadiness.notReady => false,
-      IntentionReadiness.ready => true,
-    },
     'archived': switch (intention.archiveState) {
       IntentionArchiveState.active => false,
       IntentionArchiveState.archived => true,
@@ -501,9 +497,6 @@ Intention _readIntention(_JsonFields fields) {
       'supporting' => IntentionKind.supporting,
       _ => throw const GraphFormatCorruption(),
     },
-    readiness: fields.boolean('actionReady')
-        ? IntentionReadiness.ready
-        : IntentionReadiness.notReady,
     archiveState: fields.boolean('archived')
         ? IntentionArchiveState.archived
         : IntentionArchiveState.active,

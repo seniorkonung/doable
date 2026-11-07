@@ -73,8 +73,8 @@ void main() {
     seedRawGraph(raw, () {
       for (var i = 1; i <= 106; i++) {
         raw.execute(
-          'INSERT INTO intentions (id, title, description, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [_uuid(i), 'Намерение $i', 'Описание $i', 1, i.isEven ? 1 : 0, i, i],
+          'INSERT INTO intentions (id, title, description, kind, is_archived, created_at, updated_at) VALUES (?, ?, ?, \'main\', ?, ?, ?)',
+          [_uuid(i), 'Намерение $i', 'Описание $i', i.isEven ? 1 : 0, i, i],
         );
       }
       raw.execute(
@@ -161,8 +161,8 @@ void main() {
     seedRawGraph(raw, () {
       for (var i = 1; i <= 2; i++) {
         raw.execute(
-          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-          [_uuid(i), 'Намерение $i', 0, i - 1, i, i],
+          'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', ?, ?, ?)',
+          [_uuid(i), 'Намерение $i', i - 1, i, i],
         );
       }
       raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [

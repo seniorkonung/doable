@@ -276,7 +276,6 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
           table.title,
           table.description,
           table.kind,
-          table.isActionReady,
           table.isArchived,
           table.createdAt,
           table.updatedAt,

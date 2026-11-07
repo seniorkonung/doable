@@ -155,7 +155,7 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
     };
     final rows = await _database
         .customSelect(
-          '''SELECT id, title, description, kind, is_action_ready, is_archived,
+          '''SELECT id, title, description, kind, is_archived,
                 created_at, updated_at
          FROM intentions
          $afterKey

@@ -113,9 +113,6 @@ Intention _intention(local.Intention row) => Intention(
   title: row.title,
   description: row.description,
   kind: IntentionKind.values.byName(row.kind),
-  readiness: row.isActionReady
-      ? IntentionReadiness.ready
-      : IntentionReadiness.notReady,
   archiveState: row.isArchived
       ? IntentionArchiveState.archived
       : IntentionArchiveState.active,

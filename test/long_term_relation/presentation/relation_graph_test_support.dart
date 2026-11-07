@@ -335,7 +335,7 @@ Intention testGraphIntention({
   required IntentionId id,
   String title = 'Намерение',
   String? description,
-  IntentionReadiness readiness = IntentionReadiness.notReady,
+  IntentionKind kind = IntentionKind.main,
   IntentionArchiveState archiveState = IntentionArchiveState.active,
 }) {
   final timestamp = IntentionTimestamp(DateTime.utc(2026, 9, 20));
@@ -343,7 +343,7 @@ Intention testGraphIntention({
     id: id,
     title: title,
     description: description,
-    readiness: readiness,
+    kind: kind,
     archiveState: archiveState,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -385,7 +385,7 @@ final class _CatalogEntrySnapshot implements IntentionCatalogEntrySnapshot {
         id: intention.id,
         title: intention.title,
         descriptionPreview: testDescriptionPreview(intention.description),
-        readiness: intention.readiness,
+        kind: intention.kind,
         archiveState: intention.archiveState,
         createdAt: intention.createdAt,
         updatedAt: intention.updatedAt,

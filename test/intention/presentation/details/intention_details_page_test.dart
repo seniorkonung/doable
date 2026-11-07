@@ -85,7 +85,6 @@ void main() {
     final intention = testDetailsIntention(
       title: 'Сохранить русский заголовок',
       description: '  Описание\nбез преобразования  ',
-      readiness: IntentionReadiness.ready,
     );
     await _pumpDetailsPage(tester, repository, intention.id);
     await waitForDetailRequests(repository, 1);
@@ -115,7 +114,6 @@ void main() {
     final intention = testDetailsIntention(
       title: 'Доступное намерение',
       description: 'Описание доступного намерения',
-      readiness: IntentionReadiness.ready,
       archiveState: IntentionArchiveState.archived,
     );
     await _pumpDetailsPage(tester, repository, intention.id);

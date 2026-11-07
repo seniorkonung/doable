@@ -1874,18 +1874,6 @@ abstract class AppLocalizations {
   /// **'Edit'**
   String get graphOperationUpdate;
 
-  /// Вид операции включения готовности в сообщении оболочки
-  ///
-  /// In en, this message translates to:
-  /// **'Mark ready'**
-  String get graphOperationEnableReadiness;
-
-  /// Вид операции отключения готовности в сообщении оболочки
-  ///
-  /// In en, this message translates to:
-  /// **'Mark not ready'**
-  String get graphOperationDisableReadiness;
-
   /// Вид операции архивирования намерения в сообщении оболочки
   ///
   /// In en, this message translates to:

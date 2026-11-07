@@ -683,29 +683,25 @@ void main() {
             as IntentionCatalogLoaded;
     expect(current.items.single.id, created.id);
     expect(current.totalCount, 1);
-    final ready = testSummary(
-      index: 30,
-      title: 'Новое',
-      readiness: IntentionReadiness.ready,
-    );
-    final readiness = coordinator.acceptExisting(
-      EnableIntentionReadiness(created.id),
+    final renamed = testSummary(index: 30, title: 'Новое имя');
+    final rename = coordinator.acceptExisting(
+      UpdateIntention(id: created.id, title: renamed.title, description: null),
       presentationTitle: created.title,
     ) as IntentionCommandAccepted;
     repository.completeCommand(
       1,
       ResultSuccess(
         IntentionSaved(
-          testIntention(index: 30, title: 'Новое'),
+          testIntention(index: 30, title: 'Новое имя'),
           catalogMutation: IntentionCatalogUpdated(
             revision: const TestCatalogRevision(3),
             before: TestCatalogEntrySnapshot(created),
-            after: TestCatalogEntrySnapshot(ready),
+            after: TestCatalogEntrySnapshot(renamed),
           ),
         ),
       ),
     );
-    await readiness.future;
+    await rename.future;
     await Future<void>.delayed(Duration.zero);
     current =
         container
@@ -716,11 +712,11 @@ void main() {
                 )
                 .requireValue
             as IntentionCatalogLoaded;
-    expect(current.items.single.readiness, IntentionReadiness.ready);
+    expect(current.items.single.title, renamed.title);
     expect(current.totalCount, 1);
     final successClaim = await presenter.nextClaim();
     expect(successClaim, isNotNull);
-    // Успех готовности согласует данные, но не предъявляется.
+    // Успех переименования согласует данные, но не предъявляется.
     expect(successClaim!.completions.map((completion) => completion.token), [
       create.token,
     ]);
@@ -768,12 +764,7 @@ void main() {
     IntentionSummary created({
       String title = 'Ходить в лес',
       required List<Tag> tags,
-    }) => testSummary(
-      index: 9,
-      title: title,
-      readiness: IntentionReadiness.ready,
-      tags: tags,
-    );
+    }) => testSummary(index: 9, title: title, tags: tags);
 
     // Здесь — условия, по-разному сочетающиеся с фактами назначений пакета.
     for (final (name, entry, matches) in <(String, IntentionSummary, bool)>[
@@ -809,13 +800,11 @@ void main() {
         final first = testSummary(
           index: 5,
           title: 'Ходить в парк',
-          readiness: IntentionReadiness.ready,
           tags: [health],
         );
         final second = testSummary(
           index: 4,
           title: 'Ходить в зал',
-          readiness: IntentionReadiness.ready,
           tags: [health, rest],
         );
         repository.complete(

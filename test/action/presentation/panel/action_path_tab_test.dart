@@ -316,7 +316,7 @@ ActionPathIntention _intention(
     id: intentionIdOf(10 + number),
     title: title,
     description: null,
-    readiness: IntentionReadiness.ready,
+    kind: IntentionKind.main,
     archiveState: archived
         ? IntentionArchiveState.archived
         : IntentionArchiveState.active,

@@ -10,7 +10,6 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/application/title_search_key.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
@@ -204,7 +203,6 @@ void main() {
           id: id,
           title: 'Исходное намерение',
           description: 'Исходное описание',
-          isActionReady: false,
           isArchived: false,
           createdAt: createdAt,
         );
@@ -281,7 +279,6 @@ void main() {
           id: owner,
           title: 'Архивируемое намерение',
           description: null,
-          isActionReady: false,
           isArchived: false,
           createdAt: createdAt,
         );
@@ -370,7 +367,6 @@ void main() {
         CreateIntention.withInitialState(
           title: 'Полное намерение',
           description: 'Описание полного намерения',
-          readiness: IntentionReadiness.ready,
           tagIds: tagIds,
         );
 
@@ -731,7 +727,6 @@ void main() {
               id: id,
               title: 'Стабильное намерение',
               description: null,
-              isActionReady: false,
               isArchived: false,
               createdAt: DateTime.utc(2026, 9, 2, 10),
             );
@@ -787,7 +782,6 @@ Future<void> _insertIntention(
   required IntentionId id,
   required String title,
   String? description,
-  bool isActionReady = false,
   bool isArchived = false,
   required DateTime createdAt,
 }) => seedGraph(
@@ -799,7 +793,6 @@ Future<void> _insertIntention(
           id: id.toCanonicalString(),
           title: title,
           description: Value(description),
-          isActionReady: Value(isActionReady),
           isArchived: Value(isArchived),
           createdAt: createdAt.microsecondsSinceEpoch,
           updatedAt: createdAt.microsecondsSinceEpoch,
@@ -812,7 +805,6 @@ Future<void> _expectStoredIntention(
   required IntentionId id,
   required String title,
   required String? description,
-  required bool isActionReady,
   required bool isArchived,
   required DateTime createdAt,
   DateTime? updatedAt,
@@ -823,7 +815,6 @@ Future<void> _expectStoredIntention(
   expect(row.title, title);
   expect(row.titleSearchKey, titleSearchKey(title));
   expect(row.description, description);
-  expect(row.isActionReady, isActionReady);
   expect(row.isArchived, isArchived);
   expect(row.createdAt, createdAt.microsecondsSinceEpoch);
   expect(row.updatedAt, (updatedAt ?? createdAt).microsecondsSinceEpoch);
@@ -1209,7 +1200,7 @@ Future<_ObservedCreationGraph> _observeCreationGraph(
           [
             item.id,
             item.title,
-            item.readiness,
+            item.kind,
             item.archiveState,
             [for (final tag in item.tags) tag.id],
           ],

@@ -280,7 +280,6 @@ void main() {
       CreateIntention.withInitialState(
         title: 'Корень',
         description: null,
-        readiness: IntentionReadiness.notReady,
         tagIds: const {},
       ),
     )).intention;
@@ -296,7 +295,6 @@ void main() {
           CreateIntention.withInitialState(
             title: 'Намерение $index',
             description: null,
-            readiness: IntentionReadiness.ready,
             tagIds: {tags[index].id},
           ),
         )).intention,

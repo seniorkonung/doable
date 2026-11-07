@@ -12,7 +12,6 @@ import 'package:doable/src/data/local/app_database.dart'
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -129,7 +128,6 @@ void main() {
             CreateIntention.withInitialState(
               title: 'Бегать',
               description: null,
-              readiness: IntentionReadiness.notReady,
               tagIds: const {},
             ),
           ),

@@ -83,7 +83,7 @@ Future<IntentionCommandCompletion> completeCatalogCommand(
 /// Создаёт намерение с полным начальным состоянием [created] через
 /// coordinator до опубликованного завершения.
 ///
-/// Команда несёт готовность, отметку и теги снимка, а подтверждение
+/// Команда несёт теги снимка, а подтверждение
 /// повторяет пакет настоящего создания: см. [fullCreationSuccess].
 Future<IntentionCommandCompletion> completeFullCreation(
   ProviderContainer container,
@@ -96,7 +96,6 @@ Future<IntentionCommandCompletion> completeFullCreation(
   CreateIntention.withInitialState(
     title: created.title,
     description: null,
-    readiness: created.readiness,
     tagIds: [for (final tag in created.tags) tag.id],
   ),
   fullCreationSuccess(created, revision: revision),
@@ -113,7 +112,7 @@ IntentionSaved fullCreationSuccess(
     id: created.id,
     title: created.title,
     description: null,
-    readiness: created.readiness,
+    kind: created.kind,
     archiveState: created.archiveState,
     createdAt: created.createdAt,
     updatedAt: created.updatedAt,

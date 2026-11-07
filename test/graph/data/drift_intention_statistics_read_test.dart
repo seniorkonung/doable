@@ -66,9 +66,6 @@ void main() {
     diagnostics = InMemoryDiagnosticsSink();
     await seedDurabilityGraph(database);
     await seedGraph(database, () async {
-      await database.customStatement(
-        'UPDATE intentions SET is_action_ready = 1',
-      );
       for (final (number, source, target) in _relations.skip(4)) {
         await database.customStatement(
           '''INSERT INTO long_term_relations

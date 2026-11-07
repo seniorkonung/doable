@@ -122,8 +122,8 @@ final class GraphLogFixture {
         'INSERT INTO tags (id, name, position) VALUES (?, ?, ?)',
       ),
       database.prepare('''INSERT INTO intentions
-        (id, title, description, is_action_ready, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)'''),
+        (id, title, description, kind, created_at, updated_at)
+        VALUES (?, ?, ?, 'main', ?, ?)'''),
       database.prepare('''INSERT INTO tag_assignments (tag_id, intention_id)
         VALUES (?, ?)'''),
       database.prepare('''INSERT INTO long_term_relations
@@ -164,7 +164,6 @@ final class GraphLogFixture {
             _id(2, intention),
             intentionTitle(intention),
             intentionDescription(intention),
-            intention % 2,
             timestamp,
             timestamp,
           ]);

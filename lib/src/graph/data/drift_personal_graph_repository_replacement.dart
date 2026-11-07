@@ -257,9 +257,6 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
                 title: intention.title,
                 description: Value(intention.description),
                 kind: Value(intention.kind.name),
-                isActionReady: Value(
-                  intention.readiness == domain.IntentionReadiness.ready,
-                ),
                 isArchived: Value(
                   intention.archiveState ==
                       domain.IntentionArchiveState.archived,

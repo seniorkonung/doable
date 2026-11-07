@@ -379,8 +379,6 @@
   "graphOperationCreate": "Создание",
   "graphOperationChangeKind": "Изменение вида",
   "graphOperationUpdate": "Изменение",
-  "graphOperationEnableReadiness": "Включение готовности",
-  "graphOperationDisableReadiness": "Отключение готовности",
   "graphOperationArchive": "Архивирование",
   "graphOperationRestore": "Восстановление",
   "graphOperationDelete": "Удаление",

@@ -157,7 +157,6 @@ void main() {
           id: id.toCanonicalString(),
           title: 'Прочитать книгу',
           description: 'До выходных',
-          isActionReady: true,
           createdAt: createdAt,
         );
         repository = DriftPersonalGraphRepository(
@@ -176,7 +175,6 @@ void main() {
             id: id,
             title: 'Прочитать книгу',
             description: 'До выходных',
-            readiness: IntentionReadiness.ready,
             createdAt: createdAt,
           ),
         );
@@ -194,7 +192,6 @@ void main() {
             id: id,
             title: 'Прочитать книгу',
             description: 'До выходных',
-            readiness: IntentionReadiness.ready,
             archiveState: IntentionArchiveState.archived,
             createdAt: createdAt,
             updatedAt: DateTime.utc(2026, 9, 3, 12),
@@ -238,7 +235,6 @@ void main() {
             id: _id(_uuidV4),
             title: 'Быть здоровым',
             description: null,
-            readiness: IntentionReadiness.notReady,
             archiveState: IntentionArchiveState.active,
             createdAt: DateTime.utc(2026, 9, 2, 9),
             updatedAt: DateTime.utc(2026, 9, 2, 9),
@@ -247,7 +243,6 @@ void main() {
             id: _id(_uuidV7),
             title: 'Учить английский',
             description: 'Сохраняются  внутренние пробелы\nи перенос строки',
-            readiness: IntentionReadiness.ready,
             archiveState: IntentionArchiveState.archived,
             createdAt: DateTime.utc(2026, 9, 2, 10),
             updatedAt: DateTime.utc(2026, 9, 2, 12),
@@ -256,7 +251,6 @@ void main() {
             id: _id('018f0b5d-6b2e-7c80-8000-000000000305'),
             title: 'Показание после перевода часов',
             description: null,
-            readiness: IntentionReadiness.notReady,
             archiveState: IntentionArchiveState.active,
             createdAt: DateTime.utc(2026, 9, 2, 12),
             updatedAt: DateTime.utc(2026, 9, 2, 11),
@@ -269,7 +263,6 @@ void main() {
             id: fixture.id.toCanonicalString(),
             title: fixture.title,
             description: fixture.description,
-            isActionReady: fixture.readiness == IntentionReadiness.ready,
             isArchived: fixture.archiveState == IntentionArchiveState.archived,
             createdAt: fixture.createdAt,
             updatedAt: fixture.updatedAt,
@@ -281,7 +274,6 @@ void main() {
               id: fixture.id,
               title: fixture.title,
               description: fixture.description,
-              readiness: fixture.readiness,
               archiveState: fixture.archiveState,
               createdAt: fixture.createdAt,
               updatedAt: fixture.updatedAt,
@@ -330,7 +322,6 @@ void main() {
         final fixtures = [
           (
             id: _id('018f0b5d-6b2e-7c80-8000-000000000309'),
-            isActionReady: 0 as Object,
             isArchived: 0 as Object,
             createdAt: 1.5 as Object,
             updatedAt:
@@ -339,7 +330,6 @@ void main() {
           ),
           (
             id: _id('018f0b5d-6b2e-7c80-8000-000000000310'),
-            isActionReady: 0 as Object,
             isArchived: 0 as Object,
             createdAt: 9223372036854775807 as Object,
             updatedAt:
@@ -348,7 +338,6 @@ void main() {
           ),
           (
             id: _id('018f0b5d-6b2e-7c80-8000-000000000311'),
-            isActionReady: 0 as Object,
             isArchived: 0 as Object,
             createdAt:
                 DateTime.utc(2026, 9, 2, 10).microsecondsSinceEpoch as Object,
@@ -363,7 +352,6 @@ void main() {
             database,
             id: fixture.id.toCanonicalString(),
             description: fixture.description,
-            isActionReady: fixture.isActionReady,
             isArchived: fixture.isArchived,
             createdAt: fixture.createdAt,
             updatedAt: fixture.updatedAt,
@@ -452,7 +440,6 @@ Future<void> _insertIntention(
   required String id,
   required String title,
   String? description,
-  bool isActionReady = false,
   bool isArchived = false,
   DateTime? createdAt,
   DateTime? updatedAt,
@@ -468,7 +455,6 @@ Future<void> _insertIntention(
             id: id,
             title: title,
             description: Value(description),
-            isActionReady: Value(isActionReady),
             isArchived: Value(isArchived),
             createdAt: created.microsecondsSinceEpoch,
             updatedAt: updated.microsecondsSinceEpoch,
@@ -480,7 +466,6 @@ Future<void> _insertIntention(
 Future<void> _insertRawIntention(
   AppDatabase database, {
   required String id,
-  required Object isActionReady,
   required Object isArchived,
   required Object createdAt,
   required Object updatedAt,
@@ -493,21 +478,13 @@ Future<void> _insertRawIntention(
       id,
       title,
       description,
-      is_action_ready,
+      kind,
       is_archived,
       created_at,
       updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, 'main', ?, ?, ?)
   ''',
-    [
-      id,
-      'Корректное название',
-      description,
-      isActionReady,
-      isArchived,
-      createdAt,
-      updatedAt,
-    ],
+    [id, 'Корректное название', description, isArchived, createdAt, updatedAt],
   ),
 );
 
@@ -539,7 +516,6 @@ Matcher _isSuccessfulIntention({
   required IntentionId id,
   required String title,
   String? description,
-  IntentionReadiness readiness = IntentionReadiness.notReady,
   IntentionArchiveState archiveState = IntentionArchiveState.active,
   DateTime? createdAt,
   DateTime? updatedAt,
@@ -551,11 +527,6 @@ Matcher _isSuccessfulIntention({
       (result) => result.value.value!.intention.description,
       'description',
       description,
-    )
-    .having(
-      (result) => result.value.value!.intention.readiness,
-      'readiness',
-      readiness,
     )
     .having(
       (result) => result.value.value!.intention.archiveState,

@@ -434,7 +434,7 @@ Object _intention(Intention intention) => (
   intention.id,
   intention.title,
   intention.description,
-  intention.readiness,
+  intention.kind,
   intention.archiveState,
   intention.createdAt,
   intention.updatedAt,

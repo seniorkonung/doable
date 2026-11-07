@@ -191,7 +191,7 @@ Future<_App> _launch(
   seedRawGraph(raw, () {
     for (final (id, title, archived) in [(1, 'Гулять', 0), (2, 'Читать', 1)]) {
       raw.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, ?, 1, 1)',
+        'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', ?, 1, 1)',
         [tagFixtureId(id), title, archived],
       );
     }
@@ -408,11 +408,10 @@ void _expectFaultPoint(_App app, List<TagId> tags) {
     _description,
     'main',
     0,
-    0,
     isA<int>(),
     isA<int>(),
   ]);
-  expect(row[7], row[8]);
+  expect(row[6], row[7]);
   final assignments = point.graph['tag_assignments']!
       .where((assignment) => assignment[2] == row.first)
       .toList();
@@ -451,18 +450,18 @@ void _expectSaved(
   app.diagnostics.privateValues.add(intention.id.toCanonicalString());
   expect(intention.title, _title);
   expect(intention.description, _description);
-  expect(intention.readiness, IntentionReadiness.notReady);
+  expect(intention.kind, IntentionKind.main);
   expect(intention.archiveState, IntentionArchiveState.active);
   expect(intention.createdAt, intention.updatedAt);
   final stored = app.raw
       .select(
-        'SELECT title, description, is_action_ready, is_archived, created_at, updated_at FROM intentions WHERE id = ?',
+        'SELECT title, description, kind, is_archived, created_at, updated_at FROM intentions WHERE id = ?',
         [intention.id.toCanonicalString()],
       )
       .single
       .values
       .toList();
-  expect(stored, [_title, _description, 0, 0, isA<int>(), isA<int>()]);
+  expect(stored, [_title, _description, 'main', 0, isA<int>(), isA<int>()]);
   expect(stored[4], stored[5]);
   expect(_storedGraph(app.raw)['ftsCreatedMatches'], hasLength(1));
   expect(
