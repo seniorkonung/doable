@@ -374,7 +374,7 @@ void main() {
     for (final (description, event, expected)
         in <(String, DiagnosticsEvent, Map<String, Object>)>[
           (
-            'успех ежедневной копии',
+            'успех суточной копии',
             GraphBackupCreationDiagnosticsEvent.succeeded(
               kind: GraphBackupCreationDiagnosticsKind.daily,
               duration: const Duration(microseconds: 71),

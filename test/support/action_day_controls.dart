@@ -120,7 +120,7 @@ CalendarDate shownActionDayDate(WidgetTester tester) {
     matching: find.text(label, skipOffstage: false),
   );
   if (shown.evaluate().isEmpty) {
-    fail('Каталог дневных выборов не называет выбранный день $selected.');
+    fail('Экран дня не называет выбранный день $selected.');
   }
   return selected;
 }

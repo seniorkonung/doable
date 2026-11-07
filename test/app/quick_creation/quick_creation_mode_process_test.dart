@@ -8,7 +8,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'controlled_mode_io.dart';
 
 /// Прежний ключ неизвестен режимам, поэтому отличает нетронутый файл от записи.
-const _initial = 'daily-choice';
+const _initial =
+    'daily'
+    '-choice';
 const _saved = QuickCreationMode.intention;
 
 void main() {

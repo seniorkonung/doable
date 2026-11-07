@@ -58,7 +58,7 @@ void main() {
     );
   }
 
-  /// Записывает в файл базы тег «Дом», ежедневную копию 5 октября в 09:00 и
+  /// Записывает в файл базы тег «Дом», суточную копию 5 октября в 09:00 и
   /// после неё теги [tagsAfterBackup].
   Future<void> seedGraph({List<String> tagsAfterBackup = const []}) async {
     final repository = DriftPersonalGraphRepository(
@@ -82,7 +82,7 @@ void main() {
   }
 
   /// Runtime над файлом базы с часами [now]; [hold] задерживает первое
-  /// чтение пакетов лога — подсчёт сводки ежедневной копии.
+  /// чтение пакетов лога — подсчёт сводки суточной копии.
   AppRuntime runtimeWith({_PackageReadHold? hold}) {
     final files = harness.temporaryDirectory.uri;
     final runtime = AppRuntime(
@@ -134,7 +134,7 @@ void main() {
     }
   }
 
-  test('после подготовки хранилища делает ежедневную копию фоном, не '
+  test('после подготовки хранилища делает суточную копию фоном, не '
       'задерживая готовность и команды графа', () async {
     await seedGraph(tagsAfterBackup: ['Дача']);
     now = DateTime(2026, 10, 6, 8, 15);
@@ -155,7 +155,7 @@ void main() {
     expect(backups.first.madeAt.toLocal(), DateTime(2026, 10, 6, 8, 15));
   });
 
-  test('при возвращении на передний план после смены дня делает ежедневную '
+  test('при возвращении на передний план после смены дня делает суточную '
       'копию, только если граф изменялся, а команды копию не делают', () async {
     await seedGraph();
     now = DateTime(2026, 10, 5, 20);
@@ -185,7 +185,7 @@ void main() {
     expect(backups.first.madeAt.toLocal(), DateTime(2026, 10, 6, 8, 15));
   });
 
-  test('выключение дожидается идущего создания ежедневной копии и только '
+  test('выключение дожидается идущего создания суточной копии и только '
       'затем закрывает базу', () async {
     await seedGraph(tagsAfterBackup: ['Дача']);
     now = DateTime(2026, 10, 6, 8, 15);

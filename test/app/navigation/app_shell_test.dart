@@ -24,9 +24,7 @@ import '../../support/intention_catalog_controls.dart';
 import '../../support/quick_creation.dart';
 
 void main() {
-  testWidgets('пункт календаря открывает каталог дневных выборов', (
-    tester,
-  ) async {
+  testWidgets('пункт календаря открывает экран дня', (tester) async {
     final semantics = tester.ensureSemantics();
     await _start(tester);
 
@@ -81,8 +79,8 @@ void main() {
   });
 
   for (final locale in const [Locale('en'), Locale('ru')]) {
-    testWidgets('шапка каталога намерений не ведёт ни к каталогу дневных '
-        'выборов, ни к тегам (${locale.languageCode})', (tester) async {
+    testWidgets('шапка каталога намерений не ведёт ни к экрану дня, '
+        'ни к тегам (${locale.languageCode})', (tester) async {
       final localizations = lookupAppLocalizations(locale);
       await _start(tester, locale: locale);
       await _select(tester, AppDestination.intentionGraph);

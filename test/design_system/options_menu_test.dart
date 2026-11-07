@@ -128,7 +128,7 @@ void main() {
             OptionsMenuItem.unavailable(
               icon: DoableIconData.delete,
               name: 'Удалить намерение',
-              reason: 'Сначала удалите его связи и дневные выборы',
+              reason: 'Сначала удалите его связи и действия',
             ),
           ],
         );

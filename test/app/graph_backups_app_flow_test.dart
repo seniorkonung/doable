@@ -33,7 +33,7 @@ import '../support/local_database_harness.dart';
 import '../support/temporary_graph_files.dart';
 
 void main() {
-  testWidgets('сценарий «Ежедневная копия при первом открытии за день»: при '
+  testWidgets('сценарий «Суточная копия при первом открытии за день»: при '
       'запуске 6 октября в 08:15 появляется копия с намерением, созданным '
       'накануне в 20:00', (tester) async {
     final app = await _BackupsApp.start(
@@ -104,7 +104,7 @@ void main() {
     expect(find.text('Последняя копия только что'), findsOneWidget);
   });
 
-  testWidgets('команда, выполненная, пока ежедневная копия при возвращении в '
+  testWidgets('команда, выполненная, пока суточная копия при возвращении в '
       'приложение считает сводку, подтверждается без ожидания и входит в '
       'копию', (tester) async {
     final app = await _BackupsApp.start(
@@ -154,8 +154,8 @@ void main() {
     expect(_sheetBackups(tester), ['1 октября, 09:30', '1 добавлено']);
   });
 
-  testWidgets('сценарий «Новая ежедневная копия вытесняет более старые '
-      'копии»: восьмая ежедневная копия удаляет самую старую ежедневную и '
+  testWidgets('сценарий «Новая суточная копия вытесняет более старые '
+      'копии»: восьмая суточная копия удаляет самую старую суточную и '
       'ручную копию после неё', (tester) async {
     final app = await _BackupsApp.start(
       tester,
@@ -323,7 +323,7 @@ final class _BackupsApp {
   Future<void> waitForBackups(int count) =>
       _waitFor(_tester, () => backups.length == count);
 
-  /// Ждёт проверки ежедневной копии, начатой при запуске или возвращении в
+  /// Ждёт проверки суточной копии, начатой при запуске или возвращении в
   /// приложение, и возвращает исход ещё одной проверки: копии делаются по
   /// одной, поэтому она завершается после начатой.
   Future<DailyGraphBackupOutcome> settleDailyBackup() async {

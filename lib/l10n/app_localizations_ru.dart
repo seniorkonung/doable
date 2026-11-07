@@ -1410,7 +1410,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get dataBackupsExplanation =>
-      'Копия делается каждый день, если данные менялись, и хранится на этом устройстве. Остаются 7 последних ежедневных копий. Выберите копию, чтобы восстановить её.';
+      'Копия делается каждый день, если данные менялись, и хранится на этом устройстве. Остаются 7 последних суточных копий. Выберите копию, чтобы восстановить её.';
 
   @override
   String get dataBackupsMakeNow => 'Сделать копию сейчас';
@@ -1752,7 +1752,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get tagsPanelDeleteTextAfter =>
-      ' и все его назначения активным и архивированным намерениям. Сами намерения, связи, дневные выборы и их пути сохранятся.';
+      ' и все его назначения активным и архивированным намерениям. Сами намерения, связи, действия и их пути сохранятся.';
 
   @override
   String get tagsPanelDeleteCancel => 'Отмена';

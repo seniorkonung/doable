@@ -142,7 +142,7 @@ void main() {
 final _now = DateTime(2026, 10, 6, 8, 15);
 
 /// Создаёт граф командой, чтобы он был отражён в логе, и ждёт первую
-/// ежедневную копию перед сравнением сохранённого состояния.
+/// суточную копию перед сравнением сохранённого состояния.
 Future<ImportAppHarness> _startApp(WidgetTester tester) async {
   final app = await ImportAppHarness.start(
     tester,

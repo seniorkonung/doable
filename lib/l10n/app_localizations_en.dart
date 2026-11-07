@@ -1730,7 +1730,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tagsPanelDeleteTextAfter =>
-      ' and all its assignments to active and archived intentions. The intentions, relations, daily choices and their paths remain.';
+      ' and all its assignments to active and archived intentions. The intentions, relations, actions and their paths remain.';
 
   @override
   String get tagsPanelDeleteCancel => 'Cancel';

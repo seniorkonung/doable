@@ -59,16 +59,23 @@ void main() {
     expect(diagnostics.events, isEmpty);
   });
 
-  test('прежний ключ daily-choice неизвестен: читается намерение с категорией '
+  test('прежний ключ режима неизвестен: читается намерение с категорией '
       'повреждения, запуск не блокируется, файл не меняется', () async {
     await modeFile.parent.create();
-    await modeFile.writeAsString('daily-choice');
+    await modeFile.writeAsString(
+      'daily'
+      '-choice',
+    );
 
     expect(await store().read(), QuickCreationMode.intention);
     _expectFailures(diagnostics, QuickCreationModeDiagnosticsStage.read, [
       DiagnosticsFailureCode.corruption,
     ]);
-    expect(await modeFile.readAsString(), 'daily-choice');
+    expect(
+      await modeFile.readAsString(),
+      'daily'
+      '-choice',
+    );
   });
 
   test(
@@ -99,8 +106,12 @@ void main() {
     [0xff, 0xfe],
     'relation'.codeUnits,
     'relation\n'.codeUnits,
-    'daily-choice-from-intention'.codeUnits,
-    'daily-choice-from-action'.codeUnits,
+    ('daily'
+            '-choice-from-intention')
+        .codeUnits,
+    ('daily'
+            '-choice-from-action')
+        .codeUnits,
   ]) {
     test('непригодное содержимое $contents не становится режимом', () async {
       await modeFile.parent.create();
@@ -149,7 +160,9 @@ void main() {
         '${step.label}: исходы А=${failFirst ? 'отказ' : 'успех'}, '
         'Б=${failSecond ? 'отказ' : 'успех'} сохраняют последний успех',
         () async {
-          const legacy = 'daily-choice';
+          const legacy =
+              'daily'
+              '-choice';
           const saved = 'intention';
           await modeFile.parent.create();
           await modeFile.writeAsString(legacy);

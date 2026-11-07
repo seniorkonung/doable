@@ -35,7 +35,7 @@ import '../../support/quick_creation.dart';
 import '../../support/tag_storage_fixture.dart';
 
 /// Намерение страницы, над которой открыта панель связи, и страницы, которую
-/// открывает лист над корневым каталогом дневных выборов.
+/// открывает лист над корневым экраном дня.
 const _origin = 1;
 
 /// Намерение страницы, которую панель открывает поверх себя.
@@ -144,7 +144,7 @@ void main() {
     ('системное «назад»', _systemBack),
   ]) {
     testWidgets('$name со страницы над листом, открытым над корневым каталогом '
-        'дневных выборов, возвращает тот же лист с его состоянием, а '
+        'действий, возвращает тот же лист с его состоянием, а '
         'следующее «назад» показывает каталог', (tester) async {
       final router = await _start(tester);
       await _openPageAboveCatalogSheet(tester, router);
@@ -165,7 +165,7 @@ void main() {
   }
 
   testWidgets('выбор пункта панели навигации на странице над листом, '
-      'открытым над корневым каталогом дневных выборов, убирает из истории '
+      'открытым над корневым экраном дня, убирает из истории '
       'и страницу, и лист', (tester) async {
     final router = await _start(tester);
     await _openPageAboveCatalogSheet(tester, router);
@@ -248,7 +248,7 @@ Future<void> _openPageAboveSheet(WidgetTester tester, AppRouter router) async {
   expect(appNavigationDestinations().hitTestable(), findsExactly(3));
 }
 
-/// Открывает дневные выборы корневой страницей, показывает над каталогом лист
+/// Открывает экран дня корневой страницей, показывает над ним лист
 /// с состоянием «Счёт: 1» и открывает из листа страницу намерения [_origin],
 /// которая встаёт над листом.
 Future<void> _openPageAboveCatalogSheet(

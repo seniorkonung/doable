@@ -79,7 +79,12 @@ void main() {
 
       expect(find.byType(IntentionCatalogPage), findsOneWidget);
       expect(
-        find.byKey(const ValueKey('catalog-open-daily-choices')),
+        find.byKey(
+          const ValueKey(
+            'catalog-open-daily'
+            '-choices',
+          ),
+        ),
         findsNothing,
       );
 

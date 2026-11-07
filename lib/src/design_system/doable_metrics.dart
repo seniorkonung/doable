@@ -22,7 +22,7 @@ abstract final class DoableMetrics {
   static const double navHeight = 61;
   static const double iconSize = 24;
 
-  /// Кольцо флажка дневного выбора; обводка 2.
+  /// Кольцо флажка действия; обводка 2.
   static const double checkSize = 22;
 
   /// Сплошная линия связи «нужно».

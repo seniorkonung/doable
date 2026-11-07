@@ -67,11 +67,11 @@ const _firstReplaced = 101;
 /// Местное сегодня до замены графа.
 final _today = CalendarDate.fromParts(2026, 10, 19);
 
-/// Прошлый день, который выбран в каталоге дневных выборов до замены.
+/// Прошлый день, который выбран на экране дня до замены.
 final _pastDay = CalendarDate.fromParts(2026, 10, 14);
 
 /// Местное сегодня к замене графа: корневые страницы открываются на нём, а
-/// каталог дневных выборов — не на дне своего первого открытия.
+/// экран дня — не на дне своего первого открытия.
 final _replacementDay = CalendarDate.fromParts(2026, 10, 20);
 
 final _l10n = lookupAppLocalizations(const Locale('ru'));
@@ -273,7 +273,7 @@ Future<void> _prepareIntentionCatalog(WidgetTester tester) async {
   expect(shownIntentionCatalogOffsets(tester), everyElement(greaterThan(0)));
 }
 
-/// Каталог дневных выборов: выбран прошлый день, а календарь раскрыт.
+/// Экран дня: выбран прошлый день, а календарь раскрыт.
 Future<void> _prepareActionDay(WidgetTester tester) async {
   await _select(tester, AppDestination.actions);
   await selectActionDayDate(tester, _pastDay, tap: _tap);

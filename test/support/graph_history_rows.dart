@@ -10,7 +10,7 @@ import 'package:drift/drift.dart' show Value;
 
 import 'graph_log_completeness_reference.dart';
 
-/// Записывает прямой вставкой строку ежедневной копии на позиции
+/// Записывает прямой вставкой строку суточной копии на позиции
 /// [position], как её запишет реестр копий.
 Future<void> insertDailyBackupRow(
   AppDatabase database, {

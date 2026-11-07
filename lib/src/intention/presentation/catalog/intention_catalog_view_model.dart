@@ -647,7 +647,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     ref.invalidateSelf();
   }
 
-  /// Принимает подтверждённые изменения намерений, долговременных и дневных связей.
+  /// Принимает подтверждённые изменения намерений, долговременных связей и действий.
   ///
   /// Отказ не согласует данные: подтверждённого пакета у него нет.
   void _handleCompletion(GraphCommandCompletion completion) {

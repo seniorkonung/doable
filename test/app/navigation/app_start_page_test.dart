@@ -46,7 +46,7 @@ void main() {
   });
 
   group('начальная страница не зависит от намерений', () {
-    testWidgets('намерения без дневных выборов оставляют статистику пустой', (
+    testWidgets('намерения без действий оставляют статистику пустой', (
       tester,
     ) async {
       final harness = await _harness(tester, const Locale('ru'));

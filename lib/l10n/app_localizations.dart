@@ -2179,7 +2179,7 @@ abstract class AppLocalizations {
   /// **'Backups'**
   String get dataBackupsTitle;
 
-  /// Пояснение панели «Резервные копии»: когда делаются и сколько хранятся копии; число совпадает с окном хранения ежедневных копий
+  /// Пояснение панели «Резервные копии»: когда делаются и сколько хранятся копии; число совпадает с окном хранения суточных копий
   ///
   /// In en, this message translates to:
   /// **'A copy is made each day your data changes and stays on this device. The 7 most recent daily copies are kept. Choose a copy to restore it.'**
@@ -2281,19 +2281,19 @@ abstract class AppLocalizations {
   /// **'Restore the copy from {date}, {time}'**
   String dataBackupRestoreMadeOn(String date, String time);
 
-  /// Часть сводки изменений: число добавленных намерений, тегов, долговременных связей и дневных выборов
+  /// Часть сводки изменений: число добавленных намерений, тегов, долговременных связей и действий
   ///
   /// In en, this message translates to:
   /// **'{count} added'**
   String dataBackupAdded(int count);
 
-  /// Часть сводки изменений: число изменённых намерений, тегов, долговременных связей и дневных выборов
+  /// Часть сводки изменений: число изменённых намерений, тегов, долговременных связей и действий
   ///
   /// In en, this message translates to:
   /// **'{count} changed'**
   String dataBackupChanged(int count);
 
-  /// Часть сводки изменений: число удалённых намерений, тегов, долговременных связей и дневных выборов
+  /// Часть сводки изменений: число удалённых намерений, тегов, долговременных связей и действий
   ///
   /// In en, this message translates to:
   /// **'{count} removed'**
@@ -2626,7 +2626,7 @@ abstract class AppLocalizations {
   /// Текст подтверждения удаления после выделенного названия тега: полный охват удаления и что сохраняется
   ///
   /// In en, this message translates to:
-  /// **' and all its assignments to active and archived intentions. The intentions, relations, daily choices and their paths remain.'**
+  /// **' and all its assignments to active and archived intentions. The intentions, relations, actions and their paths remain.'**
   String get tagsPanelDeleteTextAfter;
 
   /// Отмена удаления тега

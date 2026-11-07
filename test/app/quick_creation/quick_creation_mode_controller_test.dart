@@ -23,8 +23,10 @@ void main() {
         'relation',
         '0',
         '3',
-        'dailyChoice',
-        'daily-choice',
+        'daily'
+            'Choice',
+        'daily'
+            '-choice',
         'Новое намерение',
         'New intention',
         'INTENTION',

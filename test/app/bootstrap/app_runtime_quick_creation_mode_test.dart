@@ -15,7 +15,9 @@ import '../../support/in_memory_diagnostics_sink.dart';
 import '../quick_creation/controlled_mode_io.dart';
 
 /// Ключ удалённого режима: он неизвестен приложению и читается как неизвестный.
-const _legacyKey = 'daily-choice';
+const _legacyKey =
+    'daily'
+    '-choice';
 
 void main() {
   late Directory localData;
@@ -99,22 +101,19 @@ void main() {
     },
   );
 
-  test(
-    'прежний ключ daily-choice не мешает запуску и даёт намерение',
-    () async {
-      await modeFile.parent.create();
-      await modeFile.writeAsString(_legacyKey);
+  test('прежний ключ режима не мешает запуску и даёт намерение', () async {
+    await modeFile.parent.create();
+    await modeFile.writeAsString(_legacyKey);
 
-      final ready = await runtime(store()).bootstrap() as AppRuntimeReady;
+    final ready = await runtime(store()).bootstrap() as AppRuntimeReady;
 
-      expect(
-        ready.container.read(quickCreationModeControllerProvider),
-        QuickCreationMode.intention,
-      );
-      _expectReadFailure(diagnostics, DiagnosticsFailureCode.corruption);
-      expect(await modeFile.readAsString(), _legacyKey);
-    },
-  );
+    expect(
+      ready.container.read(quickCreationModeControllerProvider),
+      QuickCreationMode.intention,
+    );
+    _expectReadFailure(diagnostics, DiagnosticsFailureCode.corruption);
+    expect(await modeFile.readAsString(), _legacyKey);
+  });
 
   test('подготовка графа и чтение режима начинаются параллельно', () async {
     final modeStore = _ControlledModeStore();

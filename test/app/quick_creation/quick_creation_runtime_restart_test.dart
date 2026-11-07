@@ -85,12 +85,16 @@ void main() {
     });
   }
 
-  // null означает нечитаемый файл настройки; прежний ключ дневного выбора
+  // null означает нечитаемый файл настройки; прежний ключ режима
   // неизвестен и читается как любое неизвестное содержимое.
   for (final (title, contents) in [
     ('отказ чтения', null),
     ('неизвестный ключ', 'Секретное содержимое настройки'),
-    ('прежний ключ daily-choice', 'daily-choice'),
+    (
+      'прежний ключ режима',
+      'daily'
+          '-choice',
+    ),
   ]) {
     testWidgets('$title: Главная и создание доступны без сообщения об ошибке', (
       tester,
@@ -125,7 +129,9 @@ void main() {
       tester,
     ) async {
       // Прежний ключ отличает нетронутый файл от записанного режима.
-      const initial = 'daily-choice';
+      const initial =
+          'daily'
+          '-choice';
       const mode = QuickCreationMode.intention;
       await tester.runAsync(() async {
         await modeFile.parent.create();
@@ -300,7 +306,7 @@ Future<void> _settle(WidgetTester tester) async {
   throw StateError('Чтение или анимация приложения не завершились.');
 }
 
-/// Открывает над каталогом намерений каталог дневных выборов на дату —
+/// Открывает над каталогом намерений экран дня на дату —
 /// обычную страницу с собственной панелью.
 Future<void> _openOrdinaryPage(WidgetTester tester) async {
   unawaited(

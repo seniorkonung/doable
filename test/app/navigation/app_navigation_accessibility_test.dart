@@ -191,7 +191,7 @@ void main() {
 }
 
 /// Запускает приложение на хранилище в памяти, ждёт Главную и засевает граф
-/// намерениями, связями, тегами и дневным выбором.
+/// намерениями, связями, тегами и действием.
 Future<AppRouter> _start(WidgetTester tester, Locale locale) async {
   tester.platformDispatcher.localesTestValue = [locale];
   addTearDown(tester.platformDispatcher.clearLocalesTestValue);
@@ -260,7 +260,7 @@ String _destinationLabel(
 
 /// Экранный диктор проходит три пункта по порядку с названием, ролью,
 /// положением и признаком выбранного. Главная и граф объявляют свой заголовок
-/// только при открытии; у дневных выборов заголовка нет.
+/// только при открытии; у экрана дня заголовка нет.
 /// Текстовые подписи в панели не рисуются.
 void _expectAnnounced(
   WidgetTester tester,

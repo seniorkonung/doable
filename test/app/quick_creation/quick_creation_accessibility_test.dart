@@ -45,7 +45,7 @@ void main() {
         '${variant.size}, '
         'отступы ${variant.safe ? "24/32" : "0/0"}, '
         'клавиатура ${variant.keyboard}, '
-        '${variant.deep ? "дата дневных выборов" : "корень"}', (tester) async {
+        '${variant.deep ? "дата действий" : "корень"}', (tester) async {
       final semantics = tester.ensureSemantics();
       tester.view.physicalSize = variant.size;
       tester.view.devicePixelRatio = 1;
