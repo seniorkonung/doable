@@ -46,12 +46,13 @@ final class IntentionEditorCreated extends IntentionEditorEvent {
 /// порядке добавления. Поиск, кандидат выбора, фокус и размер панели не
 /// входят в черновик.
 final class IntentionCreationDraft {
-  const IntentionCreationDraft.initial({String initialTitle = ''})
-    : title = initialTitle,
-      _initialTitle = initialTitle,
-      description = '',
-      tagIds = const {},
-      kind = IntentionKind.main;
+  const IntentionCreationDraft.initial({
+    String initialTitle = '',
+    this.kind = IntentionKind.main,
+  }) : title = initialTitle,
+       _initialTitle = initialTitle,
+       description = '',
+       tagIds = const {};
 
   /// [tagIds] должен быть неизменяемым; копию создают только методы правки
   /// набора, чтобы неизменённый набор сохранял свою идентичность.
@@ -178,13 +179,18 @@ final class IntentionEditorState {
     required this.closing,
   });
 
-  IntentionEditorState.initial({String initialTitle = ''})
-    : draft = IntentionCreationDraft.initial(initialTitle: initialTitle),
-      selectedTags = const {},
-      operation = const OperationIdle<Intention>(),
-      event = null,
-      failurePresentation = null,
-      closing = const IntentionCreationCloseNotRequested();
+  IntentionEditorState.initial({
+    String initialTitle = '',
+    IntentionKind initialKind = IntentionKind.main,
+  }) : draft = IntentionCreationDraft.initial(
+         initialTitle: initialTitle,
+         kind: initialKind,
+       ),
+       selectedTags = const {},
+       operation = const OperationIdle<Intention>(),
+       event = null,
+       failurePresentation = null,
+       closing = const IntentionCreationCloseNotRequested();
 
   final IntentionCreationDraft draft;
 

@@ -130,6 +130,7 @@ final class IntentionEditorViewModelProvider
     required (
       IntentionCreationFormKey, {
       String initialTitle,
+      IntentionKind initialKind,
       IntentionCreationOperationTarget target,
     })
     super.argument,
@@ -176,7 +177,7 @@ final class IntentionEditorViewModelProvider
 }
 
 String _$intentionEditorViewModelHash() =>
-    r'b47f0d3d0988b2c16058ba5f04493db8cb4f367c';
+    r'c436bc4fb110d354ca9d590b919c557e55251968';
 
 /// Экранная сессия создания намерения по собственному ключу формы.
 ///
@@ -226,6 +227,7 @@ final class IntentionEditorViewModelFamily extends $Family
           (
             IntentionCreationFormKey, {
             String initialTitle,
+            IntentionKind initialKind,
             IntentionCreationOperationTarget target,
           })
         > {
@@ -279,10 +281,16 @@ final class IntentionEditorViewModelFamily extends $Family
   IntentionEditorViewModelProvider call(
     IntentionCreationFormKey formKey, {
     String initialTitle = '',
+    IntentionKind initialKind = IntentionKind.main,
     IntentionCreationOperationTarget target =
         const CreatingIntentionOperationTarget(),
   }) => IntentionEditorViewModelProvider._(
-    argument: (formKey, initialTitle: initialTitle, target: target),
+    argument: (
+      formKey,
+      initialTitle: initialTitle,
+      initialKind: initialKind,
+      target: target,
+    ),
     from: this,
   );
 
@@ -335,15 +343,18 @@ abstract class _$IntentionEditorViewModel
           as (
             IntentionCreationFormKey, {
             String initialTitle,
+            IntentionKind initialKind,
             IntentionCreationOperationTarget target,
           });
   IntentionCreationFormKey get formKey => _$args.$1;
   String get initialTitle => _$args.initialTitle;
+  IntentionKind get initialKind => _$args.initialKind;
   IntentionCreationOperationTarget get target => _$args.target;
 
   IntentionEditorState build(
     IntentionCreationFormKey formKey, {
     String initialTitle = '',
+    IntentionKind initialKind = IntentionKind.main,
     IntentionCreationOperationTarget target =
         const CreatingIntentionOperationTarget(),
   });
@@ -364,6 +375,7 @@ abstract class _$IntentionEditorViewModel
       () => build(
         _$args.$1,
         initialTitle: _$args.initialTitle,
+        initialKind: _$args.initialKind,
         target: _$args.target,
       ),
     );

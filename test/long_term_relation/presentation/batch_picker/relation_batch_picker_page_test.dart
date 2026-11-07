@@ -24,6 +24,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
@@ -272,6 +273,109 @@ void main() {
     },
   );
 
+  Future<void> createFromSearch(WidgetTester tester, String title) async {
+    await tester.enterText(
+      find.byKey(const ValueKey('participant-picker-filter')),
+      title,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Создать «$title»'));
+    await tester.pumpAndSettle();
+  }
+
+  Future<String> storedKind(WidgetTester tester, String title) async {
+    final rows = await tester.runAsync(
+      () => (database.select(
+        database.intentions,
+      )..where((row) => row.title.equals(title))).get(),
+    );
+    return rows!.single.kind;
+  }
+
+  testWidgets(
+    'в группе «Нужно» созданное намерение по умолчанию становится вспомогательным вместе со связью',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await open(tester, IntentionRelationGroup.needs);
+      await createFromSearch(tester, 'Ходить на работу');
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(IntentionEditorPage)),
+      );
+      expect(
+        find.semantics
+            .byLabel(l10n.intentionKindSupportingSemantics)
+            .evaluate()
+            .single,
+        isSemantics(hasCheckedState: true, isChecked: true, isEnabled: true),
+      );
+      expect(
+        find.semantics
+            .byLabel(l10n.intentionKindMainSemantics)
+            .evaluate()
+            .single,
+        isSemantics(hasCheckedState: true, isChecked: false, isEnabled: true),
+      );
+      await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+      await settleCommand(tester);
+      expect(await storedKind(tester, 'Ходить на работу'), 'main');
+
+      await tester.tap(addButton);
+      await settleCommand(tester);
+
+      expect(find.byType(RelationBatchPickerPage), findsNothing);
+      expect(await storedKind(tester, 'Ходить на работу'), 'supporting');
+      expect(await tester.runAsync(relations), hasLength(5));
+      semantics.dispose();
+    },
+  );
+
+  testWidgets('снятая отметка оставляет созданное намерение главным', (
+    tester,
+  ) async {
+    await open(tester, IntentionRelationGroup.needs);
+    await createFromSearch(tester, 'Ходить на работу');
+    await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+    await settleCommand(tester);
+    await tester.tap(find.text('Ходить на работу'));
+    await tester.tap(find.text('Гулять'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(addButton);
+    await settleCommand(tester);
+
+    final added = (await tester.runAsync(relations))!.last;
+    expect(added.relatedIntentionId, _uuid(5));
+    expect(await storedKind(tester, 'Ходить на работу'), 'main');
+  });
+
+  testWidgets(
+    'в группе «Нужно для» панель создания выбирает главное без вспомогательного',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await open(tester, IntentionRelationGroup.neededFor);
+      await tester.tap(find.bySemanticsLabel('Создать намерение'));
+      await tester.pumpAndSettle();
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(IntentionEditorPage)),
+      );
+      expect(
+        find.semantics
+            .byLabel(l10n.intentionKindMainSemantics)
+            .evaluate()
+            .single,
+        isSemantics(hasCheckedState: true, isChecked: true, isEnabled: true),
+      );
+      expect(
+        find.semantics
+            .byLabel(l10n.intentionKindSupportingUnavailable)
+            .evaluate()
+            .single,
+        isSemantics(hasCheckedState: true, isChecked: false, isEnabled: false),
+      );
+      semantics.dispose();
+    },
+  );
+
   testWidgets(
     'точное совпадение скрывает создание, плюс открывает пустую панель только один раз',
     (tester) async {
@@ -405,7 +509,7 @@ void main() {
             'Здоровье',
           ).notifier,
         );
-        model.acceptCreated(_id(6), 'Созданное');
+        model.acceptCreated(_id(6), 'Созданное', IntentionKind.main);
         await tester.pumpAndSettle();
         await tester.tap(
           find.byKey(const ValueKey('participant-picker-cancel')),
@@ -697,7 +801,7 @@ void main() {
             'Здоровье',
           ).notifier,
         )
-        .acceptCreated(_id(6), 'Созданное');
+        .acceptCreated(_id(6), 'Созданное', IntentionKind.main);
     await tester.pumpAndSettle();
     expect(find.byType(Notice), findsNothing);
     expect(find.text('Добавить 2 связи'), findsOneWidget);

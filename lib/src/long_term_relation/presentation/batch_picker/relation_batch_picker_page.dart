@@ -18,6 +18,7 @@ import '../../../intention/presentation/editor/intention_creation_launch.dart';
 import '../../../intention/presentation/picker/intention_picker_view.dart';
 import '../../application/intention_relation_group.dart';
 import '../../application/relation_pair_probe.dart';
+import '../../domain/long_term_relation.dart';
 import '../relation_command_failure_message.dart';
 import 'relation_batch_picker_purpose.dart';
 import 'relation_batch_state.dart';
@@ -149,11 +150,17 @@ final class _RelationBatchPickerPageState
                 IntentionEditorRoute(
                   launch: IntentionCreationForSearch(
                     initialTitle: title,
-                    onCreated: (id, createdTitle) {
+                    placement: switch (widget.group.direction) {
+                      RelationDirection.outgoing =>
+                        CreatedIntentionPlacement.belowPage,
+                      RelationDirection.incoming =>
+                        CreatedIntentionPlacement.abovePage,
+                    },
+                    onCreated: (id, createdTitle, kind) {
                       if (!mounted || !ref.read(provider).canEdit) return;
                       ref
                           .read(provider.notifier)
-                          .acceptCreated(id, createdTitle);
+                          .acceptCreated(id, createdTitle, kind);
                       if (widget.anchor case RelationBatchPathEndAnchor(
                         :final onIntentionCreated,
                       )) {

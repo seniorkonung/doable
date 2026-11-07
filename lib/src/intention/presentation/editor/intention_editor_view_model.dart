@@ -77,13 +77,17 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
   IntentionEditorState build(
     IntentionCreationFormKey formKey, {
     String initialTitle = '',
+    IntentionKind initialKind = IntentionKind.main,
     IntentionCreationOperationTarget target =
         const CreatingIntentionOperationTarget(),
   }) {
     _formKey = formKey;
     _coordinator = ref.watch(graphCommandCoordinatorProvider.notifier);
     _tagReads = ref.watch(personalGraphRepositoryProvider);
-    final initial = IntentionEditorState.initial(initialTitle: initialTitle);
+    final initial = IntentionEditorState.initial(
+      initialTitle: initialTitle,
+      initialKind: initialKind,
+    );
     final draftTagSet = _draftTagSet = _SessionDraftTagSet(
       this,
       initial.draft.tagIds,

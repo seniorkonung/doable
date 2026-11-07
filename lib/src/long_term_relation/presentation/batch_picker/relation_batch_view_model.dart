@@ -40,7 +40,7 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
   late IntentionId _pageId;
   late IntentionRelationGroup _group;
   final _searchKey = RelationsAdditionSearchKey();
-  final _selected = <IntentionId, String>{};
+  final _selected = <IntentionId, _BatchMark>{};
   bool _hasCreatedIntentions = false;
   late String _pageTitle;
   RelationBatchOperation _operation = const RelationBatchIdle();
@@ -72,16 +72,22 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
     if (_selected.containsKey(id)) {
       _selected.remove(id);
     } else {
-      _selected[id] = title;
+      _selected[id] = _BatchMark(title);
     }
     _publish(const RelationBatchIdle());
   }
 
   /// Принимает результат живой панели создания для этого поиска.
-  void acceptCreated(IntentionId id, String title) {
+  ///
+  /// Выбранный в панели [kind] отметка помнит, пока она стоит: вспомогательным
+  /// намерение становится только вместе со связью.
+  void acceptCreated(IntentionId id, String title, IntentionKind kind) {
     if (!ref.mounted || !state.canEdit) return;
     _selected.remove(id);
-    _selected[id] = title;
+    _selected[id] = _BatchMark(
+      title,
+      becomesSupporting: kind == IntentionKind.supporting,
+    );
     _hasCreatedIntentions = true;
     _publish(const RelationBatchIdle());
   }
@@ -100,11 +106,24 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
     if (!state.canSubmit) return Future.value();
     final start = _coordinator.acceptRelationsAddition(
       _searchKey,
-      AddLongTermRelations(
-        pageIntentionId: _pageId,
-        group: _group,
-        candidateIds: _selected.keys,
-      ),
+      switch (_group.direction) {
+        RelationDirection.outgoing => AddLongTermRelations.outgoing(
+          pageIntentionId: _pageId,
+          type: _group.type,
+          candidates: [
+            for (final MapEntry(key: id, value: mark) in _selected.entries)
+              OutgoingRelationCandidate(
+                id,
+                becomesSupporting: mark.becomesSupporting,
+              ),
+          ],
+        ),
+        RelationDirection.incoming => AddLongTermRelations(
+          pageIntentionId: _pageId,
+          group: _group,
+          candidateIds: _selected.keys,
+        ),
+      },
     );
     switch (start) {
       case LongTermRelationCommandAccepted(:final token, :final future):
@@ -193,8 +212,10 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
               _selected.remove(current.id);
               changed = true;
             } else if (previous.title != current.title &&
-                _selected[current.id] != current.title) {
-              _selected[current.id] = current.title;
+                _selected[current.id]!.title != current.title) {
+              _selected[current.id] = _selected[current.id]!.withTitle(
+                current.title,
+              );
               changed = true;
             }
           }
@@ -227,7 +248,19 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
     hasCreatedIntentions: _hasCreatedIntentions,
     selected: [
       for (final entry in _selected.entries)
-        RelationBatchSelection(id: entry.key, title: entry.value),
+        RelationBatchSelection(id: entry.key, title: entry.value.title),
     ],
   );
+}
+
+/// Отметка поиска: актуальное название и вид, выбранный при создании
+/// намерения в этом поиске.
+final class _BatchMark {
+  const _BatchMark(this.title, {this.becomesSupporting = false});
+
+  final String title;
+  final bool becomesSupporting;
+
+  _BatchMark withTitle(String value) =>
+      _BatchMark(value, becomesSupporting: becomesSupporting);
 }

@@ -120,7 +120,7 @@ void main() {
       h.model.toggle(_id(1), 'Первое');
       h.model.toggle(_id(2), 'Второе');
 
-      h.model.acceptCreated(_id(3), 'Созданное');
+      h.model.acceptCreated(_id(3), 'Созданное', IntentionKind.main);
       expect(h.selected, [
         (_id(1), 'Первое'),
         (_id(2), 'Второе'),

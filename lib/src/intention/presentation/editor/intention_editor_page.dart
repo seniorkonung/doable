@@ -98,10 +98,27 @@ final class _IntentionEditorPageState
     IntentionCreationForPathStart(:final initialTitle) => initialTitle,
   };
 
+  /// Вспомогательным может стать только намерение ниже намерения страницы
+  /// поиска участника: у остальных входящей связи не будет.
+  bool get _allowsSupporting => switch (widget.launch) {
+    IntentionCreationForSearch(
+      placement: CreatedIntentionPlacement.belowPage,
+    ) =>
+      true,
+    IntentionCreationForSearch(
+      placement: CreatedIntentionPlacement.abovePage,
+    ) ||
+    IntentionCreationStandalone() ||
+    IntentionCreationForPathStart() => false,
+  };
+
   IntentionEditorViewModelProvider get _provider =>
       intentionEditorViewModelProvider(
         _formKey,
         initialTitle: _initialTitle,
+        initialKind: _allowsSupporting
+            ? IntentionKind.supporting
+            : IntentionKind.main,
         target: switch (widget.launch) {
           IntentionCreationStandalone() =>
             const CreatingIntentionOperationTarget(),
@@ -259,9 +276,10 @@ final class _IntentionEditorPageState
                 second: SegmentItem(
                   id: IntentionKind.supporting,
                   label: localizations.intentionKindSupporting,
-                  semanticLabel:
-                      localizations.intentionKindSupportingUnavailable,
-                  disabled: true,
+                  semanticLabel: _allowsSupporting
+                      ? localizations.intentionKindSupportingSemantics
+                      : localizations.intentionKindSupportingUnavailable,
+                  disabled: !_allowsSupporting,
                 ),
                 value: editor.draft.kind,
                 label: localizations.intentionKindLabel,
@@ -459,11 +477,12 @@ final class _IntentionEditorPageState
       return;
     }
     _routeState = _EditorRouteState.openingCreatedIntention;
+    final kind = ref.read(_provider).draft.kind;
     ref.read(_provider.notifier).consumeEvent();
     switch (widget.launch) {
       case IntentionCreationForSearch(:final onCreated):
         router.removeRoute(route);
-        onCreated(intention.id, intention.title);
+        onCreated(intention.id, intention.title, kind);
         return;
       case IntentionCreationForPathStart(:final onCreated):
         router.removeRoute(route);

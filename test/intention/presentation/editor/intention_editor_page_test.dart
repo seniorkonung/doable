@@ -104,7 +104,8 @@ void main() {
         locale: const Locale('ru'),
         launch: IntentionCreationForSearch(
           initialTitle: 'Бегать',
-          onCreated: (_, _) {},
+          placement: CreatedIntentionPlacement.abovePage,
+          onCreated: (_, _, _) {},
         ),
       );
       expect(_fieldText(tester, 'intention-editor-title'), 'Бегать');
@@ -132,7 +133,8 @@ void main() {
         repository,
         launch: IntentionCreationForSearch(
           initialTitle: 'Бегать',
-          onCreated: (id, title) => created.add((id, title)),
+          placement: CreatedIntentionPlacement.abovePage,
+          onCreated: (id, title, _) => created.add((id, title)),
         ),
       );
       expect(
@@ -172,7 +174,8 @@ void main() {
         withPicker: true,
         launch: IntentionCreationForSearch(
           initialTitle: 'Бегать',
-          onCreated: (id, title) => created.add((id, title)),
+          placement: CreatedIntentionPlacement.abovePage,
+          onCreated: (id, title, _) => created.add((id, title)),
         ),
       );
       await tester.tap(find.byKey(_submit));
@@ -199,7 +202,8 @@ void main() {
         locale: const Locale('ru'),
         launch: IntentionCreationForSearch(
           initialTitle: 'Без правки',
-          onCreated: (_, title) => created.add(title),
+          placement: CreatedIntentionPlacement.abovePage,
+          onCreated: (_, title, _) => created.add(title),
         ),
       );
       await tester.tap(find.byKey(_submit));
@@ -242,7 +246,8 @@ void main() {
         repository,
         launch: IntentionCreationForSearch(
           initialTitle: 'Бегать',
-          onCreated: (_, title) => created.add(title),
+          placement: CreatedIntentionPlacement.abovePage,
+          onCreated: (_, title, _) => created.add(title),
         ),
       );
       await tester.enterText(find.byKey(_title), 'Плавать');
