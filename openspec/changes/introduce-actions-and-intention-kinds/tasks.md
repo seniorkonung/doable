@@ -873,3 +873,17 @@
   - **Зависимости:** 2.6, 2.8.
   - **Предполагаемые файлы:** меняются `lib/src/intention/presentation/catalog/intention_catalog_purpose.dart`, `intention_catalog_view_model.dart`, `lib/src/intention/presentation/picker/intention_picker_row.dart` или `intention_picker_view.dart`, при необходимости `lib/src/action/presentation/path_start/path_start_picker_page.dart`, `lib/src/action/presentation/path/path_page.dart`, `path_view_model.dart`, `lib/src/intention/application/intention_catalog.dart` и `lib/src/graph/data/drift_personal_graph_repository.dart` при удалении исключения, `lib/l10n/app_ru.arb`, `app_en.arb` и сгенерированные файлы локализации, тесты в `test/action/presentation/path_start/`, `test/action/presentation/path/`, `test/intention/presentation/catalog/`, `test/intention/data/`.
   - **Размер:** S.
+
+- [ ] 2.24 Доступные имена кандидата и «Добавить» на экране пути называют связь, половину и последнее намерение пути
+  - **Критерии приёмки:**
+    - Доступное имя строки кандидата (`StepOption`) называет кандидата, последнее намерение пути, вид связи открытой половины («нужно» для «Нужно», «можно использовать» для «Можно») и приоритет связи, как в README `context/doable-design-system/components/StepOption/README.md`: en — «To Keep my body functionally fit, need Build strength and endurance. Priority P1»; ru — например «Чтобы Быть здоровым, нужно Много ходить. Приоритет P1». Окончание «Новое» у кандидата, связь которого только что создана «Добавить», сохраняется (критерии задачи 2.11).
+    - Доступное имя «Добавить» называет открытую половину и последнее намерение пути, как в README `context/doable-design-system/components/PathBuilder/README.md`: en — «Add to Needs of Build strength and endurance» и «Add to Can use of …»; ru — например «Добавить в «Нужно» намерения «Много ходить»» и «Добавить в «Можно» намерения «…»».
+    - `pathCandidateLabel` и `addLabel: l10n.pathAdd` в `lib/src/action/presentation/path/path_page.dart` заменены новыми параметризованными строками ru и en в `lib/l10n/app_ru.arb` и `app_en.arb` с совпадающими ключами; строка, оставшаяся без вызывающего кода, удаляется; сгенерированные файлы локализации обновлены. Изменения тех же файлов по другим задачам сохраняются.
+    - Видимый текст экрана пути не меняется: «Добавить» остаётся текстом кнопки, строки кандидатов показывают прежние название, приоритет и отметку «Новое».
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/action/presentation/path`.
+    - Тест семантики экрана пути в `test/action/presentation/path/path_page_test.dart`: для пути, последнее намерение которого имеет кандидатов в обеих половинах, доступное имя кандидата в «Нужно» называет последнее намерение, «нужно», кандидата и приоритет, а после переключения на «Можно» — «можно использовать»; доступное имя «Добавить» называет открытую половину и последнее намерение пути в каждой из половин.
+  - **Зависимости:** 2.4, 2.9, 2.11.
+  - **Предполагаемые файлы:** меняются `lib/src/action/presentation/path/path_page.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и сгенерированные файлы локализации `lib/l10n/app_localizations*.dart`, `test/action/presentation/path/path_page_test.dart`.
+  - **Размер:** XS.
