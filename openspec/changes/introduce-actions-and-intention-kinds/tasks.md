@@ -1248,7 +1248,7 @@
     - меняются `test/graph_format/golden/*.jsonl`, вспомогательные файлы `test/support/`, `test/intention/presentation/catalog/*_test_support.dart`, `test/intention/presentation/details/details_test_support.dart`, `test/long_term_relation/presentation/relation_graph_test_support.dart`, `test/graph/presentation/package_consumers_test_support.dart`, тесты, вызывающие `CreateIntention.withInitialState` (сейчас 30 файлов в `test/app`, `test/data_transfer`, `test/graph`, `test/graph_snapshots` и `test/intention`), фикстуры `benchmark/support/` и `benchmark/graph_log/graph_log_benchmark.dart`.
   - **Размер:** M по логике: файлов больше нормы, но почти всё — удаление.
 
-- [ ] 3.15 README и ADR описывают вид намерения вместо готовности к действию
+- [x] 3.15 README и ADR описывают вид намерения вместо готовности к действию
   - **Критерии приёмки:**
     - Вводная часть `README.md` перечисляет вид намерения — главное или вспомогательное — вместо явной готовности к действию.
     - Предложенная ADR-0047 называет данные соседнего намерения без готовности к действию, как терминологическую правку из `adr.md`; принятая ADR-0001 сохраняет исходное обоснование по `ADR-FORMAT.md`.

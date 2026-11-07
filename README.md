@@ -3,9 +3,9 @@
 Doable is an Android-first Flutter application for preserving intentions and,
 through the planned intention graph, connecting them to meaningful daily
 actions. The current implementation provides the complete local lifecycle of
-an intention: creation, bounded catalog browsing, editing, explicit action
-readiness, archiving, restoration, deletion, Russian and English localization,
-and persistence within one application installation.
+an intention: creation, bounded catalog browsing, editing, an intention kind
+of main or supporting, archiving, restoration, deletion, Russian and English
+localization, and persistence within one application installation.
 
 The domain language is defined in [`CONTEXT.md`](CONTEXT.md), and the product
 behavior in [`openspec/specs/`](openspec/specs/).
