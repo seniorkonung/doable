@@ -561,7 +561,7 @@ final class _RestoreApp {
         await container.read(graphBackupsProvider).makeManualBackup(),
         ManualGraphBackupOutcome.made,
       );
-      // Суточная копия при запуске могла застать уже непустой граф.
+      // Ежедневная копия при запуске могла застать уже непустой граф.
       return (await (repository as GraphBackupRegistry).readBackups())
           .singleWhere((backup) => backup.kind == GraphBackupKind.manual);
     });

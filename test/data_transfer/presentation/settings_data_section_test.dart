@@ -912,7 +912,7 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
   fail('Условие не выполнилось');
 }
 
-/// Приложение новой установки на странице «Настройки» с одной суточной
+/// Приложение новой установки на странице «Настройки» с одной ежедневной
 /// копией с тегом «Дом», после которой создан тег «Сад». Часы остановлены
 /// 7 октября 2026 года в 09:00, а замену графа может отклонить [storage].
 final class _RestoreApp {
@@ -941,7 +941,7 @@ final class _RestoreApp {
     addTearDown(() async {
       await tester.pumpWidget(const SizedBox.shrink());
       // Выключение дожидается работы, начатой в кадрах проверки, например
-      // проверки суточной копии при возвращении в приложение, поэтому
+      // проверки ежедневной копии при возвращении в приложение, поэтому
       // продолжается и в реальном ожидании, и в кадрах.
       var isShutDown = false;
       unawaited(runtime.shutdown().whenComplete(() => isShutDown = true));
@@ -951,7 +951,7 @@ final class _RestoreApp {
     final app = _RestoreApp._(tester, ready.container, storage);
     await tester.runAsync(() async {
       await app.createTag('Дом');
-      // Проверка при запуске могла сделать суточную копию уже с тегом, и
+      // Проверка при запуске могла сделать ежедневную копию уже с тегом, и
       // тогда второй копии за день не будет.
       await ready.container.read(graphBackupsProvider).makeDailyBackupIfDue();
       await app.createTag('Сад');

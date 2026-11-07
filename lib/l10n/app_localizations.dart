@@ -2173,7 +2173,7 @@ abstract class AppLocalizations {
   /// **'Backups'**
   String get dataBackupsTitle;
 
-  /// Пояснение панели «Резервные копии»: когда делаются и сколько хранятся копии; число совпадает с окном хранения суточных копий
+  /// Пояснение панели «Резервные копии»: когда делаются и сколько хранятся копии; число совпадает с окном хранения ежедневных копий
   ///
   /// In en, this message translates to:
   /// **'A copy is made each day your data changes and stays on this device. The 7 most recent daily copies are kept. Choose a copy to restore it.'**

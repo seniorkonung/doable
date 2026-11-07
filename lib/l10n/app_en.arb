@@ -1093,7 +1093,7 @@
   "dataBackupsTitle": "Backups",
   "@dataBackupsTitle": {"description": "Заголовок панели «Резервные копии»"},
   "dataBackupsExplanation": "A copy is made each day your data changes and stays on this device. The 7 most recent daily copies are kept. Choose a copy to restore it.",
-  "@dataBackupsExplanation": {"description": "Пояснение панели «Резервные копии»: когда делаются и сколько хранятся копии; число совпадает с окном хранения суточных копий"},
+  "@dataBackupsExplanation": {"description": "Пояснение панели «Резервные копии»: когда делаются и сколько хранятся копии; число совпадает с окном хранения ежедневных копий"},
   "dataBackupsMakeNow": "Back up now",
   "@dataBackupsMakeNow": {"description": "Кнопка панели «Резервные копии», делающая ручную копию"},
   "dataBackupsReadFailed": "Couldn’t load backups",

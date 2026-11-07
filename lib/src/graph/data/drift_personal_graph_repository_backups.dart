@@ -117,7 +117,7 @@ extension _GraphBackupRegistryAccess on DriftPersonalGraphRepository {
     return written;
   });
 
-  /// Условие записи суточной копии [GraphBackupRegistry.insertDailyBackup].
+  /// Условие записи ежедневной копии [GraphBackupRegistry.insertDailyBackup].
   Future<bool> _isDailyBackupDue(
     DateTime dayStart,
     DateTime madeAt,
@@ -203,7 +203,7 @@ extension _GraphBackupRegistryAccess on DriftPersonalGraphRepository {
   }
 
   /// Удаляет копии любого вида, созданные раньше самой старой из
-  /// [retainedDailyGraphBackups] последних суточных копий, и возвращает
+  /// [retainedDailyGraphBackups] последних ежедневных копий, и возвращает
   /// число удалённых копий.
   ///
   /// Длительность удаления отсчитывает [duration]; отказ диагностируется и
