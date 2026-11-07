@@ -263,6 +263,17 @@ final class IntentionActionsPageReadDiagnosticsEvent extends DiagnosticsEvent {
   final bool isContinuation;
 }
 
+final class PathCandidatesReadDiagnosticsEvent extends DiagnosticsEvent {
+  const PathCandidatesReadDiagnosticsEvent({
+    required this.pageSize,
+    required this.isContinuation,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final int pageSize;
+  final bool isContinuation;
+}
+
 final class BootstrapDiagnosticsEvent extends DiagnosticsEvent {
   const BootstrapDiagnosticsEvent({
     required DiagnosticsStatus status,

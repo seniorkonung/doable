@@ -11,6 +11,7 @@ import '../../action/application/action_details.dart';
 import '../../action/application/action_list_item.dart';
 import '../../action/application/action_result.dart';
 import '../../action/application/intention_actions.dart';
+import '../../action/application/path_candidates.dart';
 import '../../action/domain/action.dart';
 import '../../action/domain/action_id.dart';
 import '../../action/domain/action_path.dart';
@@ -99,6 +100,7 @@ part 'drift_personal_graph_repository_action_day.dart';
 part 'drift_personal_graph_repository_action_day_statuses.dart';
 part 'drift_personal_graph_repository_action_reads.dart';
 part 'drift_personal_graph_repository_intention_actions.dart';
+part 'drift_personal_graph_repository_path_candidates.dart';
 part 'drift_personal_graph_repository_relation_commands.dart';
 part 'drift_personal_graph_repository_relation_details.dart';
 part 'drift_personal_graph_repository_relation_groups.dart';
@@ -305,6 +307,10 @@ final class DriftPersonalGraphRepository
   Future<IntentionActionsPageResult> getIntentionActionsPage(
     IntentionActionsQuery query,
   ) => _readIntentionActionsPage(query);
+
+  @override
+  Future<PathCandidatesResult> getPathCandidates(PathCandidatesQuery query) =>
+      _readPathCandidates(query);
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(

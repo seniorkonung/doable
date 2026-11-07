@@ -3,6 +3,7 @@ import 'action_day.dart';
 import 'action_day_statuses.dart';
 import 'action_details.dart';
 import 'intention_actions.dart';
+import 'path_candidates.dart';
 
 /// Чтения действий. Подмешивается в `PersonalGraphRepository`: отдельного
 /// репозитория действий нет (ADR-0009).
@@ -33,4 +34,11 @@ abstract interface class ActionReadContract {
   Future<IntentionActionsPageResult> getIntentionActionsPage(
     IntentionActionsQuery query,
   );
+
+  /// Читает целый начальный участок черновика пути — намерения от корневого
+  /// до первого разрыва — и ограниченную порцию кандидатов следующего
+  /// намерения одной половины. Первая порция несёт участок и точные числа
+  /// кандидатов обеих половин на одной ревизии; продолжение привязано к
+  /// ревизии первой порции, а смена ревизии — конфликт.
+  Future<PathCandidatesResult> getPathCandidates(PathCandidatesQuery query);
 }

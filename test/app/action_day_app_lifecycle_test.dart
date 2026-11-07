@@ -6,6 +6,7 @@ import 'package:doable/src/action/application/action_day.dart';
 import 'package:doable/src/action/application/action_day_statuses.dart';
 import 'package:doable/src/action/application/action_details.dart';
 import 'package:doable/src/action/application/intention_actions.dart';
+import 'package:doable/src/action/application/path_candidates.dart';
 import 'package:doable/src/action/domain/action_id.dart';
 import 'package:doable/src/action/presentation/day/action_day_calendar.dart';
 import 'package:doable/src/action/presentation/day/action_day_calendar_viewport.dart';
@@ -754,6 +755,10 @@ final class _ObservedRepository implements PersonalGraphRepository {
   Future<IntentionActionsPageResult> getIntentionActionsPage(
     IntentionActionsQuery query,
   ) => _delegate.getIntentionActionsPage(query);
+
+  @override
+  Future<PathCandidatesResult> getPathCandidates(PathCandidatesQuery query) =>
+      _delegate.getPathCandidates(query);
 
   @override
   Future<StatisticsPageResult> getStatisticsPage(StatisticsQuery query) =>

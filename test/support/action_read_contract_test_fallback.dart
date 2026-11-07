@@ -3,6 +3,7 @@ import 'package:doable/src/action/application/action_day_statuses.dart';
 import 'package:doable/src/action/application/action_details.dart';
 import 'package:doable/src/action/application/action_read_contract.dart';
 import 'package:doable/src/action/application/intention_actions.dart';
+import 'package:doable/src/action/application/path_candidates.dart';
 import 'package:doable/src/action/domain/action_id.dart';
 
 /// Подставляет явный отказ в тестовые графы, не читающие действия.
@@ -26,4 +27,9 @@ mixin ActionReadContractTestFallback implements ActionReadContract {
     IntentionActionsQuery query,
   ) async =>
       const IntentionActionsPageError(IntentionActionsUnexpectedFailure());
+
+  @override
+  Future<PathCandidatesResult> getPathCandidates(
+    PathCandidatesQuery query,
+  ) async => const PathCandidatesError(PathCandidatesUnexpectedFailure());
 }
