@@ -477,3 +477,17 @@
   - **Зависимости:** нет.
   - **Предполагаемые файлы:** `lib/src/long_term_relation/application/relation_group.dart`, `relation_group_page.dart`, `relation_counts.dart`, `lib/src/graph/application/personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `drift_personal_graph_repository_relation_groups.dart`, `lib/src/action/application/action_result.dart`, `lib/src/action/presentation/action_command_failure_message.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и сгенерированные `app_localizations*.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/app/navigation/app_shell_operation_reset_test.dart` и тестовые подмены репозитория с сигнатурой `RelationGroupPageQuery` в `test/`.
   - **Размер:** S.
+
+- [ ] 1.38 Панель резервных копий и словарь копий в коде говорят о ежедневных копиях, как спека и глоссарий
+  - **Критерии приёмки:**
+    - Пояснение `dataBackupsExplanation` в `lib/l10n/app_ru.arb` совпадает с требованием «Список резервных копий» спеки `graph-backups`: «Копия делается каждый день, если данные менялись, и хранится на этом устройстве. Остаются 7 последних ежедневных копий. Выберите копию, чтобы восстановить её.» Описание `@dataBackupsExplanation` в `app_en.arb` говорит об окне хранения ежедневных копий; английский текст не меняется. Локализация перегенерирована.
+    - Комментарии, названия тестов и описания в `lib`, `test` и `benchmark` называют копии, которые делаются раз в день, ежедневными, а не суточными: `lib/src/graph_backups`, `lib/src/graph/data/drift_personal_graph_repository_backups.dart`, `lib/src/app/app_runtime.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart` и тесты копий, восстановления, импорта, раздела «Данные» и диагностики, в том числе `test/data_transfer/presentation/backups_sheet_test.dart`, который закрепляет видимый текст пояснения по спеке.
+    - Поведение не меняется; ни один литерал и ни одно слово не разрезаны ради обхода текстовых проверок. Спеки и `CONTEXT.md` не меняются.
+  - **Проверка:**
+    - `mise run codegen`, затем `mise run codegen-check`.
+    - `grep -rniP 'daily.?choice|(?<!еже)дневн' lib test benchmark` ничего не находит (шаблон не совпадает с «ежедневн»).
+    - `grep -rni 'суточн' lib test benchmark` ничего не находит.
+    - `mise exec --no-deps -- flutter test test/data_transfer test/graph_backups test/graph/data/drift_graph_backup_registry_test.dart test/app/graph_backups_app_flow_test.dart test/app/graph_restore_app_flow_test.dart test/app/graph_import_app_flow_test.dart test/app/graph_import_failures_app_flow_test.dart test/app/bootstrap/app_runtime_graph_backups_test.dart test/shared/diagnostics/diagnostics_sink_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/l10n/app_ru.arb`, `app_en.arb` и сгенерированные `app_localizations*.dart`, `lib/src/graph_backups/graph_backups.dart`, `graph_backups_provider.dart`, `graph_backup_registry.dart`, `lib/src/graph/data/drift_personal_graph_repository_backups.dart`, `lib/src/app/app_runtime.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, тесты в `test/data_transfer`, `test/graph_backups`, `test/graph/data/drift_graph_backup_registry_test.dart`, `test/app` (копии, восстановление, импорт, `bootstrap/app_runtime_graph_backups_test.dart`), `test/shared/diagnostics/diagnostics_sink_test.dart`, `test/support/graph_history_rows.dart`.
+  - **Размер:** S по логике: файлов больше нормы, но меняются только формулировки.

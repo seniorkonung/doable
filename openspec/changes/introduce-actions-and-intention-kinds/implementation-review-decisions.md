@@ -4,11 +4,6 @@
 
 Файл ведёт оркестратор. Решения приняты пользователем в сессии решений и исполняются автономно, по одной finding за сессию. Сессия исполнения удаляет раздел своей finding в коммите её устранения.
 
-## F6 · Medium — Текст панели резервных копий переписан из «ежедневных» в «суточные» вопреки спеке
-
-- **Решение:** Устранить
-- **Как устранить:** Вариант A (выбран пользователем): вернуть словарь резервных копий к спеке и глоссарию — «ежедневн…» вместо «суточн…» везде в lib, test и benchmark (на базе a89df6eb слова «суточн» не было, все 67 вхождений внесены коммитом 402dbbfe): видимый текст dataBackupsExplanation в lib/l10n/app_ru.arb («…Остаются 7 последних ежедневных копий…» как в спеке graph-backups), описание @dataBackupsExplanation в app_en.arb, перегенерированная локализация, комментарии и названия в lib/src/graph_backups, lib/src/graph/data/drift_personal_graph_repository_backups.dart, lib/src/app/app_runtime.dart, lib/src/shared/diagnostics/diagnostics_sink.dart и тестах копий (test/data_transfer/presentation/backups_sheet_test.dart и др.). Спеки и CONTEXT.md не менять, завершённую задачу 1.30 не править. Проверка новой задачи: grep -rniP 'daily.?choice|(?<!еже)дневн' lib test benchmark ничего не находит (шаблон не совпадает с «ежедневн»); grep -rni 'суточн' lib test benchmark ничего не находит; mise run codegen-check; тесты копий (test/data_transfer, test/graph_backups, test/app/graph_backups_app_flow_test.dart и прочие изменённые). Отдельная новая задача Фазы 1 со следующим свободным номером, дописанная в конец списка после всех существующих задач; номера других задач не указывать.
-
 ## F7 · Medium — При переносе на действия потеряны регрессионные проверки экрана дня и вкладки «Действия»
 
 - **Решение:** Устранить
