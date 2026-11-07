@@ -12,6 +12,7 @@ enum DoableIconData {
   plus('plus'),
   plusSmall('plus_small'),
   intention('intention'),
+  supporting('supporting'),
   relation('relation'),
   calendar('calendar'),
   intentionMini('intention_mini'),

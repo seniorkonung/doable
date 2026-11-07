@@ -6,8 +6,8 @@ import '../doable_metrics.dart';
 import '../doable_type.dart';
 
 /// Тон иконки метки: `muted` — у коробки архива и у молнии архивированного
-/// действия.
-enum BadgeTone { ink, muted }
+/// действия; `accent` — у неудерживаемого вспомогательного намерения.
+enum BadgeTone { ink, muted, accent }
 
 /// Метка рядом с названием, которая сообщает факт и не является кнопкой.
 ///
@@ -16,7 +16,7 @@ enum BadgeTone { ink, muted }
 sealed class Badge extends StatelessWidget {
   const Badge._({super.key});
 
-  /// Метка-значок строки списка на заливке `fill`, поэтому её фон — `bg`.
+  /// Метка-значок строки на `fill`: фон `bg` или `accentSoft` для `accent`.
   /// Узла экранного диктора у метки нет: факт называет доступное название
   /// строки.
   const factory Badge.mark({
@@ -69,7 +69,7 @@ final class BadgeMark extends Badge {
       height: 20,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: colors.bg,
+          color: tone == BadgeTone.accent ? colors.accentSoft : colors.bg,
           borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
         ),
         child: Center(
@@ -79,6 +79,7 @@ final class BadgeMark extends Badge {
             color: switch (tone) {
               BadgeTone.ink => colors.ink,
               BadgeTone.muted => colors.muted,
+              BadgeTone.accent => colors.accent,
             },
           ),
         ),

@@ -16,9 +16,10 @@ void main() {
     for (final (tone, toneColor) in [
       (BadgeTone.ink, colors.ink),
       (BadgeTone.muted, colors.muted),
+      (BadgeTone.accent, colors.accent),
     ]) {
       testWidgets('в $themeName теме метка тона ${tone.name} — плитка 22×20 '
-          'на bg с углами radius-xs и иконкой 14 цвета ${tone.name} по '
+          'с углами radius-xs и иконкой 14 цвета ${tone.name} по '
           'центру', (tester) async {
         await tester.pumpWidget(
           _app(
@@ -38,7 +39,7 @@ void main() {
         expect(
           ground.decoration,
           BoxDecoration(
-            color: colors.bg,
+            color: tone == BadgeTone.accent ? colors.accentSoft : colors.bg,
             borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
           ),
         );
