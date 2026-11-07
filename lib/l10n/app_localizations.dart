@@ -98,6 +98,42 @@ abstract class AppLocalizations {
     Locale('ru'),
   ];
 
+  /// Подпись вида намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Intention kind'**
+  String get intentionKindLabel;
+
+  /// Подпись вида намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Main'**
+  String get intentionKindMain;
+
+  /// Подпись вида намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting'**
+  String get intentionKindSupporting;
+
+  /// Подпись вида намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Main. Matters on its own and remains when what needs it goes away'**
+  String get intentionKindMainSemantics;
+
+  /// Подпись вида намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting. Exists while a main intention needs it and goes away with it'**
+  String get intentionKindSupportingSemantics;
+
+  /// Подпись вида намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting. Available when another intention needs it or can use it'**
+  String get intentionKindSupportingUnavailable;
+
   /// Название приложения
   ///
   /// In en, this message translates to:
@@ -1237,36 +1273,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Intention details'**
   String get detailsTitle;
-
-  /// Тип неготового намерения в верхней панели его страницы
-  ///
-  /// In en, this message translates to:
-  /// **'Intention'**
-  String get detailsTypeIntention;
-
-  /// Тип готового к действию намерения в верхней панели его страницы
-  ///
-  /// In en, this message translates to:
-  /// **'Action'**
-  String get detailsTypeAction;
-
-  /// Доступное название пары плиток выбора готовности к действию на обзоре намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Intention or action'**
-  String get detailsTypeChoiceLabel;
-
-  /// Пояснение плитки неготового намерения на обзоре
-  ///
-  /// In en, this message translates to:
-  /// **'Any size. It may take more than a day.'**
-  String get detailsTypeIntentionHint;
-
-  /// Оба критерия действия на плитке готового намерения на обзоре
-  ///
-  /// In en, this message translates to:
-  /// **'Doable within one day, and clear what to do.'**
-  String get detailsTypeActionHint;
 
   /// Метка архива после названия в шапке страницы архивированного намерения
   ///

@@ -5,7 +5,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/design_system/components/archived_fold.dart';
-import 'package:doable/src/design_system/components/option_tiles.dart';
+import 'package:doable/src/design_system/components/segmented_control.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
@@ -262,11 +262,12 @@ void main() {
     expect(_row(created), findsOneWidget);
   });
 
-  _testWidgets('смена готовности на «Обзоре» не меняет группу «Связей»', (
+  _testWidgets('смена вида на «Обзоре» не меняет группу «Связей»', (
     tester,
   ) async {
     final graph = _Graph();
     final before = graph.addIntention(1, 'Быть здоровым');
+    graph.addRelation(before, index: 1, direction: RelationDirection.incoming);
     await _openPage(tester, graph, before);
     await _chooseTab(tester, 'Relations');
     _expectSelectedGroup(tester, IntentionRelationGroup.needs);
@@ -274,17 +275,18 @@ void main() {
     await _chooseTab(tester, 'Overview');
     await tester.tap(
       find.descendant(
-        of: find.byType(OptionTiles<IntentionReadiness>),
-        matching: find.text('Action'),
+        of: find.byType(SegmentedControl<IntentionKind>),
+        matching: find.text('Supporting'),
       ),
     );
     await tester.pump();
-    expect(graph.repository.commands.single, isA<EnableIntentionReadiness>());
-    final saved = graph.addIntention(
-      1,
-      'Быть здоровым',
-      IntentionReadiness.ready,
+    expect(graph.repository.commands.single, isA<ChangeIntentionKind>());
+    final saved = testDetailsIntention(
+      index: 1,
+      title: 'Быть здоровым',
+      kind: IntentionKind.supporting,
     );
+    graph._intentions[saved.id] = saved;
     graph.repository.completeCommand(
       0,
       testDetailsSavedResult(
@@ -297,7 +299,10 @@ void main() {
     graph.confirmChange(saved.id);
     await tester.pumpAndSettle();
     expect(
-      find.descendant(of: find.byType(TopBar), matching: find.text('Action')),
+      find.descendant(
+        of: find.byType(TopBar),
+        matching: find.text('Intention'),
+      ),
       findsOneWidget,
     );
 

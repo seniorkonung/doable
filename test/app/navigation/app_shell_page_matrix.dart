@@ -189,23 +189,23 @@ void _registerPageMatrixTests() {
 
   testWidgets('матрица: сценарий «Правка на странице намерения не скрывает '
       'панель»', (tester) async {
-    await _start(tester);
+    await _start(tester, incomingForRead: true);
     await _select(tester, AppDestination.intentionGraph);
     await _open(tester, intentionCatalogRow('Читать'), IntentionDetailsPage);
-    final types = find.byType(OptionTiles<IntentionReadiness>);
+    final types = find.byType(SegmentedControl<IntentionKind>);
     final removeTag = find.byKey(
       ValueKey('tag-assignment-remove-${tagFixtureId(_tag)}'),
     );
 
     await _tap(
       tester,
-      find.descendant(of: types, matching: find.text('Intention')),
+      find.descendant(of: types, matching: find.text('Supporting')),
     );
     await _waitFor(
       tester,
       () =>
-          tester.widget<OptionTiles<IntentionReadiness>>(types).value ==
-          IntentionReadiness.notReady,
+          tester.widget<SegmentedControl<IntentionKind>>(types).value ==
+          IntentionKind.supporting,
     );
     // Индикатор выполняющейся команды не даёт кадрам успокоиться.
     await _waitFor(tester, () => !tester.binding.hasScheduledFrame);

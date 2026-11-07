@@ -305,6 +305,7 @@ Intention testDetailsIntention({
   String title = 'Намерение',
   String? description = 'Описание',
   IntentionReadiness readiness = IntentionReadiness.notReady,
+  IntentionKind kind = IntentionKind.main,
   IntentionArchiveState archiveState = IntentionArchiveState.active,
 }) {
   final id = testDetailsIntentionId(index);
@@ -314,6 +315,7 @@ Intention testDetailsIntention({
     title: title,
     description: description,
     readiness: readiness,
+    kind: kind,
     archiveState: archiveState,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -336,6 +338,7 @@ IntentionSummary testDetailsSummary(Intention intention) => IntentionSummary(
   title: intention.title,
   descriptionPreview: testDescriptionPreview(intention.description),
   readiness: intention.readiness,
+  kind: intention.kind,
   archiveState: intention.archiveState,
   createdAt: intention.createdAt,
   updatedAt: intention.updatedAt,

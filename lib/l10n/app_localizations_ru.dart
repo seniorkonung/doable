@@ -10,6 +10,27 @@ class AppLocalizationsRu extends AppLocalizations {
   AppLocalizationsRu([String locale = 'ru']) : super(locale);
 
   @override
+  String get intentionKindLabel => 'Вид намерения';
+
+  @override
+  String get intentionKindMain => 'Главное';
+
+  @override
+  String get intentionKindSupporting => 'Вспомогательное';
+
+  @override
+  String get intentionKindMainSemantics =>
+      'Главное. Важно само по себе и остаётся, когда уходит то, что в нём нуждается';
+
+  @override
+  String get intentionKindSupportingSemantics =>
+      'Вспомогательное. Существует, пока в нём нуждается главное, и уходит вместе с ним';
+
+  @override
+  String get intentionKindSupportingUnavailable =>
+      'Вспомогательное. Возможно, когда другому намерению оно нужно или его можно использовать';
+
+  @override
   String get appTitle => 'Doable';
 
   @override
@@ -805,23 +826,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get detailsTitle => 'Подробности намерения';
-
-  @override
-  String get detailsTypeIntention => 'Намерение';
-
-  @override
-  String get detailsTypeAction => 'Действие';
-
-  @override
-  String get detailsTypeChoiceLabel => 'Намерение или действие';
-
-  @override
-  String get detailsTypeIntentionHint =>
-      'Любого размера. Может занять больше дня.';
-
-  @override
-  String get detailsTypeActionHint =>
-      'Выполнимо за один день, и понятно, что делать.';
 
   @override
   String get detailsArchivedBadge => 'Архив';

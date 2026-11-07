@@ -196,19 +196,25 @@ void main() {
     final intention = testDetailsIntention(title: 'Бегать');
     final ready = testDetailsIntention(
       title: 'Бегать',
-      readiness: IntentionReadiness.ready,
+      kind: IntentionKind.supporting,
     );
-    await _openLoaded(tester, repository, intention);
-    await tester.tap(find.text('Действие').last);
+    await _openLoaded(
+      tester,
+      repository,
+      intention,
+      counts: testRelationCounts(activeNeedIncoming: 1),
+    );
+    await tester.tap(find.text('Вспомогательное'));
     await tester.pump();
-    expect(repository.commands.single, isA<EnableIntentionReadiness>());
+    expect(repository.commands.single, isA<ChangeIntentionKind>());
 
     await _openOptions(tester, settle: false);
     expect(_rows(tester).map((row) => row.onPressed), everyElement(isNull));
-    expect(
-      _rows(tester).map((row) => row.hint),
-      everyElement('Дождитесь окончания текущего изменения'),
-    );
+    expect(_rows(tester).map((row) => row.hint), [
+      'Дождитесь окончания текущего изменения',
+      'Дождитесь окончания текущего изменения',
+      'Сначала удалите его связи',
+    ]);
     await tester.tap(_inSheet('Изменить'), warnIfMissed: false);
     // Индикатор выполняющейся команды не даёт кадрам успокоиться.
     await tester.pump(const Duration(seconds: 1));
@@ -221,10 +227,17 @@ void main() {
     );
     await tester.pump();
     await waitForDetailRequests(repository, 2);
-    repository.detailRequests[1].add(ResultSuccess(ready));
+    repository.detailRequests[1].add(
+      ResultSuccess(ready),
+      relationCounts: testRelationCounts(activeNeedIncoming: 1),
+    );
     await tester.pumpAndSettle();
     expect(find.byType(Sheet), findsOneWidget);
-    expect(_rows(tester).map((row) => row.onPressed), everyElement(isNotNull));
+    expect(
+      _rows(tester).take(2).map((row) => row.onPressed),
+      everyElement(isNotNull),
+    );
+    expect(_rows(tester).last.onPressed, isNull);
   });
 
   testWidgets('подтверждённое удаление активного намерения удаляет его и '

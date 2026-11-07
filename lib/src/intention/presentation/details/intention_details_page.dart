@@ -16,7 +16,7 @@ import '../../../app/routing/app_router.gr.dart';
 import '../../../design_system/components/badge.dart';
 import '../../../design_system/components/button.dart';
 import '../../../design_system/components/confirm_dialog.dart';
-import '../../../design_system/components/option_tiles.dart';
+import '../../../design_system/components/segmented_control.dart';
 import '../../../design_system/components/options_menu.dart';
 import '../../../design_system/components/page_head.dart';
 import '../../../design_system/components/sheet.dart';
@@ -443,19 +443,11 @@ final class _IntentionDetailsPageState
               );
             }
             final intention = details.intention;
-            final (type, typeIcon) = switch (intention.readiness) {
-              IntentionReadiness.ready => (
-                localizations.detailsTypeAction,
-                DoableIconData.bolt,
-              ),
-              IntentionReadiness.notReady => (
-                localizations.detailsTypeIntention,
-                DoableIconData.intention,
-              ),
-            };
             return TopBar.back(
-              title: headHidden ? intention.title : type,
-              titleIcon: headHidden ? null : typeIcon,
+              title: headHidden
+                  ? intention.title
+                  : localizations.detailsOptionsTitle,
+              titleIcon: headHidden ? null : DoableIconData.intention,
               muted:
                   headHidden &&
                   intention.archiveState == IntentionArchiveState.archived,
@@ -612,12 +604,9 @@ final class _DetailsContent extends ConsumerWidget {
         relationCounts: relationCounts ?? loaded.details.relationCounts,
         actionCount: actionCount,
         statisticsSection: statisticsSection,
-        onEnableReadiness: ref
+        onChangeKind: ref
             .read(intentionDetailsViewModelProvider(intentionId).notifier)
-            .enableReadiness,
-        onDisableReadiness: ref
-            .read(intentionDetailsViewModelProvider(intentionId).notifier)
-            .disableReadiness,
+            .changeKind,
       ),
       IntentionDetailsNotFound() => _DetailsStatus(
         message: localizations.detailsNotFound,
@@ -658,8 +647,7 @@ final class _LoadedDetails extends StatelessWidget {
     required this.relationCounts,
     required this.actionCount,
     required this.statisticsSection,
-    required this.onEnableReadiness,
-    required this.onDisableReadiness,
+    required this.onChangeKind,
   });
 
   final IntentionDetailsLoaded state;
@@ -674,13 +662,20 @@ final class _LoadedDetails extends StatelessWidget {
   final RelationCounts relationCounts;
   final int? actionCount;
   final Widget statisticsSection;
-  final VoidCallback onEnableReadiness;
-  final VoidCallback onDisableReadiness;
+  final ValueChanged<IntentionKind> onChangeKind;
 
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final intention = state.intention;
+    final canBeSupporting =
+        relationCounts.activeNeedIncoming +
+            relationCounts.activeCanIncoming +
+            (intention.archiveState == IntentionArchiveState.archived
+                ? relationCounts.archivedNeedIncoming +
+                      relationCounts.archivedCanIncoming
+                : 0) >
+        0;
     return CustomScrollView(
       controller: scrollController,
       slivers: [
@@ -723,27 +718,27 @@ final class _LoadedDetails extends StatelessWidget {
                   0,
                 ),
                 sliver: SliverToBoxAdapter(
-                  child: OptionTiles<IntentionReadiness>(
-                    first: OptionTile(
-                      id: IntentionReadiness.notReady,
-                      icon: DoableIconData.intention,
-                      title: localizations.detailsTypeIntention,
-                      hint: localizations.detailsTypeIntentionHint,
+                  child: SegmentedControl<IntentionKind>(
+                    first: SegmentItem(
+                      id: IntentionKind.main,
+                      label: localizations.intentionKindMain,
+                      semanticLabel: localizations.intentionKindMainSemantics,
                     ),
-                    second: OptionTile(
-                      id: IntentionReadiness.ready,
-                      icon: DoableIconData.bolt,
-                      title: localizations.detailsTypeAction,
-                      hint: localizations.detailsTypeActionHint,
+                    second: SegmentItem(
+                      id: IntentionKind.supporting,
+                      label: localizations.intentionKindSupporting,
+                      semanticLabel: canBeSupporting
+                          ? localizations.intentionKindSupportingSemantics
+                          : localizations.intentionKindSupportingUnavailable,
+                      disabled: !canBeSupporting,
                     ),
-                    value: intention.readiness,
-                    label: localizations.detailsTypeChoiceLabel,
-                    onChange: state.isOperationRunning
+                    value: intention.kind,
+                    label: localizations.intentionKindLabel,
+                    onChange:
+                        state.isOperationRunning ||
+                            state.isAwaitingConfirmedSnapshot
                         ? null
-                        : (readiness) => switch (readiness) {
-                            IntentionReadiness.ready => onEnableReadiness(),
-                            IntentionReadiness.notReady => onDisableReadiness(),
-                          },
+                        : onChangeKind,
                   ),
                 ),
               ),

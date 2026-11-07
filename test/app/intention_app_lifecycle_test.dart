@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:doable/src/design_system/components/option_tiles.dart';
+import 'package:doable/src/design_system/components/segmented_control.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:auto_route/auto_route.dart';
@@ -175,13 +175,14 @@ void main() {
         created.title,
       );
       expect(find.text(updated.title), findsNothing);
+      repository.hasIncoming = true;
       repository.emitDetail(2, updated);
       await tester.pumpAndSettle();
       expect(find.byType(SnackBar), findsNothing);
 
       final actionTile = find.descendant(
-        of: find.byType(OptionTiles<IntentionReadiness>),
-        matching: find.text('Action'),
+        of: find.byType(SegmentedControl<IntentionKind>),
+        matching: find.text('Supporting'),
       );
       await Scrollable.ensureVisible(
         tester.element(actionTile),
@@ -192,7 +193,7 @@ void main() {
       await tester.pump();
       final ready = _copyIntention(
         updated,
-        readiness: IntentionReadiness.ready,
+        kind: IntentionKind.supporting,
         updatedDay: 3,
       );
       repository.completeCommand(
@@ -205,11 +206,11 @@ void main() {
       await _scrollCurrentPageToTop(tester);
       expect(
         tester
-            .widget<OptionTiles<IntentionReadiness>>(
-              find.byType(OptionTiles<IntentionReadiness>),
+            .widget<SegmentedControl<IntentionKind>>(
+              find.byType(SegmentedControl<IntentionKind>),
             )
             .value,
-        IntentionReadiness.ready,
+        IntentionKind.supporting,
       );
       await _closeOperationMessage(tester);
 
@@ -256,6 +257,7 @@ void main() {
       final restored = _copyIntention(
         archived,
         archiveState: IntentionArchiveState.active,
+        kind: IntentionKind.main,
         updatedDay: 5,
       );
       repository.completeCommand(
@@ -263,6 +265,7 @@ void main() {
         _saved(restored, before: archived, revision: 5),
       );
       await _pumpUntil(tester, () => repository.detailRequests.length == 6);
+      repository.hasIncoming = false;
       repository.emitDetail(5, restored);
       await tester.pumpAndSettle();
       await _scrollCurrentPageToTop(tester);
@@ -769,8 +772,10 @@ final class _DelayedPersonalGraphRepository
         TagCatalogSnapshot(items: const [], revision: const _Revision(0)),
       );
 
+  bool hasIncoming = false;
+
   RelationCounts _countsFor(IntentionId id) => RelationCounts(
-    activeNeedIncoming: 0,
+    activeNeedIncoming: hasIncoming ? 1 : 0,
     activeNeedOutgoing: 0,
     activeCanIncoming: 0,
     activeCanOutgoing: 0,
@@ -924,6 +929,7 @@ Intention _copyIntention(
   String? title,
   String? description,
   IntentionReadiness? readiness,
+  IntentionKind? kind,
   IntentionArchiveState? archiveState,
   required int updatedDay,
 }) => Intention(
@@ -931,6 +937,7 @@ Intention _copyIntention(
   title: title ?? source.title,
   description: description ?? source.description,
   readiness: readiness ?? source.readiness,
+  kind: kind ?? source.kind,
   archiveState: archiveState ?? source.archiveState,
   createdAt: source.createdAt,
   updatedAt: IntentionTimestamp(DateTime.utc(2026, 1, updatedDay)),
@@ -941,6 +948,7 @@ IntentionSummary _summary(Intention intention) => IntentionSummary(
   title: intention.title,
   descriptionPreview: testDescriptionPreview(intention.description),
   readiness: intention.readiness,
+  kind: intention.kind,
   archiveState: intention.archiveState,
   createdAt: intention.createdAt,
   updatedAt: intention.updatedAt,

@@ -113,7 +113,7 @@ void main() {
     await waitForDetailRequests(repository, 1);
     repository.detailRequests[0].add(ResultSuccess(first));
     await pumpEventQueue();
-    container.read(firstProvider.notifier).enableReadiness();
+    container.read(firstProvider.notifier).changeKind(IntentionKind.supporting);
     firstSubscription.close();
     await pumpEventQueue();
 
@@ -138,7 +138,7 @@ void main() {
     container.read(firstProvider.notifier).archive();
     container.read(secondProvider.notifier).archive();
     expect(repository.commands, hasLength(2));
-    expect(repository.commands[0], isA<EnableIntentionReadiness>());
+    expect(repository.commands[0], isA<ChangeIntentionKind>());
     expect(repository.commands[1], isA<ArchiveIntention>());
     expect(
       (container.read(
@@ -675,16 +675,13 @@ void main() {
           >[
             (
               testDetailsIntention(index: 110),
-              (model) => model.enableReadiness(),
-              IntentionCommandKind.enableReadiness,
+              (model) => model.changeKind(IntentionKind.supporting),
+              IntentionCommandKind.changeKind,
             ),
             (
-              testDetailsIntention(
-                index: 111,
-                readiness: IntentionReadiness.ready,
-              ),
-              (model) => model.disableReadiness(),
-              IntentionCommandKind.disableReadiness,
+              testDetailsIntention(index: 111, kind: IntentionKind.supporting),
+              (model) => model.changeKind(IntentionKind.main),
+              IntentionCommandKind.changeKind,
             ),
             (
               testDetailsIntention(index: 112),
@@ -794,7 +791,7 @@ void main() {
         isFalse,
       );
 
-      container.read(provider.notifier).enableReadiness();
+      container.read(provider.notifier).changeKind(IntentionKind.supporting);
 
       expect(repository.commands.single, isA<ArchiveIntention>());
       expect(

@@ -79,16 +79,10 @@ void main() {
         repository.detailRequests.single.add(ResultSuccess(intention));
         await tester.pumpAndSettle();
 
-        final ready = readiness == IntentionReadiness.ready;
-        final type = ready
-            ? (russian ? 'Действие' : 'Action')
-            : (russian ? 'Намерение' : 'Intention');
+        final type = russian ? 'Намерение' : 'Intention';
         final bar = tester.widget<TopBar>(find.byType(TopBar));
         expect(bar.title, type);
-        expect(
-          bar.titleIcon,
-          ready ? DoableIconData.bolt : DoableIconData.intention,
-        );
+        expect(bar.titleIcon, DoableIconData.intention);
         expect(
           tester.getSemantics(_barText),
           isSemantics(

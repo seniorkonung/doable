@@ -17,13 +17,7 @@ import 'intention_details_state.dart';
 
 part 'intention_details_view_model.g.dart';
 
-enum _StateChangeKind {
-  enableReadiness,
-  disableReadiness,
-  archive,
-  restore,
-  delete,
-}
+enum _StateChangeKind { makeMain, makeSupporting, archive, restore, delete }
 
 final class _DetailObservationGeneration {
   const _DetailObservationGeneration(this.value);
@@ -104,10 +98,10 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     }
   }
 
-  void enableReadiness() => _startStateChange(_StateChangeKind.enableReadiness);
-
-  void disableReadiness() =>
-      _startStateChange(_StateChangeKind.disableReadiness);
+  void changeKind(IntentionKind kind) => _startStateChange(switch (kind) {
+    IntentionKind.main => _StateChangeKind.makeMain,
+    IntentionKind.supporting => _StateChangeKind.makeSupporting,
+  });
 
   void archive() => _startStateChange(_StateChangeKind.archive);
 
@@ -216,7 +210,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     }
   }
 
-  /// Отказ перехода предъявляет общая поверхность. У изменения готовности,
+  /// Отказ перехода предъявляет общая поверхность. У изменения вида,
   /// архивирования и восстановления права инициатора нет, а право удаления
   /// страница освобождает сразу при принятии: renderer отказа она не держит.
   Future<IntentionCommandCompletion>? _startStateChange(_StateChangeKind kind) {
@@ -248,11 +242,13 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
 
   ExistingIntentionCommand _commandForStateChange(_StateChangeKind kind) =>
       switch (kind) {
-        _StateChangeKind.enableReadiness => EnableIntentionReadiness(
+        _StateChangeKind.makeMain => ChangeIntentionKind(
           _intentionId,
+          IntentionKind.main,
         ),
-        _StateChangeKind.disableReadiness => DisableIntentionReadiness(
+        _StateChangeKind.makeSupporting => ChangeIntentionKind(
           _intentionId,
+          IntentionKind.supporting,
         ),
         _StateChangeKind.archive => ArchiveIntention(_intentionId),
         _StateChangeKind.restore => RestoreIntention(_intentionId),
@@ -265,10 +261,9 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
   ) {
     final details = loaded.details;
     return switch (kind) {
-      _StateChangeKind.enableReadiness =>
-        details.intention.readiness == IntentionReadiness.notReady,
-      _StateChangeKind.disableReadiness =>
-        details.intention.readiness == IntentionReadiness.ready,
+      _StateChangeKind.makeMain => details.intention.kind != IntentionKind.main,
+      _StateChangeKind.makeSupporting =>
+        details.intention.kind != IntentionKind.supporting,
       _StateChangeKind.archive =>
         details.intention.archiveState == IntentionArchiveState.active,
       _StateChangeKind.restore =>

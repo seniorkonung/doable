@@ -10,6 +10,27 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get intentionKindLabel => 'Intention kind';
+
+  @override
+  String get intentionKindMain => 'Main';
+
+  @override
+  String get intentionKindSupporting => 'Supporting';
+
+  @override
+  String get intentionKindMainSemantics =>
+      'Main. Matters on its own and remains when what needs it goes away';
+
+  @override
+  String get intentionKindSupportingSemantics =>
+      'Supporting. Exists while a main intention needs it and goes away with it';
+
+  @override
+  String get intentionKindSupportingUnavailable =>
+      'Supporting. Available when another intention needs it or can use it';
+
+  @override
   String get appTitle => 'Doable';
 
   @override
@@ -800,23 +821,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get detailsTitle => 'Intention details';
-
-  @override
-  String get detailsTypeIntention => 'Intention';
-
-  @override
-  String get detailsTypeAction => 'Action';
-
-  @override
-  String get detailsTypeChoiceLabel => 'Intention or action';
-
-  @override
-  String get detailsTypeIntentionHint =>
-      'Any size. It may take more than a day.';
-
-  @override
-  String get detailsTypeActionHint =>
-      'Doable within one day, and clear what to do.';
 
   @override
   String get detailsArchivedBadge => 'Archived';

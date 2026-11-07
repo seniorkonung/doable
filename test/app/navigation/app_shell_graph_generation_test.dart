@@ -382,6 +382,7 @@ Future<UnregisteredGraphSnapshot> _writeReplacementSnapshot(
         'id': intentionId(number),
         'title': _replacedTitle(number),
         'description': null,
+        'intentionKind': 'main',
         'actionReady': true,
         'archived': false,
         'createdAt': moment(number),

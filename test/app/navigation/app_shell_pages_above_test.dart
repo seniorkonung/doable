@@ -19,13 +19,12 @@ import 'package:doable/src/action/presentation/day/action_day_date_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/design_system/components/docked_footer.dart';
-import 'package:doable/src/design_system/components/option_tiles.dart';
+import 'package:doable/src/design_system/components/segmented_control.dart';
 import 'package:doable/src/design_system/components/picker_row.dart';
 import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
-import 'package:doable/src/intention/domain/intention.dart'
-    show IntentionReadiness;
+import 'package:doable/src/intention/domain/intention.dart' show IntentionKind;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/search/intention_search_bar.dart';
@@ -274,6 +273,7 @@ void _expectCreationSheetAboveCatalog(WidgetTester tester) {
 Future<AppRouter> _start(
   WidgetTester tester, {
   TemporaryGraphFiles? graphFiles,
+  bool incomingForRead = false,
 }) async {
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   tester.binding.platformDispatcher.localesTestValue = const [Locale('en')];
@@ -298,6 +298,22 @@ Future<AppRouter> _start(
   });
   final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
   _seed(raw);
+  if (incomingForRead) {
+    seedRawGraph(
+      raw,
+      () => raw.execute(
+        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, 0)',
+        [
+          tagFixtureId(102),
+          tagFixtureId(_walk),
+          tagFixtureId(_read),
+          'need',
+          2,
+          0,
+        ],
+      ),
+    );
+  }
   await tester.pumpWidget(MainApp(runtime: runtime));
   await _until(tester, find.byType(HomePage));
   await _waitFor(

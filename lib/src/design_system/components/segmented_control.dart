@@ -55,7 +55,7 @@ final class SegmentedControl<T extends Object> extends StatelessWidget {
           borderRadius: BorderRadius.circular(DoableMetrics.radiusMd),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(3),
+          padding: const EdgeInsets.symmetric(horizontal: 3),
           child: Row(
             spacing: 2,
             children: [
@@ -134,51 +134,58 @@ final class _SegmentState<T extends Object> extends State<_Segment<T>> {
             }
           : null,
       child: ExcludeSemantics(
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          constraints: const BoxConstraints(minHeight: 38),
-          decoration: BoxDecoration(
-            color: selected ? colors.raised : null,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
             borderRadius: radius,
-            boxShadow: focused
-                ? [
-                    BoxShadow(color: colors.accent, spreadRadius: 4),
-                    BoxShadow(color: colors.bg, spreadRadius: 2),
-                  ]
-                : (selected ? shadows.sm : null),
-          ),
-          child: Material(
-            type: MaterialType.transparency,
-            child: InkWell(
-              borderRadius: radius,
-              focusColor: Colors.transparent,
-              onFocusChange: (focused) => setState(() => _focused = focused),
-              onTap: enabled
-                  ? () {
-                      if (!selected) widget.onChange!(widget.item.id);
-                    }
-                  : null,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (widget.item.icon case final icon?) ...[
-                      DoableIcon(icon, size: 16, color: color),
-                      const SizedBox(width: 6),
-                    ],
-                    Flexible(
-                      child: Text(
-                        widget.item.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        softWrap: false,
-                        style: (selected ? DoableType.section : DoableType.row)
-                            .copyWith(color: color, letterSpacing: -0.15),
+            focusColor: Colors.transparent,
+            onFocusChange: (focused) => setState(() => _focused = focused),
+            onTap: enabled
+                ? () {
+                    if (!selected) widget.onChange!(widget.item.id);
+                  }
+                : null,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                constraints: const BoxConstraints(minHeight: 38),
+                decoration: BoxDecoration(
+                  color: selected ? colors.raised : null,
+                  borderRadius: radius,
+                  boxShadow: focused
+                      ? [
+                          BoxShadow(color: colors.accent, spreadRadius: 4),
+                          BoxShadow(color: colors.bg, spreadRadius: 2),
+                        ]
+                      : (selected ? shadows.sm : null),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 9,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (widget.item.icon case final icon?) ...[
+                        DoableIcon(icon, size: 16, color: color),
+                        const SizedBox(width: 6),
+                      ],
+                      Flexible(
+                        child: Text(
+                          widget.item.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: false,
+                          style:
+                              (selected ? DoableType.section : DoableType.row)
+                                  .copyWith(color: color, letterSpacing: -0.15),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

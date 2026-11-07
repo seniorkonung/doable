@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/design_system/components/button.dart';
 import 'package:doable/src/design_system/components/dates_line.dart';
-import 'package:doable/src/design_system/components/option_tiles.dart';
+import 'package:doable/src/design_system/components/segmented_control.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
@@ -97,7 +97,7 @@ void main() {
 
     expect(find.text('Сохранить русский заголовок'), findsOneWidget);
     expect(find.text('  Описание\nбез преобразования  '), findsOneWidget);
-    expect(_selectedType(tester), IntentionReadiness.ready);
+    expect(_selectedType(tester), IntentionKind.main);
     expect(find.text('Archived'), findsNothing);
     _expectNavigation(tester);
   });
@@ -770,9 +770,9 @@ Future<void> _sendTitleAndLeave(WidgetTester tester, String title) async {
   expect(find.byType(IntentionEditPage), findsNothing);
 }
 
-IntentionReadiness _selectedType(WidgetTester tester) => tester
-    .widget<OptionTiles<IntentionReadiness>>(
-      find.byType(OptionTiles<IntentionReadiness>, skipOffstage: false),
+IntentionKind _selectedType(WidgetTester tester) => tester
+    .widget<SegmentedControl<IntentionKind>>(
+      find.byType(SegmentedControl<IntentionKind>, skipOffstage: false),
     )
     .value;
 
@@ -782,8 +782,8 @@ void _expectPageControls(WidgetTester tester, {required bool enabled}) {
   expect(tester.widget<PageHead>(find.byType(PageHead)).onEdit, matcher);
   expect(
     tester
-        .widget<OptionTiles<IntentionReadiness>>(
-          find.byType(OptionTiles<IntentionReadiness>, skipOffstage: false),
+        .widget<SegmentedControl<IntentionKind>>(
+          find.byType(SegmentedControl<IntentionKind>, skipOffstage: false),
         )
         .onChange,
     matcher,
