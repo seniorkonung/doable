@@ -481,6 +481,22 @@ void main() {
     },
   );
 
+  test('смена пути убирает действие из выбранной роли намерения', () async {
+    final h = _Harness();
+    addTearDown(h.dispose);
+    h.instance.actionsRole = IntentionActionRole.root;
+    h.model.setVisible(true);
+    h.repository.first(0, [_item(1)], counts: _counts(root: 1, total: 1));
+    await pumpEventQueue();
+    await h.confirmPathChange(1, beforePath: [1, 2], afterPath: [2]);
+    h.repository.first(1, const [], counts: _counts(total: 0), revision: 2);
+    await pumpEventQueue();
+    final loaded = h.state as IntentionActionsLoaded;
+    expect(loaded.role, IntentionActionRole.root);
+    expect(loaded.items, isEmpty);
+    expect(loaded.counts.total, 0);
+  });
+
   test(
     'без показа подтверждённое изменение пути перечитывает только числа',
     () async {
@@ -557,6 +573,41 @@ final class _Harness {
   IntentionActionsState get state => container.read(provider);
   GraphCommandCoordinator get coordinator =>
       container.read(graphCommandCoordinatorProvider.notifier);
+
+  Future<void> confirmPathChange(
+    int id, {
+    required List<int> beforePath,
+    required List<int> afterPath,
+  }) async {
+    final start = coordinator.acceptActionPathUpdate(
+      SetActionPath(
+        actionId: _actionId(id),
+        path: ActionPath(afterPath.map(_intentionId)),
+      ),
+    ) as ActionCommandAccepted;
+    const revision = _Revision(2);
+    final before = _action(id, beforePath, false);
+    final after = _action(id, afterPath, false);
+    repository.completeCommand(
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: ActionPathUpdated(
+            action: after,
+            changes: [
+              ActionUpdatedChange(
+                revision: revision,
+                before: before,
+                after: after,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await start.future;
+    await pumpEventQueue();
+  }
 
   /// Подтверждает выполнение действия [id] с путём из намерений [path].
   Future<void> confirmCompletion(

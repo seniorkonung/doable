@@ -1077,6 +1077,14 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
         ActionCommandKind.update,
       );
 
+  /// Принимает замену пути с тем же исключением параллельных правок действия.
+  ActionCommandStart acceptActionPathUpdate(SetActionPath command) =>
+      _acceptAction(
+        ExistingActionKey(command.actionId),
+        command,
+        ActionCommandKind.update,
+      );
+
   /// Принимает удаление действия; успех объявляется по ADR-0012.
   ActionCommandStart acceptActionDelete(DeleteAction command) => _acceptAction(
     ExistingActionKey(command.actionId),

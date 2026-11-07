@@ -73,6 +73,12 @@ final class ActionFieldsUpdated extends ActionCommandSuccess {
   final Action action;
 }
 
+final class ActionPathUpdated extends ActionCommandSuccess {
+  ActionPathUpdated({required this.action, required super.changes});
+
+  final Action action;
+}
+
 final class ActionDeleted extends ActionCommandSuccess {
   ActionDeleted({required this.action, required super.changes});
 

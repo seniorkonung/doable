@@ -88,6 +88,14 @@ final class UpdateActionFields extends ActionCommand {
   final ActionFieldsPatch patch;
 }
 
+/// Заменяет путь существующего действия после проверки актуальности графа.
+final class SetActionPath extends ActionCommand {
+  const SetActionPath({required this.actionId, required this.path});
+
+  final ActionId actionId;
+  final ActionPath path;
+}
+
 /// Удаляет действие вместе с его путём; намерения и связи остаются.
 final class DeleteAction extends ActionCommand {
   const DeleteAction(this.actionId);

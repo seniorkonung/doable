@@ -25,7 +25,7 @@ final class ActionCreatedChange extends ActionChange {
   Action get after => action;
 }
 
-/// Поля действия подтверждённо записаны. При операции без изменений состояния
+/// Действие подтверждённо записано. При операции без изменений состояния
 /// до и после совпадают, а ревизия остаётся прежней.
 final class ActionUpdatedChange extends ActionChange {
   const ActionUpdatedChange({

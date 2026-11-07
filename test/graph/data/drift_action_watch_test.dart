@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:doable/src/action/application/action_command.dart';
 import 'package:doable/src/action/application/action_details.dart';
 import 'package:doable/src/action/domain/action_id.dart';
+import 'package:doable/src/action/domain/action_path.dart';
 import 'package:doable/src/action/domain/action_priority.dart';
 import 'package:doable/src/action/domain/action_schedule.dart';
 import 'package:doable/src/action/domain/action_text.dart';
@@ -177,6 +178,20 @@ void main() {
     expect(path.intentionCount, 1);
     expect(path.root.id, _intention(2));
     expect(path.steps, isEmpty);
+  });
+
+  test('подписка перечитывает заменённый путь действия', () async {
+    final events = watch(11);
+    expect((await next(events)).path.intentionCount, 3);
+    await confirm(
+      SetActionPath(
+        actionId: _action(11),
+        path: ActionPath([_intention(2), _intention(3)]),
+      ),
+    );
+    final path = (await next(events)).path;
+    expect(path.root.id, _intention(2));
+    expect(path.intentionCount, 2);
   });
 
   test('отсутствующее действие — успех без значения, а изменение и удаление '

@@ -119,6 +119,30 @@ void main() {
     await coordinator.shutdown();
   });
 
+  test('замена пути исключает другие правки и успех не объявляется', () async {
+    final repository = _ControlledRepository();
+    final coordinator = _coordinator(repository);
+    final command = SetActionPath(
+      actionId: _actionA,
+      path: ActionPath([_intention]),
+    );
+    final accepted =
+        coordinator.acceptActionPathUpdate(command) as ActionCommandAccepted;
+    expect(
+      coordinator.acceptActionUpdate(_updateCompleted(_actionA)),
+      isA<ActionCommandAlreadyRunning>(),
+    );
+    expect(
+      coordinator.acceptActionDelete(DeleteAction(_actionA)),
+      isA<ActionCommandAlreadyRunning>(),
+    );
+    repository.completeUpdated(0);
+    final completion = await accepted.future;
+    expect(completion.isFailure, isFalse);
+    expect(completion, isNot(isA<GraphPresentableCompletion>()));
+    await coordinator.shutdown();
+  });
+
   test(
     'исключение репозитория становится безопасным неизвестным отказом',
     () async {

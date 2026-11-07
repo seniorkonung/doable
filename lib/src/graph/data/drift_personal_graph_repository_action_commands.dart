@@ -11,6 +11,10 @@ extension _ActionCommandExecution on DriftPersonalGraphRepository {
           ActionCommandDiagnosticsType.updateFields,
           (clock, enterStage) => _updateActionFields(update, clock, enterStage),
         ),
+        final SetActionPath update => _runActionCommand(
+          ActionCommandDiagnosticsType.setPath,
+          (clock, enterStage) => _setActionPath(update, clock, enterStage),
+        ),
         final DeleteAction delete => _runActionCommand(
           ActionCommandDiagnosticsType.delete,
           (_, enterStage) => _deleteAction(delete, enterStage),
@@ -67,31 +71,7 @@ extension _ActionCommandExecution on DriftPersonalGraphRepository {
     _GraphWriteClock clock,
     void Function(ActionCommandDiagnosticsStage next) enterStage,
   ) async {
-    final path = command.path.intentions;
-    for (final (position, intention) in path.indexed) {
-      final id = intention.toCanonicalString();
-      final active = await _database
-          .customSelect(
-            'SELECT 1 FROM intentions WHERE id = ? AND is_archived = 0',
-            variables: [Variable<String>(id)],
-            readsFrom: {_database.intentions},
-          )
-          .getSingleOrNull();
-      if (active == null) throw const ActionPathConflictFailure();
-      if (position > 0) {
-        final relation = await _database
-            .customSelect(
-              'SELECT 1 FROM long_term_relations WHERE source_intention_id = ? AND related_intention_id = ? AND is_archived = 0',
-              variables: [
-                Variable<String>(path[position - 1].toCanonicalString()),
-                Variable<String>(id),
-              ],
-              readsFrom: {_database.longTermRelations},
-            )
-            .getSingleOrNull();
-        if (relation == null) throw const ActionPathConflictFailure();
-      }
-    }
+    await _validateActionPath(command.path);
     final id = switch (ActionId.decode(const Uuid().v7())) {
       ActionIdDecodingSuccess(:final id) => id,
       InvalidActionIdDecoding() => throw StateError(
@@ -119,6 +99,52 @@ extension _ActionCommandExecution on DriftPersonalGraphRepository {
             updatedAt: timestamp,
           ),
         );
+    await _insertActionPath(serialized, command.path);
+    enterStage(ActionCommandDiagnosticsStage.resultRead);
+    final action =
+        await _readStoredAction(id) ?? (throw const StoredGraphCorruption());
+    return _GraphWriteResult<ActionCommandSuccess>(
+      didMutate: true,
+      toSuccess: (revision) => ActionCreated(
+        action: action,
+        changes: [ActionCreatedChange(revision: revision, action: action)],
+      ),
+    );
+  }
+
+  Future<void> _validateActionPath(ActionPath actionPath) async {
+    final path = actionPath.intentions;
+    for (final (position, intention) in path.indexed) {
+      final id = intention.toCanonicalString();
+      final active = await _database
+          .customSelect(
+            'SELECT 1 FROM intentions WHERE id = ? AND is_archived = 0',
+            variables: [Variable<String>(id)],
+            readsFrom: {_database.intentions},
+          )
+          .getSingleOrNull();
+      if (active == null) throw const ActionPathConflictFailure();
+      if (position > 0) {
+        final relation = await _database
+            .customSelect(
+              'SELECT 1 FROM long_term_relations WHERE source_intention_id = ? AND related_intention_id = ? AND is_archived = 0',
+              variables: [
+                Variable<String>(path[position - 1].toCanonicalString()),
+                Variable<String>(id),
+              ],
+              readsFrom: {_database.longTermRelations},
+            )
+            .getSingleOrNull();
+        if (relation == null) throw const ActionPathConflictFailure();
+      }
+    }
+  }
+
+  Future<void> _insertActionPath(
+    String serialized,
+    ActionPath actionPath,
+  ) async {
+    final path = actionPath.intentions;
     for (final (position, intention) in path.indexed) {
       await _database.customStatement(
         """INSERT INTO action_path_items
@@ -133,14 +159,48 @@ extension _ActionCommandExecution on DriftPersonalGraphRepository {
         ],
       );
     }
-    enterStage(ActionCommandDiagnosticsStage.resultRead);
-    final action =
-        await _readStoredAction(id) ?? (throw const StoredGraphCorruption());
+  }
+
+  Future<_GraphWrite<ActionCommandSuccess>> _setActionPath(
+    SetActionPath command,
+    _GraphWriteClock clock,
+    void Function(ActionCommandDiagnosticsStage next) enterStage,
+  ) async {
+    final before = await _readStoredAction(command.actionId);
+    if (before == null) throw const ActionNotFoundFailure();
+    await _validateActionPath(command.path);
+    final oldPath = before.path.intentions;
+    final newPath = command.path.intentions;
+    final didMutate =
+        oldPath.length != newPath.length ||
+        oldPath.indexed.any((item) => item.$2 != newPath[item.$1]);
+    var after = before;
+    if (didMutate) {
+      enterStage(ActionCommandDiagnosticsStage.write);
+      final id = command.actionId.toCanonicalString();
+      await (_database.delete(
+        _database.actionPathItems,
+      )..where((row) => row.actionId.equals(id))).go();
+      await _insertActionPath(id, command.path);
+      await (_database.update(
+        _database.actions,
+      )..where((row) => row.id.equals(id))).write(
+        local.ActionsCompanion(
+          updatedAt: Value(clock.read().microsecondsSinceEpoch),
+        ),
+      );
+      enterStage(ActionCommandDiagnosticsStage.resultRead);
+      after =
+          await _readStoredAction(command.actionId) ??
+          (throw const StoredGraphCorruption());
+    }
     return _GraphWriteResult<ActionCommandSuccess>(
-      didMutate: true,
-      toSuccess: (revision) => ActionCreated(
-        action: action,
-        changes: [ActionCreatedChange(revision: revision, action: action)],
+      didMutate: didMutate,
+      toSuccess: (revision) => ActionPathUpdated(
+        action: after,
+        changes: [
+          ActionUpdatedChange(revision: revision, before: before, after: after),
+        ],
       ),
     );
   }
