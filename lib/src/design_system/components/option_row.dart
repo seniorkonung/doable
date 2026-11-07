@@ -35,9 +35,26 @@ final class OptionRow extends StatelessWidget {
     this.progress,
     this.autofocus = false,
     super.key,
-  });
+  }) : mark = null;
 
-  final DoableIconData icon;
+  /// Вариант-значение со своей меткой на месте плитки, например кольцом
+  /// приоритета. Метка стоит в квадрате плитки без её круга и не меняется
+  /// выбором: выбранность показывают строка и галочка.
+  const OptionRow.marked({
+    required Widget this.mark,
+    required this.name,
+    required this.onPressed,
+    this.hint,
+    this.trailing = OptionRowTrailing.none,
+    super.key,
+  }) : icon = null,
+       tone = OptionRowTone.normal,
+       progress = null,
+       autofocus = false;
+
+  /// Значок плитки; у варианта с [mark] его нет.
+  final DoableIconData? icon;
+  final Widget? mark;
   final String name;
 
   /// Пояснение под названием; без него строка показывает только название.
@@ -112,37 +129,43 @@ final class OptionRow extends StatelessWidget {
                 padding: const EdgeInsets.all(DoableMetrics.space2),
                 child: Row(
                   children: [
-                    Container(
-                      width: DoableMetrics.controlHeight,
-                      height: DoableMetrics.controlHeight,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: selected
-                            ? colors.accent
-                            : danger
-                            ? colors.dangerSoft
-                            : colors.fill,
-                      ),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          DoableIcon(
-                            icon,
-                            size: 22,
-                            color: selected ? colors.onAccent : ink,
-                          ),
-                          if (progress case final progress?)
-                            Positioned.fill(
-                              // Ход читается значением строки.
-                              child: ExcludeSemantics(
-                                child: CircularProgressIndicator(
-                                  value: progress.share,
+                    if (mark case final mark?)
+                      SizedBox.square(
+                        dimension: DoableMetrics.controlHeight,
+                        child: Center(child: mark),
+                      )
+                    else
+                      Container(
+                        width: DoableMetrics.controlHeight,
+                        height: DoableMetrics.controlHeight,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: selected
+                              ? colors.accent
+                              : danger
+                              ? colors.dangerSoft
+                              : colors.fill,
+                        ),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            DoableIcon(
+                              icon!,
+                              size: 22,
+                              color: selected ? colors.onAccent : ink,
+                            ),
+                            if (progress case final progress?)
+                              Positioned.fill(
+                                // Ход читается значением строки.
+                                child: ExcludeSemantics(
+                                  child: CircularProgressIndicator(
+                                    value: progress.share,
+                                  ),
                                 ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
                     const SizedBox(width: DoableMetrics.space3),
                     Expanded(
                       child: Column(
