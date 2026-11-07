@@ -797,7 +797,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/action/application/action_read_contract.dart`, `action_details.dart`, `lib/src/graph/data/drift_personal_graph_repository_action_reads.dart`, `test/support/action_read_contract_test_fallback.dart`, `lib/src/action/presentation/editor/action_editor_page.dart`, `action_editor_state.dart`, `action_editor_view_model.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`; добавляется `test/graph/data/drift_action_path_state_read_test.dart`; меняются тесты в `test/action/presentation/editor/`.
   - **Размер:** M.
 
-- [ ] 2.18 Сброс истории пунктом панели спрашивает о листах нового действия с введённым текстом
+- [x] 2.18 Сброс истории пунктом панели спрашивает о листах нового действия с введённым текстом
   - **Критерии приёмки:**
     - Выбор любого пункта панели — в оболочке или на обычной странице — перед сбросом просматривает стек корневого маршрутизатора и, если хоть один лист нового действия при закрытии спросил бы «Отменить новое действие?», один раз задаёт этот вопрос (D11, ADR-0058, требование «Сброс истории выбором пункта панели»).
     - «Продолжить ввод» оставляет историю, листы с их данными и выбранный пункт без изменений, «Сбросить» выполняет сброс и показывает корневую страницу выбранного пункта; без таких листов сброс идёт без вопроса, как прежде.

@@ -65,6 +65,93 @@ void main() {
   _registerAccessibilityTests();
   _registerQuickCreationFlowTests();
   _registerRelationPickerIntentionTest();
+  testWidgets('повторный выбор пункта сбрасывает пустой лист без вопроса', (
+    tester,
+  ) async {
+    final app = await _start(tester);
+    await _tap(tester, find.text('Новое действие'));
+    await _tap(tester, actionEditorValue('Выберите причину'));
+    final intention = find.bySemanticsLabel(
+      'Открыть страницу намерения «Намерение 1»',
+    );
+    await _until(tester, () => intention.evaluate().isNotEmpty);
+    await _tap(tester, intention);
+    final tabs = app.router.innerRouterOf<TabsRouter>(AppShellRoute.name)!;
+    final selected = tabs.activeIndex;
+    tester
+        .widget<AppNavigationBar>(find.byType(AppNavigationBar).last)
+        .onSelected(AppDestination.values[selected]);
+    await tester.pumpAndSettle();
+    expect(find.text('Отменить новое действие?'), findsNothing);
+    expect(app.router.stack.map((route) => route.name), [AppShellRoute.name]);
+    expect(tabs.activeIndex, selected);
+  });
+
+  testWidgets('сброс истории спрашивает о черновиках ниже обычной страницы', (
+    tester,
+  ) async {
+    final app = await _start(tester);
+    await _tap(tester, find.text('Новое действие'));
+    await tester.enterText(actionEditorTitleField, 'Первый черновик');
+    await _tap(tester, actionEditorValue('Выберите причину'));
+    final firstIntention = find.bySemanticsLabel(
+      'Открыть страницу намерения «Намерение 1»',
+    );
+    await _until(tester, () => firstIntention.evaluate().isNotEmpty);
+    await _tap(tester, firstIntention);
+    final tabs = app.router.innerRouterOf<TabsRouter>(AppShellRoute.name)!;
+    final selected = tabs.activeIndex;
+    void selectGraph() => tester
+        .widget<AppNavigationBar>(find.byType(AppNavigationBar).last)
+        .onSelected(AppDestination.intentionGraph);
+    final firstHistory = [
+      for (final route in app.router.stackData) route.matchId,
+    ];
+    selectGraph();
+    await tester.pumpAndSettle();
+    expect(find.text('Отменить новое действие?'), findsOneWidget);
+    await _tap(tester, find.text('Продолжить ввод'));
+    expect(app.router.stackData.map((route) => route.matchId), firstHistory);
+    expect(tabs.activeIndex, selected);
+    await openIntentionActionsTab(
+      tester,
+      waitFor: (tester, finder) =>
+          _until(tester, () => finder.evaluate().isNotEmpty),
+      tap: _tap,
+    );
+    await _tap(tester, find.text('Добавить'));
+    await tester.enterText(actionEditorDescriptionField, 'Второй черновик');
+    await _tap(tester, actionEditorValue('Намерение 1'));
+    await _until(tester, () => find.byType(PathPage).evaluate().isNotEmpty);
+    await _tap(tester, find.text('Намерение 1'));
+    final anotherIntention = find.bySemanticsLabel(
+      'Открыть страницу намерения «Намерение 2»',
+    );
+    await _until(tester, () => anotherIntention.evaluate().isNotEmpty);
+    await _tap(tester, anotherIntention);
+
+    final history = [for (final route in app.router.stackData) route.matchId];
+    selectGraph();
+    await tester.pumpAndSettle();
+    expect(find.text('Отменить новое действие?'), findsOneWidget);
+    await _tap(tester, find.text('Продолжить ввод'));
+    expect(app.router.stackData.map((route) => route.matchId), history);
+    expect(tabs.activeIndex, selected);
+    final texts = tester
+        .widgetList<EditableText>(
+          find.byType(EditableText, skipOffstage: false),
+        )
+        .map((field) => field.controller.text);
+    expect(texts, containsAll(['Первый черновик', 'Второй черновик']));
+
+    selectGraph();
+    await tester.pumpAndSettle();
+    expect(find.text('Отменить новое действие?'), findsOneWidget);
+    await _tap(tester, find.text('Сбросить'));
+    expect(app.router.stack.map((route) => route.name), [AppShellRoute.name]);
+    expect(tabs.activeIndex, AppDestination.intentionGraph.index);
+    expect(find.text('Отменить новое действие?'), findsNothing);
+  });
   testWidgets('выбор причины сохраняет путь в листе и его введённые поля', (
     tester,
   ) async {

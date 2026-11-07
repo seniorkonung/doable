@@ -4,8 +4,11 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/app_localizations.dart';
 import '../../action/presentation/day/action_day_root_page.dart';
 import '../../action/presentation/day/action_day_view_model.dart';
+import '../../action/presentation/editor/action_editor_view_model.dart';
+import '../../design_system/components/confirm_dialog.dart';
 import '../../shared/domain/calendar_date.dart';
 import '../quick_creation/quick_creation_launcher.dart';
 import '../quick_creation/quick_creation_mode.dart';
@@ -19,8 +22,8 @@ import 'app_navigation_bar.dart';
 ///
 /// Требует смонтированную оболочку [AppShellRoute] в начале корневого стека.
 /// Единственный источник выбранного пункта — её маршрутизатор вкладок.
-/// Выбор любого пункта удаляет всю историю над оболочкой без подтверждения
-/// и выбирает сохранённую корневую страницу, включая повторный выбор пункта.
+/// Выбор любого пункта удаляет историю над оболочкой и выбирает сохранённую
+/// корневую страницу, предварительно спрашивая о текстах новых действий.
 /// Страницы не управляют индексами вкладок или удалением маршрутов.
 final class AppNavigation extends ConsumerStatefulWidget {
   const AppNavigation({this.sourceRoute, this.actionDate, super.key});
@@ -38,6 +41,41 @@ final class AppNavigation extends ConsumerStatefulWidget {
 final class _AppNavigationState extends ConsumerState<AppNavigation> {
   static const _heroTag = 'app-primary-navigation';
   final _launcher = QuickCreationLauncher();
+  var _isAskingToReset = false;
+
+  Future<void> _selectDestination(
+    StackRouter root,
+    TabsRouter tabs,
+    AppDestination destination,
+  ) async {
+    if (_isAskingToReset) return;
+    final editors = [
+      for (final route in root.stackData)
+        if (route.name == ActionEditorRoute.name)
+          actionEditorViewModelProvider(
+            route.argsAs<ActionEditorRouteArgs>().launch,
+          ),
+    ];
+    if (editors.any((editor) => ref.read(editor).asksOnClose)) {
+      _isAskingToReset = true;
+      final localizations = AppLocalizations.of(context);
+      final discarded = await showDiscardDialog(
+        context: context,
+        title: localizations.actionEditorDiscardTitle,
+        text: localizations.actionEditorDiscardMessage,
+        discardLabel: localizations.editorCloseDiscardAction,
+        keepLabel: localizations.editorCloseContinueAction,
+      );
+      _isAskingToReset = false;
+      if (!discarded || !mounted) return;
+    }
+    for (final editor in editors) {
+      ref.read(editor.notifier).close();
+    }
+    // Удаляет также безымянные маршруты через Navigator.popUntil.
+    root.popUntilRoot();
+    tabs.setActiveIndex(destination.index);
+  }
 
   CalendarDate? _actionDate() {
     final date = widget.actionDate;
@@ -81,12 +119,8 @@ final class _AppNavigationState extends ConsumerState<AppNavigation> {
                 ),
                 onChangeQuickCreationMode: () =>
                     unawaited(showQuickCreationModeMenu(sourceContext)),
-                onSelected: (destination) {
-                  // Удаляет также безымянные маршруты через Navigator.popUntil.
-                  // https://pub.dev/documentation/auto_route/11.1.0/auto_route/StackRouter/popUntilRoot.html
-                  root.popUntilRoot();
-                  tabs.setActiveIndex(destination.index);
-                },
+                onSelected: (destination) =>
+                    unawaited(_selectDestination(root, tabs, destination)),
               ),
             ),
           ),
