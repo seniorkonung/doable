@@ -1059,6 +1059,58 @@ void main() {
   );
 
   testWidgets(
+    'связи, добавленные после ухода из поиска во время записи, отмечаются '
+    '«Новое» и называются в вопросе при уходе',
+    (tester) async {
+      seedRawGraph(raw, () => seedIntention(raw, seedUuid(5), 'Плавать'));
+      await openPathScreen(
+        tester,
+        router: router,
+        repository: repository,
+        purpose: NewActionPathPurpose(_path([1])),
+      );
+      await tester.tap(find.text('Много ходить'));
+      await settlePathScreen(tester);
+      expect(find.bySemanticsLabel('Можно: 1'), findsOneWidget);
+
+      await tester.tap(find.text('Добавить'));
+      await tester.pumpAndSettle();
+      for (final title in ['Высыпаться', 'Плавать']) {
+        await tester.tap(find.text(title));
+        await tester.pumpAndSettle();
+      }
+      // Удерживает хранилище, чтобы принятое добавление не завершалось.
+      final gate = Completer<void>();
+      unawaited(database.transaction(() => gate.future));
+      await tester.tap(find.text('Добавить 2 связи'));
+      await tester.pump();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(RelationBatchPickerPage), findsNothing);
+      await tester.tap(find.text('Нужно').last);
+      await tester.pump();
+
+      gate.complete();
+      await settlePathScreen(tester);
+      expect(relationsFrom(2), hasLength(3));
+      // Поздний исход не возвращает половину «Можно» и не меняет путь.
+      expect(find.text('Пока ничего не нужно'), findsOneWidget);
+      expect(isPathSaveEnabled(tester), isTrue);
+      await tester.tap(find.text('Можно').last);
+      await settlePathScreen(tester);
+      expect(find.text('Новое'), findsNWidgets(2));
+
+      await tapPathBack(tester);
+      expect(
+        find.text(
+          'Изменения пути не сохранятся. Добавленные 2 связи останутся.',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
     'вопрос при уходе называет намерение, созданное в поиске начала пути',
     (tester) async {
       await openPathScreen(

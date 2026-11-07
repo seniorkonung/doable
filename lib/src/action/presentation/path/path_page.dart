@@ -439,6 +439,7 @@ final class _PathPageState extends ConsumerState<PathPage> {
 
   /// Поиск участника с последним намерением в роли якоря кладёт связи в
   /// открытую половину и сам закрывается после подтверждённого добавления.
+  /// Связи отмечаются «Новое», даже если из поиска ушли до исхода записи.
   void _addRelations(
     ({IntentionId id, String title}) last,
     LongTermRelationType half,
@@ -455,9 +456,7 @@ final class _PathPageState extends ConsumerState<PathPage> {
           anchor: RelationBatchPathEndAnchor(
             onAdded: (relations) {
               if (mounted) {
-                ref
-                    .read(_provider.notifier)
-                    .acceptAddedRelations(half, relations);
+                ref.read(_provider.notifier).acceptAddedRelations(relations);
               }
             },
             onIntentionCreated: () {

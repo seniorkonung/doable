@@ -15,6 +15,7 @@ import '../../../intention/presentation/catalog/pair_occupant_reconciliation.dar
 import '../../application/intention_relation_group.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/relation_pair_probe.dart';
+import '../../domain/long_term_relation.dart';
 import 'relation_batch_state.dart';
 
 part 'relation_batch_view_model.g.dart';
@@ -92,8 +93,11 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
   }
 
   /// Отправляет одну команду со всеми отметками в порядке их установки.
-  void submit() {
-    if (!state.canSubmit) return;
+  ///
+  /// Завершается связями подтверждённого добавления и после ухода поиска;
+  /// отказ и непринятая команда завершают её `null`.
+  Future<List<LongTermRelation>?> submit() {
+    if (!state.canSubmit) return Future.value();
     final start = _coordinator.acceptRelationsAddition(
       _searchKey,
       AddLongTermRelations(
@@ -107,8 +111,17 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
         _activeToken = token;
         _publish(const RelationBatchSubmitting());
         unawaited(_finish(future));
+        return future.then(
+          (completion) => switch (completion.result) {
+            GraphResultSuccess(
+              value: LongTermRelationsAdded(:final relations),
+            ) =>
+              relations,
+            GraphResultSuccess() || GraphResultFailure() => null,
+          },
+        );
       case LongTermRelationCommandAlreadyRunning():
-        return;
+        return Future.value();
       case GraphCommandCoordinatorDraining():
         _publish(
           const RelationBatchFailed(
@@ -116,6 +129,7 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
             claim: null,
           ),
         );
+        return Future.value();
     }
   }
 

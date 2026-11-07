@@ -87,18 +87,14 @@ final class PathViewModel extends _$PathViewModel {
     );
   }
 
-  /// Связи, добавленные к последнему намерению, сами в путь не входят: экран
-  /// остаётся на той же половине, где они стали кандидатами.
-  void acceptAddedRelations(
-    LongTermRelationType half,
-    List<LongTermRelation> relations,
-  ) {
+  /// Связи, добавленные к последнему намерению, сами в путь не входят и
+  /// половину не переключают: исход может прийти после ухода с поиска, когда
+  /// открыта уже другая половина. Кандидатов перечитывает подтверждённое
+  /// изменение графа.
+  void acceptAddedRelations(List<LongTermRelation> relations) {
     state = state.withCreations(
       state.creations.withRelations(relations.map((relation) => relation.id)),
     );
-    if (state.draft is LoadedPathDraft) {
-      unawaited(_read(state.draft.intentions, half: half));
-    }
   }
 
   void acceptCreatedIntention() {

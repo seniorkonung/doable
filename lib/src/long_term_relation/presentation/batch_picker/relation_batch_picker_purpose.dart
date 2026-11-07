@@ -25,8 +25,9 @@ final class RelationBatchPageAnchor extends RelationBatchAnchor {
   const RelationBatchPageAnchor();
 }
 
-/// Последнее намерение пути: экран пути узнаёт о добавленных связях и о
-/// намерениях, созданных в поиске, пока поиск открыт.
+/// Последнее намерение пути: экран пути узнаёт о намерениях, созданных в
+/// поиске, пока поиск открыт, а о добавленных связях — и после ухода с поиска
+/// во время записи.
 final class RelationBatchPathEndAnchor extends RelationBatchAnchor {
   const RelationBatchPathEndAnchor({
     required this.onAdded,

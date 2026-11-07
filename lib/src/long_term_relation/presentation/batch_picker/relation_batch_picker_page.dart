@@ -57,6 +57,19 @@ final class _RelationBatchPickerPageState
     ),
   );
 
+  /// Исход добавления якорь пути получает из самой команды: уход с поиска во
+  /// время записи его не теряет.
+  void _submit(RelationBatchViewModelProvider provider) {
+    final added = ref.read(provider.notifier).submit();
+    if (widget.anchor case RelationBatchPathEndAnchor(:final onAdded)) {
+      unawaited(
+        added.then((relations) {
+          if (relations != null) onAdded(relations);
+        }),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -68,11 +81,8 @@ final class _RelationBatchPickerPageState
     );
     final batch = ref.watch(provider);
     ref.listen(provider, (previous, next) {
-      if (next.operation case RelationBatchAdded(:final relations)
-          when previous?.operation is! RelationBatchAdded) {
-        if (widget.anchor case RelationBatchPathEndAnchor(:final onAdded)) {
-          onAdded(relations);
-        }
+      if (next.operation is RelationBatchAdded &&
+          previous?.operation is! RelationBatchAdded) {
         // removeRoute снимает маршрут по его matchId, что бы ни стояло над ним:
         // https://pub.dev/documentation/auto_route/11.1.0/auto_route/StackRouter/removeRoute.html
         context.router.removeRoute(context.routeData);
@@ -190,9 +200,7 @@ final class _RelationBatchPickerPageState
                 final count => l10n.batchAddCount(count),
               },
             },
-            onPressed: batch.canSubmit
-                ? ref.read(provider.notifier).submit
-                : null,
+            onPressed: batch.canSubmit ? () => _submit(provider) : null,
           ),
         ),
       ),
