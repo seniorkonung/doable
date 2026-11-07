@@ -54,16 +54,9 @@ final class PathViewModel extends _$PathViewModel {
         draft: const EmptyPathDraft(),
       );
     }
-    final draft = LoadingPathDraft(start.intentions);
-    unawaited(Future.microtask(() => _read(draft.intentions)));
-    final state = PathState(original: purpose.original, draft: draft)
-        .withCandidates(
-          const CandidateState(
-            half: LongTermRelationType.need,
-            loading: true,
-            chooseDefault: true,
-          ),
-        );
+    final draft = LoadingPathDraft(start.intentions, CandidateState.initial);
+    unawaited(Future.microtask(() => _read(draft)));
+    final state = PathState(original: purpose.original, draft: draft);
     return switch (purpose) {
       NewActionPathPurpose(createdIntention: true) => state.withCreations(
         const PathCreations(intentions: 1),
@@ -78,12 +71,8 @@ final class PathViewModel extends _$PathViewModel {
     final previous = state.draft.intentions.lastOrNull == root
         ? state.candidates
         : null;
-    state = state.withDraft(LoadingPathDraft([root]));
-    if (previous != null) state = state.withCandidates(previous);
     unawaited(
-      _read([
-        root,
-      ], half: previous?.chooseDefault == true ? null : previous?.half),
+      _reread(LoadingPathDraft([root], previous ?? CandidateState.initial)),
     );
   }
 
@@ -116,60 +105,47 @@ final class PathViewModel extends _$PathViewModel {
       root: segment.root,
       steps: segment.steps.take(index + 1),
     );
-    state = state
-        .withDraft(LoadedPathDraft(shortened))
-        .withCandidates(
-          const CandidateState(half: LongTermRelationType.need, loading: true),
-        );
-    unawaited(_read(state.draft.intentions));
+    unawaited(_read(LoadedPathDraft(shortened, CandidateState.initial)));
   }
 
   void selectCandidate(PathCandidate candidate) {
     final draft = state.draft;
     if (draft is! LoadedPathDraft) return;
-    final ids = [...draft.intentions, candidate.relation.relatedIntentionId];
-    state = state.withDraft(
-      LoadedPathDraft(draft.segment, appended: candidate),
+    unawaited(
+      _read(
+        LoadedPathDraft(
+          draft.segment,
+          CandidateState.initial,
+          appended: candidate,
+        ),
+      ),
     );
-    unawaited(_read(ids));
   }
 
   void selectHalf(LongTermRelationType half) {
-    final current = state.candidates;
-    if (current == null || current.half == half) return;
-    unawaited(_read(state.draft.intentions, half: half));
+    if (state.draft case final NonEmptyPathDraft draft
+        when draft.candidates.half != half) {
+      unawaited(_read(draft, half: half));
+    }
   }
 
-  Future<void> retry() {
-    final draft = state.draft;
-    if (draft is FailedPathDraft && draft.canRetry) {
-      final candidates = state.candidates;
-      state = state.withDraft(LoadingPathDraft(draft.intentions));
-      return _read(
-        draft.intentions,
-        half: candidates?.chooseDefault == true ? null : candidates?.half,
-      );
-    }
-    final candidates = state.candidates;
-    if (candidates?.failure is PathCandidatesUnavailableFailure) {
-      return _read(
-        draft.intentions,
-        half: candidates!.chooseDefault ? null : candidates.half,
-      );
-    }
-    return Future.value();
-  }
+  Future<void> retry() => switch (state.draft) {
+    final FailedPathDraft draft when draft.canRetry => _reread(draft),
+    final LoadedPathDraft draft
+        when draft.candidates.failure is PathCandidatesUnavailableFailure =>
+      _reread(draft),
+    _ => Future.value(),
+  };
 
   Future<void> loadMore() async {
-    final current = state.candidates;
-    if (current == null ||
-        current.loading ||
-        current.failure != null ||
-        current.cursor == null) {
+    final draft = state.draft;
+    if (draft is! LoadedPathDraft) return;
+    final current = draft.candidates;
+    if (current.loading || current.failure != null || current.cursor == null) {
       return;
     }
     final generation = ++_generation;
-    state = state.withCandidates(
+    final loading = draft.withCandidates(
       CandidateState(
         half: current.half,
         counts: current.counts,
@@ -178,9 +154,10 @@ final class PathViewModel extends _$PathViewModel {
         loading: true,
       ),
     );
+    state = state.withDraft(loading);
     final result = await _repository.getPathCandidates(
       PathCandidatesQuery(
-        draft: ActionPath(state.draft.intentions),
+        draft: ActionPath(loading.intentions),
         half: current.half,
         cursor: current.cursor,
       ),
@@ -188,34 +165,40 @@ final class PathViewModel extends _$PathViewModel {
     if (!ref.mounted || generation != _generation) return;
     switch (result) {
       case GraphResultSuccess(value: PathCandidatesContinuationPage page):
-        state = state.withCandidates(
-          CandidateState(
-            half: current.half,
-            counts: current.counts,
-            items: [...current.items, ...page.items],
-            cursor: page.nextCursor,
+        state = state.withDraft(
+          loading.withCandidates(
+            CandidateState(
+              half: current.half,
+              counts: current.counts,
+              items: [...current.items, ...page.items],
+              cursor: page.nextCursor,
+            ),
           ),
         );
       case GraphResultFailure(failure: PathCandidatesSnapshotExpired()):
-        await _read(state.draft.intentions, half: current.half);
+        await _read(loading, half: current.half);
       case GraphResultFailure(:final failure):
-        state = state.withCandidates(
-          CandidateState(
-            half: current.half,
-            counts: current.counts,
-            items: current.items,
-            cursor: current.cursor,
-            failure: failure,
+        state = state.withDraft(
+          loading.withCandidates(
+            CandidateState(
+              half: current.half,
+              counts: current.counts,
+              items: current.items,
+              cursor: current.cursor,
+              failure: failure,
+            ),
           ),
         );
       case GraphResultSuccess():
-        state = state.withCandidates(
-          CandidateState(
-            half: current.half,
-            counts: current.counts,
-            items: current.items,
-            cursor: current.cursor,
-            failure: const PathCandidatesUnexpectedFailure(),
+        state = state.withDraft(
+          loading.withCandidates(
+            CandidateState(
+              half: current.half,
+              counts: current.counts,
+              items: current.items,
+              cursor: current.cursor,
+              failure: const PathCandidatesUnexpectedFailure(),
+            ),
           ),
         );
     }
@@ -297,53 +280,56 @@ final class PathViewModel extends _$PathViewModel {
         )) {
       return;
     }
-    final ids = state.draft.intentions;
-    if (ids.isEmpty) return;
+    final draft = state.draft;
+    if (draft is! NonEmptyPathDraft) return;
     if (state.saving is PathSavingRunning) {
       _refreshAfterSaving = true;
       return;
     }
-    final candidates = state.candidates;
-    unawaited(
-      _read(
-        ids,
-        half: candidates?.chooseDefault == true ? null : candidates?.half,
-      ),
-    );
+    unawaited(_reread(draft));
   }
 
   void _refreshAfterFailedSave() {
     if (!_refreshAfterSaving) return;
     _refreshAfterSaving = false;
-    final ids = state.draft.intentions;
-    if (ids.isNotEmpty) {
-      final candidates = state.candidates;
-      unawaited(
-        _read(
-          ids,
-          half: candidates?.chooseDefault == true ? null : candidates?.half,
-        ),
-      );
+    if (state.draft case final NonEmptyPathDraft draft) {
+      unawaited(_reread(draft));
     }
   }
 
+  /// Перечитывает участок с выбранной половиной, а если её не выбирали —
+  /// снова выбирает половину по умолчанию.
+  Future<void> _reread(NonEmptyPathDraft draft) {
+    final candidates = draft.candidates;
+    return _read(
+      draft,
+      half: candidates.chooseDefault ? null : candidates.half,
+    );
+  }
+
+  /// Читает участок [draft]. Числа половин из его кандидатов остаются на
+  /// экране до подтверждённого результата: черновик нового последнего
+  /// намерения приходит без них.
   Future<void> _read(
-    List<IntentionId> ids, {
+    NonEmptyPathDraft draft, {
     LongTermRelationType? half,
   }) async {
     final generation = ++_generation;
+    final ids = draft.intentions;
     final selected = half ?? LongTermRelationType.need;
-    final counts = state.candidates?.counts;
-    if (state.draft is FailedPathDraft) {
-      state = state.withDraft(LoadingPathDraft(ids));
-    }
-    state = state.withCandidates(
-      CandidateState(
-        half: selected,
-        counts: counts,
-        loading: true,
-        chooseDefault: half == null,
-      ),
+    final counts = draft.candidates.counts;
+    final loaded = switch (draft) {
+      LoadedPathDraft() => draft,
+      LoadingPathDraft() || FailedPathDraft() => null,
+    };
+    final loading = CandidateState(
+      half: selected,
+      counts: counts,
+      loading: true,
+      chooseDefault: half == null,
+    );
+    state = state.withDraft(
+      loaded?.withCandidates(loading) ?? LoadingPathDraft(ids, loading),
     );
     final result = await _repository.getPathCandidates(
       PathCandidatesQuery(draft: ActionPath(ids), half: selected),
@@ -351,62 +337,56 @@ final class PathViewModel extends _$PathViewModel {
     if (!ref.mounted || generation != _generation) return;
     switch (result) {
       case GraphResultSuccess(value: PathCandidatesFirstPage page):
-        state = state.withDraft(LoadedPathDraft(page.segment));
         if (half != null && page.segment.last.id != ids.last) {
-          await _read(state.draft.intentions);
+          await _read(LoadedPathDraft(page.segment, CandidateState.initial));
         } else if (half == null &&
             page.counts.need == 0 &&
             page.counts.can > 0) {
-          state = state.withCandidates(
-            CandidateState(half: selected, counts: page.counts),
+          await _read(
+            LoadedPathDraft(
+              page.segment,
+              CandidateState(half: selected, counts: page.counts),
+            ),
+            half: LongTermRelationType.can,
           );
-          await _read(state.draft.intentions, half: LongTermRelationType.can);
         } else {
-          state = state.withCandidates(
-            CandidateState(
-              half: selected,
-              counts: page.counts,
-              items: page.items,
-              cursor: page.nextCursor,
+          state = state.withDraft(
+            LoadedPathDraft(
+              page.segment,
+              CandidateState(
+                half: selected,
+                counts: page.counts,
+                items: page.items,
+                cursor: page.nextCursor,
+              ),
             ),
           );
         }
       case GraphResultSuccess(value: EmptyPathSegment()):
         state = state.withDraft(const EmptyPathDraft());
       case GraphResultFailure(:final failure):
-        if (state.draft is LoadedPathDraft) {
-          state = state.withCandidates(
+        final failed = CandidateState(
+          half: selected,
+          counts: counts,
+          failure: failure,
+          chooseDefault: half == null,
+        );
+        state = state.withDraft(
+          loaded?.withCandidates(failed) ??
+              FailedPathDraft(ids, failure, failed),
+        );
+      case GraphResultSuccess():
+        state = state.withDraft(
+          FailedPathDraft(
+            ids,
+            const PathCandidatesUnexpectedFailure(),
             CandidateState(
               half: selected,
               counts: counts,
-              failure: failure,
-              chooseDefault: half == null,
+              failure: const PathCandidatesUnexpectedFailure(),
             ),
-          );
-        } else {
-          state = state
-              .withDraft(FailedPathDraft(ids, failure))
-              .withCandidates(
-                CandidateState(
-                  half: selected,
-                  counts: counts,
-                  failure: failure,
-                  chooseDefault: half == null,
-                ),
-              );
-        }
-      case GraphResultSuccess():
-        state = state
-            .withDraft(
-              FailedPathDraft(ids, const PathCandidatesUnexpectedFailure()),
-            )
-            .withCandidates(
-              CandidateState(
-                half: selected,
-                counts: counts,
-                failure: const PathCandidatesUnexpectedFailure(),
-              ),
-            );
+          ),
+        );
     }
   }
 }

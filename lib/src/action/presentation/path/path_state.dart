@@ -122,21 +122,39 @@ final class EmptyPathDraft extends PathDraft {
   List<IntentionId> get intentions => const [];
 }
 
+/// В пути есть намерения: переключатель половин показан при любом исходе
+/// чтения участка.
+sealed class NonEmptyPathDraft extends PathDraft {
+  const NonEmptyPathDraft();
+
+  CandidateState get candidates;
+
+  NonEmptyPathDraft withCandidates(CandidateState value);
+}
+
 /// Участок пути читается: названий и связей ещё нет.
-final class LoadingPathDraft extends PathDraft {
-  LoadingPathDraft(Iterable<IntentionId> intentions)
+final class LoadingPathDraft extends NonEmptyPathDraft {
+  LoadingPathDraft(Iterable<IntentionId> intentions, this.candidates)
     : intentions = List.unmodifiable(intentions);
 
   @override
   final List<IntentionId> intentions;
+  @override
+  final CandidateState candidates;
+
+  @override
+  LoadingPathDraft withCandidates(CandidateState value) =>
+      LoadingPathDraft(intentions, value);
 }
 
 /// Путь — целый участок с текущими данными намерений и связей.
-final class LoadedPathDraft extends PathDraft {
-  const LoadedPathDraft(this.segment, {this.appended});
+final class LoadedPathDraft extends NonEmptyPathDraft {
+  const LoadedPathDraft(this.segment, this.candidates, {this.appended});
 
   final PathSegment segment;
   final PathCandidate? appended;
+  @override
+  final CandidateState candidates;
 
   @override
   List<IntentionId> get intentions => [
@@ -144,19 +162,32 @@ final class LoadedPathDraft extends PathDraft {
     for (final step in segment.steps) step.intention.id,
     if (appended case final candidate?) candidate.relation.relatedIntentionId,
   ];
+
+  @override
+  LoadedPathDraft withCandidates(CandidateState value) =>
+      LoadedPathDraft(segment, value, appended: appended);
 }
 
 /// Чтение участка завершилось отказом; это не пустой путь.
-final class FailedPathDraft extends PathDraft {
-  FailedPathDraft(Iterable<IntentionId> intentions, this.failure)
-    : intentions = List.unmodifiable(intentions);
+final class FailedPathDraft extends NonEmptyPathDraft {
+  FailedPathDraft(
+    Iterable<IntentionId> intentions,
+    this.failure,
+    this.candidates,
+  ) : intentions = List.unmodifiable(intentions);
 
   @override
   final List<IntentionId> intentions;
   final PathCandidatesReadFailure failure;
+  @override
+  final CandidateState candidates;
 
   /// Повтор несёт только доказанно временный отказ.
   bool get canRetry => failure is PathCandidatesUnavailableFailure;
+
+  @override
+  FailedPathDraft withCandidates(CandidateState value) =>
+      FailedPathDraft(intentions, failure, value);
 }
 
 /// Связи и намерения, созданные с экрана пути. Они уже в графе и остаются
@@ -182,24 +213,22 @@ final class PathCreations {
 final class PathState {
   PathState({required ActionPath? original, required this.draft})
     : original = original?.intentions ?? const [],
-      candidates = null,
       saving = const PathSavingIdle(),
       creations = const PathCreations();
 
-  const PathState._(
-    this.original,
-    this.draft,
-    this.candidates,
-    this.saving,
-    this.creations,
-  );
+  const PathState._(this.original, this.draft, this.saving, this.creations);
 
   /// Исходный путь, с которым открыт экран; пустой, пока путь не выбран.
   final List<IntentionId> original;
   final PathDraft draft;
-  final CandidateState? candidates;
   final PathSaving saving;
   final PathCreations creations;
+
+  /// Кандидаты продолжения; у пустого пути их нет.
+  CandidateState? get candidates => switch (draft) {
+    EmptyPathDraft() => null,
+    NonEmptyPathDraft(:final candidates) => candidates,
+  };
 
   /// Пути сравниваются по последовательности намерений.
   bool get isChanged => !listEquals(draft.intentions, original);
@@ -216,16 +245,21 @@ final class PathState {
       : PathCloseDecision.close;
 
   PathState withDraft(PathDraft value) =>
-      PathState._(original, value, null, saving, creations);
-  PathState withCandidates(CandidateState value) =>
-      PathState._(original, draft, value, saving, creations);
+      PathState._(original, value, saving, creations);
   PathState withSaving(PathSaving value) =>
-      PathState._(original, draft, candidates, value, creations);
+      PathState._(original, draft, value, creations);
   PathState withCreations(PathCreations value) =>
-      PathState._(original, draft, candidates, saving, value);
+      PathState._(original, draft, saving, value);
 }
 
 final class CandidateState {
+  /// Кандидаты пути, который ещё не читался: половину выбирает первое чтение.
+  static const initial = CandidateState(
+    half: LongTermRelationType.need,
+    loading: true,
+    chooseDefault: true,
+  );
+
   const CandidateState({
     required this.half,
     this.counts,

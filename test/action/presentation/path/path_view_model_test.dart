@@ -33,37 +33,42 @@ final class _ControlledRepository implements PersonalGraphRepository {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+/// Первая порция пути из одного корня, у которого есть «Нужно» и «Можно».
+Future<PathCandidatesResult> _firstPage(ActionPath path) async {
+  late sqlite.Database raw;
+  final database = AppDatabase(
+    openInMemoryLocalDatabase(setup: (db) => raw = db),
+  );
+  await database.open();
+  addTearDown(database.close);
+  seedRawGraph(raw, () {
+    seedIntention(raw, seedUuid(1), 'Причина');
+    seedIntention(raw, seedUuid(2), 'Продолжение');
+    seedIntention(raw, seedUuid(3), 'Возможность');
+    seedRelation(raw, seedUuid(101), seedUuid(1), seedUuid(2));
+    seedRelation(raw, seedUuid(102), seedUuid(1), seedUuid(3));
+    raw.execute('UPDATE long_term_relations SET type = ? WHERE id = ?', [
+      LongTermRelationType.can.name,
+      seedUuid(102),
+    ]);
+  });
+  final graph = DriftPersonalGraphRepository(
+    database,
+    UuidV7IntentionIdGenerator(),
+    DateTime.now,
+    InMemoryDiagnosticsSink(),
+  );
+  return graph.getPathCandidates(
+    PathCandidatesQuery(draft: path, half: LongTermRelationType.need),
+  );
+}
+
 void main() {
   test(
     'числа сохраняются при чтении и отказе и сбрасываются для нового намерения',
     () async {
-      late sqlite.Database raw;
-      final database = AppDatabase(
-        openInMemoryLocalDatabase(setup: (db) => raw = db),
-      );
-      await database.open();
-      addTearDown(database.close);
-      seedRawGraph(raw, () {
-        seedIntention(raw, seedUuid(1), 'Причина');
-        seedIntention(raw, seedUuid(2), 'Продолжение');
-        seedIntention(raw, seedUuid(3), 'Возможность');
-        seedRelation(raw, seedUuid(101), seedUuid(1), seedUuid(2));
-        seedRelation(raw, seedUuid(102), seedUuid(1), seedUuid(3));
-        raw.execute('UPDATE long_term_relations SET type = ? WHERE id = ?', [
-          LongTermRelationType.can.name,
-          seedUuid(102),
-        ]);
-      });
-      final graph = DriftPersonalGraphRepository(
-        database,
-        UuidV7IntentionIdGenerator(),
-        DateTime.now,
-        InMemoryDiagnosticsSink(),
-      );
       final path = ActionPath([seedIntentionId(1)]);
-      final result = await graph.getPathCandidates(
-        PathCandidatesQuery(draft: path, half: LongTermRelationType.need),
-      );
+      final result = await _firstPage(path);
       final repository = _ControlledRepository();
       final container = ProviderContainer(
         overrides: [
@@ -108,4 +113,62 @@ void main() {
       expect(container.read(provider).candidates!.counts, isNull);
     },
   );
+
+  test('«Повторить» после отказа чтения пути сохраняет числа при загрузке и повторном отказе', () async {
+    final path = ActionPath([seedIntentionId(1)]);
+    final result = await _firstPage(path);
+    final repository = _ControlledRepository();
+    final container = ProviderContainer(
+      overrides: [
+        personalGraphRepositoryProvider.overrideWithValue(repository),
+      ],
+    );
+    addTearDown(container.dispose);
+    final provider = pathViewModelProvider(
+      PathSessionKey(),
+      NewActionPathPurpose(path),
+    );
+    final subscription = container.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+    await pumpEventQueue();
+    repository.requests[0].complete(result);
+    await pumpEventQueue();
+    final model = container.read(provider.notifier);
+    final counts = container.read(provider).candidates!.counts;
+    expect(counts, isNotNull);
+    model.selectRoot(PathStartSelected(seedIntentionId(1)));
+    repository.requests[1].complete(
+      const PathCandidatesError(PathCandidatesUnavailableFailure()),
+    );
+    await pumpEventQueue();
+    expect(
+      container.read(provider).draft,
+      isA<FailedPathDraft>().having(
+        (draft) => draft.candidates.counts,
+        'counts',
+        same(counts),
+      ),
+    );
+    final retry = model.retry();
+    expect(
+      container.read(provider).draft,
+      isA<LoadingPathDraft>().having(
+        (draft) => draft.candidates.counts,
+        'counts',
+        same(counts),
+      ),
+    );
+    repository.requests[2].complete(
+      const PathCandidatesError(PathCandidatesUnavailableFailure()),
+    );
+    await retry;
+    expect(
+      container.read(provider).draft,
+      isA<FailedPathDraft>().having(
+        (draft) => draft.candidates.counts,
+        'counts',
+        same(counts),
+      ),
+    );
+  });
 }

@@ -147,17 +147,17 @@ final class _PathPageState extends ConsumerState<PathPage> {
 
   Widget _draft(AppLocalizations l10n, PathViewModel model, PathState path) =>
       switch (path.draft) {
-        LoadingPathDraft() => Column(
+        LoadingPathDraft(:final candidates) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _switcher(l10n, model, path.candidates!),
+            _switcher(l10n, model, candidates),
             ListState.loading(text: l10n.pathLoading),
           ],
         ),
         final FailedPathDraft failed => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _switcher(l10n, model, path.candidates!),
+            _switcher(l10n, model, failed.candidates),
             ListState.error(
               message: _failureMessage(l10n, failed.failure),
               retry: failed.canRetry
