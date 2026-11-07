@@ -51,10 +51,10 @@ final _months = [
 
 void main() {
   for (final onDate in [false, true]) {
-    final catalog = onDate ? 'экран дня на дату' : 'корневой экран дня';
+    final screen = onDate ? 'экран дня на дату' : 'корневой экран дня';
     for (final cancel in [false, true]) {
       final ending = cancel ? 'системная отмена' : 'медленное отпускание';
-      testWidgets('$catalog: $ending короткого сворачивания '
+      testWidgets('$screen: $ending короткого сворачивания '
           'восстанавливает конец выдачи', (tester) async {
         final repository = await _openExpandedDayAtEnd(tester, onDate);
         final list = find.byType(CustomScrollView);
@@ -90,7 +90,7 @@ void main() {
         expect(tester.takeException(), isNull);
       });
 
-      testWidgets('$catalog: $ending после продолжения движения ручки '
+      testWidgets('$screen: $ending после продолжения движения ручки '
           'сохраняет последнюю отдельную прокрутку выдачи', (tester) async {
         final repository = await _openExpandedDayAtEnd(tester, onDate);
         final calendar = find.byType(ActionDayCalendar);
@@ -151,7 +151,7 @@ void main() {
         expect(repository.queries.single.section, ActionDaySection.incomplete);
         expect(tester.takeException(), isNull);
       });
-      testWidgets('$catalog: $ending после движения ручки во время инерции '
+      testWidgets('$screen: $ending после движения ручки во время инерции '
           'сохраняет пользовательскую позицию выдачи', (tester) async {
         await _openExpandedDayAtEnd(tester, onDate);
         final calendar = find.byType(ActionDayCalendar);
@@ -216,7 +216,7 @@ void main() {
       });
     }
 
-    testWidgets('$catalog: возврат календаря сохраняет прокрутку выдачи '
+    testWidgets('$screen: возврат календаря сохраняет прокрутку выдачи '
         'вторым указателем во время удержания ручки', (tester) async {
       final repository = await _openExpandedDayAtEnd(tester, onDate);
       final position = tester.state<ScrollableState>(_pageScroll).position;
@@ -246,7 +246,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('$catalog: перетягивание, возврат и смена представления '
+    testWidgets('$screen: перетягивание, возврат и смена представления '
         'сдвигают выдачу без сброса прокрутки', (tester) async {
       final repository = ActionDayRepository();
       await pumpActionDay(

@@ -41,7 +41,7 @@ void main() {
         } else {
           expect(find.byType(AppBar), findsNothing);
         }
-        await _expectUsableCatalog(tester, repository, initialDate: selected);
+        await _expectUsableScreen(tester, repository, initialDate: selected);
       });
     }
   }
@@ -137,7 +137,7 @@ Future<void> _loadInter() =>
 
 /// Общий сценарий доступности закреплённого блока на обоих экранах дня.
 /// Начальное чтение выдачи и отметок ещё не завершено; выбран октябрь 2026.
-Future<void> _expectUsableCatalog(
+Future<void> _expectUsableScreen(
   WidgetTester tester,
   ActionDayRepository repository, {
   required CalendarDate initialDate,
@@ -153,7 +153,7 @@ Future<void> _expectUsableCatalog(
   repository.failDayStatuses(0);
   await tester.pumpAndSettle();
 
-  final body = _catalogContent;
+  final body = _screenContent;
   final media = MediaQuery.of(tester.element(body));
   expect(media.size, const Size(360, 720));
   expect(media.devicePixelRatio, 1);
@@ -404,7 +404,7 @@ void _expectTransitionLayout(
 }
 
 /// Содержимое экрана дня в области тела страницы: под `AppBar` и над панелью.
-final _catalogContent = find
+final _screenContent = find
     .ancestor(
       of: find.byType(ActionDayCalendar),
       matching: find.byType(SafeArea),
@@ -414,8 +414,8 @@ final _catalogContent = find
 /// Отступ и ручка сохраняют прежние 52 dp во всех представлениях экрана дня.
 void _expectCalendarSpacing(WidgetTester tester) {
   final safeTop =
-      tester.getTopLeft(_catalogContent).dy +
-      MediaQuery.paddingOf(tester.element(_catalogContent)).top;
+      tester.getTopLeft(_screenContent).dy +
+      MediaQuery.paddingOf(tester.element(_screenContent)).top;
   final calendarTop = tester.getTopLeft(find.byType(ActionDayCalendar)).dy;
   final topPadding = calendarTop - safeTop;
   expect(topPadding, 16);
