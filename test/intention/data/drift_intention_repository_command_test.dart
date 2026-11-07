@@ -261,7 +261,6 @@ void main() {
         'снимок удаления сохраняет теги до каскадного удаления назначений',
         () async {
           seedRawGraph(raw, () {
-            raw.execute('DELETE FROM daily_choices');
             raw.execute('DELETE FROM long_term_relations');
           });
 

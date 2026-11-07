@@ -20,6 +20,7 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/action_seed.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
@@ -117,15 +118,14 @@ void main() {
     late sqlite.Database raw;
     await harness.openReadyDatabase(setup: (db) => raw = db);
     seedTagRecipientGraphFixture(raw);
-    // Архивированное действие участвует в выполненном дневном выборе.
+    // Путь выполненного действия содержит архивированное намерение.
     seedRawGraph(raw, () {
-      raw.execute(
-        'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, 1)',
-        [tagFixtureId(203), tagFixtureId(1), tagFixtureId(2), '2026-09-24'],
-      );
-      raw.execute(
-        'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
-        [tagFixtureId(204), tagFixtureId(203), tagFixtureId(102)],
+      seedAction(
+        raw,
+        id: tagFixtureId(203),
+        path: [tagFixtureId(1), tagFixtureId(2)],
+        date: '2026-09-24',
+        isCompleted: true,
       );
     });
     final graphBefore = retainedTagFixtureGraph(raw);

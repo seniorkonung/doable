@@ -61,8 +61,8 @@ void main() {
       'intentions',
       'intention_titles_fts',
       'long_term_relations',
-      'daily_choices',
-      'daily_choice_path_steps',
+      'actions',
+      'action_path_items',
       'tags',
       'tag_assignments',
     ])
