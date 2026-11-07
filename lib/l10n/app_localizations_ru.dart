@@ -1098,6 +1098,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get editorCreatedAndChosen => 'Намерение создано и отмечено.';
 
   @override
+  String get editorCreatedAndChosenPathStart =>
+      'Намерение создано и выбрано началом пути.';
+
+  @override
   String get editorCloseDiscardTitle => 'Сбросить черновик?';
 
   @override

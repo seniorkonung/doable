@@ -835,6 +835,8 @@
   },
   "editorCreated": "Intention created.",
   "editorCreatedAndChosen": "Intention created and selected.",
+  "editorCreatedAndChosenPathStart": "Intention created and selected as the start of the path.",
+  "@editorCreatedAndChosenPathStart": {"description": "Успех создания намерения для начала пути"},
   "@editorCreatedAndChosen": {
     "description": "Успех создания намерения для поиска участника"
   },

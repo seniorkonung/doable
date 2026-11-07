@@ -167,4 +167,56 @@ void main() {
     );
     expect(find.text('Сбросить фильтры'), findsNothing);
   });
+
+  testWidgets('плюс создаёт намерение и возвращает его началом пути', (
+    tester,
+  ) async {
+    final (:result) = await open(tester);
+    await tester.tap(find.bySemanticsLabel('Создать намерение'));
+    await tester.pumpAndSettle();
+    final title = find.byKey(const ValueKey('intention-editor-title'));
+    expect(tester.widget<TextField>(title).controller!.text, isEmpty);
+    expect(find.text('Сразу отмечается для новых связей'), findsNothing);
+    await tester.enterText(title, 'Быть здоровым');
+    await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('intention-editor-title')), findsNothing);
+    expect(find.text('Выбор намерения'), findsNothing);
+    final createdId = await result;
+    final rows = await tester.runAsync(
+      () => (database.select(
+        database.intentions,
+      )..where((row) => row.title.equals('Быть здоровым'))).get(),
+    );
+    expect(rows, hasLength(1));
+    expect(
+      createdId,
+      (IntentionId.decode(rows!.single.id) as IntentionIdDecodingSuccess).id,
+    );
+  });
+
+  testWidgets('создание из строки учитывает даже исключённый корень', (
+    tester,
+  ) async {
+    final (:result) = await open(tester, currentRoot: id(1));
+    final filter = find.byKey(const ValueKey('path-start-picker-filter'));
+    await tester.enterText(filter, 'КОРЕНЬ');
+    await tester.pumpAndSettle();
+    expect(find.text('Создать «КОРЕНЬ»'), findsNothing);
+    await tester.enterText(filter, '  Высыпаться  ');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Создать «Высыпаться»'));
+    await tester.pumpAndSettle();
+    final title = find.byKey(const ValueKey('intention-editor-title'));
+    expect(tester.widget<TextField>(title).controller!.text, 'Высыпаться');
+    await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pumpAndSettle();
+    expect(await result, isNotNull);
+  });
 }

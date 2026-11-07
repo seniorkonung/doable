@@ -136,6 +136,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
           SelectPathStart(:final currentRoot) => currentRoot,
           _ => null,
         },
+        countExactActiveTitle: purpose is SelectPathStart,
         order: _order,
         pageSize: _policy.pageSize,
         counting: switch (selection.scope) {

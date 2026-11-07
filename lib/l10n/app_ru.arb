@@ -355,6 +355,7 @@
   "editorCreateUnexpected": "Не удалось создать намерение из-за непредвиденной ошибки.",
   "editorCreated": "Намерение создано.",
   "editorCreatedAndChosen": "Намерение создано и отмечено.",
+  "editorCreatedAndChosenPathStart": "Намерение создано и выбрано началом пути.",
   "@editorCreatedAndChosen": {"description": "Успех создания намерения для поиска участника"},
   "editorCloseDiscardTitle": "Сбросить черновик?",
   "editorCloseDiscardMessage": "Введённые данные нового намерения не сохранены и будут потеряны.",

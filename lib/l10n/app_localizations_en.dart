@@ -1092,6 +1092,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editorCreatedAndChosen => 'Intention created and selected.';
 
   @override
+  String get editorCreatedAndChosenPathStart =>
+      'Intention created and selected as the start of the path.';
+
+  @override
   String get editorCloseDiscardTitle => 'Discard the draft?';
 
   @override

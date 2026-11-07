@@ -145,6 +145,7 @@ final class IntentionCatalogQuery {
     IntentionTagFilter tagFilter = IntentionTagFilter.empty,
     RelationPairProbe? pairProbe,
     IntentionId? excludedIntentionId,
+    bool countExactActiveTitle = false,
     required IntentionCatalogOrder order,
     required int pageSize,
     IntentionCatalogCursor? cursor,
@@ -164,6 +165,7 @@ final class IntentionCatalogQuery {
       tagFilter: tagFilter,
       pairProbe: pairProbe,
       excludedIntentionId: excludedIntentionId,
+      countExactActiveTitle: countExactActiveTitle,
       order: order,
       pageSize: pageSize,
       cursor: cursor,
@@ -178,6 +180,7 @@ final class IntentionCatalogQuery {
     required this.tagFilter,
     required this.pairProbe,
     required this.excludedIntentionId,
+    required this.countExactActiveTitle,
     required this.order,
     required this.pageSize,
     required this.cursor,
@@ -199,6 +202,9 @@ final class IntentionCatalogQuery {
 
   /// Намерение, исключённое до подсчёта и формирования порций.
   final IntentionId? excludedIntentionId;
+
+  /// Запрашивает число активных намерений с точным названием для создания.
+  final bool countExactActiveTitle;
   final IntentionCatalogOrder order;
   final int pageSize;
   final IntentionCatalogCursor? cursor;
@@ -215,6 +221,7 @@ final class IntentionCatalogQuery {
     tagFilter: tagFilter,
     pairProbe: pairProbe,
     excludedIntentionId: excludedIntentionId,
+    countExactActiveTitle: countExactActiveTitle,
     order: order,
     pageSize: pageSize,
     cursor: cursor,
@@ -230,6 +237,7 @@ final class IntentionCatalogQuery {
     tagFilter: tagFilter,
     pairProbe: pairProbe,
     excludedIntentionId: excludedIntentionId,
+    countExactActiveTitle: countExactActiveTitle,
     order: order,
     pageSize: pageSize,
     cursor: cursor,
@@ -620,8 +628,8 @@ final class IntentionCatalogFirstPage extends IntentionCatalogPage {
   /// Числа вида, который попросил запрос.
   final IntentionCatalogCounts counts;
 
-  /// Число активных намерений с точным названием при поиске участника.
-  /// Отсутствует без пробы пары или фильтра названия.
+  /// Число активных намерений с точным названием при поиске для создания.
+  /// Отсутствует без запроса подсчёта, пробы пары или фильтра названия.
   final int? exactTitleCount;
 
   static int? _requireExactTitleCount(int? count) {

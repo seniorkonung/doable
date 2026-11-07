@@ -7,6 +7,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../intention/presentation/catalog/intention_catalog_purpose.dart';
+import '../../../intention/presentation/editor/intention_creation_launch.dart';
 import '../../../intention/presentation/picker/intention_picker_view.dart';
 import 'path_start_picker_purpose.dart';
 
@@ -43,6 +44,34 @@ final class _PathStartPickerPageState extends State<PathStartPickerPage> {
       rowBehavior: IntentionPickerSingle(
         onPick: (snapshot) =>
             unawaited(context.router.maybePop(snapshot.value.id)),
+        onCreate: (title, _) {
+          final router = context.router;
+          final pickerMatchId = context.routeData.matchId;
+          if (router.stackData
+              .skipWhile((entry) => entry.matchId != pickerMatchId)
+              .skip(1)
+              .any((entry) => entry.name == IntentionEditorRoute.name)) {
+            return;
+          }
+          unawaited(
+            router.push(
+              IntentionEditorRoute(
+                launch: IntentionCreationForPathStart(
+                  initialTitle: title,
+                  onCreated: (id) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted &&
+                          router.stackData.lastOrNull?.matchId ==
+                              pickerMatchId) {
+                        unawaited(router.maybePop(id));
+                      }
+                    });
+                  },
+                ),
+              ),
+            ),
+          );
+        },
       ),
       onOpenDetails: (id) => unawaited(
         context.router.push(IntentionDetailsRoute(intentionId: id)),

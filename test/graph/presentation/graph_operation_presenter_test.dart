@@ -418,6 +418,36 @@ void main() {
     }
   }
 
+  for (final (locale, live, late) in [
+    (
+      const Locale('ru'),
+      'Создание — «Полное намерение»: Намерение создано и выбрано началом пути.',
+      'Создание — «Полное намерение»: Намерение создано.',
+    ),
+    (
+      const Locale('en'),
+      'Create — “Полное намерение”: Intention created and selected as the start of the path.',
+      'Create — “Полное намерение”: Intention created.',
+    ),
+  ]) {
+    for (final released in [false, true]) {
+      testWidgets(
+        'создание начала пути сообщает исход с учётом ухода, ${locale.languageCode}, освобождено: $released',
+        (tester) async {
+          final harness = await _pumpPresenterApp(tester, locale: locale);
+          final creation = harness.startFullCreation(
+            releaseInitiator: released,
+            target: const CreatingIntentionForPathStartOperationTarget(),
+          );
+          harness.completeFullCreated(creation);
+          await tester.pumpAndSettle();
+          expect(find.text(released ? late : live), findsOneWidget);
+          await _closeMessage(tester);
+        },
+      );
+    }
+  }
+
   // Язык не меняет путь предъявления, поэтому достаточно русского.
   const fullCreation = (
     locale: Locale('ru'),

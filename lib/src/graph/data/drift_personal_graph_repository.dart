@@ -1094,7 +1094,8 @@ final class DriftPersonalGraphRepository
     final (totalCount, counts) = await _countCatalog(query);
     final titleFilter = query.titleFilter;
     int? exactTitleCount;
-    if (query.pairProbe != null && titleFilter != null) {
+    if ((query.pairProbe != null || query.countExactActiveTitle) &&
+        titleFilter != null) {
       final count = countAll();
       final countQuery = _database.selectOnly(intentions)
         ..addColumns([count])

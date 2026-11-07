@@ -1742,6 +1742,12 @@ abstract class AppLocalizations {
   /// **'Intention created and selected.'**
   String get editorCreatedAndChosen;
 
+  /// Успех создания намерения для начала пути
+  ///
+  /// In en, this message translates to:
+  /// **'Intention created and selected as the start of the path.'**
+  String get editorCreatedAndChosenPathStart;
+
   /// Заголовок подтверждения закрытия изменённого черновика создания до отправки
   ///
   /// In en, this message translates to:

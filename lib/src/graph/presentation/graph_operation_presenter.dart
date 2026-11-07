@@ -543,6 +543,8 @@ String _successFor(
   (IntentionCommandKind.create, IntentionSaved()) => switch (target) {
     CreatingIntentionForSearchOperationTarget() =>
       localizations.editorCreatedAndChosen,
+    CreatingIntentionForPathStartOperationTarget() =>
+      localizations.editorCreatedAndChosenPathStart,
     CreatingIntentionOperationTarget() ||
     ExistingIntentionOperationTarget() => localizations.editorCreated,
   },

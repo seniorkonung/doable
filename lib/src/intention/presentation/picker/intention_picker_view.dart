@@ -83,8 +83,9 @@ sealed class IntentionPickerRowBehavior {
 }
 
 final class IntentionPickerSingle extends IntentionPickerRowBehavior {
-  const IntentionPickerSingle({required this.onPick});
+  const IntentionPickerSingle({required this.onPick, this.onCreate});
   final void Function(GraphSnapshot<IntentionSummary>) onPick;
+  final void Function(String title, VoidCallback clearTitle)? onCreate;
 }
 
 final class IntentionPickerCheckable extends IntentionPickerRowBehavior {
@@ -142,7 +143,7 @@ final class _IntentionPickerViewState
     final title = kind.title(l10n);
     final purposeDescription = widget.purposeDescription;
     final onCreate = switch (widget.rowBehavior) {
-      IntentionPickerSingle() => null,
+      IntentionPickerSingle(:final onCreate) => onCreate,
       IntentionPickerCheckable(:final onCreate) => onCreate,
     };
     return Scaffold(

@@ -694,6 +694,11 @@ final class CreatingIntentionForSearchOperationTarget
   const CreatingIntentionForSearchOperationTarget();
 }
 
+final class CreatingIntentionForPathStartOperationTarget
+    extends IntentionCreationOperationTarget {
+  const CreatingIntentionForPathStartOperationTarget();
+}
+
 final class ExistingIntentionOperationTarget extends IntentionOperationTarget {
   const ExistingIntentionOperationTarget({
     required this.intentionId,
@@ -1271,7 +1276,8 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       execute: () async {
         final result = await _executeIntention(command);
         final completionTarget =
-            target is CreatingIntentionForSearchOperationTarget &&
+            (target is CreatingIntentionForSearchOperationTarget ||
+                    target is CreatingIntentionForPathStartOperationTarget) &&
                 entry.initiatorReleased
             ? const CreatingIntentionOperationTarget()
             : target;

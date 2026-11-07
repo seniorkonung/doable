@@ -97,6 +97,7 @@ final class _IntentionEditorPageState
   String get _initialTitle => switch (widget.launch) {
     IntentionCreationStandalone() => '',
     IntentionCreationForSearch(:final initialTitle) => initialTitle,
+    IntentionCreationForPathStart(:final initialTitle) => initialTitle,
   };
 
   IntentionEditorViewModelProvider get _provider =>
@@ -108,6 +109,8 @@ final class _IntentionEditorPageState
             const CreatingIntentionOperationTarget(),
           IntentionCreationForSearch() =>
             const CreatingIntentionForSearchOperationTarget(),
+          IntentionCreationForPathStart() =>
+            const CreatingIntentionForPathStartOperationTarget(),
         },
       );
 
@@ -470,6 +473,10 @@ final class _IntentionEditorPageState
       case IntentionCreationForSearch(:final onCreated):
         router.removeRoute(route);
         onCreated(intention.id, intention.title);
+        return;
+      case IntentionCreationForPathStart(:final onCreated):
+        router.removeRoute(route);
+        onCreated(intention.id);
         return;
       case IntentionCreationStandalone():
         break;
