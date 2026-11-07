@@ -412,7 +412,7 @@ void main() {
       ]);
       expect(_pickerMarks(tester, l10n, _sleep), isEmpty);
       final header = tester.widget<CatalogHeader>(find.byType(CatalogHeader));
-      expect(header.title, l10n.intentionPickerAllHeader);
+      expect(header.title, l10n.intentionPickerIntentionsHeader);
       expect(header.count, 3);
 
       // Страница из поиска позволяет удалить занимающую связь.

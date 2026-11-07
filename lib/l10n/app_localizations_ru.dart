@@ -2496,13 +2496,14 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerTypeCaption => 'Тип';
 
   @override
-  String get intentionPickerTypeAll => 'Намерения и действия';
+  String get intentionPickerKindMainAndSupporting =>
+      'Главные и вспомогательные';
 
   @override
-  String get intentionPickerTypeIntentionsOnly => 'Только намерения';
+  String get intentionPickerKindMainOnly => 'Только главные';
 
   @override
-  String get intentionPickerTypeActionsOnly => 'Только действия';
+  String get intentionPickerKindSupportingOnly => 'Только вспомогательные';
 
   @override
   String get intentionPickerSortCaption => 'Сортировка';
@@ -2537,9 +2538,6 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get intentionPickerAllHeader => 'Все';
-
-  @override
   String get intentionPickerOrderCreatedNewest => 'Создание, сначала новые';
 
   @override
@@ -2558,37 +2556,23 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerOrderTitleDescending => 'Название, от Я до А';
 
   @override
-  String intentionPickerHeaderLabel(String type, String summary) {
-    return 'Показать и упорядочить. Тип: $type. Сортировка: $summary.';
-  }
-
-  @override
-  String intentionPickerHeaderCountLabel(
-    String type,
-    int count,
-    String summary,
-  ) {
-    return 'Показать и упорядочить. Тип: $type, $count. Сортировка: $summary.';
-  }
-
-  @override
-  String intentionPickerScopeHeader(String scope, String type) {
-    String _temp0 = intl.Intl.selectLogic(type, {
-      'all': 'Активные',
-      'intentions': 'Активные намерения',
-      'actions': 'Активные действия',
+  String intentionPickerScopeHeader(String scope, String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'mainOnly': 'Активные главные',
+      'supportingOnly': 'Активные вспомогательные',
+      'mainAndSupporting': 'Активные',
       'other': '',
     });
-    String _temp1 = intl.Intl.selectLogic(type, {
-      'all': 'Архивные',
-      'intentions': 'Архивные намерения',
-      'actions': 'Архивные действия',
+    String _temp1 = intl.Intl.selectLogic(kind, {
+      'mainOnly': 'Архивные главные',
+      'supportingOnly': 'Архивные вспомогательные',
+      'mainAndSupporting': 'Архивные',
       'other': '',
     });
-    String _temp2 = intl.Intl.selectLogic(type, {
-      'all': 'Все',
-      'intentions': 'Все намерения',
-      'actions': 'Все действия',
+    String _temp2 = intl.Intl.selectLogic(kind, {
+      'mainOnly': 'Все главные',
+      'supportingOnly': 'Все вспомогательные',
+      'mainAndSupporting': 'Все',
       'other': '',
     });
     String _temp3 = intl.Intl.selectLogic(scope, {
@@ -2615,9 +2599,6 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get intentionPickerActionsHeader => 'Действия';
-
-  @override
   String get intentionPickerIntentionsHeader => 'Намерения';
 
   @override
@@ -2627,30 +2608,23 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerEmptyScopeTitle => 'Выбрать не из чего';
 
   @override
-  String get intentionPickerEmptyTypeTitle => 'Намерений этого типа нет';
-
-  @override
-  String get intentionPickerEmptyTypeText =>
-      'Покажите оба типа, чтобы выбрать из доступных намерений.';
-
-  @override
   String get intentionPickerShowBothTypes => 'Показать оба типа';
 
   @override
-  String intentionPickerEmptyScopedTypeTitle(String scope, String type) {
-    String _temp0 = intl.Intl.selectLogic(type, {
-      'actions': 'Нет активных действий',
-      'intentions': 'Нет активных намерений',
+  String intentionCatalogEmptyKindTitle(String scope, String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'main': 'Нет активных главных намерений',
+      'supporting': 'Нет активных вспомогательных намерений',
       'other': '',
     });
-    String _temp1 = intl.Intl.selectLogic(type, {
-      'actions': 'Нет действий в архиве',
-      'intentions': 'Нет намерений в архиве',
+    String _temp1 = intl.Intl.selectLogic(kind, {
+      'main': 'В архиве нет главных намерений',
+      'supporting': 'В архиве нет вспомогательных намерений',
       'other': '',
     });
-    String _temp2 = intl.Intl.selectLogic(type, {
-      'actions': 'Действий пока нет',
-      'intentions': 'Намерений пока нет',
+    String _temp2 = intl.Intl.selectLogic(kind, {
+      'main': 'Главных намерений пока нет',
+      'supporting': 'Вспомогательных намерений пока нет',
       'other': '',
     });
     String _temp3 = intl.Intl.selectLogic(scope, {
@@ -2663,12 +2637,12 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get intentionPickerEmptyActionsText =>
-      'Здесь появится намерение, отмеченное как действие.';
+  String get intentionCatalogEmptyMainText =>
+      'Намерение становится главным, когда его так отмечают на его странице. Новое создаётся кнопкой с плюсом внизу.';
 
   @override
-  String get intentionPickerEmptyIntentionsText =>
-      'Здесь всё отмечено как действия.';
+  String get intentionCatalogEmptySupportingText =>
+      'Вспомогательным становится намерение, созданное в группах «Нужно» или «Можно использовать» другого намерения, и то, которое так отметили на его странице.';
 
   @override
   String get intentionCatalogNoActiveTitle => 'Нет активных намерений';
@@ -2934,10 +2908,6 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get intentionPickerNoActionsByTitle =>
-      'Нет действий с таким названием';
-
-  @override
   String get intentionPickerNoIntentionsByTitle =>
       'Нет намерений с таким названием';
 
@@ -2945,17 +2915,11 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerTryShorterTitle => 'Попробуйте название короче.';
 
   @override
-  String get intentionPickerNoActionsByTags => 'Нет действий под эти теги';
-
-  @override
   String get intentionPickerNoIntentionsByTags => 'Нет намерений под эти теги';
 
   @override
   String get intentionPickerChangeTags =>
       'Измените теги в фильтре или сбросьте его.';
-
-  @override
-  String get intentionPickerNoActionsFound => 'Действия не найдены';
 
   @override
   String get intentionPickerNoIntentionsFound => 'Намерения не найдены';

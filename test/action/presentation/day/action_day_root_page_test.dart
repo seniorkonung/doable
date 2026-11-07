@@ -41,7 +41,7 @@ import '../../../support/action_panel_controls.dart';
 import '../../../support/app_root_pages.dart';
 import '../../../support/controlled_local_date.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
-import '../../../support/intention_type_counts.dart';
+import '../../../support/intention_kind_counts.dart';
 import '../../../support/quick_creation.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import 'action_day_calendar_test_support.dart';

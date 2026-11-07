@@ -63,7 +63,7 @@ import '../../support/action_seed.dart';
 import '../../support/graph_durability_fixture.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
-import '../../support/intention_type_counts.dart';
+import '../../support/intention_kind_counts.dart';
 import '../../long_term_relation/presentation/relation_graph_test_support.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
 import '../../support/action_read_contract_test_fallback.dart';

@@ -1480,58 +1480,81 @@ void main() {
       );
     });
 
-    test('снимки смены готовности принадлежат условию готовности по своему состоянию', () async {
-      final id = _idForSequence(0x701);
-      await _insertIntention(
-        database,
-        id: id.toCanonicalString(),
-        title: 'Гулять',
-        createdAt: DateTime.utc(2026, 9, 2, 10),
-      );
-      clock = _DeterministicClock([
-        DateTime.utc(2026, 9, 3, 10),
-        DateTime.utc(2026, 9, 3, 11),
-      ]);
-      repository = DriftPersonalGraphRepository(
-        database,
-        idGenerator,
-        clock.call,
-        diagnostics,
-      );
-      IntentionCatalogQuery query(IntentionReadinessFilter filter) =>
-          IntentionCatalogQuery(
-            scope: IntentionScope.active,
-            readinessFilter: filter,
-            titleFilter: null,
-            order: IntentionCatalogOrder.createdAtDescending,
-            pageSize: 1,
-          );
-
-      for (final (command, readyBefore) in [
-        (EnableIntentionReadiness.new, false),
-        (DisableIntentionReadiness.new, true),
-      ]) {
-        final saved = _commandSuccess(
-          await repository.execute(command(id)),
-        ) as IntentionSaved;
-        final mutation = saved.catalogMutation as IntentionCatalogUpdated;
-
-        for (final (snapshot, isReady) in [
-          (mutation.before, readyBefore),
-          (mutation.after, !readyBefore),
+    test(
+      'снимки смены вида принадлежат условию вида по своему состоянию',
+      () async {
+        final id = _idForSequence(0x701);
+        final sourceId = _idForSequence(0x702);
+        for (final (intentionId, title) in [
+          (id, 'Гулять'),
+          (sourceId, 'Бегать'),
         ]) {
-          expect(snapshot.matches(query(IntentionReadinessFilter.all)), isTrue);
-          expect(
-            snapshot.matches(query(IntentionReadinessFilter.readyOnly)),
-            isReady,
-          );
-          expect(
-            snapshot.matches(query(IntentionReadinessFilter.notReadyOnly)),
-            !isReady,
+          await _insertIntention(
+            database,
+            id: intentionId.toCanonicalString(),
+            title: title,
+            createdAt: DateTime.utc(2026, 9, 2, 10),
           );
         }
-      }
-    });
+        // Вспомогательным намерение становится только при входящей связи.
+        seedRawGraph(raw, () {
+          raw.execute(
+            "INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at) VALUES (?, ?, ?, 'need', 4, 1, 1)",
+            [
+              _idForSequence(0x703).toCanonicalString(),
+              sourceId.toCanonicalString(),
+              id.toCanonicalString(),
+            ],
+          );
+        });
+        clock = _DeterministicClock([
+          DateTime.utc(2026, 9, 3, 10),
+          DateTime.utc(2026, 9, 3, 11),
+        ]);
+        repository = DriftPersonalGraphRepository(
+          database,
+          idGenerator,
+          clock.call,
+          diagnostics,
+        );
+        IntentionCatalogQuery query(IntentionKindFilter filter) =>
+            IntentionCatalogQuery(
+              scope: IntentionScope.active,
+              kindFilter: filter,
+              titleFilter: null,
+              order: IntentionCatalogOrder.createdAtDescending,
+              pageSize: 1,
+            );
+
+        for (final (newKind, mainBefore) in [
+          (IntentionKind.supporting, true),
+          (IntentionKind.main, false),
+        ]) {
+          final saved = _commandSuccess(
+            await repository.execute(ChangeIntentionKind(id, newKind)),
+          ) as IntentionSaved;
+          final mutation = saved.catalogMutation as IntentionCatalogUpdated;
+
+          for (final (snapshot, isMain) in [
+            (mutation.before, mainBefore),
+            (mutation.after, !mainBefore),
+          ]) {
+            expect(
+              snapshot.matches(query(IntentionKindFilter.mainAndSupporting)),
+              isTrue,
+            );
+            expect(
+              snapshot.matches(query(IntentionKindFilter.mainOnly)),
+              isMain,
+            );
+            expect(
+              snapshot.matches(query(IntentionKindFilter.supportingOnly)),
+              !isMain,
+            );
+          }
+        }
+      },
+    );
 
     test('ключ порядка названия в порции и снимках команды берётся из сохранённой проекции', () async {
       final walkId = _idForSequence(0x711);
@@ -1891,9 +1914,9 @@ void main() {
         order: IntentionCatalogOrder.createdAtDescending,
         pageSize: 100,
       );
-      final readyHomeQuery = IntentionCatalogQuery(
+      final mainHomeQuery = IntentionCatalogQuery(
         scope: IntentionScope.active,
-        readinessFilter: IntentionReadinessFilter.readyOnly,
+        kindFilter: IntentionKindFilter.mainOnly,
         titleFilter: null,
         tagFilter: IntentionTagFilter(requiredTagIds: [homeTagId]),
         order: IntentionCatalogOrder.createdAtDescending,
@@ -2037,10 +2060,22 @@ void main() {
               summary.tags.map((tag) => tag.name.value),
               scenario.withTags ? ['Выходные', 'Дом'] : isEmpty,
             );
-            final matchesReadyHome =
-                scenario.readiness == IntentionReadiness.ready &&
-                scenario.withTags;
-            expect(created.entry.matches(readyHomeQuery), matchesReadyHome);
+            // Созданное намерение всегда главное: условие вида не отсекает
+            // его, а решают теги.
+            expect(summary.kind, IntentionKind.main);
+            expect(created.entry.matches(mainHomeQuery), scenario.withTags);
+            expect(
+              created.entry.matches(
+                IntentionCatalogQuery(
+                  scope: IntentionScope.active,
+                  kindFilter: IntentionKindFilter.supportingOnly,
+                  titleFilter: null,
+                  order: IntentionCatalogOrder.createdAtDescending,
+                  pageSize: 100,
+                ),
+              ),
+              isFalse,
+            );
 
             final page = _firstCatalogPage(
               await repository.getCatalogPage(allQuery),
@@ -2054,9 +2089,9 @@ void main() {
               _summaryFacts(summary),
             );
             expect(
-              _catalogItems(await repository.getCatalogPage(readyHomeQuery))
+              _catalogItems(await repository.getCatalogPage(mainHomeQuery))
                   .map((item) => item.id),
-              matchesReadyHome ? [newId] : isEmpty,
+              scenario.withTags ? [newId] : isEmpty,
             );
             expect(
               (await _tagAssignments(

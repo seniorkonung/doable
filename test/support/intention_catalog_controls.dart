@@ -18,7 +18,6 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_row.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter/material.dart';
@@ -30,7 +29,7 @@ import 'tag_condition_cycles.dart';
 /// Параметры поиска, которые показывает каталог намерений.
 typedef ShownIntentionCatalogParameters = ({
   IntentionScope scope,
-  IntentionTypeChoice type,
+  IntentionKindFilter kind,
   IntentionCatalogOrder order,
   String titleFilter,
   int tagConditions,
@@ -143,11 +142,11 @@ Future<void> selectIntentionCatalogScope(
   await _closeShowAndSort(tester);
 }
 
-/// Выбирает тип [type] в листе «Показать и упорядочить» и закрывает лист.
+/// Выбирает вид [kind] в листе «Показать и упорядочить» и закрывает лист.
 /// [tap] — нажатие сценария; по умолчанию [tapWhenFound].
-Future<void> selectIntentionCatalogType(
+Future<void> selectIntentionCatalogKind(
   WidgetTester tester,
-  IntentionTypeChoice type, {
+  IntentionKindFilter kind, {
   RootPageTap tap = tapWhenFound,
 }) async {
   final texts = AppLocalizations.of(tester.element(_page));
@@ -155,7 +154,7 @@ Future<void> selectIntentionCatalogType(
   await _choose(
     tester,
     texts.intentionPickerTypeCaption,
-    _typeLabels(texts)[type]!,
+    _kindLabels(texts)[kind]!,
   );
   await _closeShowAndSort(tester);
 }
@@ -238,14 +237,14 @@ ShownIntentionCatalogParameters shownIntentionCatalogParameters(
   final header = tester.widget<CatalogHeader>(_header);
   final shown = [
     for (final scope in IntentionScope.values)
-      for (final type in IntentionTypeChoice.values)
-        if (texts.intentionPickerScopeHeader(scope.name, type.name) ==
+      for (final kind in IntentionKindFilter.values)
+        if (texts.intentionPickerScopeHeader(scope.name, kind.name) ==
             header.title)
-          (scope: scope, type: type),
+          (scope: scope, kind: kind),
   ].single;
   return (
     scope: shown.scope,
-    type: shown.type,
+    kind: shown.kind,
     order: _orderSummaries(texts).entries
         .singleWhere((order) => order.value == header.summary)
         .key,
@@ -377,10 +376,11 @@ Map<IntentionScope, String> _scopeLabels(AppLocalizations texts) => {
   IntentionScope.all: texts.intentionPickerScopeAll,
 };
 
-Map<IntentionTypeChoice, String> _typeLabels(AppLocalizations texts) => {
-  IntentionTypeChoice.all: texts.intentionPickerTypeAll,
-  IntentionTypeChoice.intentions: texts.intentionPickerTypeIntentionsOnly,
-  IntentionTypeChoice.actions: texts.intentionPickerTypeActionsOnly,
+Map<IntentionKindFilter, String> _kindLabels(AppLocalizations texts) => {
+  IntentionKindFilter.mainOnly: texts.intentionPickerKindMainOnly,
+  IntentionKindFilter.supportingOnly: texts.intentionPickerKindSupportingOnly,
+  IntentionKindFilter.mainAndSupporting:
+      texts.intentionPickerKindMainAndSupporting,
 };
 
 Map<IntentionCatalogSortField, String> _sortFieldLabels(

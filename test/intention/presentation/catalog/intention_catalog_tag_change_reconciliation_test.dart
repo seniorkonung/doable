@@ -91,7 +91,7 @@ void main() {
     expect(current.nextCursor, same(before.nextCursor));
     expect(current.selection.tagFilter, filter);
     expect(current.selection.order, before.selection.order);
-    expect(current.selection.scope, before.selection.scope);
+    expect(current.selection.show, before.selection.show);
     expect(repository.queries, hasLength(2));
   });
 

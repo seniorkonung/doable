@@ -2466,13 +2466,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerTypeCaption => 'Type';
 
   @override
-  String get intentionPickerTypeAll => 'Intentions and actions';
+  String get intentionPickerKindMainAndSupporting => 'Main and supporting';
 
   @override
-  String get intentionPickerTypeIntentionsOnly => 'Intentions only';
+  String get intentionPickerKindMainOnly => 'Main only';
 
   @override
-  String get intentionPickerTypeActionsOnly => 'Actions only';
+  String get intentionPickerKindSupportingOnly => 'Supporting only';
 
   @override
   String get intentionPickerSortCaption => 'Sort by';
@@ -2507,9 +2507,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get intentionPickerAllHeader => 'All';
-
-  @override
   String get intentionPickerOrderCreatedNewest => 'Created, newest first';
 
   @override
@@ -2528,37 +2525,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerOrderTitleDescending => 'Name, Z to A';
 
   @override
-  String intentionPickerHeaderLabel(String type, String summary) {
-    return 'Show and sort. Type: $type. Sorted by: $summary.';
-  }
-
-  @override
-  String intentionPickerHeaderCountLabel(
-    String type,
-    int count,
-    String summary,
-  ) {
-    return 'Show and sort. Type: $type, $count. Sorted by: $summary.';
-  }
-
-  @override
-  String intentionPickerScopeHeader(String scope, String type) {
-    String _temp0 = intl.Intl.selectLogic(type, {
-      'all': 'Active',
-      'intentions': 'Active intentions',
-      'actions': 'Active actions',
+  String intentionPickerScopeHeader(String scope, String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'mainOnly': 'Active main',
+      'supportingOnly': 'Active supporting',
+      'mainAndSupporting': 'Active',
       'other': '',
     });
-    String _temp1 = intl.Intl.selectLogic(type, {
-      'all': 'Archived',
-      'intentions': 'Archived intentions',
-      'actions': 'Archived actions',
+    String _temp1 = intl.Intl.selectLogic(kind, {
+      'mainOnly': 'Archived main',
+      'supportingOnly': 'Archived supporting',
+      'mainAndSupporting': 'Archived',
       'other': '',
     });
-    String _temp2 = intl.Intl.selectLogic(type, {
-      'all': 'All',
-      'intentions': 'All intentions',
-      'actions': 'All actions',
+    String _temp2 = intl.Intl.selectLogic(kind, {
+      'mainOnly': 'All main',
+      'supportingOnly': 'All supporting',
+      'mainAndSupporting': 'All',
       'other': '',
     });
     String _temp3 = intl.Intl.selectLogic(scope, {
@@ -2585,9 +2568,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get intentionPickerActionsHeader => 'Actions';
-
-  @override
   String get intentionPickerIntentionsHeader => 'Intentions';
 
   @override
@@ -2597,30 +2577,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerEmptyScopeTitle => 'Nothing to choose from';
 
   @override
-  String get intentionPickerEmptyTypeTitle => 'No intentions of this type';
-
-  @override
-  String get intentionPickerEmptyTypeText =>
-      'Show both types to choose from the available intentions.';
-
-  @override
   String get intentionPickerShowBothTypes => 'Show both types';
 
   @override
-  String intentionPickerEmptyScopedTypeTitle(String scope, String type) {
-    String _temp0 = intl.Intl.selectLogic(type, {
-      'actions': 'No active actions',
-      'intentions': 'No active intentions',
+  String intentionCatalogEmptyKindTitle(String scope, String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'main': 'No active main intentions',
+      'supporting': 'No active supporting intentions',
       'other': '',
     });
-    String _temp1 = intl.Intl.selectLogic(type, {
-      'actions': 'No actions in the archive',
-      'intentions': 'No intentions in the archive',
+    String _temp1 = intl.Intl.selectLogic(kind, {
+      'main': 'No main intentions in the archive',
+      'supporting': 'No supporting intentions in the archive',
       'other': '',
     });
-    String _temp2 = intl.Intl.selectLogic(type, {
-      'actions': 'No actions yet',
-      'intentions': 'No intentions yet',
+    String _temp2 = intl.Intl.selectLogic(kind, {
+      'main': 'No main intentions yet',
+      'supporting': 'No supporting intentions yet',
       'other': '',
     });
     String _temp3 = intl.Intl.selectLogic(scope, {
@@ -2633,12 +2606,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get intentionPickerEmptyActionsText =>
-      'An intention marked as an action is shown here.';
+  String get intentionCatalogEmptyMainText =>
+      'An intention becomes main when you mark it so on its page. Create a new one with the plus button below.';
 
   @override
-  String get intentionPickerEmptyIntentionsText =>
-      'Everything here is marked as an action.';
+  String get intentionCatalogEmptySupportingText =>
+      'An intention becomes supporting when it is created in the Needs or Can use group of another intention, or when you mark it so on its page.';
 
   @override
   String get intentionCatalogNoActiveTitle => 'No active intentions';
@@ -2893,17 +2866,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get intentionPickerNoActionsByTitle => 'No actions with this name';
-
-  @override
   String get intentionPickerNoIntentionsByTitle =>
       'No intentions with this name';
 
   @override
   String get intentionPickerTryShorterTitle => 'Try a shorter name.';
-
-  @override
-  String get intentionPickerNoActionsByTags => 'No actions match these tags';
 
   @override
   String get intentionPickerNoIntentionsByTags =>
@@ -2912,9 +2879,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get intentionPickerChangeTags =>
       'Change the tags in the filter or reset it.';
-
-  @override
-  String get intentionPickerNoActionsFound => 'No actions found';
 
   @override
   String get intentionPickerNoIntentionsFound => 'No intentions found';

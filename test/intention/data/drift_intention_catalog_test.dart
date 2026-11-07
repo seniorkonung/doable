@@ -8,6 +8,7 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
@@ -61,20 +62,20 @@ void main() {
         'Тег',
         tagPositionKey(100),
       ]);
-      for (final (number, title, ready, archived) in [
-        (1, 'Читать', 1, 0),
-        (2, 'ЧИТАТЬ', 1, 0),
-        (3, 'читать', 0, 0),
-        (4, 'Читать', 1, 0),
-        (5, 'Читать', 1, 1),
-        (6, 'Читать книгу', 1, 0),
-        (7, 'Читать', 1, 0),
+      for (final (number, title, kind, archived) in [
+        (1, 'Читать', 'main', 0),
+        (2, 'ЧИТАТЬ', 'main', 0),
+        (3, 'читать', 'supporting', 0),
+        (4, 'Читать', 'main', 0),
+        (5, 'Читать', 'main', 1),
+        (6, 'Читать книгу', 'main', 0),
+        (7, 'Читать', 'main', 0),
       ]) {
         raw.execute(
           'INSERT INTO intentions '
-          '(id, title, is_action_ready, is_archived, created_at, updated_at) '
+          '(id, title, kind, is_archived, created_at, updated_at) '
           'VALUES (?, ?, ?, ?, ?, ?)',
-          [_uuid(number), title, ready, archived, number, number],
+          [_uuid(number), title, kind, archived, number, number],
         );
       }
       for (final number in [2, 3, 4, 5, 6]) {
@@ -87,7 +88,7 @@ void main() {
 
     final query = _tagQuery(
       scope: IntentionScope.active,
-      readinessFilter: IntentionReadinessFilter.readyOnly,
+      kindFilter: IntentionKindFilter.mainOnly,
       titleFilter: '  чИтАтЬ  ',
       tagFilter: IntentionTagFilter(requiredTagIds: [_tagId(100)]),
       pairProbe: _excluding(_id(_uuid(1))),
@@ -242,7 +243,7 @@ void main() {
         IntentionCatalogQuery query(IntentionCatalogCursor? cursor) =>
             IntentionCatalogQuery(
               scope: IntentionScope.active,
-              readinessFilter: IntentionReadinessFilter.readyOnly,
+              kindFilter: IntentionKindFilter.mainOnly,
               titleFilter: 'гулять',
               tagFilter: filter,
               pairProbe: _excluding(_id(_uuid(236))),
@@ -402,13 +403,15 @@ void main() {
       expect(lastExclusion.items.single.id, _id(_uuid(3)));
     });
 
-    test('сохраняет все охваты, готовность и исключает одноимённого участника до порции', () async {
+    test('сочетает охват, вид, название и теги через «И» и исключает одноимённого участника до порции', () async {
       for (var number = 1; number <= 6; number++) {
         await _insertIntention(
           database,
           id: _uuid(number),
           title: 'Гулять',
-          isActionReady: number.isOdd || number == 6,
+          kind: number.isOdd || number == 6
+              ? IntentionKind.main
+              : IntentionKind.supporting,
           isArchived: number == 3 || number == 4,
           createdAt: DateTime.utc(2026, 9, 2, number),
         );
@@ -435,22 +438,25 @@ void main() {
         requiredTagIds: [_tagId(101)],
         excludedTagIds: [_tagId(102)],
       );
-      for (final (scope, readiness, numbers) in [
-        (IntentionScope.active, IntentionReadinessFilter.all, [1, 2]),
-        (IntentionScope.archived, IntentionReadinessFilter.all, [3, 4]),
-        (IntentionScope.all, IntentionReadinessFilter.all, [1, 2, 3, 4]),
-        (IntentionScope.active, IntentionReadinessFilter.readyOnly, [1]),
-        (IntentionScope.archived, IntentionReadinessFilter.readyOnly, [3]),
-        (IntentionScope.all, IntentionReadinessFilter.readyOnly, [1, 3]),
-        (IntentionScope.active, IntentionReadinessFilter.notReadyOnly, [2]),
-        (IntentionScope.archived, IntentionReadinessFilter.notReadyOnly, [4]),
-        (IntentionScope.all, IntentionReadinessFilter.notReadyOnly, [2, 4]),
+      const both = IntentionKindFilter.mainAndSupporting;
+      const main = IntentionKindFilter.mainOnly;
+      const supporting = IntentionKindFilter.supportingOnly;
+      for (final (scope, kind, numbers) in [
+        (IntentionScope.active, both, [1, 2]),
+        (IntentionScope.archived, both, [3, 4]),
+        (IntentionScope.all, both, [1, 2, 3, 4]),
+        (IntentionScope.active, main, [1]),
+        (IntentionScope.archived, main, [3]),
+        (IntentionScope.all, main, [1, 3]),
+        (IntentionScope.active, supporting, [2]),
+        (IntentionScope.archived, supporting, [4]),
+        (IntentionScope.all, supporting, [2, 4]),
       ]) {
         IntentionCatalogQuery query(IntentionCatalogCursor? cursor) =>
             _tagQuery(
               tagFilter: filter,
               scope: scope,
-              readinessFilter: readiness,
+              kindFilter: kind,
               pairProbe: _excluding(_id(_uuid(5))),
               titleFilter: 'гулять',
               cursor: cursor,
@@ -485,11 +491,11 @@ void main() {
       expect(otherSameTitle.items.single.id, _id(_uuid(2)));
     });
 
-    test('первая порция отдаёт числа вида подсчёта по всем условиям, кроме готовности, тем же одним подсчётом', () async {
+    test('первая порция отдаёт числа видов по охватам при всех условиях, кроме вида и охвата, тем же одним подсчётом', () async {
       // В активном охвате совпадают 1, 2 и 4, в архивном — 3 и 9. 5 —
       // исключённый участник, 6 — с запрещённым тегом, 7 — без обязательного
       // тега, 8 — с другим названием.
-      for (final (number, title, isActionReady, isArchived) in [
+      for (final (number, title, isMain, isArchived) in [
         (1, 'Гулять', true, false),
         (2, 'Гулять', false, false),
         (3, 'Гулять', true, true),
@@ -504,7 +510,7 @@ void main() {
           database,
           id: _uuid(number),
           title: title,
-          isActionReady: isActionReady,
+          kind: isMain ? IntentionKind.main : IntentionKind.supporting,
           isArchived: isArchived,
           createdAt: DateTime.utc(2026, 9, 2, number),
         );
@@ -529,7 +535,7 @@ void main() {
       });
       IntentionCatalogQuery query(
         IntentionScope scope,
-        IntentionReadinessFilter readiness,
+        IntentionKindFilter kind,
         IntentionCatalogCounting counting,
       ) => _tagQuery(
         tagFilter: IntentionTagFilter(
@@ -537,31 +543,32 @@ void main() {
           excludedTagIds: [_tagId(102)],
         ),
         scope: scope,
-        readinessFilter: readiness,
+        kindFilter: kind,
         pairProbe: _excluding(_id(_uuid(5))),
         titleFilter: 'гулять',
         counting: counting,
       );
 
-      // Числа охватов не зависят от охвата запроса: активных три, из них одно
-      // действие, архивных два, из них одно действие.
-      const ready = IntentionReadinessFilter.readyOnly;
-      const notReady = IntentionReadinessFilter.notReadyOnly;
-      for (final (scope, readiness, totalCount, scopeAll, scopeActions) in [
-        (IntentionScope.active, IntentionReadinessFilter.all, 3, 3, 1),
-        (IntentionScope.active, ready, 1, 3, 1),
-        (IntentionScope.active, notReady, 2, 3, 1),
-        (IntentionScope.archived, IntentionReadinessFilter.all, 2, 2, 1),
-        (IntentionScope.archived, ready, 1, 2, 1),
-        (IntentionScope.archived, notReady, 1, 2, 1),
-        (IntentionScope.all, IntentionReadinessFilter.all, 5, 5, 2),
-        (IntentionScope.all, ready, 2, 5, 2),
-        (IntentionScope.all, notReady, 3, 5, 2),
+      // Числа видов не зависят от охвата и вида запроса: в активном охвате
+      // одно главное и два вспомогательных, в архивном по одному.
+      const both = IntentionKindFilter.mainAndSupporting;
+      const main = IntentionKindFilter.mainOnly;
+      const supporting = IntentionKindFilter.supportingOnly;
+      for (final (scope, kind, totalCount) in [
+        (IntentionScope.active, both, 3),
+        (IntentionScope.active, main, 1),
+        (IntentionScope.active, supporting, 2),
+        (IntentionScope.archived, both, 2),
+        (IntentionScope.archived, main, 1),
+        (IntentionScope.archived, supporting, 1),
+        (IntentionScope.all, both, 5),
+        (IntentionScope.all, main, 2),
+        (IntentionScope.all, supporting, 3),
       ]) {
         trace.measured.clear();
         final totalOnly = _firstPage(
           await repository.getCatalogPage(
-            query(scope, readiness, IntentionCatalogCounting.totalOnly),
+            query(scope, kind, IntentionCatalogCounting.totalOnly),
           ),
         );
         final readsTotalOnly = trace.measured.length;
@@ -569,41 +576,28 @@ void main() {
         expect(totalOnly.counts, isA<IntentionCountsTotalOnly>());
 
         trace.measured.clear();
-        final byType = _firstPage(
+        final byScopeAndKind = _firstPage(
           await repository.getCatalogPage(
-            query(scope, readiness, IntentionCatalogCounting.byType),
+            query(scope, kind, IntentionCatalogCounting.byScopeAndKind),
           ),
         );
-        final typeCounts = switch (byType.counts) {
-          IntentionCountsByType(:final counts) => counts,
-          _ => fail('Ожидались числа типов, получено ${byType.counts}.'),
-        };
-        expect(byType.totalCount, totalCount);
-        expect(typeCounts.all, scopeAll);
-        expect(typeCounts.actions, scopeActions);
-        // Числа типов приходят тем же подсчётом, что и общее количество.
-        expect(trace.measured, hasLength(readsTotalOnly));
-
-        trace.measured.clear();
-        final byScopeAndType = _firstPage(
-          await repository.getCatalogPage(
-            query(scope, readiness, IntentionCatalogCounting.byScopeAndType),
-          ),
-        );
-        final matrix = switch (byScopeAndType.counts) {
-          final IntentionCountsByScopeAndType counts => counts,
+        final matrix = switch (byScopeAndKind.counts) {
+          final IntentionCountsByScopeAndKind counts => counts,
           _ => fail(
-            'Ожидались числа по охватам, получено ${byScopeAndType.counts}.',
+            'Ожидались числа по охватам и видам, получено '
+            '${byScopeAndKind.counts}.',
           ),
         };
-        expect(byScopeAndType.totalCount, totalCount);
-        expect(matrix.active.all, 3);
-        expect(matrix.active.actions, 1);
-        expect(matrix.archived.all, 2);
-        expect(matrix.archived.actions, 1);
-        // Строки порции и число чтений те же, что без чисел охватов.
+        expect(byScopeAndKind.totalCount, totalCount);
+        expect(matrix.active.main, 1);
+        expect(matrix.active.supporting, 2);
+        expect(matrix.archived.main, 1);
+        expect(matrix.archived.supporting, 1);
+        // Общее количество — число выбранного охвата и вида.
+        expect(matrix.inScope(scope).matching(kind), totalCount);
+        // Строки порции и число чтений те же, что без чисел по видам.
         expect(
-          byScopeAndType.items.map((item) => item.id),
+          byScopeAndKind.items.map((item) => item.id),
           totalOnly.items.map((item) => item.id),
         );
         expect(trace.measured, hasLength(readsTotalOnly));
@@ -638,10 +632,19 @@ void main() {
             excludedTagIds: [_tagId(lastTagNumber)],
           ),
           scope: IntentionScope.active,
-          readinessFilter: IntentionReadinessFilter.readyOnly,
+          kindFilter: IntentionKindFilter.mainOnly,
           titleFilter: 'намерение',
         );
         expect(snapshot.matches(required), isTrue);
+        expect(
+          snapshot.matches(
+            _tagQuery(
+              tagFilter: required.tagFilter,
+              kindFilter: IntentionKindFilter.supportingOnly,
+            ),
+          ),
+          isFalse,
+        );
         expect(
           snapshot.matches(
             _tagQuery(
@@ -1337,19 +1340,19 @@ void main() {
     });
 
     test(
-      'занятость не меняет число совпадений, числа по типам и порядок',
+      'занятость не меняет число совпадений, числа по видам и порядок',
       () async {
         final pairProbe = probe(healthy, RelationParticipantRole.related);
         final occupied = await firstPage(
           pairProbe,
-          counting: IntentionCatalogCounting.byType,
+          counting: IntentionCatalogCounting.byScopeAndKind,
         );
         seedRawGraph(raw, () {
           raw.execute('DELETE FROM long_term_relations');
         });
         final free = await firstPage(
           pairProbe,
-          counting: IntentionCatalogCounting.byType,
+          counting: IntentionCatalogCounting.byScopeAndKind,
         );
 
         expect(occupied.pairOccupants, isNotEmpty);
@@ -1359,11 +1362,15 @@ void main() {
           free.items.map((item) => item.id),
         );
         expect(occupied.totalCount, free.totalCount);
-        final occupiedCounts =
-            (occupied.counts as IntentionCountsByType).counts;
-        final freeCounts = (free.counts as IntentionCountsByType).counts;
-        expect(occupiedCounts.all, freeCounts.all);
-        expect(occupiedCounts.actions, freeCounts.actions);
+        final occupiedCounts = occupied.counts as IntentionCountsByScopeAndKind;
+        final freeCounts = free.counts as IntentionCountsByScopeAndKind;
+        for (final (occupiedKinds, freeKinds) in [
+          (occupiedCounts.active, freeCounts.active),
+          (occupiedCounts.archived, freeCounts.archived),
+        ]) {
+          expect(occupiedKinds.main, freeKinds.main);
+          expect(occupiedKinds.supporting, freeKinds.supporting);
+        }
       },
     );
   });
@@ -1560,12 +1567,12 @@ void main() {
     });
   });
 
-  test('отбирает действия до порции и считает только совпадения', () async {
+  test('отбирает вспомогательные до порции и считает только совпадения', () async {
     for (var index = 1; index <= 60; index++) {
       await _insertIntention(
         database,
         id: '018f0b5d-6b2e-7c80-8000-${index.toRadixString(16).padLeft(12, '0')}',
-        title: 'Действие %_ без готовности',
+        title: 'Главное %_ для исключения',
         createdAt: DateTime.utc(2026, 9, 2, 11, index),
       );
     }
@@ -1577,8 +1584,8 @@ void main() {
       await _insertIntention(
         database,
         id: '018f0b5d-6b2e-7c80-8000-000000000$suffix',
-        title: 'Действие %_ с одинаковым названием',
-        isActionReady: true,
+        title: 'Вспомогательное %_ с одинаковым названием',
+        kind: IntentionKind.supporting,
         createdAt: DateTime.utc(2026, 9, 2, createdHour),
         updatedAt: DateTime.utc(2026, 9, 2, updatedHour),
       );
@@ -1586,8 +1593,8 @@ void main() {
     await _insertIntention(
       database,
       id: '018f0b5d-6b2e-7c80-8000-000000000104',
-      title: 'Действие %_ в архиве',
-      isActionReady: true,
+      title: 'Вспомогательное %_ в архиве',
+      kind: IntentionKind.supporting,
       isArchived: true,
       createdAt: DateTime.utc(2026, 9, 2, 13),
     );
@@ -1601,7 +1608,7 @@ void main() {
     for (final (order, expectedSuffixes) in cases) {
       final query = IntentionCatalogQuery(
         scope: IntentionScope.active,
-        readinessFilter: IntentionReadinessFilter.readyOnly,
+        kindFilter: IntentionKindFilter.supportingOnly,
         titleFilter: '%_',
         order: order,
         pageSize: 1,
@@ -1616,7 +1623,7 @@ void main() {
           await repository.getCatalogPage(
             IntentionCatalogQuery(
               scope: query.scope,
-              readinessFilter: query.readinessFilter,
+              kindFilter: query.kindFilter,
               titleFilter: '%_',
               order: query.order,
               pageSize: query.pageSize,
@@ -1636,73 +1643,79 @@ void main() {
     }
   });
 
-  test('читает только порцию и количество при редкой готовности в большом каталоге', () async {
-    await seedGraph(
-      database,
-      () => database.customStatement('''
+  test(
+    'читает только порцию и количество при редком виде в большом каталоге',
+    () async {
+      await seedGraph(
+        database,
+        () => database.customStatement('''
       WITH RECURSIVE ids(n) AS (
         VALUES(1) UNION ALL SELECT n + 1 FROM ids WHERE n < 3000
       )
       INSERT INTO intentions
-        (id, title, is_action_ready, is_archived, created_at, updated_at)
+        (id, title, kind, is_archived, created_at, updated_at)
       SELECT printf('018f0b5d-6b2e-7c80-8000-%012x', n),
-             'Действие %_ ' || n, n % 1000 = 0, 0, n, n FROM ids
+             'Запись %_ ' || n,
+             CASE WHEN n % 1000 = 0 THEN 'supporting' ELSE 'main' END,
+             0, n, n FROM ids
     '''),
-    );
-    final query = IntentionCatalogQuery(
-      scope: IntentionScope.active,
-      readinessFilter: IntentionReadinessFilter.readyOnly,
-      titleFilter: '%_',
-      order: IntentionCatalogOrder.createdAtDescending,
-      pageSize: 2,
-    );
-    trace.measured.clear();
-    final first = _firstPage(await repository.getCatalogPage(query));
-    expect(first.totalCount, 3);
-    expect(first.items.map((item) => item.id), [
-      _id(_uuid(3000)),
-      _id(_uuid(2000)),
-    ]);
-    // Порция из двух намерений и одна строка сверх неё: ни одно чтение не
-    // возвращает остальные 2997 намерений без готовности.
-    expect(
-      trace.measured.map((entry) => entry.rows),
-      everyElement(lessThanOrEqualTo(3)),
-    );
+      );
+      final query = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        kindFilter: IntentionKindFilter.supportingOnly,
+        titleFilter: '%_',
+        order: IntentionCatalogOrder.createdAtDescending,
+        pageSize: 2,
+      );
+      trace.measured.clear();
+      final first = _firstPage(await repository.getCatalogPage(query));
+      expect(first.totalCount, 3);
+      expect(first.items.map((item) => item.id), [
+        _id(_uuid(3000)),
+        _id(_uuid(2000)),
+      ]);
+      // Порция из двух намерений и одна строка сверх неё: ни одно чтение не
+      // возвращает остальные 2997 главных намерений.
+      expect(
+        trace.measured.map((entry) => entry.rows),
+        everyElement(lessThanOrEqualTo(3)),
+      );
 
-    trace.measured.clear();
-    final next = _continuationPage(
-      await repository.getCatalogPage(
-        IntentionCatalogQuery(
-          scope: query.scope,
-          readinessFilter: query.readinessFilter,
-          titleFilter: '%_',
-          order: query.order,
-          pageSize: query.pageSize,
-          cursor: first.nextCursor,
+      trace.measured.clear();
+      final next = _continuationPage(
+        await repository.getCatalogPage(
+          IntentionCatalogQuery(
+            scope: query.scope,
+            kindFilter: query.kindFilter,
+            titleFilter: '%_',
+            order: query.order,
+            pageSize: query.pageSize,
+            cursor: first.nextCursor,
+          ),
         ),
-      ),
-    );
-    expect(next.items.map((item) => item.id), [_id(_uuid(1000))]);
-    expect(
-      trace.measured.map((entry) => entry.rows),
-      everyElement(lessThanOrEqualTo(1)),
-    );
-  });
+      );
+      expect(next.items.map((item) => item.id), [_id(_uuid(1000))]);
+      expect(
+        trace.measured.map((entry) => entry.rows),
+        everyElement(lessThanOrEqualTo(1)),
+      );
+    },
+  );
 
   test(
-    'снимки изменения готовности сохраняют точную принадлежность каталогу',
+    'снимки изменения вида сохраняют точную принадлежность каталогу',
     () async {
       const id = '018f0b5d-6b2e-7c80-8000-000000000301';
       await _insertIntention(
         database,
         id: id,
         title: 'Пройти по Straße',
+        kind: IntentionKind.supporting,
         createdAt: DateTime.utc(2026, 9, 2, 10),
       );
       final query = IntentionCatalogQuery(
         scope: IntentionScope.active,
-        readinessFilter: IntentionReadinessFilter.readyOnly,
+        kindFilter: IntentionKindFilter.mainOnly,
         titleFilter: 'STRASSE',
         order: IntentionCatalogOrder.createdAtDescending,
         pageSize: 1,
@@ -1710,7 +1723,7 @@ void main() {
       expect(_firstPage(await repository.getCatalogPage(query)).totalCount, 0);
 
       final result = await repository.execute(
-        EnableIntentionReadiness(_id(id)),
+        ChangeIntentionKind(_id(id), IntentionKind.main),
       );
       expect(
         result,
@@ -2723,12 +2736,12 @@ void _seedJointCatalogPagingFixture(Database database) {
     for (var number = 1; number <= 285; number++) {
       database.execute(
         'INSERT INTO intentions '
-        '(id, title, is_action_ready, is_archived, created_at, updated_at) '
+        '(id, title, kind, is_archived, created_at, updated_at) '
         'VALUES (?, ?, ?, ?, ?, ?)',
         [
           _uuid(number),
           number >= 256 && number <= 265 ? 'Читать' : 'Гулять',
-          number < 276 ? 1 : 0,
+          number < 276 ? 'main' : 'supporting',
           number >= 266 && number <= 275 ? 1 : 0,
           100 + (number - 1) ~/ 120,
           300 - (number - 1) ~/ 80,
@@ -2754,7 +2767,7 @@ Future<void> _insertIntention(
   required String id,
   required String title,
   String? description,
-  bool isActionReady = false,
+  IntentionKind kind = IntentionKind.main,
   bool isArchived = false,
   required DateTime createdAt,
   DateTime? updatedAt,
@@ -2767,7 +2780,7 @@ Future<void> _insertIntention(
           id: id,
           title: title,
           description: Value(description),
-          isActionReady: Value(isActionReady),
+          kind: Value(kind.name),
           isArchived: Value(isArchived),
           createdAt: createdAt.microsecondsSinceEpoch,
           updatedAt: (updatedAt ?? createdAt).microsecondsSinceEpoch,
@@ -2828,7 +2841,7 @@ RelationPairProbe _excluding(IntentionId id) => RelationPairProbe(
 IntentionCatalogQuery _tagQuery({
   required IntentionTagFilter tagFilter,
   IntentionScope scope = IntentionScope.all,
-  IntentionReadinessFilter readinessFilter = IntentionReadinessFilter.all,
+  IntentionKindFilter kindFilter = IntentionKindFilter.mainAndSupporting,
   String? titleFilter,
   RelationPairProbe? pairProbe,
   int pageSize = 1,
@@ -2836,7 +2849,7 @@ IntentionCatalogQuery _tagQuery({
   IntentionCatalogCounting counting = IntentionCatalogCounting.totalOnly,
 }) => IntentionCatalogQuery(
   scope: scope,
-  readinessFilter: readinessFilter,
+  kindFilter: kindFilter,
   titleFilter: titleFilter,
   tagFilter: tagFilter,
   pairProbe: pairProbe,

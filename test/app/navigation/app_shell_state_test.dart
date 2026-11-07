@@ -1028,16 +1028,16 @@ void _seed(sqlite.Database database) {
   database.execute('COMMIT');
 }
 
-/// Каталог намерений: архивный охват, только действия, фильтр названия, условие
-/// по тегу, порядок от старых к новым, две загруженные порции из трёх и
-/// прокрутка внутри второй порции.
+/// Каталог намерений: архивный охват, оба вида, фильтр названия, условие по
+/// тегу, порядок от старых к новым, две загруженные порции из трёх и прокрутка
+/// внутри второй порции.
 Future<void> _prepareIntentionCatalog(WidgetTester tester, _App app) async {
   await _select(tester, AppDestination.intentionGraph);
   await selectIntentionCatalogScope(tester, IntentionScope.archived, tap: _tap);
   await _settle(tester);
-  await selectIntentionCatalogType(
+  await selectIntentionCatalogKind(
     tester,
-    IntentionTypeChoice.actions,
+    IntentionKindFilter.mainAndSupporting,
     tap: _tap,
   );
   await _settle(tester);
@@ -1073,13 +1073,16 @@ Future<void> _prepareIntentionCatalog(WidgetTester tester, _App app) async {
   expect(catalog.totalCount, _archivedCount);
   expect(catalog.nextCursor, isNotNull);
   expect(
-    catalog.selection.scope,
-    const IntentionScopeOpen(IntentionScope.archived),
+    catalog.selection.show,
+    const IntentionShowChosen(
+      scope: IntentionScope.archived,
+      kind: IntentionKindFilter.mainAndSupporting,
+    ),
   );
   expect(catalog.selection.order, IntentionCatalogOrder.createdAtAscending);
   expect(
-    shownIntentionCatalogParameters(tester).type,
-    IntentionTypeChoice.actions,
+    shownIntentionCatalogParameters(tester).kind,
+    IntentionKindFilter.mainAndSupporting,
   );
   expect(catalog.items.first.title, 'Архив 001');
   expect(shownIntentionCatalogParameters(tester).tagConditions, 1);

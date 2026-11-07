@@ -9,43 +9,53 @@ enum IntentionCatalogFilterValidationFailure {
   tooLong,
 }
 
-/// Тип намерения, которым поиск ограничивает выдачу.
-enum IntentionTypeChoice { all, intentions, actions }
+/// Охват и вид выдачи, которые задаёт назначение поиска.
+sealed class IntentionShowParameters {
+  const IntentionShowParameters();
 
-/// Доступность выбора охвата, которую задаёт назначение поиска.
-sealed class IntentionScopeAvailability {
-  const IntentionScopeAvailability();
+  IntentionScope get scope;
+
+  IntentionKindFilter get kind;
 }
 
-/// Охват выбирается человеком; [selected] — выбранный охват.
-final class IntentionScopeOpen extends IntentionScopeAvailability {
-  const IntentionScopeOpen(this.selected);
-
-  final IntentionScope selected;
+/// Каталог: охват [scope] и вид [kind] выбирает человек.
+final class IntentionShowChosen extends IntentionShowParameters {
+  const IntentionShowChosen({required this.scope, required this.kind});
 
   @override
-  bool operator ==(Object other) =>
-      other is IntentionScopeOpen && other.selected == selected;
-
-  @override
-  int get hashCode => Object.hash(IntentionScopeOpen, selected);
-}
-
-/// Назначение поиска закрепляет охват за [scope].
-final class IntentionScopeFixed extends IntentionScopeAvailability {
-  const IntentionScopeFixed(this.scope);
-
   final IntentionScope scope;
 
   @override
-  bool operator ==(Object other) =>
-      other is IntentionScopeFixed && other.scope == scope;
+  final IntentionKindFilter kind;
 
   @override
-  int get hashCode => Object.hash(IntentionScopeFixed, scope);
+  bool operator ==(Object other) =>
+      other is IntentionShowChosen &&
+      other.scope == scope &&
+      other.kind == kind;
+
+  @override
+  int get hashCode => Object.hash(IntentionShowChosen, scope, kind);
 }
 
-/// Точные числа намерений каждого охвата при одном условии готовности.
+/// Поиск для выбора: активные намерения обоих видов, без выбора человеком.
+final class IntentionShowFixed extends IntentionShowParameters {
+  const IntentionShowFixed();
+
+  @override
+  IntentionScope get scope => IntentionScope.active;
+
+  @override
+  IntentionKindFilter get kind => IntentionKindFilter.mainAndSupporting;
+
+  @override
+  bool operator ==(Object other) => other is IntentionShowFixed;
+
+  @override
+  int get hashCode => (IntentionShowFixed).hashCode;
+}
+
+/// Точные числа намерений каждого охвата при одном условии вида.
 final class IntentionScopeCounts {
   const IntentionScopeCounts({required this.active, required this.archived});
 
@@ -57,16 +67,14 @@ final class IntentionScopeCounts {
 
 final class IntentionCatalogSelection {
   const IntentionCatalogSelection({
-    required this.scope,
-    required this.type,
+    required this.show,
     required this.titleFilterText,
     this.tagFilter = IntentionTagFilter.empty,
     required this.order,
     required this.filterValidationFailure,
   });
 
-  final IntentionScopeAvailability scope;
-  final IntentionTypeChoice type;
+  final IntentionShowParameters show;
   final String titleFilterText;
   final IntentionTagFilter tagFilter;
   final IntentionCatalogOrder order;
@@ -111,22 +119,21 @@ sealed class IntentionCatalogConfirmedState extends IntentionCatalogState {
   String? get createTitle =>
       exactTitleCount == 0 ? query.titleFilter?.map((value) => value) : null;
 
-  /// Числа обоих типов в текущем охвате при условиях выдачи без условия
-  /// готовности. Есть тогда и только тогда, когда тип в [selection] открыт.
-  IntentionTypeCounts? get typeCounts => switch (counts) {
+  /// Числа обоих видов в текущем охвате при условиях выдачи без условия
+  /// вида. Есть тогда и только тогда, когда вид в [selection] выбирается.
+  IntentionKindCounts? get kindCounts => switch (counts) {
     IntentionCountsTotalOnly() => null,
-    IntentionCountsByType(:final counts) => counts,
-    final IntentionCountsByScopeAndType counts => counts.inScope(query.scope),
+    final IntentionCountsByScopeAndKind counts => counts.inScope(query.scope),
   };
 
-  /// Числа охватов при текущем типе и условиях выдачи без условия охвата.
-  /// Есть тогда и только тогда, когда охват в [selection] открыт.
+  /// Числа охватов при текущем виде и условиях выдачи без условия охвата.
+  /// Есть тогда и только тогда, когда охват в [selection] выбирается.
   IntentionScopeCounts? get scopeCounts => switch (counts) {
-    IntentionCountsTotalOnly() || IntentionCountsByType() => null,
-    IntentionCountsByScopeAndType(:final active, :final archived) =>
+    IntentionCountsTotalOnly() => null,
+    IntentionCountsByScopeAndKind(:final active, :final archived) =>
       IntentionScopeCounts(
-        active: active.matching(query.readinessFilter),
-        archived: archived.matching(query.readinessFilter),
+        active: active.matching(query.kindFilter),
+        archived: archived.matching(query.kindFilter),
       ),
   };
 }

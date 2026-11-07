@@ -10,6 +10,7 @@ import '../../../design_system/components/tag_create_row.dart';
 import '../../../design_system/doable_icon.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../application/intention_catalog.dart';
+import '../../domain/intention.dart';
 import '../catalog/intention_catalog_purpose.dart';
 import '../catalog/intention_catalog_state.dart';
 import '../catalog/intention_catalog_view_model.dart';
@@ -27,8 +28,8 @@ typedef IntentionSearchRowBuilder = Widget Function(
 /// порции, загрузка, отказы и пустая выдача.
 ///
 /// Пустая выдача из-за фильтров предлагает их сбросить, а пустой выбранный
-/// тип — показать оба типа. Пустой допустимый охват описывает страница через
-/// [emptyScope]. С [onCreate] подтверждённая выдача, которая предлагает
+/// вид каталога — показать оба вида. Пустой допустимый охват описывает
+/// страница через [emptyScope]. С [onCreate] подтверждённая выдача, которая предлагает
 /// создание, начинается строкой «Создать».
 ///
 /// Место в списке держит [ResultsScrollKeeper]: новая выдача начинается с
@@ -212,72 +213,67 @@ final class _IntentionSearchListState
   /// Причину пустой выдачи называет запрос, который её дал.
   EmptyState _empty(AppLocalizations l10n, IntentionCatalogEmpty empty) {
     final query = empty.query;
-    final actionsOnly =
-        query.readinessFilter == IntentionReadinessFilter.readyOnly;
     return switch ((
       byTitle: query.titleFilter != null,
       byTags: query.tagFilter != IntentionTagFilter.empty,
     )) {
-      (byTitle: false, byTags: false) when (empty.typeCounts?.all ?? 0) > 0 =>
-        _emptyType(l10n, empty, actionsOnly: actionsOnly),
-      (byTitle: false, byTags: false) => widget.emptyScope(empty),
+      (byTitle: false, byTags: false) => switch ((
+        query.kindFilter,
+        empty.kindCounts?.all ?? 0,
+      )) {
+        (IntentionKindFilter.mainOnly, > 0) => _emptyKind(
+          l10n,
+          empty,
+          IntentionKind.main,
+        ),
+        (IntentionKindFilter.supportingOnly, > 0) => _emptyKind(
+          l10n,
+          empty,
+          IntentionKind.supporting,
+        ),
+        _ => widget.emptyScope(empty),
+      },
       (byTitle: true, byTags: false) => _filteredEmpty(
         l10n,
-        title: actionsOnly
-            ? l10n.intentionPickerNoActionsByTitle
-            : l10n.intentionPickerNoIntentionsByTitle,
+        title: l10n.intentionPickerNoIntentionsByTitle,
         text: l10n.intentionPickerTryShorterTitle,
       ),
       (byTitle: false, byTags: true) => _filteredEmpty(
         l10n,
-        title: actionsOnly
-            ? l10n.intentionPickerNoActionsByTags
-            : l10n.intentionPickerNoIntentionsByTags,
+        title: l10n.intentionPickerNoIntentionsByTags,
         text: l10n.intentionPickerChangeTags,
       ),
       (byTitle: true, byTags: true) => _filteredEmpty(
         l10n,
-        title: actionsOnly
-            ? l10n.intentionPickerNoActionsFound
-            : l10n.intentionPickerNoIntentionsFound,
+        title: l10n.intentionPickerNoIntentionsFound,
         text: l10n.intentionPickerChangeTitleOrTags,
       ),
     };
   }
 
-  /// Пустой выбранный тип. При открытом охвате заголовок называет охват,
-  /// а текст и значок — тип; при закреплённом охвате текст общий.
-  EmptyState _emptyType(
+  /// Пустой выбранный вид каталога, когда в охвате есть намерения другого
+  /// вида: заголовок называет охват и вид, текст — как намерение становится
+  /// этого вида.
+  EmptyState _emptyKind(
     AppLocalizations l10n,
-    IntentionCatalogEmpty empty, {
-    required bool actionsOnly,
-  }) {
-    final action = (
+    IntentionCatalogEmpty empty,
+    IntentionKind kind,
+  ) => EmptyState(
+    icon: switch (kind) {
+      IntentionKind.main => DoableIconData.intention,
+      IntentionKind.supporting => DoableIconData.supporting,
+    },
+    title: l10n.intentionCatalogEmptyKindTitle(empty.scope.name, kind.name),
+    text: switch (kind) {
+      IntentionKind.main => l10n.intentionCatalogEmptyMainText,
+      IntentionKind.supporting => l10n.intentionCatalogEmptySupportingText,
+    },
+    action: (
       label: l10n.intentionPickerShowBothTypes,
-      onPressed: () => _notifier.changeType(IntentionTypeChoice.all),
-    );
-    return switch (empty.selection.scope) {
-      IntentionScopeOpen() => EmptyState(
-        icon: actionsOnly ? DoableIconData.bolt : DoableIconData.intention,
-        title: l10n.intentionPickerEmptyScopedTypeTitle(
-          empty.query.scope.name,
-          (actionsOnly
-                  ? IntentionTypeChoice.actions
-                  : IntentionTypeChoice.intentions)
-              .name,
-        ),
-        text: actionsOnly
-            ? l10n.intentionPickerEmptyActionsText
-            : l10n.intentionPickerEmptyIntentionsText,
-        action: action,
-      ),
-      IntentionScopeFixed() => EmptyState(
-        title: l10n.intentionPickerEmptyTypeTitle,
-        text: l10n.intentionPickerEmptyTypeText,
-        action: action,
-      ),
-    };
-  }
+      onPressed: () =>
+          _notifier.changeKind(IntentionKindFilter.mainAndSupporting),
+    ),
+  );
 
   EmptyState _filteredEmpty(
     AppLocalizations l10n, {

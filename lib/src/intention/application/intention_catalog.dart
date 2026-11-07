@@ -10,18 +10,26 @@ import 'title_search_key.dart';
 
 enum IntentionScope { active, archived, all }
 
-enum IntentionReadinessFilter { all, readyOnly, notReadyOnly }
+/// Вид намерения, которым каталог ограничивает выдачу.
+enum IntentionKindFilter {
+  mainOnly,
+  supportingOnly,
+  mainAndSupporting;
+
+  bool admits(IntentionKind kind) => switch (this) {
+    mainOnly => kind == IntentionKind.main,
+    supportingOnly => kind == IntentionKind.supporting,
+    mainAndSupporting => true,
+  };
+}
 
 /// Какие числа несёт первая порция каталога кроме общего количества.
 enum IntentionCatalogCounting {
   /// Только общее количество.
   totalOnly,
 
-  /// Числа типов в охвате запроса.
-  byType,
-
-  /// Числа типов отдельно в активном и архивном охватах.
-  byScopeAndType,
+  /// Числа видов отдельно в активном и архивном охватах.
+  byScopeAndKind,
 }
 
 /// Неизменяемые условия наличия и отсутствия собственных тегов намерения.
@@ -135,12 +143,12 @@ final class IntentionCatalogQueryValidationException implements Exception {
   final IntentionTextValidationFailure? textFailure;
 }
 
-/// Соединяет охват, готовность, название, собственные теги и исключение
+/// Соединяет охват, вид, название, собственные теги и исключение
 /// участника другой роли из [pairProbe] через «И». Условия не требуют существования выбранных тегов.
 final class IntentionCatalogQuery {
   factory IntentionCatalogQuery({
     required IntentionScope scope,
-    IntentionReadinessFilter readinessFilter = IntentionReadinessFilter.all,
+    IntentionKindFilter kindFilter = IntentionKindFilter.mainAndSupporting,
     required String? titleFilter,
     IntentionTagFilter tagFilter = IntentionTagFilter.empty,
     RelationPairProbe? pairProbe,
@@ -159,7 +167,7 @@ final class IntentionCatalogQuery {
     final normalizedFilter = _normalizeFilter(titleFilter);
     return IntentionCatalogQuery._(
       scope: scope,
-      readinessFilter: readinessFilter,
+      kindFilter: kindFilter,
       titleFilter: normalizedFilter,
       tagFilter: tagFilter,
       pairProbe: pairProbe,
@@ -173,7 +181,7 @@ final class IntentionCatalogQuery {
 
   const IntentionCatalogQuery._({
     required this.scope,
-    required this.readinessFilter,
+    required this.kindFilter,
     required this.titleFilter,
     required this.tagFilter,
     required this.pairProbe,
@@ -189,7 +197,7 @@ final class IntentionCatalogQuery {
   static const maxTitleFilterLength = 255;
 
   final IntentionScope scope;
-  final IntentionReadinessFilter readinessFilter;
+  final IntentionKindFilter kindFilter;
   final IntentionTitleFilter? titleFilter;
   final IntentionTagFilter tagFilter;
 
@@ -206,26 +214,11 @@ final class IntentionCatalogQuery {
   /// Просит первую порцию нести числа вида [counting].
   final IntentionCatalogCounting counting;
 
-  /// Тот же запрос с условием готовности «все»: по нему считаются числа
-  /// обоих типов.
-  IntentionCatalogQuery withAnyReadiness() => IntentionCatalogQuery._(
-    scope: scope,
-    readinessFilter: IntentionReadinessFilter.all,
-    titleFilter: titleFilter,
-    tagFilter: tagFilter,
-    pairProbe: pairProbe,
-    countExactActiveTitle: countExactActiveTitle,
-    order: order,
-    pageSize: pageSize,
-    cursor: cursor,
-    counting: counting,
-  );
-
-  /// Тот же запрос без условий охвата и готовности: по нему снимок попадает
-  /// в числа своих охвата и типа.
-  IntentionCatalogQuery withAnyScopeAndReadiness() => IntentionCatalogQuery._(
+  /// Тот же запрос без условий охвата и вида: по нему снимок попадает в числа
+  /// своих охвата и вида.
+  IntentionCatalogQuery withAnyScopeAndKind() => IntentionCatalogQuery._(
     scope: IntentionScope.all,
-    readinessFilter: IntentionReadinessFilter.all,
+    kindFilter: IntentionKindFilter.mainAndSupporting,
     titleFilter: titleFilter,
     tagFilter: tagFilter,
     pairProbe: pairProbe,
@@ -244,16 +237,8 @@ final class IntentionCatalogQuery {
         summary.archiveState == IntentionArchiveState.archived,
       IntentionScope.all => true,
     };
-    final matchesReadiness = switch (readinessFilter) {
-      IntentionReadinessFilter.all => true,
-      IntentionReadinessFilter.readyOnly =>
-        summary.readiness == IntentionReadiness.ready,
-
-      IntentionReadinessFilter.notReadyOnly =>
-        summary.readiness == IntentionReadiness.notReady,
-    };
     if (!matchesScope ||
-        !matchesReadiness ||
+        !kindFilter.admits(summary.kind) ||
         summary.id == pairProbe?.counterpartId ||
         !tagFilter.matches(summary.tags.map((tag) => tag.id).toSet())) {
       return false;
@@ -617,7 +602,7 @@ final class IntentionCatalogFirstPage extends IntentionCatalogPage {
   }) : totalCount = _requireTotalCount(totalCount, items.length, counts),
        exactTitleCount = _requireExactTitleCount(exactTitleCount);
 
-  /// Количество совпадений со всеми условиями запроса, включая готовность.
+  /// Количество совпадений со всеми условиями запроса, включая вид.
   final int totalCount;
 
   /// Числа вида, который попросил запрос.
@@ -662,67 +647,54 @@ final class IntentionCountsTotalOnly extends IntentionCatalogCounts {
   bool admitsTotalCount(int totalCount) => true;
 }
 
-/// Числа типов в охвате запроса.
-final class IntentionCountsByType extends IntentionCatalogCounts {
-  const IntentionCountsByType(this.counts);
-
-  final IntentionTypeCounts counts;
-
-  @override
-  bool admitsTotalCount(int totalCount) => totalCount <= counts.all;
-}
-
-/// Числа типов отдельно в активном и архивном охватах.
-final class IntentionCountsByScopeAndType extends IntentionCatalogCounts {
-  const IntentionCountsByScopeAndType({
+/// Числа видов отдельно в активном и архивном охватах.
+final class IntentionCountsByScopeAndKind extends IntentionCatalogCounts {
+  const IntentionCountsByScopeAndKind({
     required this.active,
     required this.archived,
   });
 
-  final IntentionTypeCounts active;
-  final IntentionTypeCounts archived;
+  final IntentionKindCounts active;
+  final IntentionKindCounts archived;
 
-  /// Число всех намерений в обоих охватах.
-  int get all => active.all + archived.all;
-
-  /// Числа типов в [scope]: для охвата «все» — сумма обоих охватов.
-  IntentionTypeCounts inScope(IntentionScope scope) => switch (scope) {
+  /// Числа видов в [scope]: для охвата «все» — сумма обоих охватов.
+  IntentionKindCounts inScope(IntentionScope scope) => switch (scope) {
     IntentionScope.active => active,
     IntentionScope.archived => archived,
-    IntentionScope.all => IntentionTypeCounts(
-      all: all,
-      actions: active.actions + archived.actions,
+    IntentionScope.all => IntentionKindCounts(
+      main: active.main + archived.main,
+      supporting: active.supporting + archived.supporting,
     ),
   };
 
   @override
-  bool admitsTotalCount(int totalCount) => totalCount <= all;
+  bool admitsTotalCount(int totalCount) =>
+      totalCount <= inScope(IntentionScope.all).all;
 }
 
-/// Точные числа обоих типов намерения в одном охвате при всех условиях запроса,
-/// кроме условия готовности.
-final class IntentionTypeCounts {
-  factory IntentionTypeCounts({required int all, required int actions}) {
-    if (actions < 0 || actions > all) {
+/// Точные числа обоих видов намерения в одном охвате при всех условиях
+/// запроса, кроме условия вида.
+final class IntentionKindCounts {
+  factory IntentionKindCounts({required int main, required int supporting}) {
+    if (main < 0 || supporting < 0) {
       throw const IntentionCatalogPageValidationException();
     }
-    return IntentionTypeCounts._(all: all, actions: actions);
+    return IntentionKindCounts._(main: main, supporting: supporting);
   }
 
-  const IntentionTypeCounts._({required this.all, required this.actions});
+  const IntentionKindCounts._({required this.main, required this.supporting});
 
-  final int all;
-  final int actions;
+  final int main;
+  final int supporting;
 
-  int get intentions => all - actions;
+  int get all => main + supporting;
 
-  /// Число намерений того типа, который выбирает условие готовности.
-  int matching(IntentionReadinessFilter readinessFilter) =>
-      switch (readinessFilter) {
-        IntentionReadinessFilter.all => all,
-        IntentionReadinessFilter.readyOnly => actions,
-        IntentionReadinessFilter.notReadyOnly => intentions,
-      };
+  /// Число намерений, которые допускает условие вида.
+  int matching(IntentionKindFilter kindFilter) => switch (kindFilter) {
+    IntentionKindFilter.mainOnly => main,
+    IntentionKindFilter.supportingOnly => supporting,
+    IntentionKindFilter.mainAndSupporting => all,
+  };
 }
 
 final class IntentionCatalogPageValidationException implements Exception {

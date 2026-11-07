@@ -340,7 +340,12 @@ void main() {
         expect(query.tagFilter, filters[index]);
         expect(query.titleFilter?.map((value) => value), 'свой $index');
         expect(query.scope, IntentionScope.active);
-        expect(query.readinessFilter, IntentionReadinessFilter.all);
+        expect(
+          query.kindFilter,
+          index == 0
+              ? IntentionKindFilter.mainOnly
+              : IntentionKindFilter.mainAndSupporting,
+        );
         expect(query.pairProbe, index == 1 ? probe : null);
         _completeEmptyPage(repository, purposes.length + index);
         await container.read(provider.future);
@@ -361,10 +366,7 @@ void main() {
         expect(notifier.selection.tagFilter, filters[index]);
         expect(notifier.selection.titleFilterText, '  свой $index  ');
         notifier.changeScope(IntentionScope.archived);
-        expect(
-          notifier.selection.scope,
-          const IntentionScopeFixed(IntentionScope.active),
-        );
+        expect(notifier.selection.show, const IntentionShowFixed());
       }
       expect(repository.queries, hasLength(5));
     },
@@ -445,7 +447,7 @@ void main() {
         for (final query in repository.queries.skip(2)) {
           expect(query.tagFilter, filter);
           expect(query.scope, first.query.scope);
-          expect(query.readinessFilter, first.query.readinessFilter);
+          expect(query.kindFilter, first.query.kindFilter);
           expect(
             query.pairProbe,
             purpose is SelectRelationParticipant ? purpose.pairProbe : null,

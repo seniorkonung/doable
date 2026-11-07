@@ -6,6 +6,10 @@ import 'graph_seed.dart';
 String intentionCatalogFixtureId(int index) =>
     '018f0b5d-6b2e-7c80-8000-${index.toRadixString(16).padLeft(12, '0')}';
 
+/// Каждое второе намерение архивировано, а в каждом охвате половина намерений
+/// вспомогательные: в каждой четвёрке подряд идут активное главное, архивное
+/// главное, активное вспомогательное и архивное вспомогательное. Связей набор
+/// не содержит: каталог читает вид без них.
 Future<void> populateIntentionCatalogFixture(AppDatabase database, int size) =>
     seedGraph(
       database,
@@ -20,6 +24,7 @@ Future<void> populateIntentionCatalogFixture(AppDatabase database, int size) =>
             IntentionsCompanion.insert(
               id: intentionCatalogFixtureId(index),
               title: title,
+              kind: Value(index % 4 < 2 ? 'main' : 'supporting'),
               isArchived: Value(index.isOdd),
               createdAt: timestamp,
               updatedAt: timestamp,

@@ -4,7 +4,6 @@ import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/search/intention_list_header.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
@@ -22,7 +21,7 @@ void main() {
 
     testWidgets(
       '${locale.languageCode}: каталог называет словами все девять сочетаний '
-      'охвата и типа',
+      'охвата и вида',
       (tester) async {
         final purpose = const BrowseIntentionCatalog();
         final h = await _open(tester, purpose, locale);
@@ -30,46 +29,48 @@ void main() {
           intentionCatalogViewModelProvider(purpose).notifier,
         );
         final titles = {
-          (IntentionScope.active, IntentionTypeChoice.all): ru
+          (IntentionScope.active, IntentionKindFilter.mainOnly): ru
+              ? 'Активные главные'
+              : 'Active main',
+          (IntentionScope.active, IntentionKindFilter.supportingOnly): ru
+              ? 'Активные вспомогательные'
+              : 'Active supporting',
+          (IntentionScope.active, IntentionKindFilter.mainAndSupporting): ru
               ? 'Активные'
               : 'Active',
-          (IntentionScope.active, IntentionTypeChoice.intentions): ru
-              ? 'Активные намерения'
-              : 'Active intentions',
-          (IntentionScope.active, IntentionTypeChoice.actions): ru
-              ? 'Активные действия'
-              : 'Active actions',
-          (IntentionScope.archived, IntentionTypeChoice.all): ru
+          (IntentionScope.archived, IntentionKindFilter.mainOnly): ru
+              ? 'Архивные главные'
+              : 'Archived main',
+          (IntentionScope.archived, IntentionKindFilter.supportingOnly): ru
+              ? 'Архивные вспомогательные'
+              : 'Archived supporting',
+          (IntentionScope.archived, IntentionKindFilter.mainAndSupporting): ru
               ? 'Архивные'
               : 'Archived',
-          (IntentionScope.archived, IntentionTypeChoice.intentions): ru
-              ? 'Архивные намерения'
-              : 'Archived intentions',
-          (IntentionScope.archived, IntentionTypeChoice.actions): ru
-              ? 'Архивные действия'
-              : 'Archived actions',
-          (IntentionScope.all, IntentionTypeChoice.all): ru ? 'Все' : 'All',
-          (IntentionScope.all, IntentionTypeChoice.intentions): ru
-              ? 'Все намерения'
-              : 'All intentions',
-          (IntentionScope.all, IntentionTypeChoice.actions): ru
-              ? 'Все действия'
-              : 'All actions',
+          (IntentionScope.all, IntentionKindFilter.mainOnly): ru
+              ? 'Все главные'
+              : 'All main',
+          (IntentionScope.all, IntentionKindFilter.supportingOnly): ru
+              ? 'Все вспомогательные'
+              : 'All supporting',
+          (IntentionScope.all, IntentionKindFilter.mainAndSupporting): ru
+              ? 'Все'
+              : 'All',
         };
 
-        for (final MapEntry(key: (scope, type), value: title)
+        for (final MapEntry(key: (scope, kind), value: title)
             in titles.entries) {
           model
             ..changeScope(scope)
-            ..changeType(type);
+            ..changeKind(kind);
           await tester.pump();
-          expect(_header(tester).title, title, reason: '$scope, $type');
+          expect(_header(tester).title, title, reason: '$scope, $kind');
         }
       },
     );
 
     testWidgets(
-      '${locale.languageCode}: заголовок каталога называет охват и тип и '
+      '${locale.languageCode}: заголовок каталога называет охват и вид и '
       'сообщает их в доступном названии с количеством и без него',
       (tester) async {
         final semantics = tester.ensureSemantics();
@@ -80,9 +81,9 @@ void main() {
         );
         model
           ..changeScope(IntentionScope.archived)
-          ..changeType(IntentionTypeChoice.actions);
+          ..changeKind(IntentionKindFilter.supportingOnly);
         await tester.pump();
-        final title = ru ? 'Архивные действия' : 'Archived actions';
+        final title = ru ? 'Архивные вспомогательные' : 'Archived supporting';
         final summary = ru
             ? 'Создание, сначала новые'
             : 'Created, newest first';
@@ -119,8 +120,8 @@ void main() {
     );
 
     testWidgets(
-      '${locale.languageCode}: экран выбора с закреплённым охватом называет '
-      'только тип',
+      '${locale.languageCode}: экран выбора называет «Намерения» и сообщает '
+      'это в доступном названии с количеством и без него',
       (tester) async {
         final semantics = tester.ensureSemantics();
         final purpose = SelectRelationParticipant(
@@ -130,19 +131,35 @@ void main() {
             candidateRole: RelationParticipantRole.related,
           ),
         );
-        await _open(tester, purpose, locale);
-        final title = ru ? 'Все' : 'All';
+        final h = await _open(tester, purpose, locale);
+        final title = ru ? 'Намерения' : 'Intentions';
         final summary = ru
             ? 'Создание, сначала новые'
             : 'Created, newest first';
 
         expect(_header(tester).title, title);
+        expect(_header(tester).count, isNull);
         expect(
           tester.getSemantics(find.byType(CatalogHeader)),
           isSemantics(
             label: ru
-                ? 'Показать и упорядочить. Тип: $title. Сортировка: $summary.'
-                : 'Show and sort. Type: $title. Sorted by: $summary.',
+                ? 'Показать и упорядочить. Показаны: $title. Сортировка: $summary.'
+                : 'Show and sort. Showing: $title. Sorted by: $summary.',
+            isButton: true,
+          ),
+        );
+
+        h.repository.complete(h.repository.queries.length - 1, _page(2));
+        await tester.pumpAndSettle();
+
+        expect(_header(tester).title, title);
+        expect(_header(tester).count, 2);
+        expect(
+          tester.getSemantics(find.byType(CatalogHeader)),
+          isSemantics(
+            label: ru
+                ? 'Показать и упорядочить. Показаны: $title, 2. Сортировка: $summary.'
+                : 'Show and sort. Showing: $title, 2. Sorted by: $summary.',
             isButton: true,
           ),
         );

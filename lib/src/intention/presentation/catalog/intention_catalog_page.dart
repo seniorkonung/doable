@@ -114,8 +114,8 @@ final class _IntentionCatalogPageState
     );
   }
 
-  /// Архивные намерения считаются без условия типа: сводка охватов при
-  /// выбранном типе не видит архивные намерения другого типа.
+  /// Архивные намерения считаются без условия вида: сводка охватов при
+  /// выбранном виде не видит архивные намерения другого вида.
   EmptyState _emptyScope(AppLocalizations l10n, IntentionCatalogEmpty empty) =>
       switch ((empty.scope, empty.counts)) {
         (IntentionScope.archived, _) => EmptyState(
@@ -123,7 +123,7 @@ final class _IntentionCatalogPageState
           title: l10n.intentionCatalogEmptyArchiveTitle,
           text: l10n.intentionCatalogEmptyArchiveText,
         ),
-        (IntentionScope.active, IntentionCountsByScopeAndType(:final archived))
+        (IntentionScope.active, IntentionCountsByScopeAndKind(:final archived))
             when archived.all > 0 =>
           EmptyState(
             icon: DoableIconData.intention,

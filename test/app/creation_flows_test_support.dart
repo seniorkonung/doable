@@ -104,7 +104,7 @@ final class _App {
         .selection;
     final daily = container.read(openedActionDayProvider(container)).selection;
     return (
-      intentions.scope,
+      intentions.show,
       intentions.titleFilterText,
       intentions.order,
       intentions.tagFilter,

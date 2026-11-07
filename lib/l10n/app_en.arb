@@ -1785,13 +1785,13 @@
   "intentionPickerScopeAll": "All, archived included",
   "@intentionPickerScopeAll": {"description": "Вариант активных и архивированных намерений в строке и меню охвата листа параметров показа"},
   "intentionPickerTypeCaption": "Type",
-  "@intentionPickerTypeCaption": {"description": "Название группы типа намерения"},
-  "intentionPickerTypeAll": "Intentions and actions",
-  "@intentionPickerTypeAll": {"description": "Вариант без ограничения по типу в строке и меню листа параметров поиска"},
-  "intentionPickerTypeIntentionsOnly": "Intentions only",
-  "@intentionPickerTypeIntentionsOnly": {"description": "Вариант намерений без готовности к действию в строке и меню листа параметров поиска"},
-  "intentionPickerTypeActionsOnly": "Actions only",
-  "@intentionPickerTypeActionsOnly": {"description": "Вариант действий в строке и меню листа параметров поиска"},
+  "@intentionPickerTypeCaption": {"description": "Название строки вида намерения в листе параметров показа каталога"},
+  "intentionPickerKindMainAndSupporting": "Main and supporting",
+  "@intentionPickerKindMainAndSupporting": {"description": "Вариант без ограничения по виду в строке и меню «Тип» листа параметров показа каталога"},
+  "intentionPickerKindMainOnly": "Main only",
+  "@intentionPickerKindMainOnly": {"description": "Вариант главных намерений в строке и меню «Тип» листа параметров показа каталога"},
+  "intentionPickerKindSupportingOnly": "Supporting only",
+  "@intentionPickerKindSupportingOnly": {"description": "Вариант вспомогательных намерений в строке и меню «Тип» листа параметров показа каталога"},
   "intentionPickerSortCaption": "Sort by",
   "@intentionPickerSortCaption": {"description": "Название группы поля сортировки"},
   "intentionPickerSortCreated": "Date created",
@@ -1815,10 +1815,6 @@
       "currentOrder": {"type": "String", "description": "Локализованное название текущего порядка"},
       "nextOrder": {"type": "String", "description": "Локализованное название порядка после нажатия"}
     }
-  },
-  "intentionPickerAllHeader": "All",
-  "@intentionPickerAllHeader": {
-    "description": "Показываемый тип без ограничения в заголовке списка поиска для выбора"
   },
   "intentionPickerOrderCreatedNewest": "Created, newest first",
   "@intentionPickerOrderCreatedNewest": {
@@ -1844,29 +1840,12 @@
   "@intentionPickerOrderTitleDescending": {
     "description": "Сводка сортировки в заголовке списка поиска для выбора"
   },
-  "intentionPickerHeaderLabel": "Show and sort. Type: {type}. Sorted by: {summary}.",
-  "@intentionPickerHeaderLabel": {
-    "description": "Доступное название кнопки заголовка поиска до подтверждения количества",
-    "placeholders": {
-      "type": {"type": "String"},
-      "summary": {"type": "String"}
-    }
-  },
-  "intentionPickerHeaderCountLabel": "Show and sort. Type: {type}, {count}. Sorted by: {summary}.",
-  "@intentionPickerHeaderCountLabel": {
-    "description": "Доступное название кнопки заголовка поиска с подтверждённым количеством",
-    "placeholders": {
-      "type": {"type": "String"},
-      "count": {"type": "int"},
-      "summary": {"type": "String"}
-    }
-  },
-  "intentionPickerScopeHeader": "{scope, select, active{{type, select, all{Active} intentions{Active intentions} actions{Active actions} other{}}} archived{{type, select, all{Archived} intentions{Archived intentions} actions{Archived actions} other{}}} all{{type, select, all{All} intentions{All intentions} actions{All actions} other{}}} other{}}",
+  "intentionPickerScopeHeader": "{scope, select, active{{kind, select, mainOnly{Active main} supportingOnly{Active supporting} mainAndSupporting{Active} other{}}} archived{{kind, select, mainOnly{Archived main} supportingOnly{Archived supporting} mainAndSupporting{Archived} other{}}} all{{kind, select, mainOnly{All main} supportingOnly{All supporting} mainAndSupporting{All} other{}}} other{}}",
   "@intentionPickerScopeHeader": {
-    "description": "Охват и тип словами в заголовке списка каталога намерений; значения select — имена IntentionScope и IntentionTypeChoice",
+    "description": "Охват и вид словами в заголовке списка каталога намерений; значения select — имена IntentionScope и IntentionKindFilter",
     "placeholders": {
       "scope": {"type": "String"},
-      "type": {"type": "String"}
+      "kind": {"type": "String"}
     }
   },
   "intentionPickerScopeHeaderLabel": "Show and sort. Showing: {title}. Sorted by: {summary}.",
@@ -1886,13 +1865,9 @@
       "summary": {"type": "String"}
     }
   },
-  "intentionPickerActionsHeader": "Actions",
-  "@intentionPickerActionsHeader": {
-    "description": "Заголовок выдачи поиска действия на экране выбора"
-  },
   "intentionPickerIntentionsHeader": "Intentions",
   "@intentionPickerIntentionsHeader": {
-    "description": "Заголовок выдачи поиска намерения на экране выбора"
+    "description": "Заголовок выдачи поиска для выбора намерения на экране выбора"
   },
   "intentionPickerLoadingMoreIntentions": "Loading more intentions",
   "@intentionPickerLoadingMoreIntentions": {
@@ -1902,33 +1877,25 @@
   "@intentionPickerEmptyScopeTitle": {
     "description": "Заголовок пустой выдачи экрана выбора, когда допустимый охват пуст без фильтров"
   },
-  "intentionPickerEmptyTypeTitle": "No intentions of this type",
-  "@intentionPickerEmptyTypeTitle": {
-    "description": "Заголовок пустого выбранного типа, когда в допустимом охвате есть намерения другого типа"
-  },
-  "intentionPickerEmptyTypeText": "Show both types to choose from the available intentions.",
-  "@intentionPickerEmptyTypeText": {
-    "description": "Совет показать оба типа при пустом выбранном типе"
-  },
   "intentionPickerShowBothTypes": "Show both types",
   "@intentionPickerShowBothTypes": {
-    "description": "Действие пустого выбранного типа, которое выбирает тип «Все»"
+    "description": "Действие пустой выдачи каталога, которое выбирает вид «Главные и вспомогательные»"
   },
-  "intentionPickerEmptyScopedTypeTitle": "{scope, select, active{{type, select, actions{No active actions} intentions{No active intentions} other{}}} archived{{type, select, actions{No actions in the archive} intentions{No intentions in the archive} other{}}} all{{type, select, actions{No actions yet} intentions{No intentions yet} other{}}} other{}}",
-  "@intentionPickerEmptyScopedTypeTitle": {
-    "description": "Заголовок пустого выбранного типа в каталоге с открытым охватом, который называет охват; значения select — имена IntentionScope и IntentionTypeChoice",
+  "intentionCatalogEmptyKindTitle": "{scope, select, active{{kind, select, main{No active main intentions} supporting{No active supporting intentions} other{}}} archived{{kind, select, main{No main intentions in the archive} supporting{No supporting intentions in the archive} other{}}} all{{kind, select, main{No main intentions yet} supporting{No supporting intentions yet} other{}}} other{}}",
+  "@intentionCatalogEmptyKindTitle": {
+    "description": "Заголовок пустого выбранного вида каталога, который называет охват и вид; значения select — имена IntentionScope и IntentionKind",
     "placeholders": {
       "scope": {"type": "String"},
-      "type": {"type": "String"}
+      "kind": {"type": "String"}
     }
   },
-  "intentionPickerEmptyActionsText": "An intention marked as an action is shown here.",
-  "@intentionPickerEmptyActionsText": {
-    "description": "Текст пустого выбранного типа «Только действия» в каталоге с открытым охватом"
+  "intentionCatalogEmptyMainText": "An intention becomes main when you mark it so on its page. Create a new one with the plus button below.",
+  "@intentionCatalogEmptyMainText": {
+    "description": "Пояснение пустого вида «Только главные» в каталоге: как намерение становится главным"
   },
-  "intentionPickerEmptyIntentionsText": "Everything here is marked as an action.",
-  "@intentionPickerEmptyIntentionsText": {
-    "description": "Текст пустого выбранного типа «Только намерения» в каталоге с открытым охватом"
+  "intentionCatalogEmptySupportingText": "An intention becomes supporting when it is created in the Needs or Can use group of another intention, or when you mark it so on its page.",
+  "@intentionCatalogEmptySupportingText": {
+    "description": "Пояснение пустого вида «Только вспомогательные» в каталоге: как намерение становится вспомогательным"
   },
   "intentionCatalogNoActiveTitle": "No active intentions",
   "@intentionCatalogNoActiveTitle": {
@@ -2076,10 +2043,6 @@
     "description": "Доступное название кнопки фильтра по тегам на экране выбора с числом условий",
     "placeholders": {"count": {"type": "int"}}
   },
-  "intentionPickerNoActionsByTitle": "No actions with this name",
-  "@intentionPickerNoActionsByTitle": {
-    "description": "Заголовок пустой выдачи выбора действия из-за фильтра названия"
-  },
   "intentionPickerNoIntentionsByTitle": "No intentions with this name",
   "@intentionPickerNoIntentionsByTitle": {
     "description": "Заголовок пустой выдачи выбора намерения из-за фильтра названия"
@@ -2088,10 +2051,6 @@
   "@intentionPickerTryShorterTitle": {
     "description": "Совет пустой выдачи экрана выбора из-за фильтра названия"
   },
-  "intentionPickerNoActionsByTags": "No actions match these tags",
-  "@intentionPickerNoActionsByTags": {
-    "description": "Заголовок пустой выдачи выбора действия из-за условий по тегам"
-  },
   "intentionPickerNoIntentionsByTags": "No intentions match these tags",
   "@intentionPickerNoIntentionsByTags": {
     "description": "Заголовок пустой выдачи выбора намерения из-за условий по тегам"
@@ -2099,10 +2058,6 @@
   "intentionPickerChangeTags": "Change the tags in the filter or reset it.",
   "@intentionPickerChangeTags": {
     "description": "Совет пустой выдачи экрана выбора из-за условий по тегам"
-  },
-  "intentionPickerNoActionsFound": "No actions found",
-  "@intentionPickerNoActionsFound": {
-    "description": "Заголовок пустой выдачи действий из-за фильтра названия и условий по тегам"
   },
   "intentionPickerNoIntentionsFound": "No intentions found",
   "@intentionPickerNoIntentionsFound": {

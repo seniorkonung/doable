@@ -9,11 +9,11 @@ import 'package:doable/src/long_term_relation/application/relation_pair_probe.da
 /// запроса с пробой пары несёт карту занимающих связей, без пробы — не несёт.
 ///
 /// Числа, которые тест задал в порции сам, остаются как есть. Иначе они
-/// выводятся из общего количества и готовности намерений порции:
-/// незагруженные совпадения без условия готовности считаются намерениями.
-/// Число охвата и готовности запроса при подсчёте по охватам и типам равно
-/// общему количеству порции, второй охват пуст, а охват «все» считается
-/// активным. Карта, которую тест не задал, пуста: ни одна пара не занята.
+/// выводятся из общего количества и вида намерений порции: незагруженные
+/// совпадения без условия вида считаются главными. Число охвата и вида
+/// запроса равно общему количеству порции, второй охват пуст, а охват «все»
+/// считается активным. Карта, которую тест не задал, пуста: ни одна пара не
+/// занята.
 Result<IntentionCatalogPage> answerCatalogQuery(
   IntentionCatalogQuery query,
   Result<IntentionCatalogPage> result,
@@ -56,40 +56,35 @@ IntentionCatalogCounts _counts(
   IntentionCatalogQuery query,
   IntentionCatalogFirstPage page,
 ) {
-  final inScope = _typeCounts(query.readinessFilter, page);
+  final inScope = _kindCounts(query.kindFilter, page);
   return switch (query.counting) {
     IntentionCatalogCounting.totalOnly => const IntentionCountsTotalOnly(),
-    IntentionCatalogCounting.byType => IntentionCountsByType(inScope),
-    IntentionCatalogCounting.byScopeAndType => switch (query.scope) {
-      IntentionScope.archived => IntentionCountsByScopeAndType(
-        active: IntentionTypeCounts(all: 0, actions: 0),
+    IntentionCatalogCounting.byScopeAndKind => switch (query.scope) {
+      IntentionScope.archived => IntentionCountsByScopeAndKind(
+        active: IntentionKindCounts(main: 0, supporting: 0),
         archived: inScope,
       ),
       IntentionScope.active ||
-      IntentionScope.all => IntentionCountsByScopeAndType(
+      IntentionScope.all => IntentionCountsByScopeAndKind(
         active: inScope,
-        archived: IntentionTypeCounts(all: 0, actions: 0),
+        archived: IntentionKindCounts(main: 0, supporting: 0),
       ),
     },
   };
 }
 
-IntentionTypeCounts _typeCounts(
-  IntentionReadinessFilter readinessFilter,
+IntentionKindCounts _kindCounts(
+  IntentionKindFilter kindFilter,
   IntentionCatalogFirstPage page,
-) => switch (readinessFilter) {
-  IntentionReadinessFilter.all => IntentionTypeCounts(
-    all: page.totalCount,
-    actions: page.items
-        .where((item) => item.readiness == IntentionReadiness.ready)
-        .length,
-  ),
-  IntentionReadinessFilter.readyOnly => IntentionTypeCounts(
-    all: page.totalCount,
-    actions: page.totalCount,
-  ),
-  IntentionReadinessFilter.notReadyOnly => IntentionTypeCounts(
-    all: page.totalCount,
-    actions: 0,
-  ),
-};
+) {
+  final supporting = switch (kindFilter) {
+    IntentionKindFilter.mainOnly => 0,
+    IntentionKindFilter.supportingOnly => page.totalCount,
+    IntentionKindFilter.mainAndSupporting =>
+      page.items.where((item) => item.kind == IntentionKind.supporting).length,
+  };
+  return IntentionKindCounts(
+    main: page.totalCount - supporting,
+    supporting: supporting,
+  );
+}

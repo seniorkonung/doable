@@ -12,7 +12,6 @@ import 'package:doable/src/data/local/app_database.dart'
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -59,7 +58,7 @@ void main() {
     // названия для поиска.
     expect(shownIntentionCatalogParameters(tester), (
       scope: IntentionScope.active,
-      type: IntentionTypeChoice.all,
+      kind: IntentionKindFilter.mainOnly,
       order: IntentionCatalogOrder.createdAtDescending,
       titleFilter: '',
       tagConditions: 0,

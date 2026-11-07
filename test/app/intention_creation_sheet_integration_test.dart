@@ -25,7 +25,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
         IntentionCatalogFirstPage,
         IntentionCatalogOrder,
         IntentionCatalogQuery,
-        IntentionReadinessFilter,
+        IntentionKindFilter,
         IntentionSaved,
         IntentionScope,
         IntentionSummary,
@@ -614,7 +614,7 @@ Future<void> _searchCatalog(WidgetTester tester, _Launch app) async {
   final catalog = _catalog(app);
   expect(catalog.totalCount, _sketchCount);
   expect(catalog.nextCursor, isNull);
-  expect(catalog.selection.scope, const IntentionScopeOpen(IntentionScope.all));
+  expect(catalog.selection.show.scope, IntentionScope.all);
   expect(catalog.selection.titleFilterText, _catalogFilter);
   expect(
     catalog.selection.tagFilter,
@@ -623,7 +623,7 @@ Future<void> _searchCatalog(WidgetTester tester, _Launch app) async {
       excludedTagIds: [_tagId(_workTag)],
     ),
   );
-  expect(catalog.query.readinessFilter, IntentionReadinessFilter.all);
+  expect(catalog.query.kindFilter, IntentionKindFilter.mainOnly);
 }
 
 /// Прокручивает выдачу каталога жестом в видимой области списка.
@@ -1128,7 +1128,7 @@ Future<IntentionCatalogFirstPage> _catalogPage(
     () => repository.getCatalogPage(
       IntentionCatalogQuery(
         scope: query.scope,
-        readinessFilter: query.readinessFilter,
+        kindFilter: query.kindFilter,
         titleFilter: _catalogFilter,
         tagFilter: query.tagFilter,
         order: query.order,

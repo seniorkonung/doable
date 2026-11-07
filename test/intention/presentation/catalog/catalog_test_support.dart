@@ -28,7 +28,7 @@ import '../../../support/action_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
 import '../../../support/intention_description_preview.dart';
 import '../../../support/intention_title_order_key.dart';
-import '../../../support/intention_type_counts.dart';
+import '../../../support/intention_kind_counts.dart';
 
 final class ControlledCatalogRepository
     with

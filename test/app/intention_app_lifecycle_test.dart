@@ -36,7 +36,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_root_pages.dart';
 import '../support/intention_catalog_controls.dart';
-import '../support/intention_type_counts.dart';
+import '../support/intention_kind_counts.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/intention_options.dart';
 import '../support/tag_read_contract_test_fallback.dart';
@@ -234,10 +234,26 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
       expect(find.text('No active intentions'), findsOneWidget);
-      await selectIntentionCatalogScope(tester, IntentionScope.archived);
+      // Архивированное намерение вспомогательное: каталог показывает оба вида.
+      await selectIntentionCatalogKind(
+        tester,
+        IntentionKindFilter.mainAndSupporting,
+      );
       await _pumpUntil(tester, () => repository.pageQueries.length == 2);
       repository.completePage(
         1,
+        IntentionCatalogFirstPage(
+          items: const [],
+          totalCount: 0,
+          nextCursor: null,
+          revision: const _Revision(4),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await selectIntentionCatalogScope(tester, IntentionScope.archived);
+      await _pumpUntil(tester, () => repository.pageQueries.length == 3);
+      repository.completePage(
+        2,
         IntentionCatalogFirstPage(
           items: [_summary(archived)],
           totalCount: 1,
@@ -276,9 +292,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Nothing in the archive'), findsOneWidget);
       await selectIntentionCatalogScope(tester, IntentionScope.active);
-      await _pumpUntil(tester, () => repository.pageQueries.length == 3);
+      await _pumpUntil(tester, () => repository.pageQueries.length == 4);
       repository.completePage(
-        2,
+        3,
         IntentionCatalogFirstPage(
           items: [_summary(restored)],
           totalCount: 1,

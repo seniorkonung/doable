@@ -914,7 +914,7 @@ Future<List<IntentionSummary>> _readWhole(
     final result = await repository.getCatalogPage(
       IntentionCatalogQuery(
         scope: query.scope,
-        readinessFilter: query.readinessFilter,
+        kindFilter: query.kindFilter,
         titleFilter: query.titleFilter?.map((value) => value),
         tagFilter: query.tagFilter,
         pairProbe: query.pairProbe,

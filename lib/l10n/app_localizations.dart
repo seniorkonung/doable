@@ -3846,29 +3846,29 @@ abstract class AppLocalizations {
   /// **'All, archived included'**
   String get intentionPickerScopeAll;
 
-  /// Название группы типа намерения
+  /// Название строки вида намерения в листе параметров показа каталога
   ///
   /// In en, this message translates to:
   /// **'Type'**
   String get intentionPickerTypeCaption;
 
-  /// Вариант без ограничения по типу в строке и меню листа параметров поиска
+  /// Вариант без ограничения по виду в строке и меню «Тип» листа параметров показа каталога
   ///
   /// In en, this message translates to:
-  /// **'Intentions and actions'**
-  String get intentionPickerTypeAll;
+  /// **'Main and supporting'**
+  String get intentionPickerKindMainAndSupporting;
 
-  /// Вариант намерений без готовности к действию в строке и меню листа параметров поиска
+  /// Вариант главных намерений в строке и меню «Тип» листа параметров показа каталога
   ///
   /// In en, this message translates to:
-  /// **'Intentions only'**
-  String get intentionPickerTypeIntentionsOnly;
+  /// **'Main only'**
+  String get intentionPickerKindMainOnly;
 
-  /// Вариант действий в строке и меню листа параметров поиска
+  /// Вариант вспомогательных намерений в строке и меню «Тип» листа параметров показа каталога
   ///
   /// In en, this message translates to:
-  /// **'Actions only'**
-  String get intentionPickerTypeActionsOnly;
+  /// **'Supporting only'**
+  String get intentionPickerKindSupportingOnly;
 
   /// Название группы поля сортировки
   ///
@@ -3927,12 +3927,6 @@ abstract class AppLocalizations {
     String nextOrder,
   );
 
-  /// Показываемый тип без ограничения в заголовке списка поиска для выбора
-  ///
-  /// In en, this message translates to:
-  /// **'All'**
-  String get intentionPickerAllHeader;
-
   /// Сводка сортировки в заголовке списка поиска для выбора
   ///
   /// In en, this message translates to:
@@ -3969,27 +3963,11 @@ abstract class AppLocalizations {
   /// **'Name, Z to A'**
   String get intentionPickerOrderTitleDescending;
 
-  /// Доступное название кнопки заголовка поиска до подтверждения количества
+  /// Охват и вид словами в заголовке списка каталога намерений; значения select — имена IntentionScope и IntentionKindFilter
   ///
   /// In en, this message translates to:
-  /// **'Show and sort. Type: {type}. Sorted by: {summary}.'**
-  String intentionPickerHeaderLabel(String type, String summary);
-
-  /// Доступное название кнопки заголовка поиска с подтверждённым количеством
-  ///
-  /// In en, this message translates to:
-  /// **'Show and sort. Type: {type}, {count}. Sorted by: {summary}.'**
-  String intentionPickerHeaderCountLabel(
-    String type,
-    int count,
-    String summary,
-  );
-
-  /// Охват и тип словами в заголовке списка каталога намерений; значения select — имена IntentionScope и IntentionTypeChoice
-  ///
-  /// In en, this message translates to:
-  /// **'{scope, select, active{{type, select, all{Active} intentions{Active intentions} actions{Active actions} other{}}} archived{{type, select, all{Archived} intentions{Archived intentions} actions{Archived actions} other{}}} all{{type, select, all{All} intentions{All intentions} actions{All actions} other{}}} other{}}'**
-  String intentionPickerScopeHeader(String scope, String type);
+  /// **'{scope, select, active{{kind, select, mainOnly{Active main} supportingOnly{Active supporting} mainAndSupporting{Active} other{}}} archived{{kind, select, mainOnly{Archived main} supportingOnly{Archived supporting} mainAndSupporting{Archived} other{}}} all{{kind, select, mainOnly{All main} supportingOnly{All supporting} mainAndSupporting{All} other{}}} other{}}'**
+  String intentionPickerScopeHeader(String scope, String kind);
 
   /// Доступное название кнопки заголовка списка каталога до подтверждения количества
   ///
@@ -4007,13 +3985,7 @@ abstract class AppLocalizations {
     String summary,
   );
 
-  /// Заголовок выдачи поиска действия на экране выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Actions'**
-  String get intentionPickerActionsHeader;
-
-  /// Заголовок выдачи поиска намерения на экране выбора
+  /// Заголовок выдачи поиска для выбора намерения на экране выбора
   ///
   /// In en, this message translates to:
   /// **'Intentions'**
@@ -4031,41 +4003,29 @@ abstract class AppLocalizations {
   /// **'Nothing to choose from'**
   String get intentionPickerEmptyScopeTitle;
 
-  /// Заголовок пустого выбранного типа, когда в допустимом охвате есть намерения другого типа
-  ///
-  /// In en, this message translates to:
-  /// **'No intentions of this type'**
-  String get intentionPickerEmptyTypeTitle;
-
-  /// Совет показать оба типа при пустом выбранном типе
-  ///
-  /// In en, this message translates to:
-  /// **'Show both types to choose from the available intentions.'**
-  String get intentionPickerEmptyTypeText;
-
-  /// Действие пустого выбранного типа, которое выбирает тип «Все»
+  /// Действие пустой выдачи каталога, которое выбирает вид «Главные и вспомогательные»
   ///
   /// In en, this message translates to:
   /// **'Show both types'**
   String get intentionPickerShowBothTypes;
 
-  /// Заголовок пустого выбранного типа в каталоге с открытым охватом, который называет охват; значения select — имена IntentionScope и IntentionTypeChoice
+  /// Заголовок пустого выбранного вида каталога, который называет охват и вид; значения select — имена IntentionScope и IntentionKind
   ///
   /// In en, this message translates to:
-  /// **'{scope, select, active{{type, select, actions{No active actions} intentions{No active intentions} other{}}} archived{{type, select, actions{No actions in the archive} intentions{No intentions in the archive} other{}}} all{{type, select, actions{No actions yet} intentions{No intentions yet} other{}}} other{}}'**
-  String intentionPickerEmptyScopedTypeTitle(String scope, String type);
+  /// **'{scope, select, active{{kind, select, main{No active main intentions} supporting{No active supporting intentions} other{}}} archived{{kind, select, main{No main intentions in the archive} supporting{No supporting intentions in the archive} other{}}} all{{kind, select, main{No main intentions yet} supporting{No supporting intentions yet} other{}}} other{}}'**
+  String intentionCatalogEmptyKindTitle(String scope, String kind);
 
-  /// Текст пустого выбранного типа «Только действия» в каталоге с открытым охватом
+  /// Пояснение пустого вида «Только главные» в каталоге: как намерение становится главным
   ///
   /// In en, this message translates to:
-  /// **'An intention marked as an action is shown here.'**
-  String get intentionPickerEmptyActionsText;
+  /// **'An intention becomes main when you mark it so on its page. Create a new one with the plus button below.'**
+  String get intentionCatalogEmptyMainText;
 
-  /// Текст пустого выбранного типа «Только намерения» в каталоге с открытым охватом
+  /// Пояснение пустого вида «Только вспомогательные» в каталоге: как намерение становится вспомогательным
   ///
   /// In en, this message translates to:
-  /// **'Everything here is marked as an action.'**
-  String get intentionPickerEmptyIntentionsText;
+  /// **'An intention becomes supporting when it is created in the Needs or Can use group of another intention, or when you mark it so on its page.'**
+  String get intentionCatalogEmptySupportingText;
 
   /// Заголовок пустого активного охвата каталога, когда в архиве есть намерения
   ///
@@ -4427,12 +4387,6 @@ abstract class AppLocalizations {
   /// **'{count, plural, =0{Filter by tags} =1{Filter by tags, 1 condition} other{Filter by tags, {count} conditions}}'**
   String intentionPickerFilterLabel(int count);
 
-  /// Заголовок пустой выдачи выбора действия из-за фильтра названия
-  ///
-  /// In en, this message translates to:
-  /// **'No actions with this name'**
-  String get intentionPickerNoActionsByTitle;
-
   /// Заголовок пустой выдачи выбора намерения из-за фильтра названия
   ///
   /// In en, this message translates to:
@@ -4445,12 +4399,6 @@ abstract class AppLocalizations {
   /// **'Try a shorter name.'**
   String get intentionPickerTryShorterTitle;
 
-  /// Заголовок пустой выдачи выбора действия из-за условий по тегам
-  ///
-  /// In en, this message translates to:
-  /// **'No actions match these tags'**
-  String get intentionPickerNoActionsByTags;
-
   /// Заголовок пустой выдачи выбора намерения из-за условий по тегам
   ///
   /// In en, this message translates to:
@@ -4462,12 +4410,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Change the tags in the filter or reset it.'**
   String get intentionPickerChangeTags;
-
-  /// Заголовок пустой выдачи действий из-за фильтра названия и условий по тегам
-  ///
-  /// In en, this message translates to:
-  /// **'No actions found'**
-  String get intentionPickerNoActionsFound;
 
   /// Заголовок пустой выдачи намерений из-за фильтра названия и условий по тегам
   ///

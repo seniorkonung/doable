@@ -1844,7 +1844,7 @@ void _defineControlledCatalogTests() {
       find.byWidgetPredicate(
         (widget) =>
             widget is CatalogHeader &&
-            widget.title == 'All' &&
+            widget.title == 'Intentions' &&
             widget.count == 4,
       ),
       findsOneWidget,
@@ -1953,7 +1953,7 @@ void _expectParticipantQuery(
   IntentionTagFilter tagFilter,
 ) {
   expect(query.scope, IntentionScope.active);
-  expect(query.readinessFilter, IntentionReadinessFilter.all);
+  expect(query.kindFilter, IntentionKindFilter.mainAndSupporting);
   expect(query.pairProbe, _needsProbe);
   expect(query.tagFilter, tagFilter);
   expect(query.cursor, isNull);

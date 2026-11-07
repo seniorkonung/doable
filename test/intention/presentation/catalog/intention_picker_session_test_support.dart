@@ -7,7 +7,6 @@ import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_result.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
@@ -34,7 +33,6 @@ void defineIntentionPickerSessionTests({
   required String listKey,
   IntentionScope scope = IntentionScope.active,
   RelationPairProbe? pairProbe,
-  required IntentionReadinessFilter readinessFilter,
 }) {
   testWidgets('вложенные поиски сохраняют свои параметры, порции и прокрутку', (
     tester,
@@ -100,7 +98,7 @@ void defineIntentionPickerSessionTests({
     expect(initialQuery.tagFilter, IntentionTagFilter.empty);
     expect(initialQuery.scope, scope);
     expect(initialQuery.pairProbe, pairProbe);
-    expect(initialQuery.readinessFilter, readinessFilter);
+    expect(initialQuery.kindFilter, IntentionKindFilter.mainAndSupporting);
     expect(initialQuery.pageSize, 60);
     repository.complete(7, _page('Вторая'));
     await tester.pumpAndSettle();
@@ -194,7 +192,7 @@ void defineIntentionPickerSessionTests({
   );
 
   testWidgets(
-    'тип и порядок независимы у вложенных поисков и начинаются заново после закрытия',
+    'порядок независим у вложенных поисков и начинается заново после закрытия',
     (tester) async {
       final (container, repository, router) = await _openApp(tester);
       unawaited(router.push<void>(route));
@@ -203,10 +201,9 @@ void defineIntentionPickerSessionTests({
       final firstModel = container.read(
         intentionCatalogViewModelProvider(first).notifier,
       );
-      firstModel.changeType(IntentionTypeChoice.actions);
       firstModel.changeOrder(IntentionCatalogOrder.titleDescending);
       await tester.pump();
-      repository.complete(repository.queries.length - 1, _singleActionPage());
+      repository.complete(repository.queries.length - 1, _singlePage());
       await tester.pumpAndSettle();
 
       unawaited(router.push<void>(route));
@@ -214,21 +211,19 @@ void defineIntentionPickerSessionTests({
       final second = _purpose(tester);
       final initialQuery = repository.queries.last;
       expect(initialQuery.order, IntentionCatalogOrder.createdAtDescending);
-      expect(initialQuery.readinessFilter, readinessFilter);
-      repository.complete(repository.queries.length - 1, _singleActionPage());
+      repository.complete(repository.queries.length - 1, _singlePage());
       await tester.pumpAndSettle();
       final secondModel = container.read(
         intentionCatalogViewModelProvider(second).notifier,
       );
       secondModel.changeOrder(IntentionCatalogOrder.updatedAtAscending);
       await tester.pump();
-      repository.complete(repository.queries.length - 1, _singleActionPage());
+      repository.complete(repository.queries.length - 1, _singlePage());
       await tester.pumpAndSettle();
 
       await router.maybePop();
       await tester.pumpAndSettle();
       expect(firstModel.selection.order, IntentionCatalogOrder.titleDescending);
-      expect(firstModel.selection.type, IntentionTypeChoice.actions);
 
       await router.maybePop();
       await tester.pumpAndSettle();
@@ -238,16 +233,15 @@ void defineIntentionPickerSessionTests({
         repository.queries.last.order,
         IntentionCatalogOrder.createdAtDescending,
       );
-      expect(repository.queries.last.readinessFilter, readinessFilter);
-      repository.complete(repository.queries.length - 1, _singleActionPage());
+      repository.complete(repository.queries.length - 1, _singlePage());
       await tester.pumpAndSettle();
     },
   );
 }
 
-Result<IntentionCatalogFirstPage> _singleActionPage() => ResultSuccess(
+Result<IntentionCatalogFirstPage> _singlePage() => ResultSuccess(
   IntentionCatalogFirstPage(
-    items: [testSummary(index: 1, readiness: IntentionReadiness.ready)],
+    items: [testSummary(index: 1)],
     totalCount: 1,
     nextCursor: null,
     revision: const TestCatalogRevision(1),
@@ -270,11 +264,7 @@ ScrollPosition _position(WidgetTester tester, String listKey) => tester
 
 List<IntentionSummary> _items(String title, int last) => [
   for (var index = last; index > last - 60; index--)
-    testSummary(
-      index: index,
-      title: '$title $index',
-      readiness: IntentionReadiness.ready,
-    ),
+    testSummary(index: index, title: '$title $index'),
 ];
 
 Result<IntentionCatalogFirstPage> _page(String title, {bool hasMore = false}) =>

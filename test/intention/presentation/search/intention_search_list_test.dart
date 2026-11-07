@@ -332,76 +332,88 @@ void main() {
     });
   });
 
-  group('пустой выбранный тип каталога при открытом охвате', () {
+  group('пустой выбранный вид каталога', () {
     for (final (locale, texts) in [
       (
         const Locale('ru'),
         (
-          actionsText: 'Здесь появится намерение, отмеченное как действие.',
-          intentionsText: 'Здесь всё отмечено как действия.',
+          mainText:
+              'Намерение становится главным, когда его так отмечают на его '
+              'странице. Новое создаётся кнопкой с плюсом внизу.',
+          supportingText:
+              'Вспомогательным становится намерение, созданное в группах '
+              '«Нужно» или «Можно использовать» другого намерения, и то, '
+              'которое так отметили на его странице.',
           titles: {
-            (IntentionScope.active, IntentionTypeChoice.actions):
-                'Нет активных действий',
-            (IntentionScope.active, IntentionTypeChoice.intentions):
-                'Нет активных намерений',
-            (IntentionScope.archived, IntentionTypeChoice.actions):
-                'Нет действий в архиве',
-            (IntentionScope.archived, IntentionTypeChoice.intentions):
-                'Нет намерений в архиве',
-            (IntentionScope.all, IntentionTypeChoice.actions):
-                'Действий пока нет',
-            (IntentionScope.all, IntentionTypeChoice.intentions):
-                'Намерений пока нет',
+            (IntentionScope.active, IntentionKind.main):
+                'Нет активных главных намерений',
+            (IntentionScope.active, IntentionKind.supporting):
+                'Нет активных вспомогательных намерений',
+            (IntentionScope.archived, IntentionKind.main):
+                'В архиве нет главных намерений',
+            (IntentionScope.archived, IntentionKind.supporting):
+                'В архиве нет вспомогательных намерений',
+            (IntentionScope.all, IntentionKind.main):
+                'Главных намерений пока нет',
+            (IntentionScope.all, IntentionKind.supporting):
+                'Вспомогательных намерений пока нет',
           },
         ),
       ),
       (
         const Locale('en'),
         (
-          actionsText: 'An intention marked as an action is shown here.',
-          intentionsText: 'Everything here is marked as an action.',
+          mainText:
+              'An intention becomes main when you mark it so on its page. '
+              'Create a new one with the plus button below.',
+          supportingText:
+              'An intention becomes supporting when it is created in the '
+              'Needs or Can use group of another intention, or when you mark '
+              'it so on its page.',
           titles: {
-            (IntentionScope.active, IntentionTypeChoice.actions):
-                'No active actions',
-            (IntentionScope.active, IntentionTypeChoice.intentions):
-                'No active intentions',
-            (IntentionScope.archived, IntentionTypeChoice.actions):
-                'No actions in the archive',
-            (IntentionScope.archived, IntentionTypeChoice.intentions):
-                'No intentions in the archive',
-            (IntentionScope.all, IntentionTypeChoice.actions): 'No actions yet',
-            (IntentionScope.all, IntentionTypeChoice.intentions):
-                'No intentions yet',
+            (IntentionScope.active, IntentionKind.main):
+                'No active main intentions',
+            (IntentionScope.active, IntentionKind.supporting):
+                'No active supporting intentions',
+            (IntentionScope.archived, IntentionKind.main):
+                'No main intentions in the archive',
+            (IntentionScope.archived, IntentionKind.supporting):
+                'No supporting intentions in the archive',
+            (IntentionScope.all, IntentionKind.main): 'No main intentions yet',
+            (IntentionScope.all, IntentionKind.supporting):
+                'No supporting intentions yet',
           },
         ),
       ),
     ]) {
-      for (final MapEntry(key: (scope, type), value: title)
+      for (final MapEntry(key: (scope, kind), value: title)
           in texts.titles.entries) {
-        final actions = type == IntentionTypeChoice.actions;
-        testWidgets('${locale.languageCode}, ${scope.name}, ${type.name}: '
+        final main = kind == IntentionKind.main;
+        testWidgets('${locale.languageCode}, ${scope.name}, ${kind.name}: '
             'заголовок «$title», текст и значок', (tester) async {
           final h = await _openCatalog(tester, locale: locale);
           h.notifier
             ..changeScope(scope)
-            ..changeType(type);
+            ..changeKind(_filterOf(kind));
           await tester.pump();
           h.repository.complete(
             h.repository.queries.length - 1,
-            _otherTypeOnlyPage(shown: type),
+            _otherKindOnlyPage(shown: kind),
           );
           await _settle(tester);
 
           expect(_inEmptyState(find.text(title)), findsOneWidget);
           expect(
             _inEmptyState(
-              find.text(actions ? texts.actionsText : texts.intentionsText),
+              find.text(main ? texts.mainText : texts.supportingText),
             ),
             findsOneWidget,
           );
           expect(
             _inEmptyState(
-              _icon(actions ? DoableIconData.bolt : DoableIconData.intention),
+              _icon(
+                main ? DoableIconData.intention : DoableIconData.supporting,
+              ),
             ),
             findsOneWidget,
           );
@@ -409,17 +421,16 @@ void main() {
       }
     }
 
-    testWidgets('«Показать оба типа» выбирает тип «Все» в выбранном охвате', (
-      tester,
-    ) async {
+    testWidgets('«Показать оба типа» выбирает «Главные и вспомогательные» в '
+        'выбранном охвате', (tester) async {
       final h = await _openCatalog(tester, locale: const Locale('ru'));
       h.notifier
         ..changeScope(IntentionScope.archived)
-        ..changeType(IntentionTypeChoice.actions);
+        ..changeKind(IntentionKindFilter.supportingOnly);
       await tester.pump();
       h.repository.complete(
         h.repository.queries.length - 1,
-        _otherTypeOnlyPage(shown: IntentionTypeChoice.actions),
+        _otherKindOnlyPage(shown: IntentionKind.supporting),
       );
       await _settle(tester);
 
@@ -427,9 +438,80 @@ void main() {
       await tester.pump();
 
       final query = h.repository.queries.last;
-      expect(query.readinessFilter, IntentionReadinessFilter.all);
+      expect(query.kindFilter, IntentionKindFilter.mainAndSupporting);
       expect(query.scope, IntentionScope.archived);
     });
+
+    testWidgets('без намерений другого вида в охвате показано пустое '
+        'состояние охвата без «Показать оба типа»', (tester) async {
+      final h = await _openCatalog(tester, locale: const Locale('ru'));
+      h.repository.complete(
+        0,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: const [],
+            totalCount: 0,
+            counts: IntentionCountsByScopeAndKind(
+              active: IntentionKindCounts(main: 0, supporting: 0),
+              archived: IntentionKindCounts(main: 0, supporting: 0),
+            ),
+            nextCursor: null,
+            revision: const TestCatalogRevision(1),
+          ),
+        ),
+      );
+      await _settle(tester);
+
+      expect(_inEmptyState(find.text('Выбрать не из чего')), findsOneWidget);
+      expect(find.text('Показать оба типа'), findsNothing);
+    });
+
+    testWidgets('поиск для выбора не показывает пустой вид: только пустое '
+        'состояние охвата без кнопок', (tester) async {
+      final h = await _openRelationParticipants(tester);
+      h.repository.complete(0, _firstPage(const []));
+      await _settle(tester);
+
+      expect(_inEmptyState(find.text('Выбрать не из чего')), findsOneWidget);
+      expect(find.text('Показать оба типа'), findsNothing);
+      expect(find.byType(TextButton), findsNothing);
+      expect(find.byType(FilledButton), findsNothing);
+    });
+  });
+
+  group('пустая выдача по фильтрам называет искомое намерениями', () {
+    for (final kind in IntentionKindFilter.values) {
+      for (final (cause, title, tagged, titled) in [
+        ('название', 'Нет намерений с таким названием', false, true),
+        ('теги', 'Нет намерений под эти теги', true, false),
+        ('название и теги', 'Намерения не найдены', true, true),
+      ]) {
+        testWidgets('${kind.name}, $cause: «$title» без «Показать оба типа»', (
+          tester,
+        ) async {
+          final h = await _openCatalog(tester, locale: const Locale('ru'));
+          h.notifier.changeKind(kind);
+          if (tagged) {
+            h.notifier.changeTagFilter(
+              IntentionTagFilter(requiredTagIds: [_sport.id]),
+            );
+          }
+          if (titled) {
+            h.notifier.changeTitleFilter('бег');
+          }
+          await tester.pump(const Duration(milliseconds: 300));
+          await _settle(tester);
+          h.repository.complete(
+            h.repository.queries.length - 1,
+            _firstPage(const []),
+          );
+          await _settle(tester);
+
+          expect(_inEmptyState(find.text(title)), findsOneWidget);
+          expect(find.text('Показать оба типа'), findsNothing);
+        });
+      }
+    }
   });
 
   group('согласование выдачи без смены параметров', () {
@@ -863,26 +945,31 @@ Result<IntentionCatalogPage> _firstPage(
   );
 }
 
-/// Пустая первая порция, у которой в обоих охватах нет намерений типа
-/// [shown], а есть только другого типа.
-Result<IntentionCatalogPage> _otherTypeOnlyPage({
-  required IntentionTypeChoice shown,
+/// Пустая первая порция, у которой в обоих охватах нет намерений вида
+/// [shown], а есть только другого вида.
+Result<IntentionCatalogPage> _otherKindOnlyPage({
+  required IntentionKind shown,
 }) {
   final counts = switch (shown) {
-    IntentionTypeChoice.actions => IntentionTypeCounts(all: 2, actions: 0),
-    IntentionTypeChoice.intentions => IntentionTypeCounts(all: 2, actions: 2),
-    IntentionTypeChoice.all => throw ArgumentError.value(shown, 'shown'),
+    IntentionKind.main => IntentionKindCounts(main: 0, supporting: 2),
+    IntentionKind.supporting => IntentionKindCounts(main: 2, supporting: 0),
   };
   return ResultSuccess(
     IntentionCatalogFirstPage(
       items: const [],
       totalCount: 0,
-      counts: IntentionCountsByScopeAndType(active: counts, archived: counts),
+      counts: IntentionCountsByScopeAndKind(active: counts, archived: counts),
       nextCursor: null,
       revision: const TestCatalogRevision(1),
     ),
   );
 }
+
+/// Условие вида каталога, которое выбирает намерения вида [kind].
+IntentionKindFilter _filterOf(IntentionKind kind) => switch (kind) {
+  IntentionKind.main => IntentionKindFilter.mainOnly,
+  IntentionKind.supporting => IntentionKindFilter.supportingOnly,
+};
 
 Result<IntentionCatalogPage> _continuationPage(
   List<IntentionSummary> items, {
@@ -985,7 +1072,7 @@ Future<_Harness> _open(
   return h;
 }
 
-/// Открывает выдачу каталога намерений с открытым охватом и типом.
+/// Открывает выдачу каталога намерений с выбираемыми охватом и видом.
 Future<_Harness> _openCatalog(WidgetTester tester, {required Locale locale}) =>
     _open(tester, purpose: const BrowseIntentionCatalog(), locale: locale);
 
