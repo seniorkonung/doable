@@ -14,10 +14,7 @@ import 'package:sqlite3/sqlite3.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../quick_creation/controlled_mode_io.dart';
 
-/// Ключ удалённого режима: он неизвестен приложению и читается как неизвестный.
-const _legacyKey =
-    'daily'
-    '-choice';
+const _initialKey = 'unknown';
 
 void main() {
   late Directory localData;
@@ -100,20 +97,6 @@ void main() {
       ]);
     },
   );
-
-  test('прежний ключ режима не мешает запуску и даёт намерение', () async {
-    await modeFile.parent.create();
-    await modeFile.writeAsString(_legacyKey);
-
-    final ready = await runtime(store()).bootstrap() as AppRuntimeReady;
-
-    expect(
-      ready.container.read(quickCreationModeControllerProvider),
-      QuickCreationMode.intention,
-    );
-    _expectReadFailure(diagnostics, DiagnosticsFailureCode.corruption);
-    expect(await modeFile.readAsString(), _legacyKey);
-  });
 
   test('подготовка графа и чтение режима начинаются параллельно', () async {
     final modeStore = _ControlledModeStore();
@@ -258,8 +241,8 @@ void main() {
     test('поздний ${fails ? 'отказ' : 'успех'} записи не использует '
         'освобождённый контейнер и не считается сохранённым заранее', () async {
       await modeFile.parent.create();
-      // Прежний ключ отличает нетронутый файл от записанного режима.
-      await modeFile.writeAsString(_legacyKey);
+      // Неизвестный ключ отличает нетронутый файл от записанного режима.
+      await modeFile.writeAsString(_initialKey);
       final attempt = ModeWriteAttempt(
         holdAt: ModeWriteStep.rename,
         failAt: fails ? ModeWriteStep.rename : null,
@@ -282,7 +265,7 @@ void main() {
           () => ready.container.read(quickCreationModeControllerProvider),
           throwsStateError,
         );
-        expect(await modeFile.readAsString(), _legacyKey);
+        expect(await modeFile.readAsString(), _initialKey);
 
         final beforeRuntime = runtime(store());
         final before = await beforeRuntime.bootstrap() as AppRuntimeReady;
@@ -290,7 +273,7 @@ void main() {
           before.container.read(quickCreationModeControllerProvider),
           QuickCreationMode.intention,
         );
-        expect(await modeFile.readAsString(), _legacyKey);
+        expect(await modeFile.readAsString(), _initialKey);
         attempt.release.complete();
         expect(
           await saving,
@@ -304,7 +287,7 @@ void main() {
         );
         expect(
           await modeFile.readAsString(),
-          fails ? _legacyKey : QuickCreationMode.intention.storageKey,
+          fails ? _initialKey : QuickCreationMode.intention.storageKey,
         );
         await beforeRuntime.shutdown();
 

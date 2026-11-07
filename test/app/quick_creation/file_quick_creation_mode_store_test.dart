@@ -59,25 +59,6 @@ void main() {
     expect(diagnostics.events, isEmpty);
   });
 
-  test('прежний ключ режима неизвестен: читается намерение с категорией '
-      'повреждения, запуск не блокируется, файл не меняется', () async {
-    await modeFile.parent.create();
-    await modeFile.writeAsString(
-      'daily'
-      '-choice',
-    );
-
-    expect(await store().read(), QuickCreationMode.intention);
-    _expectFailures(diagnostics, QuickCreationModeDiagnosticsStage.read, [
-      DiagnosticsFailureCode.corruption,
-    ]);
-    expect(
-      await modeFile.readAsString(),
-      'daily'
-      '-choice',
-    );
-  });
-
   test(
     'неизвестный ключ возвращает начальный режим с категорией повреждения',
     () async {
@@ -106,12 +87,6 @@ void main() {
     [0xff, 0xfe],
     'relation'.codeUnits,
     'relation\n'.codeUnits,
-    ('daily'
-            '-choice-from-intention')
-        .codeUnits,
-    ('daily'
-            '-choice-from-action')
-        .codeUnits,
   ]) {
     test('непригодное содержимое $contents не становится режимом', () async {
       await modeFile.parent.create();
@@ -153,19 +128,17 @@ void main() {
 
   for (final step in [ModeWriteStep.write, ModeWriteStep.rename]) {
     // Отказ после успеха и два отказа подряд с последующим успехом; остальные
-    // сочетания идут теми же ветвями очереди. Прежний ключ в файле отличает
+    // сочетания идут теми же ветвями очереди. Неизвестный ключ в файле отличает
     // нетронутую настройку от записанной.
     for (final (failFirst, failSecond) in [(false, true), (true, true)]) {
       test(
         '${step.label}: исходы А=${failFirst ? 'отказ' : 'успех'}, '
         'Б=${failSecond ? 'отказ' : 'успех'} сохраняют последний успех',
         () async {
-          const legacy =
-              'daily'
-              '-choice';
+          const initial = 'unknown';
           const saved = 'intention';
           await modeFile.parent.create();
-          await modeFile.writeAsString(legacy);
+          await modeFile.writeAsString(initial);
           final first = ModeWriteAttempt(
             holdAt: step,
             failAt: failFirst ? step : null,
@@ -196,12 +169,12 @@ void main() {
             await Future<void>(() {});
 
             expect(secondFinished, isFalse);
-            expect(await modeFile.readAsString(), legacy);
+            expect(await modeFile.readAsString(), initial);
 
             first.release.complete();
             _expectOutcome(await savingFirst, failed: failFirst);
             await _waitUntilHeld(second, savingSecond);
-            final afterFirst = failFirst ? legacy : saved;
+            final afterFirst = failFirst ? initial : saved;
             expect(await modeFile.readAsString(), afterFirst);
             expect(secondFinished, isFalse);
 

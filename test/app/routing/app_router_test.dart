@@ -78,16 +78,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(IntentionCatalogPage), findsOneWidget);
-      expect(
-        find.byKey(
-          const ValueKey(
-            'catalog-open-daily'
-            '-choices',
-          ),
-        ),
-        findsNothing,
-      );
-
       await openActions(tester);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
