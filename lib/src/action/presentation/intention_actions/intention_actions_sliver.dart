@@ -310,8 +310,11 @@ final class _IntentionActionsSliverState
                 )
               : null,
         ),
-      IntentionActionsPageIdle() || IntentionActionsPageLoading() =>
+      IntentionActionsPageIdle() || IntentionActionsPageLoading()
+          when state.freshness is IntentionActionsCurrent =>
         ListState.more(text: l10n.detailsActionsLoadingMore),
+      IntentionActionsPageIdle() ||
+      IntentionActionsPageLoading() => const SizedBox.shrink(),
     },
   );
 }
