@@ -927,3 +927,16 @@
   - **Зависимости:** 2.17.
   - **Предполагаемые файлы:** меняются `lib/src/graph/data/drift_personal_graph_repository_action_reads.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, `developer_diagnostics_sink.dart`, `test/graph/data/drift_action_path_state_read_test.dart`, при необходимости `test/shared/diagnostics/diagnostics_sink_test.dart`.
   - **Размер:** S.
+
+- [ ] 2.28 Варианты строки `OptionRow`, связь шага `PathBuilder` и загруженный черновик при сохранении пути выражены типами
+  - **Критерии приёмки:**
+    - `OptionRow` (`lib/src/design_system/components/option_row.dart`) хранит ведущий элемент одним полем запечатанного типа с вариантами «значок» (`DoableIconData`) и «метка» (`Widget`) вместо пары необязательных полей `icon` и `mark`; отрисовка исчерпывающе сопоставляет варианты, разыменования `icon!` нет. Конструкторы `OptionRow` и `OptionRow.marked` и их вызывающий код (`action_priority_sheet.dart` и др.) обновлены, если меняется их форма.
+    - `PathBuilder` (`lib/src/design_system/components/path_builder.dart`) получает путь так, что корневой шаг не имеет связи, а каждый следующий шаг несёт обязательную `PathBuilderRelation` — например отдельные типы корневого и следующего шага или корень плюс список шагов со связью; `step.relation!` и прочих разыменований связи нет. Вызывающий код (`path_page.dart`) и тесты компонента обновлены.
+    - `_save` в `lib/src/action/presentation/path/path_page.dart` берёт черновик для `onSaved` сопоставлением с образцом `LoadedPathDraft` без приведения `as` (если задача 2.21 уже внесла это, форма сохраняется).
+    - Поведение, доступные имена и внешний вид строк вариантов, построения пути и экрана пути не меняются; ожидания существующих тестов не ослабляются. Изменения тех же файлов по другим задачам (2.21, 2.22, удаление `showEndSlot`) сохраняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- flutter test test/design_system test/action/presentation/path test/action/presentation/editor test/app/quick_creation`.
+  - **Зависимости:** 2.4, 2.8, 2.13, 2.21, 2.22.
+  - **Предполагаемые файлы:** меняются `lib/src/design_system/components/option_row.dart`, `path_builder.dart`, `lib/src/action/presentation/path/path_page.dart`, при необходимости `lib/src/action/presentation/editor/action_priority_sheet.dart` и другой вызывающий код `OptionRow`, `test/design_system/option_row_test.dart`, `path_builder_test.dart`.
+  - **Размер:** S.
