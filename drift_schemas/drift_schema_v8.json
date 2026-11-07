@@ -823,6 +823,16 @@
             "dsl_features": []
           },
           {
+            "name": "kind",
+            "getter_name": "kind",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 'main' CHECK (kind IN ('main', 'supporting'))",
+            "default_dart": "const CustomExpression('\\'main\\'')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
             "name": "is_action_ready",
             "getter_name": "isActionReady",
             "moor_type": "bool",
@@ -2711,7 +2721,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TABLE IF NOT EXISTS \"intentions\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"title\" TEXT NOT NULL CHECK (title <> '' AND instr(CAST(title AS BLOB), X'00') = 0), \"title_search_key\" TEXT NOT NULL GENERATED ALWAYS AS (doable_title_search_key(title)) STORED CHECK (title_search_key <> '' AND instr(CAST(title_search_key AS BLOB), X'00') = 0), \"description\" TEXT CHECK (description IS NULL OR(instr(CAST(description AS BLOB), X'00') = 0 AND length(trim(description, char(9) || char(10) || char(11) || char(12) || char(13) || char(32))) > 0)), \"is_action_ready\" INTEGER NOT NULL DEFAULT FALSE CHECK (is_action_ready IN (0, 1)), \"is_archived\" INTEGER NOT NULL DEFAULT FALSE CHECK (is_archived IN (0, 1)), \"created_at\" INTEGER NOT NULL, \"updated_at\" INTEGER NOT NULL);"
+          "sql": "CREATE TABLE IF NOT EXISTS \"intentions\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"title\" TEXT NOT NULL CHECK (title <> '' AND instr(CAST(title AS BLOB), X'00') = 0), \"title_search_key\" TEXT NOT NULL GENERATED ALWAYS AS (doable_title_search_key(title)) STORED CHECK (title_search_key <> '' AND instr(CAST(title_search_key AS BLOB), X'00') = 0), \"description\" TEXT CHECK (description IS NULL OR(instr(CAST(description AS BLOB), X'00') = 0 AND length(trim(description, char(9) || char(10) || char(11) || char(12) || char(13) || char(32))) > 0)), \"kind\" TEXT NOT NULL DEFAULT 'main' CHECK (kind IN ('main', 'supporting')), \"is_action_ready\" INTEGER NOT NULL DEFAULT FALSE CHECK (is_action_ready IN (0, 1)), \"is_archived\" INTEGER NOT NULL DEFAULT FALSE CHECK (is_archived IN (0, 1)), \"created_at\" INTEGER NOT NULL, \"updated_at\" INTEGER NOT NULL);"
         }
       ]
     },

@@ -3,6 +3,8 @@ import 'intention_text.dart';
 
 enum IntentionReadiness { notReady, ready }
 
+enum IntentionKind { main, supporting }
+
 enum IntentionArchiveState { active, archived }
 
 final class IntentionTimestamp {
@@ -23,6 +25,7 @@ final class Intention {
     required IntentionId id,
     required String title,
     required String? description,
+    IntentionKind kind = IntentionKind.main,
     required IntentionReadiness readiness,
     required IntentionArchiveState archiveState,
     required IntentionTimestamp createdAt,
@@ -33,6 +36,7 @@ final class Intention {
     description: description == null
         ? null
         : IntentionText.normalizeDescription(description),
+    kind: kind,
     readiness: readiness,
     archiveState: archiveState,
     createdAt: createdAt,
@@ -43,6 +47,7 @@ final class Intention {
     required this.id,
     required this.title,
     required this.description,
+    required this.kind,
     required this.readiness,
     required this.archiveState,
     required this.createdAt,
@@ -52,6 +57,7 @@ final class Intention {
   final IntentionId id;
   final String title;
   final String? description;
+  final IntentionKind kind;
   final IntentionReadiness readiness;
   final IntentionArchiveState archiveState;
   final IntentionTimestamp createdAt;

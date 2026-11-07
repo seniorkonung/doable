@@ -79,7 +79,7 @@ final class GraphFactCapture {
         .customSelect(
           '''SELECT mark.intention_id AS mark_id, mark.first_operation,
                 intention.id IS NOT NULL AS present, intention.id,
-                intention.title, intention.description,
+                intention.title, intention.description, intention.kind,
                 intention.is_action_ready, intention.is_archived,
                 intention.created_at, intention.updated_at
          FROM graph_log_intention_marks AS mark

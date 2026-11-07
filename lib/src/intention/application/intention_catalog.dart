@@ -374,6 +374,7 @@ final class IntentionSummary {
     required this.id,
     required String title,
     required this.descriptionPreview,
+    this.kind = IntentionKind.main,
     required this.readiness,
     required this.archiveState,
     required this.createdAt,
@@ -388,6 +389,7 @@ final class IntentionSummary {
 
   /// Начало описания; `null` означает отсутствие описания.
   final TextPreview? descriptionPreview;
+  final IntentionKind kind;
   final IntentionReadiness readiness;
   final IntentionArchiveState archiveState;
   final IntentionTimestamp createdAt;
@@ -414,6 +416,7 @@ final class IntentionSummary {
       id: id,
       title: title,
       descriptionPreview: descriptionPreview,
+      kind: kind,
       readiness: readiness,
       archiveState: archiveState,
       createdAt: createdAt,
@@ -437,6 +440,7 @@ final class IntentionSummary {
       id: id,
       title: title,
       descriptionPreview: descriptionPreview,
+      kind: kind,
       readiness: readiness,
       archiveState: archiveState,
       createdAt: createdAt,

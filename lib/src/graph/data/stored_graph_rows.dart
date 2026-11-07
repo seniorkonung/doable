@@ -126,6 +126,11 @@ Intention decodeStoredIntention(
       id: decodeStoredIntentionId(requiredStoredString(data, '${prefix}id')),
       title: title,
       description: description,
+      kind: switch (requiredStoredString(data, '${prefix}kind')) {
+        'main' => IntentionKind.main,
+        'supporting' => IntentionKind.supporting,
+        _ => throw const StoredGraphCorruption(),
+      },
       readiness: decodeStoredIntentionReadiness(
         data,
         '${prefix}is_action_ready',

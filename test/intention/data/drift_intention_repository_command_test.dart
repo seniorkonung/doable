@@ -103,6 +103,13 @@ void main() {
       test(
         'снимки изменения полей сохраняют полные собственные теги',
         () async {
+          seedRawGraph(
+            raw,
+            () => raw.execute('UPDATE intentions SET kind = ? WHERE id = ?', [
+              'supporting',
+              id.toCanonicalString(),
+            ]),
+          );
           rawOverride.overrideSelect(const {
             'title_search_key': 'историческая проекция',
           });
@@ -132,6 +139,7 @@ void main() {
           expect(mutation.after.matches(query('Новое название')), isTrue);
           for (final entry in [mutation.before, mutation.after]) {
             expect(entry.summary.id, id);
+            expect(entry.summary.kind, IntentionKind.supporting);
             expect(
               entry.summary.tags.map((tag) => tag.name.value),
               expectedTagNames,
@@ -1636,6 +1644,12 @@ void main() {
                 commandType: IntentionCommandDiagnosticsType.enableReadiness,
                 isArchived: false,
                 overrides: const {'is_action_ready': 2},
+              ),
+              (
+                command: EnableIntentionReadiness.new,
+                commandType: IntentionCommandDiagnosticsType.enableReadiness,
+                isArchived: false,
+                overrides: const {'kind': 'unknown'},
               ),
               (
                 command: DisableIntentionReadiness.new,

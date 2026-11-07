@@ -51,6 +51,7 @@ void main() {
       expect(active.title, 'Переписать "статью"');
       expect(active.description, '  Сохранить точный\nтекст  ');
       expect(active.readiness, IntentionReadiness.ready);
+      expect(active.kind, IntentionKind.main);
       expect(active.archiveState, IntentionArchiveState.active);
       expect(active.createdAt.value, DateTime.utc(2026, 9, 3, 10));
       expect(active.updatedAt.value, DateTime.utc(2026, 9, 3, 12));
@@ -63,6 +64,7 @@ void main() {
       expect(archived.title, 'Архивировать журнал');
       expect(archived.description, isNull);
       expect(archived.readiness, IntentionReadiness.notReady);
+      expect(archived.kind, IntentionKind.supporting);
       expect(archived.archiveState, IntentionArchiveState.archived);
       expect(archived.createdAt.value, DateTime.utc(2026, 9, 3, 13));
       expect(archived.updatedAt.value, DateTime.utc(2026, 9, 3, 16));
@@ -83,6 +85,7 @@ void main() {
       );
       expect(archivedPage.totalCount, 1);
       expect(archivedPage.items.map((item) => item.id), [archivedId]);
+      expect(archivedPage.items.single.kind, IntentionKind.supporting);
 
       final allPage = _firstPage(
         await repository.getCatalogPage(_catalogQuery(IntentionScope.all)),
@@ -368,9 +371,21 @@ Future<void> _createFirstObjectGraph(
       const CreateIntention(title: 'Архивировать журнал', description: null),
     ),
   );
-  _saved(await repository.execute(ArchiveIntention(archivedId)));
-  _saved(await repository.execute(RestoreIntention(archivedId)));
-  _saved(await repository.execute(ArchiveIntention(archivedId)));
+  await seedGraph(
+    database,
+    () => database.customStatement(
+      'UPDATE intentions SET kind = ? WHERE id = ?',
+      ['supporting', archivedId.toCanonicalString()],
+    ),
+  );
+  for (final command in [
+    ArchiveIntention(archivedId),
+    RestoreIntention(archivedId),
+    ArchiveIntention(archivedId),
+  ]) {
+    final saved = _saved(await repository.execute(command));
+    expect(saved.kind, IntentionKind.supporting);
+  }
 
   _saved(
     await repository.execute(

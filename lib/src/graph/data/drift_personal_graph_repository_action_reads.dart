@@ -223,6 +223,7 @@ extension _ActionReading on DriftPersonalGraphRepository {
          )
          SELECT p.position, p.intention_id, i.id AS i_id,
                 i.title AS i_title, i.description AS i_description,
+                i.kind AS i_kind,
                 i.is_action_ready AS i_is_action_ready,
                 i.is_archived AS i_is_archived, i.created_at AS i_created_at,
                 i.updated_at AS i_updated_at, d.title AS deleted_title,
