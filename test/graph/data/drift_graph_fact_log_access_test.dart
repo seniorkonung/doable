@@ -23,7 +23,8 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../support/action_seed.dart' show insertAction, seedUuid;
+import '../../support/action_seed.dart'
+    show actionPathRole, insertAction, insertActionPathItem, seedUuid;
 import '../../support/graph_log_completeness_reference.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
@@ -384,17 +385,13 @@ void main() {
           [seedUuid(5000 + index), 'Действие $index'],
         );
         for (final (position, intention) in path.indexed) {
-          await write(
-            'INSERT INTO action_path_items '
-            '(action_id, position, intention_id, previous_intention_id) '
-            'VALUES (?, ?, ?, ?)',
-            [
-              seedUuid(5000 + index),
-              position,
-              intention,
-              position == 0 ? null : path.first,
-            ],
-          );
+          await write(insertActionPathItem, [
+            seedUuid(5000 + index),
+            position,
+            intention,
+            position == 0 ? null : path.first,
+            actionPathRole(position, path.length),
+          ]);
         }
       }
       // Удаление в обратном порядке расходится с порядком ключей.

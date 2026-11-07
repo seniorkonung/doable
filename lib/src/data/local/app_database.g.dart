@@ -5822,12 +5822,58 @@ class ActionPathItems extends Table
         requiredDuringInsert: false,
         $customConstraints: '',
       );
+  static const VerificationMeta _roleMeta = const VerificationMeta('role');
+  late final GeneratedColumn<String> role = GeneratedColumn<String>(
+    'role',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(role) = \'text\' AND role IN (\'root\', \'intermediate\', \'terminal\', \'single\'))',
+  );
+  static const VerificationMeta _orderDateMeta = const VerificationMeta(
+    'orderDate',
+  );
+  late final GeneratedColumn<String> orderDate = GeneratedColumn<String>(
+    'order_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _orderHourMeta = const VerificationMeta(
+    'orderHour',
+  );
+  late final GeneratedColumn<int> orderHour = GeneratedColumn<int>(
+    'order_hour',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _orderSequenceMeta = const VerificationMeta(
+    'orderSequence',
+  );
+  late final GeneratedColumn<int> orderSequence = GeneratedColumn<int>(
+    'order_sequence',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
   @override
   List<GeneratedColumn> get $columns => [
     actionId,
     position,
     intentionId,
     previousIntentionId,
+    role,
+    orderDate,
+    orderHour,
+    orderSequence,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -5877,6 +5923,41 @@ class ActionPathItems extends Table
         ),
       );
     }
+    if (data.containsKey('role')) {
+      context.handle(
+        _roleMeta,
+        role.isAcceptableOrUnknown(data['role']!, _roleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_roleMeta);
+    }
+    if (data.containsKey('order_date')) {
+      context.handle(
+        _orderDateMeta,
+        orderDate.isAcceptableOrUnknown(data['order_date']!, _orderDateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_orderDateMeta);
+    }
+    if (data.containsKey('order_hour')) {
+      context.handle(
+        _orderHourMeta,
+        orderHour.isAcceptableOrUnknown(data['order_hour']!, _orderHourMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_orderHourMeta);
+    }
+    if (data.containsKey('order_sequence')) {
+      context.handle(
+        _orderSequenceMeta,
+        orderSequence.isAcceptableOrUnknown(
+          data['order_sequence']!,
+          _orderSequenceMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_orderSequenceMeta);
+    }
     return context;
   }
 
@@ -5906,6 +5987,22 @@ class ActionPathItems extends Table
         DriftSqlType.string,
         data['${effectivePrefix}previous_intention_id'],
       ),
+      role: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}role'],
+      )!,
+      orderDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}order_date'],
+      )!,
+      orderHour: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}order_hour'],
+      )!,
+      orderSequence: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}order_sequence'],
+      )!,
     );
   }
 
@@ -5928,11 +6025,21 @@ class ActionPathItem extends DataClass implements Insertable<ActionPathItem> {
   final int position;
   final String intentionId;
   final String? previousIntentionId;
+  final String role;
+  final String orderDate;
+
+  /// -1 — «Весь день».
+  final int orderHour;
+  final int orderSequence;
   const ActionPathItem({
     required this.actionId,
     required this.position,
     required this.intentionId,
     this.previousIntentionId,
+    required this.role,
+    required this.orderDate,
+    required this.orderHour,
+    required this.orderSequence,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -5943,6 +6050,10 @@ class ActionPathItem extends DataClass implements Insertable<ActionPathItem> {
     if (!nullToAbsent || previousIntentionId != null) {
       map['previous_intention_id'] = Variable<String>(previousIntentionId);
     }
+    map['role'] = Variable<String>(role);
+    map['order_date'] = Variable<String>(orderDate);
+    map['order_hour'] = Variable<int>(orderHour);
+    map['order_sequence'] = Variable<int>(orderSequence);
     return map;
   }
 
@@ -5954,6 +6065,10 @@ class ActionPathItem extends DataClass implements Insertable<ActionPathItem> {
       previousIntentionId: previousIntentionId == null && nullToAbsent
           ? const Value.absent()
           : Value(previousIntentionId),
+      role: Value(role),
+      orderDate: Value(orderDate),
+      orderHour: Value(orderHour),
+      orderSequence: Value(orderSequence),
     );
   }
 
@@ -5969,6 +6084,10 @@ class ActionPathItem extends DataClass implements Insertable<ActionPathItem> {
       previousIntentionId: serializer.fromJson<String?>(
         json['previous_intention_id'],
       ),
+      role: serializer.fromJson<String>(json['role']),
+      orderDate: serializer.fromJson<String>(json['order_date']),
+      orderHour: serializer.fromJson<int>(json['order_hour']),
+      orderSequence: serializer.fromJson<int>(json['order_sequence']),
     );
   }
   @override
@@ -5979,6 +6098,10 @@ class ActionPathItem extends DataClass implements Insertable<ActionPathItem> {
       'position': serializer.toJson<int>(position),
       'intention_id': serializer.toJson<String>(intentionId),
       'previous_intention_id': serializer.toJson<String?>(previousIntentionId),
+      'role': serializer.toJson<String>(role),
+      'order_date': serializer.toJson<String>(orderDate),
+      'order_hour': serializer.toJson<int>(orderHour),
+      'order_sequence': serializer.toJson<int>(orderSequence),
     };
   }
 
@@ -5987,6 +6110,10 @@ class ActionPathItem extends DataClass implements Insertable<ActionPathItem> {
     int? position,
     String? intentionId,
     Value<String?> previousIntentionId = const Value.absent(),
+    String? role,
+    String? orderDate,
+    int? orderHour,
+    int? orderSequence,
   }) => ActionPathItem(
     actionId: actionId ?? this.actionId,
     position: position ?? this.position,
@@ -5994,6 +6121,10 @@ class ActionPathItem extends DataClass implements Insertable<ActionPathItem> {
     previousIntentionId: previousIntentionId.present
         ? previousIntentionId.value
         : this.previousIntentionId,
+    role: role ?? this.role,
+    orderDate: orderDate ?? this.orderDate,
+    orderHour: orderHour ?? this.orderHour,
+    orderSequence: orderSequence ?? this.orderSequence,
   );
   ActionPathItem copyWithCompanion(ActionPathItemsCompanion data) {
     return ActionPathItem(
@@ -6005,6 +6136,12 @@ class ActionPathItem extends DataClass implements Insertable<ActionPathItem> {
       previousIntentionId: data.previousIntentionId.present
           ? data.previousIntentionId.value
           : this.previousIntentionId,
+      role: data.role.present ? data.role.value : this.role,
+      orderDate: data.orderDate.present ? data.orderDate.value : this.orderDate,
+      orderHour: data.orderHour.present ? data.orderHour.value : this.orderHour,
+      orderSequence: data.orderSequence.present
+          ? data.orderSequence.value
+          : this.orderSequence,
     );
   }
 
@@ -6014,14 +6151,26 @@ class ActionPathItem extends DataClass implements Insertable<ActionPathItem> {
           ..write('actionId: $actionId, ')
           ..write('position: $position, ')
           ..write('intentionId: $intentionId, ')
-          ..write('previousIntentionId: $previousIntentionId')
+          ..write('previousIntentionId: $previousIntentionId, ')
+          ..write('role: $role, ')
+          ..write('orderDate: $orderDate, ')
+          ..write('orderHour: $orderHour, ')
+          ..write('orderSequence: $orderSequence')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(actionId, position, intentionId, previousIntentionId);
+  int get hashCode => Object.hash(
+    actionId,
+    position,
+    intentionId,
+    previousIntentionId,
+    role,
+    orderDate,
+    orderHour,
+    orderSequence,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -6029,7 +6178,11 @@ class ActionPathItem extends DataClass implements Insertable<ActionPathItem> {
           other.actionId == this.actionId &&
           other.position == this.position &&
           other.intentionId == this.intentionId &&
-          other.previousIntentionId == this.previousIntentionId);
+          other.previousIntentionId == this.previousIntentionId &&
+          other.role == this.role &&
+          other.orderDate == this.orderDate &&
+          other.orderHour == this.orderHour &&
+          other.orderSequence == this.orderSequence);
 }
 
 class ActionPathItemsCompanion extends UpdateCompanion<ActionPathItem> {
@@ -6037,12 +6190,20 @@ class ActionPathItemsCompanion extends UpdateCompanion<ActionPathItem> {
   final Value<int> position;
   final Value<String> intentionId;
   final Value<String?> previousIntentionId;
+  final Value<String> role;
+  final Value<String> orderDate;
+  final Value<int> orderHour;
+  final Value<int> orderSequence;
   final Value<int> rowid;
   const ActionPathItemsCompanion({
     this.actionId = const Value.absent(),
     this.position = const Value.absent(),
     this.intentionId = const Value.absent(),
     this.previousIntentionId = const Value.absent(),
+    this.role = const Value.absent(),
+    this.orderDate = const Value.absent(),
+    this.orderHour = const Value.absent(),
+    this.orderSequence = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ActionPathItemsCompanion.insert({
@@ -6050,15 +6211,27 @@ class ActionPathItemsCompanion extends UpdateCompanion<ActionPathItem> {
     required int position,
     required String intentionId,
     this.previousIntentionId = const Value.absent(),
+    required String role,
+    required String orderDate,
+    required int orderHour,
+    required int orderSequence,
     this.rowid = const Value.absent(),
   }) : actionId = Value(actionId),
        position = Value(position),
-       intentionId = Value(intentionId);
+       intentionId = Value(intentionId),
+       role = Value(role),
+       orderDate = Value(orderDate),
+       orderHour = Value(orderHour),
+       orderSequence = Value(orderSequence);
   static Insertable<ActionPathItem> custom({
     Expression<String>? actionId,
     Expression<int>? position,
     Expression<String>? intentionId,
     Expression<String>? previousIntentionId,
+    Expression<String>? role,
+    Expression<String>? orderDate,
+    Expression<int>? orderHour,
+    Expression<int>? orderSequence,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -6067,6 +6240,10 @@ class ActionPathItemsCompanion extends UpdateCompanion<ActionPathItem> {
       if (intentionId != null) 'intention_id': intentionId,
       if (previousIntentionId != null)
         'previous_intention_id': previousIntentionId,
+      if (role != null) 'role': role,
+      if (orderDate != null) 'order_date': orderDate,
+      if (orderHour != null) 'order_hour': orderHour,
+      if (orderSequence != null) 'order_sequence': orderSequence,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -6076,6 +6253,10 @@ class ActionPathItemsCompanion extends UpdateCompanion<ActionPathItem> {
     Value<int>? position,
     Value<String>? intentionId,
     Value<String?>? previousIntentionId,
+    Value<String>? role,
+    Value<String>? orderDate,
+    Value<int>? orderHour,
+    Value<int>? orderSequence,
     Value<int>? rowid,
   }) {
     return ActionPathItemsCompanion(
@@ -6083,6 +6264,10 @@ class ActionPathItemsCompanion extends UpdateCompanion<ActionPathItem> {
       position: position ?? this.position,
       intentionId: intentionId ?? this.intentionId,
       previousIntentionId: previousIntentionId ?? this.previousIntentionId,
+      role: role ?? this.role,
+      orderDate: orderDate ?? this.orderDate,
+      orderHour: orderHour ?? this.orderHour,
+      orderSequence: orderSequence ?? this.orderSequence,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -6104,6 +6289,18 @@ class ActionPathItemsCompanion extends UpdateCompanion<ActionPathItem> {
         previousIntentionId.value,
       );
     }
+    if (role.present) {
+      map['role'] = Variable<String>(role.value);
+    }
+    if (orderDate.present) {
+      map['order_date'] = Variable<String>(orderDate.value);
+    }
+    if (orderHour.present) {
+      map['order_hour'] = Variable<int>(orderHour.value);
+    }
+    if (orderSequence.present) {
+      map['order_sequence'] = Variable<int>(orderSequence.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -6117,6 +6314,10 @@ class ActionPathItemsCompanion extends UpdateCompanion<ActionPathItem> {
           ..write('position: $position, ')
           ..write('intentionId: $intentionId, ')
           ..write('previousIntentionId: $previousIntentionId, ')
+          ..write('role: $role, ')
+          ..write('orderDate: $orderDate, ')
+          ..write('orderHour: $orderHour, ')
+          ..write('orderSequence: $orderSequence, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6962,6 +7163,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'action_path_items_intention_action',
     'CREATE INDEX action_path_items_intention_action ON action_path_items (intention_id, action_id)',
   );
+  late final Index actionPathItemsIntentionRoleOrder = Index(
+    'action_path_items_intention_role_order',
+    'CREATE INDEX action_path_items_intention_role_order ON action_path_items (intention_id, role, order_date DESC, order_hour DESC, order_sequence DESC)',
+  );
   late final Index actionPathItemsLink = Index(
     'action_path_items_link',
     'CREATE INDEX action_path_items_link ON action_path_items (previous_intention_id, intention_id)',
@@ -6970,12 +7175,24 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'CREATE TRIGGER action_path_items_continue_previous_position AFTER INSERT ON action_path_items WHEN new.previous_intention_id IS NOT (SELECT intention_id FROM action_path_items WHERE action_id = new.action_id AND position = new.position - 1) BEGIN SELECT RAISE (ABORT, \'action path item must continue the previous position\');END',
     'action_path_items_continue_previous_position',
   );
+  late final Trigger actionPathItemsRoleFollowsPosition = Trigger(
+    'CREATE TRIGGER action_path_items_role_follows_position AFTER INSERT ON action_path_items WHEN CASE WHEN new.position = 0 THEN new.role NOT IN (\'root\', \'single\') ELSE new.role NOT IN (\'intermediate\', \'terminal\') OR NOT EXISTS (SELECT 1 FROM action_path_items WHERE action_id = new.action_id AND position = new.position - 1 AND role IN (\'root\', \'intermediate\')) END BEGIN SELECT RAISE (ABORT, \'action path item role must follow its position\');END',
+    'action_path_items_role_follows_position',
+  );
+  late final Trigger actionPathItemsOrderKeyMatchesAction = Trigger(
+    'CREATE TRIGGER action_path_items_order_key_matches_action AFTER INSERT ON action_path_items WHEN NOT EXISTS (SELECT 1 FROM actions WHERE id = new.action_id AND date = new.order_date AND COALESCE(scheduled_hour, -1) = new.order_hour AND creation_sequence = new.order_sequence) BEGIN SELECT RAISE (ABORT, \'action path item order key must match its action\');END',
+    'action_path_items_order_key_matches_action',
+  );
+  late final Trigger actionsCopyOrderKeyToPath = Trigger(
+    'CREATE TRIGGER actions_copy_order_key_to_path AFTER UPDATE OF date, scheduled_hour ON actions WHEN new.date IS NOT old.date OR new.scheduled_hour IS NOT old.scheduled_hour BEGIN UPDATE action_path_items SET order_date = new.date, order_hour = COALESCE(new.scheduled_hour, -1) WHERE action_id = new.id;END',
+    'actions_copy_order_key_to_path',
+  );
   late final Trigger actionPathItemsKnownIntention = Trigger(
     'CREATE TRIGGER action_path_items_known_intention AFTER INSERT ON action_path_items WHEN NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.intention_id) AND NOT EXISTS (SELECT 1 FROM deleted_intentions WHERE intention_id = new.intention_id) BEGIN SELECT RAISE (ABORT, \'action path item requires a known intention\');END',
     'action_path_items_known_intention',
   );
   late final Trigger actionPathItemsImmutable = Trigger(
-    'CREATE TRIGGER action_path_items_immutable BEFORE UPDATE ON action_path_items BEGIN SELECT RAISE (ABORT, \'action path items are immutable\');END',
+    'CREATE TRIGGER action_path_items_immutable BEFORE UPDATE ON action_path_items WHEN new.action_id IS NOT old.action_id OR new.position IS NOT old.position OR new.intention_id IS NOT old.intention_id OR new.previous_intention_id IS NOT old.previous_intention_id OR new.role IS NOT old.role OR new.order_sequence IS NOT old.order_sequence BEGIN SELECT RAISE (ABORT, \'action path items are immutable\');END',
     'action_path_items_immutable',
   );
   late final Trigger deletedIntentionsRejectExisting = Trigger(
@@ -7186,8 +7403,12 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     actionsDateCompletionScheduleOrder,
     actionsImmutableIdentity,
     actionPathItemsIntentionAction,
+    actionPathItemsIntentionRoleOrder,
     actionPathItemsLink,
     actionPathItemsContinuePreviousPosition,
+    actionPathItemsRoleFollowsPosition,
+    actionPathItemsOrderKeyMatchesAction,
+    actionsCopyOrderKeyToPath,
     actionPathItemsKnownIntention,
     actionPathItemsImmutable,
     deletedIntentionsRejectExisting,
@@ -7461,6 +7682,27 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.insert,
       ),
       result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'action_path_items',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'action_path_items',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'actions',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [TableUpdate('action_path_items', kind: UpdateKind.update)],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
@@ -11700,6 +11942,10 @@ typedef $ActionPathItemsCreateCompanionBuilder =
       required int position,
       required String intentionId,
       Value<String?> previousIntentionId,
+      required String role,
+      required String orderDate,
+      required int orderHour,
+      required int orderSequence,
       Value<int> rowid,
     });
 typedef $ActionPathItemsUpdateCompanionBuilder =
@@ -11708,6 +11954,10 @@ typedef $ActionPathItemsUpdateCompanionBuilder =
       Value<int> position,
       Value<String> intentionId,
       Value<String?> previousIntentionId,
+      Value<String> role,
+      Value<String> orderDate,
+      Value<int> orderHour,
+      Value<int> orderSequence,
       Value<int> rowid,
     });
 
@@ -11754,6 +12004,26 @@ class $ActionPathItemsFilterComposer
 
   ColumnFilters<String> get previousIntentionId => $composableBuilder(
     column: $table.previousIntentionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get role => $composableBuilder(
+    column: $table.role,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get orderDate => $composableBuilder(
+    column: $table.orderDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get orderHour => $composableBuilder(
+    column: $table.orderHour,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get orderSequence => $composableBuilder(
+    column: $table.orderSequence,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11805,6 +12075,26 @@ class $ActionPathItemsOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get role => $composableBuilder(
+    column: $table.role,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get orderDate => $composableBuilder(
+    column: $table.orderDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get orderHour => $composableBuilder(
+    column: $table.orderHour,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get orderSequence => $composableBuilder(
+    column: $table.orderSequence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $ActionsOrderingComposer get actionId {
     final $ActionsOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -11848,6 +12138,20 @@ class $ActionPathItemsAnnotationComposer
 
   GeneratedColumn<String> get previousIntentionId => $composableBuilder(
     column: $table.previousIntentionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get role =>
+      $composableBuilder(column: $table.role, builder: (column) => column);
+
+  GeneratedColumn<String> get orderDate =>
+      $composableBuilder(column: $table.orderDate, builder: (column) => column);
+
+  GeneratedColumn<int> get orderHour =>
+      $composableBuilder(column: $table.orderHour, builder: (column) => column);
+
+  GeneratedColumn<int> get orderSequence => $composableBuilder(
+    column: $table.orderSequence,
     builder: (column) => column,
   );
 
@@ -11907,12 +12211,20 @@ class $ActionPathItemsTableManager
                 Value<int> position = const Value.absent(),
                 Value<String> intentionId = const Value.absent(),
                 Value<String?> previousIntentionId = const Value.absent(),
+                Value<String> role = const Value.absent(),
+                Value<String> orderDate = const Value.absent(),
+                Value<int> orderHour = const Value.absent(),
+                Value<int> orderSequence = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ActionPathItemsCompanion(
                 actionId: actionId,
                 position: position,
                 intentionId: intentionId,
                 previousIntentionId: previousIntentionId,
+                role: role,
+                orderDate: orderDate,
+                orderHour: orderHour,
+                orderSequence: orderSequence,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -11921,12 +12233,20 @@ class $ActionPathItemsTableManager
                 required int position,
                 required String intentionId,
                 Value<String?> previousIntentionId = const Value.absent(),
+                required String role,
+                required String orderDate,
+                required int orderHour,
+                required int orderSequence,
                 Value<int> rowid = const Value.absent(),
               }) => ActionPathItemsCompanion.insert(
                 actionId: actionId,
                 position: position,
                 intentionId: intentionId,
                 previousIntentionId: previousIntentionId,
+                role: role,
+                orderDate: orderDate,
+                orderHour: orderHour,
+                orderSequence: orderSequence,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

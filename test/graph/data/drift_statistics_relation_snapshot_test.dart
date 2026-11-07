@@ -127,17 +127,13 @@ void main() {
         [seedUuid(201)],
       );
       for (final (position, number) in [1, 2, 3].indexed) {
-        await database.customStatement(
-          '''INSERT INTO action_path_items
-           (action_id, position, intention_id, previous_intention_id)
-           VALUES (?, ?, ?, ?)''',
-          [
-            seedUuid(201),
-            position,
-            seedUuid(number),
-            position == 0 ? null : seedUuid(number - 1),
-          ],
-        );
+        await database.customStatement(insertActionPathItem, [
+          seedUuid(201),
+          position,
+          seedUuid(number),
+          position == 0 ? null : seedUuid(number - 1),
+          actionPathRole(position, 3),
+        ]);
       }
     });
     await repository.loadStatisticsRelationSnapshot();

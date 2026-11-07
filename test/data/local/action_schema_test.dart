@@ -156,7 +156,8 @@ void main() {
   test('принимает строки пути только по порядку позиций без повторов', () {
     seedRawGraph(raw, () {
       _addAction(raw, _action);
-      _addPath(raw, _action, [_health, _sport]);
+      _addPathItem(raw, _action, 0, _health, null, role: 'root');
+      _addPathItem(raw, _action, 1, _sport, _health, role: 'intermediate');
     });
 
     for (final (description, position, intention, previous) in [
@@ -170,20 +171,155 @@ void main() {
       expect(
         () => seedRawGraph(
           raw,
-          () => _addPathItem(raw, _action, position, intention, previous),
+          () => _addPathItem(
+            raw,
+            _action,
+            position,
+            intention,
+            previous,
+            role: position == 0 ? 'root' : 'terminal',
+          ),
         ),
         throwsA(isA<sqlite.SqliteException>()),
         reason: description,
       );
     }
     expect(
-      () => seedRawGraph(raw, () => _addPathItem(raw, _other, 0, _run, null)),
+      () => seedRawGraph(
+        raw,
+        () => _addPathItem(raw, _other, 0, _run, null, role: 'single'),
+      ),
       throwsA(isA<sqlite.SqliteException>()),
       reason: 'строка пути несуществующего действия',
     );
 
-    seedRawGraph(raw, () => _addPathItem(raw, _action, 2, _run, _sport));
+    seedRawGraph(
+      raw,
+      () => _addPathItem(raw, _action, 2, _run, _sport, role: 'terminal'),
+    );
     expect(_pathOf(raw, _action), [_health, _sport, _run]);
+  });
+
+  test('принимает роль строки пути, только согласованную с позицией и ролью '
+      'предыдущей позиции', () {
+    seedRawGraph(raw, () => _addAction(raw, _action));
+
+    for (final (description, path) in [
+      ('корень с ролью промежуточного', [(_health, 'intermediate')]),
+      ('корень с ролью конечного', [(_health, 'terminal')]),
+      ('неизвестная роль', [(_health, 'leaf')]),
+      ('продолжение с ролью корневого', [(_health, 'root'), (_sport, 'root')]),
+      (
+        'продолжение с ролью единственного',
+        [(_health, 'root'), (_sport, 'single')],
+      ),
+      (
+        'продолжение после конечного',
+        [(_health, 'root'), (_sport, 'terminal'), (_run, 'terminal')],
+      ),
+      (
+        'продолжение после единственного',
+        [(_health, 'single'), (_sport, 'terminal')],
+      ),
+    ]) {
+      expect(
+        () => seedRawGraph(raw, () {
+          for (final (position, (intention, role)) in path.indexed) {
+            _addPathItem(
+              raw,
+              _action,
+              position,
+              intention,
+              position == 0 ? null : path[position - 1].$1,
+              role: role,
+            );
+          }
+        }),
+        throwsA(isA<sqlite.SqliteException>()),
+        reason: description,
+      );
+      expect(_pathOf(raw, _action), isEmpty, reason: description);
+    }
+
+    seedRawGraph(raw, () => _addPath(raw, _action, [_health, _sport, _run]));
+    expect(
+      raw
+          .select('SELECT role FROM action_path_items ORDER BY position')
+          .map((row) => row['role']),
+      ['root', 'intermediate', 'terminal'],
+    );
+  });
+
+  test('отклоняет строку пути с копией ключа порядка, не совпадающей с '
+      'действием', () {
+    seedRawGraph(raw, () {
+      _addAction(raw, _action);
+      raw.execute('UPDATE actions SET scheduled_hour = 9');
+    });
+    final key = _orderKeyOf(raw, _action)!;
+
+    for (final (description, wrong) in [
+      (
+        'чужая дата',
+        (date: '2026-09-24', hour: key.hour, sequence: key.sequence),
+      ),
+      ('чужой час', (date: key.date, hour: 10, sequence: key.sequence)),
+      (
+        '«Весь день» у действия на час',
+        (date: key.date, hour: -1, sequence: key.sequence),
+      ),
+      (
+        'чужая последовательность',
+        (date: key.date, hour: key.hour, sequence: key.sequence + 1),
+      ),
+    ]) {
+      expect(
+        () => seedRawGraph(
+          raw,
+          () => _addPathItem(
+            raw,
+            _action,
+            0,
+            _health,
+            null,
+            role: 'single',
+            orderKey: wrong,
+          ),
+        ),
+        throwsA(isA<sqlite.SqliteException>()),
+        reason: description,
+      );
+    }
+    expect(_pathOf(raw, _action), isEmpty);
+  });
+
+  test('изменение даты и часа действия переписывает копию ключа порядка в '
+      'строках его пути', () {
+    seedRawGraph(raw, () {
+      _addAction(raw, _action);
+      _addPath(raw, _action, [_health, _sport]);
+      _addAction(raw, _secondAction);
+      _addPath(raw, _secondAction, [_health]);
+    });
+    final untouched = _orderKeysOf(raw, _secondAction);
+
+    for (final (date, hour) in [
+      ('2026-09-30', 7),
+      ('2026-09-30', null),
+      ('2026-10-01', 23),
+    ]) {
+      seedRawGraph(
+        raw,
+        () => raw.execute(
+          'UPDATE actions SET date = ?, scheduled_hour = ? WHERE id = ?',
+          [date, hour, _action],
+        ),
+      );
+      final key = _orderKeyOf(raw, _action)!;
+      expect(key.hour, hour ?? -1);
+      expect(_orderKeysOf(raw, _action), [key, key]);
+    }
+    expect(_orderKeysOf(raw, _secondAction), untouched);
   });
 
   test('отклоняет строку пути с неизвестным намерением и принимает '
@@ -192,8 +328,10 @@ void main() {
     const unknown = '018f0b5d-6b2e-7c80-8000-0000000000ff';
 
     expect(
-      () =>
-          seedRawGraph(raw, () => _addPathItem(raw, _action, 0, unknown, null)),
+      () => seedRawGraph(
+        raw,
+        () => _addPathItem(raw, _action, 0, unknown, null, role: 'single'),
+      ),
       throwsA(isA<sqlite.SqliteException>()),
     );
 
@@ -203,15 +341,17 @@ void main() {
         "VALUES (?, 'Удалённое намерение')",
         [unknown],
       );
-      _addPathItem(raw, _action, 0, unknown, null);
+      _addPathItem(raw, _action, 0, unknown, null, role: 'single');
     });
     expect(_pathOf(raw, _action), [unknown]);
   });
 
-  test('запрещает менять строки пути и надгробия', () {
+  test('запрещает менять строки пути, кроме копии ключа порядка, и '
+      'надгробия', () {
     seedRawGraph(raw, () {
       _addAction(raw, _action);
       _addPath(raw, _action, [_health, _sport]);
+      _addAction(raw, _secondAction);
     });
     seedRawGraph(raw, () {
       raw.execute('DELETE FROM long_term_relations');
@@ -219,7 +359,13 @@ void main() {
     });
 
     for (final statement in [
-      'UPDATE action_path_items SET intention_id = intention_id',
+      "UPDATE action_path_items SET action_id = '$_secondAction'",
+      'UPDATE action_path_items SET position = position + 10',
+      'UPDATE action_path_items SET intention_id = '
+          "'$_other' WHERE position = 1",
+      'UPDATE action_path_items SET previous_intention_id = NULL',
+      "UPDATE action_path_items SET role = 'single'",
+      'UPDATE action_path_items SET order_sequence = order_sequence + 1',
       "UPDATE deleted_intentions SET title = 'Другое название'",
       "UPDATE deleted_relation_pairs SET type = 'can'",
     ]) {
@@ -384,24 +530,78 @@ void _addPath(sqlite.Database db, String actionId, List<String> intentions) {
       position,
       intention,
       position == 0 ? null : intentions[position - 1],
+      role: switch (position) {
+        0 when intentions.length == 1 => 'single',
+        0 => 'root',
+        _ when position == intentions.length - 1 => 'terminal',
+        _ => 'intermediate',
+      },
     );
   }
 }
 
+typedef _OrderKey = ({String date, int hour, int sequence});
+
+/// Вставляет строку пути. Копия ключа порядка по умолчанию берётся из
+/// действия, а у несуществующего действия — произвольная.
 void _addPathItem(
   sqlite.Database db,
   String actionId,
   int position,
   String intention,
-  String? previous,
-) {
+  String? previous, {
+  required String role,
+  _OrderKey? orderKey,
+}) {
+  final key =
+      orderKey ??
+      _orderKeyOf(db, actionId) ??
+      (date: '2026-09-23', hour: -1, sequence: 1);
   db.execute(
     '''INSERT INTO action_path_items
-       (action_id, position, intention_id, previous_intention_id)
-       VALUES (?, ?, ?, ?)''',
-    [actionId, position, intention, previous],
+       (action_id, position, intention_id, previous_intention_id, role,
+        order_date, order_hour, order_sequence)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+    [
+      actionId,
+      position,
+      intention,
+      previous,
+      role,
+      key.date,
+      key.hour,
+      key.sequence,
+    ],
   );
 }
+
+_OrderKey? _orderKeyOf(sqlite.Database db, String actionId) {
+  final rows = db.select(
+    'SELECT date, COALESCE(scheduled_hour, -1) AS hour, creation_sequence '
+    'FROM actions WHERE id = ?',
+    [actionId],
+  );
+  if (rows.isEmpty) return null;
+  final row = rows.single;
+  return (
+    date: row['date'] as String,
+    hour: row['hour'] as int,
+    sequence: row['creation_sequence'] as int,
+  );
+}
+
+List<_OrderKey> _orderKeysOf(sqlite.Database db, String actionId) => [
+  for (final row in db.select(
+    'SELECT order_date, order_hour, order_sequence FROM action_path_items '
+    'WHERE action_id = ? ORDER BY position',
+    [actionId],
+  ))
+    (
+      date: row['order_date'] as String,
+      hour: row['order_hour'] as int,
+      sequence: row['order_sequence'] as int,
+    ),
+];
 
 List<Map<String, Object?>> _actionRows(sqlite.Database db) => [
   for (final row in db.select('SELECT * FROM actions')) {...row},

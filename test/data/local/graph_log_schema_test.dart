@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/action_seed.dart';
 import '../../support/graph_seed.dart';
 import '../../support/local_database_harness.dart';
 
@@ -582,17 +583,13 @@ void _addAction(sqlite.Database db, String id) {
 
 void _addPath(sqlite.Database db, String actionId, List<String> intentions) {
   for (final (position, intention) in intentions.indexed) {
-    db.execute(
-      '''INSERT INTO action_path_items
-         (action_id, position, intention_id, previous_intention_id)
-         VALUES (?, ?, ?, ?)''',
-      [
-        actionId,
-        position,
-        intention,
-        position == 0 ? null : intentions[position - 1],
-      ],
-    );
+    db.execute(insertActionPathItem, [
+      actionId,
+      position,
+      intention,
+      position == 0 ? null : intentions[position - 1],
+      actionPathRole(position, intentions.length),
+    ]);
   }
 }
 

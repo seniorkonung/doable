@@ -3,6 +3,7 @@ import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../test/support/action_seed.dart';
 import '../../test/support/graph_seed.dart';
 
 enum ContributionStatisticsProfile { shortPaths, longPaths }
@@ -71,9 +72,7 @@ final class ContributionStatisticsFixture {
     final insertAction = database.prepare('''INSERT INTO actions
       (id, title, date, priority, is_completed, created_at, updated_at)
       VALUES (?, ?, ?, 4, ?, 0, 0)''');
-    final insertItem = database.prepare('''INSERT INTO action_path_items
-      (action_id, position, intention_id, previous_intention_id)
-      VALUES (?, ?, ?, ?)''');
+    final insertItem = database.prepare(insertActionPathItem);
     try {
       seedRawGraph(database, () {
         for (var node = 0; node < 50000; node++) {
@@ -138,6 +137,7 @@ final class ContributionStatisticsFixture {
                 position,
                 id(path[position] + 1),
                 position == 0 ? null : id(path[position - 1] + 1),
+                actionPathRole(position, path.length),
               ]);
             }
             _actions.add((date: date, chain: chain, completed: completed));

@@ -67,11 +67,12 @@ void seedAction(
     timestamp,
   ]);
   for (final (position, intention) in path.indexed) {
-    db.execute(_insertPathItem, [
+    db.execute(insertActionPathItem, [
       id,
       position,
       intention,
       position == 0 ? null : path[position - 1],
+      actionPathRole(position, path.length),
     ]);
   }
 }
@@ -98,11 +99,12 @@ Future<void> insertAction(
     timestamp,
   ]);
   for (final (position, intention) in path.indexed) {
-    await database.customStatement(_insertPathItem, [
+    await database.customStatement(insertActionPathItem, [
       id,
       position,
       intention,
       position == 0 ? null : path[position - 1],
+      actionPathRole(position, path.length),
     ]);
   }
 }
@@ -112,6 +114,20 @@ const _insertAction = '''INSERT INTO actions
     created_at, updated_at)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''';
 
-const _insertPathItem = '''INSERT INTO action_path_items
-   (action_id, position, intention_id, previous_intention_id)
-   VALUES (?, ?, ?, ?)''';
+/// Вставка строки пути уже вставленного действия. Аргументы: действие,
+/// позиция, намерение, предыдущее намерение и роль из [actionPathRole];
+/// копию ключа порядка вставка берёт из строки действия.
+const insertActionPathItem = '''INSERT INTO action_path_items
+   (action_id, position, intention_id, previous_intention_id, role,
+    order_date, order_hour, order_sequence)
+   SELECT ?1, ?2, ?3, ?4, ?5,
+          date, COALESCE(scheduled_hour, -1), creation_sequence
+   FROM actions WHERE id = ?1''';
+
+/// Хранимая роль строки на позиции [position] пути из [length] намерений.
+String actionPathRole(int position, int length) => switch (position) {
+  0 when length == 1 => 'single',
+  0 => 'root',
+  _ when position == length - 1 => 'terminal',
+  _ => 'intermediate',
+};

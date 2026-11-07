@@ -1509,6 +1509,46 @@
             "default_dart": null,
             "default_client_dart": null,
             "dsl_features": []
+          },
+          {
+            "name": "role",
+            "getter_name": "role",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (typeof(role) = 'text' AND role IN ('root', 'intermediate', 'terminal', 'single'))",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "order_date",
+            "getter_name": "orderDate",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "order_hour",
+            "getter_name": "orderHour",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "order_sequence",
+            "getter_name": "orderSequence",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
           }
         ],
         "is_virtual": false,
@@ -1781,6 +1821,20 @@
       "type": "index",
       "data": {
         "on": 32,
+        "name": "action_path_items_intention_role_order",
+        "sql": "CREATE INDEX action_path_items_intention_role_order\n  ON action_path_items (\n    intention_id, role, order_date DESC, order_hour DESC,\n    order_sequence DESC\n  );",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 45,
+      "references": [
+        32
+      ],
+      "type": "index",
+      "data": {
+        "on": 32,
         "name": "action_path_items_link",
         "sql": "CREATE INDEX action_path_items_link\n  ON action_path_items (previous_intention_id, intention_id);",
         "unique": false,
@@ -1788,7 +1842,7 @@
       }
     },
     {
-      "id": 45,
+      "id": 46,
       "references": [
         32
       ],
@@ -1803,7 +1857,56 @@
       }
     },
     {
-      "id": 46,
+      "id": 47,
+      "references": [
+        32
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 32,
+        "references_in_body": [
+          32
+        ],
+        "name": "action_path_items_role_follows_position",
+        "sql": "CREATE TRIGGER action_path_items_role_follows_position\nAFTER INSERT ON action_path_items\nWHEN CASE\n  WHEN new.position = 0 THEN new.role NOT IN ('root', 'single')\n  ELSE\n    new.role NOT IN ('intermediate', 'terminal') OR\n    NOT EXISTS (\n      SELECT 1\n      FROM action_path_items\n      WHERE\n        action_id = new.action_id AND\n        position = new.position - 1 AND\n        role IN ('root', 'intermediate')\n    )\nEND\nBEGIN\n  SELECT RAISE(ABORT, 'action path item role must follow its position');\nEND;"
+      }
+    },
+    {
+      "id": 48,
+      "references": [
+        32,
+        28
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 32,
+        "references_in_body": [
+          32,
+          28
+        ],
+        "name": "action_path_items_order_key_matches_action",
+        "sql": "CREATE TRIGGER action_path_items_order_key_matches_action\nAFTER INSERT ON action_path_items\nWHEN NOT EXISTS (\n  SELECT 1\n  FROM actions\n  WHERE\n    id = new.action_id AND\n    date = new.order_date AND\n    COALESCE(scheduled_hour, -1) = new.order_hour AND\n    creation_sequence = new.order_sequence\n)\nBEGIN\n  SELECT RAISE(ABORT, 'action path item order key must match its action');\nEND;"
+      }
+    },
+    {
+      "id": 49,
+      "references": [
+        28,
+        32
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 28,
+        "references_in_body": [
+          28,
+          32
+        ],
+        "name": "actions_copy_order_key_to_path",
+        "sql": "CREATE TRIGGER actions_copy_order_key_to_path\nAFTER UPDATE OF date, scheduled_hour ON actions\nWHEN\n  new.date IS NOT old.date OR\n  new.scheduled_hour IS NOT old.scheduled_hour\nBEGIN\n  UPDATE action_path_items\n  SET order_date = new.date, order_hour = COALESCE(new.scheduled_hour, -1)\n  WHERE action_id = new.id;\nEND;"
+      }
+    },
+    {
+      "id": 50,
       "references": [
         32,
         16,
@@ -1822,7 +1925,7 @@
       }
     },
     {
-      "id": 47,
+      "id": 51,
       "references": [
         32
       ],
@@ -1833,11 +1936,11 @@
           32
         ],
         "name": "action_path_items_immutable",
-        "sql": "CREATE TRIGGER action_path_items_immutable\nBEFORE UPDATE ON action_path_items\nBEGIN\n  SELECT RAISE(ABORT, 'action path items are immutable');\nEND;"
+        "sql": "CREATE TRIGGER action_path_items_immutable\nBEFORE UPDATE ON action_path_items\nWHEN\n  new.action_id IS NOT old.action_id OR\n  new.position IS NOT old.position OR\n  new.intention_id IS NOT old.intention_id OR\n  new.previous_intention_id IS NOT old.previous_intention_id OR\n  new.role IS NOT old.role OR\n  new.order_sequence IS NOT old.order_sequence\nBEGIN\n  SELECT RAISE(ABORT, 'action path items are immutable');\nEND;"
       }
     },
     {
-      "id": 48,
+      "id": 52,
       "references": [
         35,
         16
@@ -1854,7 +1957,7 @@
       }
     },
     {
-      "id": 49,
+      "id": 53,
       "references": [
         16,
         35
@@ -1871,7 +1974,7 @@
       }
     },
     {
-      "id": 50,
+      "id": 54,
       "references": [
         38,
         24
@@ -1888,7 +1991,7 @@
       }
     },
     {
-      "id": 51,
+      "id": 55,
       "references": [
         35
       ],
@@ -1903,7 +2006,7 @@
       }
     },
     {
-      "id": 52,
+      "id": 56,
       "references": [
         38
       ],
@@ -1918,7 +2021,7 @@
       }
     },
     {
-      "id": 53,
+      "id": 57,
       "references": [
         16,
         32,
@@ -1937,7 +2040,7 @@
       }
     },
     {
-      "id": 54,
+      "id": 58,
       "references": [
         24,
         32,
@@ -1956,7 +2059,7 @@
       }
     },
     {
-      "id": 55,
+      "id": 59,
       "references": [
         24,
         38
@@ -1973,7 +2076,7 @@
       }
     },
     {
-      "id": 56,
+      "id": 60,
       "references": [
         32,
         35,
@@ -1992,7 +2095,7 @@
       }
     },
     {
-      "id": 57,
+      "id": 61,
       "references": [
         24
       ],
@@ -2006,7 +2109,7 @@
       }
     },
     {
-      "id": 58,
+      "id": 62,
       "references": [
         24
       ],
@@ -2020,7 +2123,7 @@
       }
     },
     {
-      "id": 59,
+      "id": 63,
       "references": [
         24
       ],
@@ -2035,7 +2138,7 @@
       }
     },
     {
-      "id": 60,
+      "id": 64,
       "references": [
         24,
         16
@@ -2052,7 +2155,7 @@
       }
     },
     {
-      "id": 61,
+      "id": 65,
       "references": [
         24,
         16
@@ -2069,7 +2172,7 @@
       }
     },
     {
-      "id": 62,
+      "id": 66,
       "references": [
         16,
         24
@@ -2086,7 +2189,7 @@
       }
     },
     {
-      "id": 63,
+      "id": 67,
       "references": [],
       "type": "table",
       "data": {
@@ -2111,58 +2214,58 @@
       }
     },
     {
-      "id": 64,
+      "id": 68,
       "references": [
         16,
-        63
+        67
       ],
       "type": "trigger",
       "data": {
         "on": 16,
         "references_in_body": [
           16,
-          63
+          67
         ],
         "name": "intentions_fts_after_insert",
         "sql": "CREATE TRIGGER intentions_fts_after_insert\nAFTER INSERT ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(rowid, title_search_key)\n  VALUES (new.rowid, new.title_search_key);\nEND;"
       }
     },
     {
-      "id": 65,
+      "id": 69,
       "references": [
         16,
-        63
+        67
       ],
       "type": "trigger",
       "data": {
         "on": 16,
         "references_in_body": [
           16,
-          63
+          67
         ],
         "name": "intentions_fts_after_update_search_content",
         "sql": "CREATE TRIGGER intentions_fts_after_update_search_content\nAFTER UPDATE ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(\n    intention_titles_fts, rowid, title_search_key\n  ) VALUES ('delete', old.rowid, old.title_search_key);\n  INSERT INTO intention_titles_fts(rowid, title_search_key)\n  VALUES (new.rowid, new.title_search_key);\nEND;"
       }
     },
     {
-      "id": 66,
+      "id": 70,
       "references": [
         16,
-        63
+        67
       ],
       "type": "trigger",
       "data": {
         "on": 16,
         "references_in_body": [
           16,
-          63
+          67
         ],
         "name": "intentions_fts_after_delete",
         "sql": "CREATE TRIGGER intentions_fts_after_delete\nAFTER DELETE ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(\n    intention_titles_fts, rowid, title_search_key\n  ) VALUES ('delete', old.rowid, old.title_search_key);\nEND;"
       }
     },
     {
-      "id": 67,
+      "id": 71,
       "references": [
         16
       ],
@@ -2176,7 +2279,7 @@
       }
     },
     {
-      "id": 68,
+      "id": 72,
       "references": [
         16
       ],
@@ -2190,7 +2293,7 @@
       }
     },
     {
-      "id": 69,
+      "id": 73,
       "references": [
         16
       ],
@@ -2204,7 +2307,7 @@
       }
     },
     {
-      "id": 70,
+      "id": 74,
       "references": [
         16
       ],
@@ -2218,7 +2321,7 @@
       }
     },
     {
-      "id": 71,
+      "id": 75,
       "references": [
         16
       ],
@@ -2232,7 +2335,7 @@
       }
     },
     {
-      "id": 72,
+      "id": 76,
       "references": [
         16
       ],
@@ -2246,7 +2349,7 @@
       }
     },
     {
-      "id": 73,
+      "id": 77,
       "references": [
         16
       ],
@@ -2260,7 +2363,7 @@
       }
     },
     {
-      "id": 74,
+      "id": 78,
       "references": [
         16
       ],
@@ -2274,7 +2377,7 @@
       }
     },
     {
-      "id": 75,
+      "id": 79,
       "references": [
         16
       ],
@@ -2288,7 +2391,7 @@
       }
     },
     {
-      "id": 76,
+      "id": 80,
       "references": [
         16
       ],
@@ -2302,7 +2405,7 @@
       }
     },
     {
-      "id": 77,
+      "id": 81,
       "references": [
         16
       ],
@@ -2316,7 +2419,7 @@
       }
     },
     {
-      "id": 78,
+      "id": 82,
       "references": [
         16
       ],
@@ -2330,7 +2433,7 @@
       }
     },
     {
-      "id": 79,
+      "id": 83,
       "references": [
         16
       ],
@@ -2344,7 +2447,7 @@
       }
     },
     {
-      "id": 80,
+      "id": 84,
       "references": [
         16
       ],
@@ -2358,7 +2461,7 @@
       }
     },
     {
-      "id": 81,
+      "id": 85,
       "references": [
         16
       ],
@@ -2372,7 +2475,7 @@
       }
     },
     {
-      "id": 82,
+      "id": 86,
       "references": [
         16
       ],
@@ -2386,7 +2489,7 @@
       }
     },
     {
-      "id": 83,
+      "id": 87,
       "references": [
         16
       ],
@@ -2400,7 +2503,7 @@
       }
     },
     {
-      "id": 84,
+      "id": 88,
       "references": [
         16
       ],
@@ -2414,7 +2517,7 @@
       }
     },
     {
-      "id": 85,
+      "id": 89,
       "references": [
         12
       ],
@@ -2429,7 +2532,7 @@
       }
     },
     {
-      "id": 86,
+      "id": 90,
       "references": [
         20
       ],
@@ -2443,7 +2546,7 @@
       }
     },
     {
-      "id": 87,
+      "id": 91,
       "references": [
         20
       ],
@@ -2752,7 +2855,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TABLE IF NOT EXISTS \"action_path_items\" (\"action_id\" TEXT NOT NULL REFERENCES actions(id)ON UPDATE RESTRICT ON DELETE CASCADE, \"position\" INTEGER NOT NULL CHECK (typeof(position) = 'integer' AND position >= 0), \"intention_id\" TEXT NOT NULL CHECK (typeof(intention_id) = 'text'), \"previous_intention_id\" TEXT, PRIMARY KEY(action_id, position), UNIQUE(action_id, intention_id));"
+          "sql": "CREATE TABLE IF NOT EXISTS \"action_path_items\" (\"action_id\" TEXT NOT NULL REFERENCES actions(id)ON UPDATE RESTRICT ON DELETE CASCADE, \"position\" INTEGER NOT NULL CHECK (typeof(position) = 'integer' AND position >= 0), \"intention_id\" TEXT NOT NULL CHECK (typeof(intention_id) = 'text'), \"previous_intention_id\" TEXT, \"role\" TEXT NOT NULL CHECK (typeof(role) = 'text' AND role IN ('root', 'intermediate', 'terminal', 'single')), \"order_date\" TEXT NOT NULL, \"order_hour\" INTEGER NOT NULL, \"order_sequence\" INTEGER NOT NULL, PRIMARY KEY(action_id, position), UNIQUE(action_id, intention_id));"
         }
       ]
     },
@@ -2856,6 +2959,15 @@
       ]
     },
     {
+      "name": "action_path_items_intention_role_order",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX action_path_items_intention_role_order ON action_path_items (intention_id, role, order_date DESC, order_hour DESC, order_sequence DESC)"
+        }
+      ]
+    },
+    {
       "name": "action_path_items_link",
       "sql": [
         {
@@ -2874,6 +2986,33 @@
       ]
     },
     {
+      "name": "action_path_items_role_follows_position",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER action_path_items_role_follows_position AFTER INSERT ON action_path_items WHEN CASE WHEN new.position = 0 THEN new.role NOT IN ('root', 'single') ELSE new.role NOT IN ('intermediate', 'terminal') OR NOT EXISTS (SELECT 1 FROM action_path_items WHERE action_id = new.action_id AND position = new.position - 1 AND role IN ('root', 'intermediate')) END BEGIN SELECT RAISE (ABORT, 'action path item role must follow its position');END"
+        }
+      ]
+    },
+    {
+      "name": "action_path_items_order_key_matches_action",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER action_path_items_order_key_matches_action AFTER INSERT ON action_path_items WHEN NOT EXISTS (SELECT 1 FROM actions WHERE id = new.action_id AND date = new.order_date AND COALESCE(scheduled_hour, -1) = new.order_hour AND creation_sequence = new.order_sequence) BEGIN SELECT RAISE (ABORT, 'action path item order key must match its action');END"
+        }
+      ]
+    },
+    {
+      "name": "actions_copy_order_key_to_path",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER actions_copy_order_key_to_path AFTER UPDATE OF date, scheduled_hour ON actions WHEN new.date IS NOT old.date OR new.scheduled_hour IS NOT old.scheduled_hour BEGIN UPDATE action_path_items SET order_date = new.date, order_hour = COALESCE(new.scheduled_hour, -1) WHERE action_id = new.id;END"
+        }
+      ]
+    },
+    {
       "name": "action_path_items_known_intention",
       "sql": [
         {
@@ -2887,7 +3026,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TRIGGER action_path_items_immutable BEFORE UPDATE ON action_path_items BEGIN SELECT RAISE (ABORT, 'action path items are immutable');END"
+          "sql": "CREATE TRIGGER action_path_items_immutable BEFORE UPDATE ON action_path_items WHEN new.action_id IS NOT old.action_id OR new.position IS NOT old.position OR new.intention_id IS NOT old.intention_id OR new.previous_intention_id IS NOT old.previous_intention_id OR new.role IS NOT old.role OR new.order_sequence IS NOT old.order_sequence BEGIN SELECT RAISE (ABORT, 'action path items are immutable');END"
         }
       ]
     },

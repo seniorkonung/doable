@@ -322,17 +322,13 @@ Future<ActionId> _seedGraph(AppDatabase database) async {
       [action, _today.toCanonicalString()],
     );
     for (final (position, intention) in [health.id, running.id].indexed) {
-      await database.customStatement(
-        '''INSERT INTO action_path_items
-           (action_id, position, intention_id, previous_intention_id)
-           VALUES (?, ?, ?, ?)''',
-        [
-          action,
-          position,
-          intention.toCanonicalString(),
-          position == 0 ? null : health.id.toCanonicalString(),
-        ],
-      );
+      await database.customStatement(insertActionPathItem, [
+        action,
+        position,
+        intention.toCanonicalString(),
+        position == 0 ? null : health.id.toCanonicalString(),
+        actionPathRole(position, 2),
+      ]);
     }
   });
   return (ActionId.decode(action) as ActionIdDecodingSuccess).id;

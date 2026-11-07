@@ -89,8 +89,9 @@ void main() {
   tearDown(() => database.close());
 
   test('порция каждой роли читает не больше своих строк без путей, а '
-      'запросы идут по индексу намерения строк пути', () async {
+      'запросы идут по индексу роли без сортировки', () async {
     final statements = <LocalDatabaseSqlStatement>[];
+    final continuations = <LocalDatabaseSqlStatement>[];
     for (final role in IntentionActionRole.values) {
       trace.clear();
       final first = ((await repository.getIntentionActionsPage(
@@ -122,26 +123,33 @@ void main() {
       );
       expect(trace.reads, hasLength(3));
       statements.addAll(trace.reads.map((read) => read.statement));
+      continuations.add(trace.reads.last.statement);
     }
 
+    String planOf(LocalDatabaseSqlStatement statement) => raw
+        .select(
+          'EXPLAIN QUERY PLAN ${statement.statements.single}',
+          statement.arguments,
+        )
+        .map((row) => row['detail'] as String)
+        .join('\n');
     for (final statement in statements) {
-      final plan = raw
-          .select(
-            'EXPLAIN QUERY PLAN ${statement.statements.single}',
-            statement.arguments,
-          )
-          .map((row) => row['detail'] as String)
-          .join('\n');
-      expect(
-        plan,
-        contains(
-          'USING INDEX action_path_items_intention_action '
-          '(intention_id=?)',
-        ),
-      );
-      expect(plan, isNot(contains('SCAN p')));
+      final plan = planOf(statement);
+      expect(plan, contains('INDEX action_path_items_intention_role_order'));
+      expect(plan, isNot(contains('USE TEMP B-TREE')));
       expect(plan, isNot(contains('SCAN action_path_items')));
       expect(plan, isNot(contains('SCAN actions')));
+    }
+    // Продолжение начинает диапазон роли с курсора, а не проходит строки
+    // до него.
+    for (final statement in continuations) {
+      expect(
+        planOf(statement),
+        contains(
+          'action_path_items_intention_role_order (intention_id=? AND '
+          'role=? AND (order_date,order_hour,order_sequence)<(?,?,?))',
+        ),
+      );
     }
   });
 }

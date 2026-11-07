@@ -118,17 +118,13 @@ void main() {
       [durabilityUuid(number), date, completed ? 1 : 0],
     );
     for (final (position, intention) in path.indexed) {
-      await database.customStatement(
-        '''INSERT INTO action_path_items
-           (action_id, position, intention_id, previous_intention_id)
-           VALUES (?, ?, ?, ?)''',
-        [
-          durabilityUuid(number),
-          position,
-          durabilityUuid(intention),
-          position == 0 ? null : durabilityUuid(path[position - 1]),
-        ],
-      );
+      await database.customStatement(insertActionPathItem, [
+        durabilityUuid(number),
+        position,
+        durabilityUuid(intention),
+        position == 0 ? null : durabilityUuid(path[position - 1]),
+        actionPathRole(position, path.length),
+      ]);
     }
   });
 

@@ -102,89 +102,102 @@ void main() {
       Map<String, Object?>.of(row),
   ];
 
-  test('меняет все поля одним изменением, обновляет только время изменения '
-      'и не трогает путь, намерения и связи', () async {
-    final untouched = {
-      for (final table in [
-        'intentions',
-        'long_term_relations',
-        'action_path_items',
-      ])
-        table: rows(table),
-    };
-    final otherAction = raw.select('SELECT * FROM actions WHERE id = ?', [
-      seedUuid(12),
-    ]).single;
-    final sequence = raw.select(
-      'SELECT creation_sequence FROM actions WHERE id = ?',
-      [seedUuid(11)],
-    ).single['creation_sequence'];
+  test(
+    'меняет все поля одним изменением, обновляет только время изменения '
+    'и не трогает путь, кроме копии ключа порядка, намерения и связи',
+    () async {
+      final untouched = {
+        for (final table in [
+          'intentions',
+          'long_term_relations',
+          'action_path_items',
+        ])
+          table: rows(table),
+      };
+      final otherAction = raw.select('SELECT * FROM actions WHERE id = ?', [
+        seedUuid(12),
+      ]).single;
+      final sequence = raw.select(
+        'SELECT creation_sequence FROM actions WHERE id = ?',
+        [seedUuid(11)],
+      ).single['creation_sequence'];
 
-    final confirmed = await update(
-      ActionFieldsPatch(
-        title: ActionFieldSet(ActionTitle('Длинная пробежка')),
-        description: const ActionFieldSet<ActionDescription?>(null),
-        date: ActionFieldSet(CalendarDate.fromParts(2026, 10, 12)),
-        schedule: const ActionFieldSet<ActionSchedule>(ActionAllDay()),
-        priority: const ActionFieldSet(ActionPriority.p1),
-        isCompleted: const ActionFieldSet(true),
-      ),
-    );
+      final confirmed = await update(
+        ActionFieldsPatch(
+          title: ActionFieldSet(ActionTitle('Длинная пробежка')),
+          description: const ActionFieldSet<ActionDescription?>(null),
+          date: ActionFieldSet(CalendarDate.fromParts(2026, 10, 12)),
+          schedule: const ActionFieldSet<ActionSchedule>(ActionAllDay()),
+          priority: const ActionFieldSet(ActionPriority.p1),
+          isCompleted: const ActionFieldSet(true),
+        ),
+      );
 
-    expect(confirmed.value, isA<ActionFieldsUpdated>());
-    final change = confirmed.changes.single as ActionUpdatedChange;
-    expect(
-      change.revision.compareTo(confirmed.revision),
-      GraphRevisionOrder.same,
-    );
-    expect(change.before.title, ActionTitle('Пробежка'));
-    expect(change.before.date, CalendarDate.fromParts(2026, 10, 8));
-    expect(change.after.title, ActionTitle('Длинная пробежка'));
-    expect(change.after.description, isNull);
-    expect(change.after.date, CalendarDate.fromParts(2026, 10, 12));
-    expect(change.after.schedule, const ActionAllDay());
-    expect(change.after.priority, ActionPriority.p1);
-    expect(change.after.isCompleted, isTrue);
-    expect(change.after.path.intentions, change.before.path.intentions);
-    expect(change.after.updatedAt.value, changedAt);
-    expect(change.after.createdAt, change.before.createdAt);
-    expect(
-      raw.select('SELECT * FROM actions WHERE id = ?', [seedUuid(11)]).single,
-      {
-        'creation_sequence': sequence,
-        'id': seedUuid(11),
-        'title': 'Длинная пробежка',
-        'description': null,
-        'date': '2026-10-12',
-        'scheduled_hour': null,
-        'priority': 1,
-        'is_completed': 1,
-        'created_at': 1,
-        'updated_at': changedAt.microsecondsSinceEpoch,
-      },
-    );
-    expect(
-      raw.select('SELECT * FROM actions WHERE id = ?', [seedUuid(12)]).single,
-      otherAction,
-    );
-    for (final entry in untouched.entries) {
-      expect(rows(entry.key), entry.value, reason: entry.key);
-    }
-    expect(
-      diagnostics.events.map((event) => (event['stage'], event['outcome'])),
-      [
-        ('validation', 'started'),
-        ('validation', 'succeeded'),
-        ('write', 'started'),
-        ('write', 'succeeded'),
-        ('resultRead', 'started'),
-        ('resultRead', 'succeeded'),
-      ],
-    );
-    expect(diagnostics.events.map((event) => event['commandType']).toSet(), {
-      'updateFields',
-    });
-  });
+      expect(confirmed.value, isA<ActionFieldsUpdated>());
+      final change = confirmed.changes.single as ActionUpdatedChange;
+      expect(
+        change.revision.compareTo(confirmed.revision),
+        GraphRevisionOrder.same,
+      );
+      expect(change.before.title, ActionTitle('Пробежка'));
+      expect(change.before.date, CalendarDate.fromParts(2026, 10, 8));
+      expect(change.after.title, ActionTitle('Длинная пробежка'));
+      expect(change.after.description, isNull);
+      expect(change.after.date, CalendarDate.fromParts(2026, 10, 12));
+      expect(change.after.schedule, const ActionAllDay());
+      expect(change.after.priority, ActionPriority.p1);
+      expect(change.after.isCompleted, isTrue);
+      expect(change.after.path.intentions, change.before.path.intentions);
+      expect(change.after.updatedAt.value, changedAt);
+      expect(change.after.createdAt, change.before.createdAt);
+      expect(
+        raw.select('SELECT * FROM actions WHERE id = ?', [seedUuid(11)]).single,
+        {
+          'creation_sequence': sequence,
+          'id': seedUuid(11),
+          'title': 'Длинная пробежка',
+          'description': null,
+          'date': '2026-10-12',
+          'scheduled_hour': null,
+          'priority': 1,
+          'is_completed': 1,
+          'created_at': 1,
+          'updated_at': changedAt.microsecondsSinceEpoch,
+        },
+      );
+      expect(
+        raw.select('SELECT * FROM actions WHERE id = ?', [seedUuid(12)]).single,
+        otherAction,
+      );
+      for (final entry in untouched.entries) {
+        expect(rows(entry.key), switch (entry.key) {
+          // Строки пути меняют только копию ключа порядка вслед за датой
+          // и часом действия.
+          'action_path_items' => [
+            for (final row in entry.value)
+              row['action_id'] == seedUuid(11)
+                  ? {...row, 'order_date': '2026-10-12', 'order_hour': -1}
+                  : row,
+          ],
+          _ => entry.value,
+        }, reason: entry.key);
+      }
+      expect(
+        diagnostics.events.map((event) => (event['stage'], event['outcome'])),
+        [
+          ('validation', 'started'),
+          ('validation', 'succeeded'),
+          ('write', 'started'),
+          ('write', 'succeeded'),
+          ('resultRead', 'started'),
+          ('resultRead', 'succeeded'),
+        ],
+      );
+      expect(diagnostics.events.map((event) => event['commandType']).toSet(), {
+        'updateFields',
+      });
+    },
+  );
 
   test('пустая правка и прежние значения не меняют время изменения и не '
       'продвигают ревизию', () async {

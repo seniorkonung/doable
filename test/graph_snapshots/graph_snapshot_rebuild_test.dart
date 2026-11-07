@@ -29,7 +29,8 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uuid/uuid.dart';
 
-import '../support/action_seed.dart' show insertAction, seedUuid;
+import '../support/action_seed.dart'
+    show actionPathRole, insertAction, insertActionPathItem, seedUuid;
 import '../support/encoded_diagnostics_log.dart';
 import '../support/failing_snapshot_temporary_files.dart';
 import '../support/forwarding_graph_fact_log.dart';
@@ -250,17 +251,13 @@ void main() {
           [seedUuid(number)],
         );
         for (final (position, intention) in path.indexed) {
-          await database.customStatement(
-            'INSERT INTO action_path_items '
-            '(action_id, position, intention_id, previous_intention_id) '
-            'VALUES (?, ?, ?, ?)',
-            [
-              seedUuid(number),
-              position,
-              intention.id.toCanonicalString(),
-              position == 0 ? null : path[position - 1].id.toCanonicalString(),
-            ],
-          );
+          await database.customStatement(insertActionPathItem, [
+            seedUuid(number),
+            position,
+            intention.id.toCanonicalString(),
+            position == 0 ? null : path[position - 1].id.toCanonicalString(),
+            actionPathRole(position, path.length),
+          ]);
         }
       }
     });

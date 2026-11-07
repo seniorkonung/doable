@@ -12,16 +12,13 @@ Future<void> _seedActionsForReturn(AppDatabase database) async {
         [id, 'Действие ${index + 1}', '2026-10-07'],
       );
       for (final (position, intention) in [1, 2].indexed) {
-        await database.customStatement(
-          'INSERT INTO action_path_items (action_id, position, '
-          'intention_id, previous_intention_id) VALUES (?, ?, ?, ?)',
-          [
-            id,
-            position,
-            seedUuid(intention),
-            position == 0 ? null : seedUuid(1),
-          ],
-        );
+        await database.customStatement(insertActionPathItem, [
+          id,
+          position,
+          seedUuid(intention),
+          position == 0 ? null : seedUuid(1),
+          actionPathRole(position, 2),
+        ]);
       }
     }
   });

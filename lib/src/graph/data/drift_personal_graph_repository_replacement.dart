@@ -331,21 +331,28 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
               ),
             );
             // Строки пути вставляются по порядку позиций: так их проверяет
-            // триггер продолжения предыдущей позиции.
+            // триггер продолжения предыдущей позиции. Копию ключа порядка
+            // вставка берёт из только что вставленного действия.
             final intentions = record.path.intentions;
-            batch.insertAll(_database.actionPathItems, [
-              for (final (position, intention) in intentions.indexed)
-                local.ActionPathItemsCompanion.insert(
-                  actionId: actionId,
-                  position: position,
-                  intentionId: intention.toCanonicalString(),
-                  previousIntentionId: Value(
-                    position == 0
-                        ? null
-                        : intentions[position - 1].toCanonicalString(),
-                  ),
-                ),
-            ]);
+            for (final (position, intention) in intentions.indexed) {
+              batch.customStatement(
+                '''INSERT INTO action_path_items
+                   (action_id, position, intention_id, previous_intention_id,
+                    role, order_date, order_hour, order_sequence)
+                   SELECT ?1, ?2, ?3, ?4, ?5,
+                          date, COALESCE(scheduled_hour, -1), creation_sequence
+                   FROM actions WHERE id = ?1''',
+                [
+                  actionId,
+                  position,
+                  intention.toCanonicalString(),
+                  position == 0
+                      ? null
+                      : intentions[position - 1].toCanonicalString(),
+                  _StoredActionPathRole.at(position, intentions.length).name,
+                ],
+              );
+            }
         }
       }
     });

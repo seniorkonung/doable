@@ -55,52 +55,44 @@ extension _IntentionActionsReading on DriftPersonalGraphRepository {
     final intentionVariable = Variable<String>(
       query.intentionId.toCanonicalString(),
     );
-    // Следующая позиция того же пути ищется по первичному ключу строк пути.
-    const hasNextPosition =
-        'EXISTS (SELECT 1 FROM action_path_items n '
-        'WHERE n.action_id = p.action_id AND n.position = p.position + 1)';
-    final filters = [
-      'p.intention_id = ?',
-      switch (query.role) {
-        IntentionActionRole.root => 'p.position = 0',
-        IntentionActionRole.intermediate =>
-          'p.position > 0 AND $hasNextPosition',
-        IntentionActionRole.terminal => 'NOT $hasNextPosition',
-      },
-    ];
-    final variables = <Variable>[intentionVariable];
-    if (cursor != null) {
-      // Сравнение полного ключа продолжает порядок без OFFSET:
-      // https://www.sqlite.org/rowvalue.html#scrolling_window_queries
-      filters.add(
-        '(a.date, COALESCE(a.scheduled_hour, -1), a.creation_sequence) '
-        '< (?, ?, ?)',
+    final variables = <Variable>[];
+    // Сравнение полного ключа продолжает порядок без OFFSET:
+    // https://www.sqlite.org/rowvalue.html#scrolling_window_queries
+    final keyFilter = cursor == null
+        ? ''
+        : ' AND (order_date, order_hour, order_sequence) < (?, ?, ?)';
+    // Каждая хранимая роль — упорядоченный диапазон индекса роли, а слияние
+    // диапазонов сохраняет порядок без сортировки строк намерения.
+    final ranges = <String>[];
+    for (final stored in _StoredActionPathRole.of(query.role)) {
+      ranges.add(
+        'SELECT action_id, order_date, order_hour, order_sequence '
+        'FROM action_path_items '
+        "WHERE intention_id = ? AND role = '${stored.name}'$keyFilter",
       );
-      variables.addAll([
-        Variable<String>(cursor.boundary.date.toCanonicalString()),
-        Variable<int>(cursor.boundary.scheduledHour),
-        Variable<int>(cursor.boundary.sequence),
-      ]);
+      variables.add(intentionVariable);
+      if (cursor != null) {
+        variables.addAll([
+          Variable<String>(cursor.boundary.date.toCanonicalString()),
+          Variable<int>(cursor.boundary.scheduledHour),
+          Variable<int>(cursor.boundary.sequence),
+        ]);
+      }
     }
-    const order =
-        'a.date DESC, COALESCE(a.scheduled_hour, -1) DESC, '
-        'a.creation_sequence DESC';
-    // Порядок роли сортируется по полям действий, а корень и число намерений
-    // пути читаются только для строк порции.
+    // Поля действий, корень и число намерений пути читаются только для строк
+    // порции.
     final rawRows = await _database
         .customSelect(
           '''SELECT $_actionListItemColumns
          FROM (
-           SELECT a.creation_sequence, a.id, a.title, a.description, a.date,
-                  a.scheduled_hour, a.priority, a.is_completed
-           FROM action_path_items p
-           JOIN actions a ON a.id = p.action_id
-           WHERE ${filters.join(' AND ')}
-           ORDER BY $order
+           ${ranges.join(' UNION ALL ')}
+           ORDER BY order_date DESC, order_hour DESC, order_sequence DESC
            LIMIT ?
-         ) a
+         ) k
+         JOIN actions a ON a.id = k.action_id
          $_actionListItemRootJoins
-         ORDER BY $order''',
+         ORDER BY k.order_date DESC, k.order_hour DESC,
+                  k.order_sequence DESC''',
           variables: [...variables, Variable<int>(query.pageSize + 1)],
           readsFrom: {
             _database.actions,
@@ -151,14 +143,12 @@ extension _IntentionActionsReading on DriftPersonalGraphRepository {
     final countRow = await _database
         .customSelect(
           '''SELECT COUNT(*) AS total_count,
-                COALESCE(SUM(p.position = 0), 0) AS root_count,
-                COALESCE(SUM(p.position > 0 AND n.action_id IS NOT NULL), 0)
-                  AS intermediate_count,
-                COALESCE(SUM(n.action_id IS NULL), 0) AS terminal_count
-         FROM action_path_items p
-         LEFT JOIN action_path_items n
-           ON n.action_id = p.action_id AND n.position = p.position + 1
-         WHERE p.intention_id = ?''',
+                COALESCE(SUM(role IN ('root', 'single')), 0) AS root_count,
+                COALESCE(SUM(role = 'intermediate'), 0) AS intermediate_count,
+                COALESCE(SUM(role IN ('terminal', 'single')), 0)
+                  AS terminal_count
+         FROM action_path_items
+         WHERE intention_id = ?''',
           variables: [intentionVariable],
           readsFrom: {_database.actionPathItems},
         )
@@ -176,6 +166,30 @@ extension _IntentionActionsReading on DriftPersonalGraphRepository {
       revision: revision,
     );
   }
+}
+
+/// Хранимая роль строки пути. Намерение пути из одного намерения —
+/// «единственное»: оно входит и в корневые, и в конечные.
+enum _StoredActionPathRole {
+  root,
+  intermediate,
+  terminal,
+  single;
+
+  static _StoredActionPathRole at(int position, int length) =>
+      switch (position) {
+        0 when length == 1 => single,
+        0 => root,
+        _ when position == length - 1 => terminal,
+        _ => intermediate,
+      };
+
+  static List<_StoredActionPathRole> of(IntentionActionRole role) =>
+      switch (role) {
+        IntentionActionRole.root => const [root, single],
+        IntentionActionRole.intermediate => const [intermediate],
+        IntentionActionRole.terminal => const [terminal, single],
+      };
 }
 
 final class _DriftIntentionActionsCursor implements IntentionActionsCursor {

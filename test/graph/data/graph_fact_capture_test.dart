@@ -22,6 +22,7 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/action_seed.dart';
 import '../../support/graph_seed.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/tag_positions.dart';
@@ -129,12 +130,13 @@ void main() {
       ],
     );
     for (final (position, intention) in path.indexed) {
-      await write(
-        'INSERT INTO action_path_items '
-        '(action_id, position, intention_id, previous_intention_id) '
-        'VALUES (?, ?, ?, ?)',
-        [id, position, intention, position == 0 ? null : path[position - 1]],
-      );
+      await write(insertActionPathItem, [
+        id,
+        position,
+        intention,
+        position == 0 ? null : path[position - 1],
+        actionPathRole(position, path.length),
+      ]);
     }
   }
 

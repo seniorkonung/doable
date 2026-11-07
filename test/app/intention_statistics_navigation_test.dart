@@ -27,6 +27,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/action_seed.dart';
 import '../support/app_root_pages.dart';
 import '../support/graph_durability_fixture.dart';
 import '../support/graph_seed.dart';
@@ -551,15 +552,13 @@ Future<void> _seed(AppDatabase database) => seedGraph(database, () async {
     );
     final path = [1000 + i, 2, 2000 + i];
     for (final (position, intention) in path.indexed) {
-      await database.customStatement(
-        'INSERT INTO action_path_items (action_id, position, intention_id, previous_intention_id) VALUES (?, ?, ?, ?)',
-        [
-          durabilityUuid(7000 + i),
-          position,
-          durabilityUuid(intention),
-          position == 0 ? null : durabilityUuid(path[position - 1]),
-        ],
-      );
+      await database.customStatement(insertActionPathItem, [
+        durabilityUuid(7000 + i),
+        position,
+        durabilityUuid(intention),
+        position == 0 ? null : durabilityUuid(path[position - 1]),
+        actionPathRole(position, path.length),
+      ]);
     }
   }
   await database.customStatement(

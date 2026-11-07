@@ -5,6 +5,7 @@ import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../test/support/action_seed.dart';
 import '../../test/support/graph_seed.dart';
 import '../../test/support/tag_positions.dart';
 
@@ -138,9 +139,7 @@ final class GraphLogFixture {
         (id, title, description, date, scheduled_hour, priority, is_completed,
          created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'''),
-      database.prepare('''INSERT INTO action_path_items
-        (action_id, position, intention_id, previous_intention_id)
-        VALUES (?, ?, ?, ?)'''),
+      database.prepare(insertActionPathItem),
     ];
     final [
       insertTag,
@@ -232,6 +231,7 @@ final class GraphLogFixture {
               position,
               _id(2, path[position]),
               position == 0 ? null : _id(2, path[position - 1]),
+              actionPathRole(position, path.length),
             ]);
           }
         }

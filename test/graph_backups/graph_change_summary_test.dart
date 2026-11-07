@@ -401,12 +401,13 @@ void main() {
                VALUES (?, 'Пробежка', '2026-10-08', 4, 0, 1, 1)''',
             [seedUuid(number)],
           );
-          await database.customStatement(
-            '''INSERT INTO action_path_items
-               (action_id, position, intention_id, previous_intention_id)
-               VALUES (?, 0, ?, NULL)''',
-            [seedUuid(number), seedUuid(1)],
-          );
+          await database.customStatement(insertActionPathItem, [
+            seedUuid(number),
+            0,
+            seedUuid(1),
+            null,
+            actionPathRole(0, 1),
+          ]);
         }
       });
       final previous = await repository.readCurrentPosition();

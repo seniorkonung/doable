@@ -28,6 +28,7 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:drift/drift.dart' show ComparableExpr, OrderingTerm;
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/action_seed.dart';
 import '../../support/graph_log_completeness_reference.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
@@ -385,17 +386,13 @@ Future<void> _insertAction(
     [id.toCanonicalString(), title],
   );
   for (final (position, intention) in path.indexed) {
-    await database.customStatement(
-      'INSERT INTO action_path_items '
-      '(action_id, position, intention_id, previous_intention_id) '
-      'VALUES (?, ?, ?, ?)',
-      [
-        id.toCanonicalString(),
-        position,
-        intention.id.toCanonicalString(),
-        position == 0 ? null : path[position - 1].id.toCanonicalString(),
-      ],
-    );
+    await database.customStatement(insertActionPathItem, [
+      id.toCanonicalString(),
+      position,
+      intention.id.toCanonicalString(),
+      position == 0 ? null : path[position - 1].id.toCanonicalString(),
+      actionPathRole(position, path.length),
+    ]);
   }
 }
 

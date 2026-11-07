@@ -358,7 +358,8 @@ BEGIN
 END;
 
 -- Путь — часть записи действия, поэтому вставка и удаление строки пути
--- отмечают изменение своего действия. Строки пути не изменяются.
+-- отмечают изменение своего действия. Строки пути меняют только копию
+-- ключа порядка вслед за изменением действия, которое уже отмечено.
 CREATE TRIGGER graph_log_mark_action_path_item_insert
 AFTER INSERT ON action_path_items
 WHEN (SELECT capture FROM graph_log_control) = 1

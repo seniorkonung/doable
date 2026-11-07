@@ -1017,17 +1017,13 @@ Future<void> _insertAction(
     [seedUuid(number), date, if (completed) 1 else 0],
   );
   for (final (position, intention) in path.indexed) {
-    await database.customStatement(
-      '''INSERT INTO action_path_items
-         (action_id, position, intention_id, previous_intention_id)
-         VALUES (?, ?, ?, ?)''',
-      [
-        seedUuid(number),
-        position,
-        seedUuid(intention),
-        position == 0 ? null : seedUuid(path[position - 1]),
-      ],
-    );
+    await database.customStatement(insertActionPathItem, [
+      seedUuid(number),
+      position,
+      seedUuid(intention),
+      position == 0 ? null : seedUuid(path[position - 1]),
+      actionPathRole(position, path.length),
+    ]);
   }
 }
 

@@ -67,17 +67,13 @@ void main() {
         [seedUuid(11)],
       );
       for (final (position, intention) in [1, 2, 3].indexed) {
-        await database.customStatement(
-          '''INSERT INTO action_path_items
-             (action_id, position, intention_id, previous_intention_id)
-             VALUES (?, ?, ?, ?)''',
-          [
-            seedUuid(11),
-            position,
-            seedUuid(intention),
-            position == 0 ? null : seedUuid(intention - 1),
-          ],
-        );
+        await database.customStatement(insertActionPathItem, [
+          seedUuid(11),
+          position,
+          seedUuid(intention),
+          position == 0 ? null : seedUuid(intention - 1),
+          actionPathRole(position, 3),
+        ]);
       }
     });
     expect(

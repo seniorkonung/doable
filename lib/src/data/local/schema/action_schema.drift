@@ -62,6 +62,11 @@ END;
 -- удаление, а данные удалённого хранят надгробия. previous_intention_id
 -- повторяет намерение предыдущей позиции, чтобы пара звена читалась из
 -- одной строки.
+--
+-- Роль и копия ключа порядка действия (order_*) — производные данные
+-- хранилища для списков ролей намерения; формат данных и факты журнала их
+-- не содержат. Намерение пути из одного намерения — «единственное»: оно и
+-- корневое, и конечное.
 CREATE TABLE action_path_items (
   action_id TEXT NOT NULL
     REFERENCES actions(id) ON UPDATE RESTRICT ON DELETE CASCADE,
@@ -70,12 +75,29 @@ CREATE TABLE action_path_items (
   ),
   intention_id TEXT NOT NULL CHECK (typeof(intention_id) = 'text'),
   previous_intention_id TEXT,
+  role TEXT NOT NULL CHECK (
+    typeof(role) = 'text' AND
+    role IN ('root', 'intermediate', 'terminal', 'single')
+  ),
+  order_date TEXT NOT NULL,
+  -- -1 — «Весь день».
+  order_hour INTEGER NOT NULL,
+  order_sequence INTEGER NOT NULL,
   PRIMARY KEY (action_id, position),
   UNIQUE (action_id, intention_id)
 );
 
 CREATE INDEX action_path_items_intention_action
   ON action_path_items (intention_id, action_id);
+
+-- Строки роли намерения в порядке списка вкладки «Действия»: продолжение
+-- находится сравнением ключа порядка без сортировки и без прохода по
+-- строкам других ролей.
+CREATE INDEX action_path_items_intention_role_order
+  ON action_path_items (
+    intention_id, role, order_date DESC, order_hour DESC,
+    order_sequence DESC
+  );
 
 CREATE INDEX action_path_items_link
   ON action_path_items (previous_intention_id, intention_id);
@@ -94,6 +116,56 @@ BEGIN
   SELECT RAISE(ABORT, 'action path item must continue the previous position');
 END;
 
+-- Путь из одного намерения задаёт роль «единственное», более длинный —
+-- корневое, промежуточные и конечное. Строки вставляются по порядку
+-- позиций, поэтому роль сверяется с позицией и ролью предыдущей строки.
+CREATE TRIGGER action_path_items_role_follows_position
+AFTER INSERT ON action_path_items
+WHEN CASE
+  WHEN new.position = 0 THEN new.role NOT IN ('root', 'single')
+  ELSE
+    new.role NOT IN ('intermediate', 'terminal') OR
+    NOT EXISTS (
+      SELECT 1
+      FROM action_path_items
+      WHERE
+        action_id = new.action_id AND
+        position = new.position - 1 AND
+        role IN ('root', 'intermediate')
+    )
+END
+BEGIN
+  SELECT RAISE(ABORT, 'action path item role must follow its position');
+END;
+
+CREATE TRIGGER action_path_items_order_key_matches_action
+AFTER INSERT ON action_path_items
+WHEN NOT EXISTS (
+  SELECT 1
+  FROM actions
+  WHERE
+    id = new.action_id AND
+    date = new.order_date AND
+    COALESCE(scheduled_hour, -1) = new.order_hour AND
+    creation_sequence = new.order_sequence
+)
+BEGIN
+  SELECT RAISE(ABORT, 'action path item order key must match its action');
+END;
+
+-- Последовательность создания действия неизменна, поэтому вслед за
+-- действием меняются только дата и час.
+CREATE TRIGGER actions_copy_order_key_to_path
+AFTER UPDATE OF date, scheduled_hour ON actions
+WHEN
+  new.date IS NOT old.date OR
+  new.scheduled_hour IS NOT old.scheduled_hour
+BEGIN
+  UPDATE action_path_items
+  SET order_date = new.date, order_hour = COALESCE(new.scheduled_hour, -1)
+  WHERE action_id = new.id;
+END;
+
 CREATE TRIGGER action_path_items_known_intention
 AFTER INSERT ON action_path_items
 WHEN
@@ -105,9 +177,17 @@ BEGIN
   SELECT RAISE(ABORT, 'action path item requires a known intention');
 END;
 
--- Изменение строки обошло бы поддержку надгробий и порядок позиций.
+-- Изменение строки обошло бы поддержку надгробий, порядок позиций и
+-- проверку роли; меняется только копия даты и часа вслед за действием.
 CREATE TRIGGER action_path_items_immutable
 BEFORE UPDATE ON action_path_items
+WHEN
+  new.action_id IS NOT old.action_id OR
+  new.position IS NOT old.position OR
+  new.intention_id IS NOT old.intention_id OR
+  new.previous_intention_id IS NOT old.previous_intention_id OR
+  new.role IS NOT old.role OR
+  new.order_sequence IS NOT old.order_sequence
 BEGIN
   SELECT RAISE(ABORT, 'action path items are immutable');
 END;

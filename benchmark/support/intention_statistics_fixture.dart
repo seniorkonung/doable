@@ -4,6 +4,7 @@ import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../test/support/action_seed.dart';
 import '../../test/support/graph_seed.dart';
 import 'contribution_statistics_fixture.dart';
 
@@ -44,9 +45,7 @@ final class IntentionStatisticsFixture {
     final action = database.prepare('''INSERT INTO actions
       (id, title, date, priority, is_completed, created_at, updated_at)
       VALUES (?, ?, ?, 4, ?, 0, 0)''');
-    final item = database.prepare('''INSERT INTO action_path_items
-      (action_id, position, intention_id, previous_intention_id)
-      VALUES (?, ?, ?, ?)''');
+    final item = database.prepare(insertActionPathItem);
     String id(int number) => ContributionStatisticsFixture.id(number);
     // Часть путей начинается или заканчивается удалённым намерением.
     int? deletedRoot(int index) => index % 50 == 33 ? 61001 + index : null;
@@ -116,6 +115,7 @@ final class IntentionStatisticsFixture {
                 position,
                 id(path[position]),
                 position == 0 ? null : id(path[position - 1]),
+                actionPathRole(position, path.length),
               ]);
             }
             actionNumber++;
