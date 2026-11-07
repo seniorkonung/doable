@@ -2754,6 +2754,34 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get pathNeedEmptyTitle => 'Nothing is needed yet';
+
+  @override
+  String get pathNeedEmptyText =>
+      'Add what is essential, or end the path here.';
+
+  @override
+  String get pathCanEmptyTitle => 'Nothing to use yet';
+
+  @override
+  String get pathCanEmptyText => 'Add what helps but is not essential.';
+
+  @override
+  String get pathNextIntention => 'Next intention';
+
+  @override
+  String pathCandidateLabel(String title, String priority) {
+    return 'Add intention “$title”, priority $priority';
+  }
+
+  @override
+  String get pathCandidatesLoading => 'Loading next intentions…';
+
+  @override
+  String get pathCandidatesUnavailable =>
+      'Could not load next intentions. Try again.';
+
+  @override
   String get pathAdd => 'Add';
 
   @override

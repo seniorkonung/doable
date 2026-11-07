@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../intention/domain/intention_id.dart';
+import '../../../long_term_relation/domain/long_term_relation.dart';
 import '../../application/path_candidates.dart';
 import '../../domain/action_path.dart';
 
@@ -47,14 +48,16 @@ final class LoadingPathDraft extends PathDraft {
 
 /// Путь — целый участок с текущими данными намерений и связей.
 final class LoadedPathDraft extends PathDraft {
-  const LoadedPathDraft(this.segment);
+  const LoadedPathDraft(this.segment, {this.appended});
 
   final PathSegment segment;
+  final PathCandidate? appended;
 
   @override
   List<IntentionId> get intentions => [
     segment.root.id,
     for (final step in segment.steps) step.intention.id,
+    if (appended case final candidate?) candidate.relation.relatedIntentionId,
   ];
 }
 
@@ -72,14 +75,18 @@ final class FailedPathDraft extends PathDraft {
 }
 
 final class PathState {
-  PathState({required ActionPath? original, required this.draft})
-    : original = original?.intentions ?? const [];
+  PathState({
+    required ActionPath? original,
+    required this.draft,
+    this.candidates,
+  }) : original = original?.intentions ?? const [];
 
-  const PathState._(this.original, this.draft);
+  const PathState._(this.original, this.draft, this.candidates);
 
   /// Исходный путь, с которым открыт экран; пустой, пока путь не выбран.
   final List<IntentionId> original;
   final PathDraft draft;
+  final CandidateState? candidates;
 
   /// Пути сравниваются по последовательности намерений.
   bool get isChanged => !listEquals(draft.intentions, original);
@@ -90,5 +97,26 @@ final class PathState {
   PathCloseDecision get closeDecision =>
       isChanged ? PathCloseDecision.askDiscard : PathCloseDecision.close;
 
-  PathState withDraft(PathDraft value) => PathState._(original, value);
+  PathState withDraft(PathDraft value) => PathState._(original, value, null);
+  PathState withCandidates(CandidateState value) =>
+      PathState._(original, draft, value);
+}
+
+final class CandidateState {
+  const CandidateState({
+    required this.half,
+    this.counts,
+    this.items = const [],
+    this.cursor,
+    this.loading = false,
+    this.failure,
+    this.chooseDefault = false,
+  });
+  final LongTermRelationType half;
+  final PathCandidateCounts? counts;
+  final List<PathCandidate> items;
+  final PathCandidatesCursor? cursor;
+  final bool loading;
+  final PathCandidatesReadFailure? failure;
+  final bool chooseDefault;
 }

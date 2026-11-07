@@ -9,6 +9,8 @@ import '../../../app/routing/app_router.gr.dart';
 import '../../../design_system/components/confirm_dialog.dart';
 import '../../../design_system/components/list_state.dart';
 import '../../../design_system/components/path_builder.dart';
+import '../../../design_system/components/step_option.dart';
+import '../../../design_system/components/tabs.dart';
 import '../../../design_system/components/top_bar.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../../design_system/doable_priority.dart';
@@ -83,32 +85,43 @@ final class _PathPageState extends ConsumerState<PathPage> {
         ),
         body: SafeArea(
           top: false,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(
-              DoableMetrics.space5,
-              DoableMetrics.space2,
-              DoableMetrics.space5,
-              DoableMetrics.space5,
-            ),
-            child: switch (path.draft) {
-              LoadingPathDraft() => ListState.loading(text: l10n.pathLoading),
-              final FailedPathDraft failed => ListState.error(
-                message: _failureMessage(l10n, failed.failure),
-                retry: failed.canRetry
-                    ? (
-                        label: l10n.commonRetry,
-                        onPressed: () => unawaited(model.retry()),
-                      )
-                    : null,
-              ),
-              EmptyPathDraft() => _builder(l10n, model, const [], null),
-              final LoadedPathDraft loaded => _builder(
-                l10n,
-                model,
-                loaded.intentions,
-                loaded.segment,
-              ),
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              if (notification.metrics.axis == Axis.vertical &&
+                  notification.metrics.extentAfter < 200) {
+                unawaited(model.loadMore());
+              }
+              return false;
             },
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                DoableMetrics.space5,
+                DoableMetrics.space2,
+                DoableMetrics.space5,
+                DoableMetrics.space5,
+              ),
+              child: switch (path.draft) {
+                LoadingPathDraft() => ListState.loading(text: l10n.pathLoading),
+                final FailedPathDraft failed => ListState.error(
+                  message: _failureMessage(l10n, failed.failure),
+                  retry: failed.canRetry
+                      ? (
+                          label: l10n.commonRetry,
+                          onPressed: () => unawaited(model.retry()),
+                        )
+                      : null,
+                ),
+                EmptyPathDraft() => _builder(l10n, model, const [], null, null),
+                final LoadedPathDraft loaded => _builder(
+                  l10n,
+                  model,
+                  loaded.intentions,
+                  loaded.segment,
+                  path.candidates,
+                  appended: loaded.appended,
+                ),
+              },
+            ),
           ),
         ),
       ),
@@ -120,10 +133,12 @@ final class _PathPageState extends ConsumerState<PathPage> {
     PathViewModel model,
     List<IntentionId> ids,
     PathSegment? segment,
-  ) {
+    CandidateState? candidates, {
+    PathCandidate? appended,
+  }) {
     final steps = segment == null
         ? const <PathBuilderStep>[]
-        : _steps(l10n, segment);
+        : _steps(l10n, segment, appended);
     return PathBuilder(
       steps: steps,
       priority: actionDesignPriority(widget.actionPriority),
@@ -142,17 +157,92 @@ final class _PathPageState extends ConsumerState<PathPage> {
         1 => '',
         _ => l10n.pathShortenHint,
       },
-      // Переключатель половин и «Добавить» подключают кандидаты следующего
-      // намерения и добавление связей экрана.
-      switcher: const SizedBox.shrink(),
+      switcher: candidates != null && candidates.counts != null
+          ? Tabs<LongTermRelationType>.toggle(
+              items: [
+                TabItem(
+                  id: LongTermRelationType.need,
+                  label: l10n.relationNeighborhoodTypeNeed,
+                  semanticLabel:
+                      '${l10n.relationNeighborhoodTypeNeed}: ${candidates.counts!.need}',
+                  count: candidates.counts!.need,
+                ),
+                TabItem(
+                  id: LongTermRelationType.can,
+                  label: l10n.relationNeighborhoodTypeCan,
+                  semanticLabel:
+                      '${l10n.relationNeighborhoodTypeCan}: ${candidates.counts!.can}',
+                  count: candidates.counts!.can,
+                ),
+              ],
+              value: candidates.half,
+              onChange: model.selectHalf,
+              label: l10n.pathNextIntention,
+              minWidth: 0,
+            )
+          : const SizedBox.shrink(),
+      emptyHalf:
+          candidates != null &&
+              candidates.counts != null &&
+              candidates.items.isEmpty &&
+              !candidates.loading &&
+              candidates.failure == null
+          ? candidates.half == LongTermRelationType.need
+                ? (title: l10n.pathNeedEmptyTitle, text: l10n.pathNeedEmptyText)
+                : (title: l10n.pathCanEmptyTitle, text: l10n.pathCanEmptyText)
+          : null,
       addText: l10n.pathAdd,
       addLabel: l10n.pathAdd,
       onAdd: () {},
+      children: [
+        if (candidates != null) ...[
+          for (final candidate in candidates.items)
+            StepOption(
+              name: candidate.title,
+              priority: _designPriority(candidate.relation.priority),
+              label: l10n.pathCandidateLabel(
+                candidate.title,
+                l10n.actionPriorityOption(
+                  actionPriorityName(
+                    _designPriority(candidate.relation.priority),
+                  ),
+                ),
+              ),
+              openLabel: l10n.intentionPickerOpenIntentionPage(candidate.title),
+              onPick: () => model.selectCandidate(candidate),
+              onOpen: () => unawaited(
+                context.router.push(
+                  IntentionDetailsRoute(
+                    intentionId: candidate.relation.relatedIntentionId,
+                  ),
+                ),
+              ),
+            ),
+          if (candidates.loading)
+            ListState.loading(text: l10n.pathCandidatesLoading),
+          if (candidates.failure case final failure?)
+            ListState.error(
+              message: failure is PathCandidatesUnavailableFailure
+                  ? l10n.pathCandidatesUnavailable
+                  : _failureMessage(l10n, failure),
+              retry: failure is PathCandidatesUnavailableFailure
+                  ? (
+                      label: l10n.commonRetry,
+                      onPressed: () => unawaited(model.retry()),
+                    )
+                  : null,
+            ),
+        ],
+      ],
     );
   }
 
-  List<PathBuilderStep> _steps(AppLocalizations l10n, PathSegment segment) {
-    final last = segment.steps.length;
+  List<PathBuilderStep> _steps(
+    AppLocalizations l10n,
+    PathSegment segment,
+    PathCandidate? appended,
+  ) {
+    final last = segment.steps.length + (appended == null ? 0 : 1);
     PathBuilderStep step(
       IntentionId id,
       String title,
@@ -189,6 +279,18 @@ final class _PathPageState extends ConsumerState<PathPage> {
                 ? segment.root.title
                 : segment.steps[index - 1].intention.title,
             related: item.intention.title,
+          ),
+        ),
+      if (appended != null)
+        step(
+          appended.relation.relatedIntentionId,
+          appended.title,
+          last,
+          _relation(
+            l10n,
+            appended.relation,
+            source: segment.last.title,
+            related: appended.title,
           ),
         ),
     ];
@@ -272,4 +374,11 @@ String _failureMessage(
   // Первое чтение не привязано к ревизии и устареть не может.
   PathCandidatesSnapshotExpired() ||
   PathCandidatesUnexpectedFailure() => l10n.pathReadUnexpected,
+};
+
+DoablePriority _designPriority(RelationPriority priority) => switch (priority) {
+  RelationPriority.p1 => DoablePriority.p1,
+  RelationPriority.p2 => DoablePriority.p2,
+  RelationPriority.p3 => DoablePriority.p3,
+  RelationPriority.p4 => DoablePriority.p4,
 };

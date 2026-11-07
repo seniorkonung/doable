@@ -4253,6 +4253,54 @@ abstract class AppLocalizations {
   /// **'Final intention “{title}”'**
   String pathFinalLabel(String title);
 
+  /// Текст блока кандидатов пути
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing is needed yet'**
+  String get pathNeedEmptyTitle;
+
+  /// Текст блока кандидатов пути
+  ///
+  /// In en, this message translates to:
+  /// **'Add what is essential, or end the path here.'**
+  String get pathNeedEmptyText;
+
+  /// Текст блока кандидатов пути
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to use yet'**
+  String get pathCanEmptyTitle;
+
+  /// Текст блока кандидатов пути
+  ///
+  /// In en, this message translates to:
+  /// **'Add what helps but is not essential.'**
+  String get pathCanEmptyText;
+
+  /// Текст блока кандидатов пути
+  ///
+  /// In en, this message translates to:
+  /// **'Next intention'**
+  String get pathNextIntention;
+
+  /// Доступное название кандидата пути
+  ///
+  /// In en, this message translates to:
+  /// **'Add intention “{title}”, priority {priority}'**
+  String pathCandidateLabel(String title, String priority);
+
+  /// Текст блока кандидатов пути
+  ///
+  /// In en, this message translates to:
+  /// **'Loading next intentions…'**
+  String get pathCandidatesLoading;
+
+  /// Текст блока кандидатов пути
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load next intentions. Try again.'**
+  String get pathCandidatesUnavailable;
+
   /// Текст экрана пути
   ///
   /// In en, this message translates to:

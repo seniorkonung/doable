@@ -13,17 +13,11 @@ import 'path_state.dart';
 
 part 'path_view_model.g.dart';
 
-/// Экранная сессия пути по ключу экрана.
-///
-/// Путь на экране показывается по целому начальному участку, прочитанному
-/// по последовательности намерений: участок короче последовательности
-/// становится путём на экране. Смена корня и сокращение меняют только путь
-/// на экране; граф остаётся прежним.
+/// Сессия построения пути и порционного чтения его продолжений.
 @riverpod
 final class PathViewModel extends _$PathViewModel {
   late PersonalGraphRepository _repository;
-
-  /// Каждая смена последовательности отбрасывает ответы прежних чтений.
+  // Поздние ответы прежнего пути или половины не меняют текущий экран.
   var _generation = 0;
 
   @override
@@ -33,19 +27,15 @@ final class PathViewModel extends _$PathViewModel {
       return PathState(original: null, draft: const EmptyPathDraft());
     }
     final draft = LoadingPathDraft(original.intentions);
-    unawaited(Future.microtask(() => _read(draft)));
+    unawaited(Future.microtask(() => _read(draft.intentions)));
     return PathState(original: original, draft: draft);
   }
 
-  /// Заменяет весь путь одним новым корнем.
   void selectRoot(IntentionId root) {
-    final draft = LoadingPathDraft([root]);
-    state = state.withDraft(draft);
-    unawaited(_read(draft));
+    state = state.withDraft(LoadingPathDraft([root]));
+    unawaited(_read([root]));
   }
 
-  /// Заканчивает путь на промежуточном намерении [intention], отбрасывая
-  /// все следующие за ним.
   void endAt(IntentionId intention) {
     final draft = state.draft;
     if (draft is! LoadedPathDraft) return;
@@ -53,58 +43,167 @@ final class PathViewModel extends _$PathViewModel {
     final index = segment.steps.indexWhere(
       (step) => step.intention.id == intention,
     );
-    // Последнее намерение пути — не кнопка, а корень сменяется в поиске.
-    if (index < 0 || index == segment.steps.length - 1) return;
+    if (index < 0 ||
+        (index == segment.steps.length - 1 && draft.appended == null)) {
+      return;
+    }
+    final shortened = PathSegment(
+      root: segment.root,
+      steps: segment.steps.take(index + 1),
+    );
+    state = state
+        .withDraft(LoadedPathDraft(shortened))
+        .withCandidates(
+          const CandidateState(half: LongTermRelationType.need, loading: true),
+        );
+    unawaited(_read(state.draft.intentions));
+  }
+
+  void selectCandidate(PathCandidate candidate) {
+    final draft = state.draft;
+    if (draft is! LoadedPathDraft) return;
+    final ids = [...draft.intentions, candidate.relation.relatedIntentionId];
     state = state.withDraft(
-      LoadedPathDraft(
-        PathSegment(root: segment.root, steps: segment.steps.take(index + 1)),
+      LoadedPathDraft(draft.segment, appended: candidate),
+    );
+    unawaited(_read(ids));
+  }
+
+  void selectHalf(LongTermRelationType half) {
+    final current = state.candidates;
+    if (current == null || current.half == half) return;
+    unawaited(_read(state.draft.intentions, half: half));
+  }
+
+  Future<void> retry() {
+    final draft = state.draft;
+    if (draft is FailedPathDraft && draft.canRetry) {
+      state = state.withDraft(LoadingPathDraft(draft.intentions));
+      return _read(draft.intentions);
+    }
+    final candidates = state.candidates;
+    if (candidates?.failure is PathCandidatesUnavailableFailure) {
+      return _read(
+        draft.intentions,
+        half: candidates!.chooseDefault ? null : candidates.half,
+      );
+    }
+    return Future.value();
+  }
+
+  Future<void> loadMore() async {
+    final current = state.candidates;
+    if (current == null ||
+        current.loading ||
+        current.failure != null ||
+        current.cursor == null) {
+      return;
+    }
+    final generation = ++_generation;
+    state = state.withCandidates(
+      CandidateState(
+        half: current.half,
+        counts: current.counts,
+        items: current.items,
+        cursor: current.cursor,
+        loading: true,
       ),
     );
-  }
-
-  /// Повторяет чтение участка после доказанно временного отказа.
-  Future<void> retry() {
-    final current = state.draft;
-    if (current is! FailedPathDraft || !current.canRetry) {
-      return Future.value();
-    }
-    final draft = LoadingPathDraft(current.intentions);
-    state = state.withDraft(draft);
-    return _read(draft);
-  }
-
-  /// Путь для возврата вызывающему; `null`, пока «Сохранить» недоступна.
-  ActionPath? save() {
-    final current = state;
-    return current.canSave ? ActionPath(current.draft.intentions) : null;
-  }
-
-  PathCloseDecision requestClose() => state.closeDecision;
-
-  Future<void> _read(LoadingPathDraft draft) async {
-    final generation = ++_generation;
     final result = await _repository.getPathCandidates(
       PathCandidatesQuery(
-        draft: ActionPath(draft.intentions),
-        half: LongTermRelationType.need,
-        pageSize: PathCandidatesQuery.minPageSize,
+        draft: ActionPath(state.draft.intentions),
+        half: current.half,
+        cursor: current.cursor,
       ),
     );
     if (!ref.mounted || generation != _generation) return;
-    state = state.withDraft(switch (result) {
-      GraphResultSuccess(value: PathCandidatesFirstPage(:final segment)) =>
-        LoadedPathDraft(segment),
-      GraphResultSuccess(value: EmptyPathSegment()) => const EmptyPathDraft(),
-      // Первое чтение без курсора продолжением не отвечает.
-      GraphResultSuccess(value: PathCandidatesContinuationPage()) =>
-        FailedPathDraft(
-          draft.intentions,
-          const PathCandidatesUnexpectedFailure(),
-        ),
-      GraphResultFailure(:final failure) => FailedPathDraft(
-        draft.intentions,
-        failure,
-      ),
-    });
+    switch (result) {
+      case GraphResultSuccess(value: PathCandidatesContinuationPage page):
+        state = state.withCandidates(
+          CandidateState(
+            half: current.half,
+            counts: current.counts,
+            items: [...current.items, ...page.items],
+            cursor: page.nextCursor,
+          ),
+        );
+      case GraphResultFailure(failure: PathCandidatesSnapshotExpired()):
+        await _read(state.draft.intentions, half: current.half);
+      case GraphResultFailure(:final failure):
+        state = state.withCandidates(
+          CandidateState(
+            half: current.half,
+            counts: current.counts,
+            items: current.items,
+            cursor: current.cursor,
+            failure: failure,
+          ),
+        );
+      case GraphResultSuccess():
+        state = state.withCandidates(
+          CandidateState(
+            half: current.half,
+            counts: current.counts,
+            items: current.items,
+            cursor: current.cursor,
+            failure: const PathCandidatesUnexpectedFailure(),
+          ),
+        );
+    }
+  }
+
+  ActionPath? save() =>
+      state.canSave ? ActionPath(state.draft.intentions) : null;
+  PathCloseDecision requestClose() => state.closeDecision;
+
+  Future<void> _read(
+    List<IntentionId> ids, {
+    LongTermRelationType? half,
+  }) async {
+    final generation = ++_generation;
+    final selected = half ?? LongTermRelationType.need;
+    if (state.draft is LoadedPathDraft) {
+      state = state.withCandidates(
+        CandidateState(half: selected, loading: true),
+      );
+    }
+    final result = await _repository.getPathCandidates(
+      PathCandidatesQuery(draft: ActionPath(ids), half: selected),
+    );
+    if (!ref.mounted || generation != _generation) return;
+    switch (result) {
+      case GraphResultSuccess(value: PathCandidatesFirstPage page):
+        state = state.withDraft(LoadedPathDraft(page.segment));
+        if (half == null && page.counts.need == 0 && page.counts.can > 0) {
+          await _read(state.draft.intentions, half: LongTermRelationType.can);
+        } else {
+          state = state.withCandidates(
+            CandidateState(
+              half: selected,
+              counts: page.counts,
+              items: page.items,
+              cursor: page.nextCursor,
+            ),
+          );
+        }
+      case GraphResultSuccess(value: EmptyPathSegment()):
+        state = state.withDraft(const EmptyPathDraft());
+      case GraphResultFailure(:final failure):
+        if (state.draft is LoadedPathDraft) {
+          state = state.withCandidates(
+            CandidateState(
+              half: selected,
+              failure: failure,
+              chooseDefault: half == null,
+            ),
+          );
+        } else {
+          state = state.withDraft(FailedPathDraft(ids, failure));
+        }
+      case GraphResultSuccess():
+        state = state.withDraft(
+          FailedPathDraft(ids, const PathCandidatesUnexpectedFailure()),
+        );
+    }
   }
 }

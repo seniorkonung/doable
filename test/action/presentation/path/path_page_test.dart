@@ -8,6 +8,7 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -127,7 +128,7 @@ void main() {
         'Можно',
         'Покупать обувь',
         'Силовая тренировка',
-      ].map((text) => tester.getTopLeft(find.text(text)).dy).toList();
+      ].map((text) => tester.getTopLeft(find.text(text).first).dy).toList();
       expect(rows, orderedEquals([...rows]..sort()));
       expect(
         find.text('Нажмите на намерение, чтобы закончить путь на нём.'),
@@ -155,7 +156,7 @@ void main() {
 
       await tester.tap(find.text('Много ходить'));
       await tester.pumpAndSettle();
-      expect(find.text('Покупать обувь'), findsNothing);
+      expect(find.text('Покупать обувь'), findsOneWidget);
       expect(isPathSaveEnabled(tester), isTrue);
 
       await tester.tap(pathSave);
@@ -212,6 +213,190 @@ void main() {
     },
   );
 
+  testWidgets(
+    'кандидат продолжает путь и возврат исходного пути отключает сохранение',
+    (tester) async {
+      await openPathScreen(
+        tester,
+        router: router,
+        repository: repository,
+        originalPath: _path([1, 2, 3]),
+      );
+      await tester.tap(find.text('Много ходить'));
+      await settlePathScreen(tester);
+      expect(isPathSaveEnabled(tester), isTrue);
+      await tester.tap(find.text('Покупать обувь'));
+      await settlePathScreen(tester);
+      expect(isPathSaveEnabled(tester), isFalse);
+      expect(find.text('Пока ничего не нужно'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'половины показывают числа, выбирают непустую и доступны пустые',
+    (tester) async {
+      await openPathScreen(
+        tester,
+        router: router,
+        repository: repository,
+        originalPath: _path([1, 2]),
+      );
+      expect(find.text('Покупать обувь'), findsOneWidget);
+      expect(find.text('0'), findsOneWidget);
+      expect(find.text('1'), findsOneWidget);
+      await tester.tap(find.text('Нужно').last);
+      await settlePathScreen(tester);
+      expect(find.text('Пока ничего не нужно'), findsOneWidget);
+      expect(find.text('Покупать обувь'), findsNothing);
+      await tester.tap(find.text('Можно').last);
+      await settlePathScreen(tester);
+      expect(find.text('Покупать обувь'), findsOneWidget);
+      await tester.tap(find.text('Покупать обувь'));
+      await settlePathScreen(tester);
+      expect(find.text('Пока ничего не нужно'), findsOneWidget);
+      await tester.tap(find.text('Можно').last);
+      await settlePathScreen(tester);
+      expect(find.text('Пока нечего использовать'), findsOneWidget);
+    },
+  );
+
+  testWidgets('стрелка кандидата открывает намерение без изменения пути', (
+    tester,
+  ) async {
+    await openPathScreen(
+      tester,
+      router: router,
+      repository: repository,
+      originalPath: _path([1]),
+    );
+    await tester.tap(
+      find.byTooltip('Открыть страницу намерения «Много ходить»'),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(IntentionDetailsPage), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(isPathSaveEnabled(tester), isFalse);
+    expect(find.text('Много ходить'), findsOneWidget);
+  });
+
+  testWidgets('следующая порция кандидатов загружается при прокрутке', (
+    tester,
+  ) async {
+    seedRawGraph(raw, () {
+      for (var i = 10; i < 61; i++) {
+        seedIntention(raw, seedUuid(i), 'Кандидат $i');
+        seedRelation(raw, seedUuid(200 + i), seedUuid(1), seedUuid(i));
+      }
+    });
+    await openPathScreen(
+      tester,
+      router: router,
+      repository: repository,
+      originalPath: _path([1]),
+    );
+    expect(find.text('52'), findsOneWidget);
+    expect(find.text('Кандидат 60'), findsNothing);
+    await tester.drag(
+      find.byType(SingleChildScrollView).first,
+      const Offset(0, -10000),
+    );
+    await settlePathScreen(tester);
+    expect(find.text('Кандидат 60'), findsOneWidget);
+  });
+
+  testWidgets(
+    'отказ чтения половины не подменяется пустым состоянием и повторяется',
+    (tester) async {
+      await openPathScreen(
+        tester,
+        router: router,
+        repository: repository,
+        originalPath: _path([1, 2]),
+      );
+      readFailure.failure = sqlite.SqliteException(
+        extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
+        message: 'database is locked',
+      );
+      await tester.tap(find.text('Нужно').last);
+      await settlePathScreen(tester);
+      expect(
+        find.text(
+          'Не удалось загрузить следующие намерения. Повторите попытку.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Пока ничего не нужно'), findsNothing);
+      expect(find.text('0'), findsNothing);
+      readFailure.failure = null;
+      await tester.tap(find.text('Повторить'));
+      await settlePathScreen(tester);
+      expect(find.text('Пока ничего не нужно'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'сокращение пути заново выбирает половину и показывает кандидата по приоритету',
+    (tester) async {
+      seedRawGraph(raw, () {
+        seedRelation(raw, seedUuid(103), seedUuid(2), seedUuid(4));
+        raw.execute(
+          'UPDATE long_term_relations SET type = ?, priority = 1 WHERE id = ?',
+          [LongTermRelationType.need.name, seedUuid(102)],
+        );
+        raw.execute(
+          'UPDATE long_term_relations SET priority = 2 WHERE id = ?',
+          [seedUuid(103)],
+        );
+      });
+      await openPathScreen(
+        tester,
+        router: router,
+        repository: repository,
+        originalPath: _path([1, 2, 3]),
+      );
+      await tester.tap(find.text('Можно').last);
+      await settlePathScreen(tester);
+      await tester.tap(find.text('Много ходить'));
+      await settlePathScreen(tester);
+      expect(
+        tester.getTopLeft(find.text('Покупать обувь')).dy,
+        lessThan(tester.getTopLeft(find.text('Высыпаться')).dy),
+      );
+      expect(find.text('Пока нечего использовать'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'после выбора кандидата отказ оставляет путь и повтор выбирает непустую половину',
+    (tester) async {
+      await openPathScreen(
+        tester,
+        router: router,
+        repository: repository,
+        originalPath: _path([1]),
+      );
+      readFailure.failure = sqlite.SqliteException(
+        extendedResultCode: sqlite.SqlError.SQLITE_BUSY,
+        message: 'database is locked',
+      );
+      await tester.tap(find.text('Много ходить'));
+      await settlePathScreen(tester);
+      expect(find.text('Быть здоровым'), findsOneWidget);
+      expect(find.text('Много ходить'), findsOneWidget);
+      expect(
+        find.text(
+          'Не удалось загрузить следующие намерения. Повторите попытку.',
+        ),
+        findsOneWidget,
+      );
+      readFailure.failure = null;
+      await tester.tap(find.text('Повторить'));
+      await settlePathScreen(tester);
+      expect(find.text('Покупать обувь'), findsOneWidget);
+    },
+  );
+
   testWidgets('стрелка намерения открывает его страницу поверх экрана', (
     tester,
   ) async {
@@ -245,7 +430,7 @@ void main() {
       originalPath: _path([1, 2]),
     );
 
-    await tester.tap(find.text('Нужно'));
+    await tester.tap(find.text('Нужно').first);
     await settlePathScreen(tester);
     expect(find.byType(RelationHead), findsOneWidget);
   });

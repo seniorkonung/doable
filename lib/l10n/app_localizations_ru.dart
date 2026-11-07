@@ -2784,6 +2784,35 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get pathNeedEmptyTitle => 'Пока ничего не нужно';
+
+  @override
+  String get pathNeedEmptyText =>
+      'Добавьте то, без чего не обойтись, или закончите путь здесь.';
+
+  @override
+  String get pathCanEmptyTitle => 'Пока нечего использовать';
+
+  @override
+  String get pathCanEmptyText =>
+      'Добавьте то, что помогает, но не обязательно.';
+
+  @override
+  String get pathNextIntention => 'Следующее намерение';
+
+  @override
+  String pathCandidateLabel(String title, String priority) {
+    return 'Добавить намерение «$title», приоритет $priority';
+  }
+
+  @override
+  String get pathCandidatesLoading => 'Загружаем следующие намерения…';
+
+  @override
+  String get pathCandidatesUnavailable =>
+      'Не удалось загрузить следующие намерения. Повторите попытку.';
+
+  @override
   String get pathAdd => 'Добавить';
 
   @override
