@@ -399,3 +399,19 @@
   - **Зависимости:** 1.1–1.30.
   - **Предполагаемые файлы:** нет, только проверка.
   - **Размер:** XS.
+
+- [ ] 1.32 Порция вкладки «Действия» читается по индексу роли с копией ключа порядка действия
+  - **Критерии приёмки:**
+    - `action_path_items` внутри базовой версии схемы 8 без миграции хранит роль строки («корневое», «промежуточное», «конечное», «единственное» для пути из одного намерения) и копию ключа порядка действия — дату, час или `-1` для «Весь день» и `creation_sequence`, — а индекс `(intention_id, роль, дата DESC, час DESC, creation_sequence DESC)` отдаёт строки роли в порядке списка (D2). Снимок `drift_schemas/drift_schema_v8.json` и сгенерированный код перегенерированы.
+    - Триггер вставки отклоняет копию, не совпадающую с действием, и роль, не согласованную с позицией и ролью предыдущей позиции; изменение даты или часа действия переписывает копии в строках его пути, а триггер неизменности строк пути разрешает менять только скопированные столбцы. Пишущие пути задают роль и копию; формат данных, факты журнала и сводка изменений резервных копий их не содержат, а изменение копии не даёт фактов, кроме изменения самого действия.
+    - Первая порция и продолжение вкладки «Действия» выбирают строки роли по новому индексу, а курсор сравнивает копию ключа; списки «Корневое» и «Конечное» включают действия с путём из одного намерения. Порядок, группы, числа ролей и согласование с изменениями действий не меняются (требование «Список действий роли намерения»). Числа ролей первой страницы могут по-прежнему проходить все строки пути намерения (D10).
+    - Схемные тесты закрепляют синхронизацию копии при изменении даты и часа действия, отклонение неверной копии и неверной роли при вставке и отказ в изменении остальных столбцов строки пути.
+    - `test/graph/data/drift_intention_actions_read_cost_test.dart` дополнительно проверяет, что план первой порции и продолжения каждой роли не содержит `USE TEMP B-TREE`.
+    - Новый бенчмарк `benchmark/**/*_benchmark.dart` читает первую страницу и продолжение в глубине списка вкладки на профиле статистики, где одно намерение входит в пути до 60 действий в день за несколько лет, и сообщает бюджеты из D10: p95 продолжения не больше 10 мс, первой страницы вместе с числами ролей — не больше 200 мс; оба соблюдаются.
+  - **Проверка:**
+    - `mise run codegen`, затем `mise run codegen-check`.
+    - `mise exec --no-deps -- flutter test test/data/local test/graph/data/drift_intention_actions_read_cost_test.dart test/graph/data/drift_intention_actions_read_test.dart test/graph/data/drift_action_update_test.dart test/graph/data/graph_fact_capture_test.dart test/graph/data/drift_graph_fact_log_completeness_test.dart`.
+    - `mise exec --no-deps -- flutter test --no-pub <новый бенчмарк> --concurrency=1 --reporter=expanded` сообщает `withinBudget` для обоих бюджетов.
+  - **Зависимости:** 1.20, 1.27, 1.31.
+  - **Предполагаемые файлы:** `lib/src/data/local/schema/action_schema.drift`, `graph_log_schema.drift` (комментарий о неизменности строк пути), `lib/src/data/local/app_database.dart` с `.g.dart`, `drift_schemas/drift_schema_v8.json`, `lib/src/graph/data/drift_personal_graph_repository_intention_actions.dart`, `drift_personal_graph_repository_replacement.dart`, `test/support/action_seed.dart`, `benchmark/support/intention_statistics_fixture.dart` и другие фикстуры с прямой вставкой строк пути, `test/data/local/action_schema_test.dart`, `test/graph/data/drift_intention_actions_read_cost_test.dart`, новый `benchmark/intention/intention_actions_benchmark.dart`.
+  - **Размер:** M.
