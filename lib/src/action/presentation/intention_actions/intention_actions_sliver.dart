@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../design_system/components/action_row.dart';
+import '../../../design_system/components/add_row.dart';
 import '../../../design_system/components/count_tiles.dart';
 import '../../../design_system/components/empty_state.dart';
 import '../../../design_system/components/list_state.dart';
@@ -36,6 +37,7 @@ final class IntentionActionsSliver extends ConsumerStatefulWidget {
     required this.intentionId,
     required this.pageInstance,
     required this.today,
+    this.onAdd,
     super.key,
   });
 
@@ -44,6 +46,7 @@ final class IntentionActionsSliver extends ConsumerStatefulWidget {
 
   /// Местный день, от которого считаются группы и слова «Сегодня» и «Завтра».
   final CalendarDate today;
+  final VoidCallback? onAdd;
 
   @override
   ConsumerState<IntentionActionsSliver> createState() =>
@@ -74,6 +77,19 @@ final class _IntentionActionsSliverState
     };
     return SliverMainAxisGroup(
       slivers: [
+        if (widget.onAdd case final onAdd?)
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: DoableMetrics.space5,
+            ),
+            sliver: SliverToBoxAdapter(
+              child: AddRow.addOnly(
+                addText: l10n.detailsActionsAdd,
+                addLabel: l10n.detailsActionsAddLabel,
+                onAdd: onAdd,
+              ),
+            ),
+          ),
         if (counts != null)
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(

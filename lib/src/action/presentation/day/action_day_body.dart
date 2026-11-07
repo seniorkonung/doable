@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent, ScrollDirection;
@@ -7,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../app/routing/app_router.gr.dart';
 import '../../../design_system/components/action_row.dart';
 import '../../../design_system/components/day_heading.dart';
 import '../../../design_system/components/empty_state.dart';
@@ -27,6 +29,7 @@ import '../../application/action_list_item.dart';
 import '../../domain/action_id.dart';
 import '../../domain/action_schedule.dart';
 import '../action_command_failure_message.dart';
+import '../editor/action_editor_state.dart';
 import '../panel/action_field_labels.dart';
 import '../panel/action_panel.dart';
 import 'action_day_calendar.dart';
@@ -438,6 +441,16 @@ final class _ActionDayBodyState extends ConsumerState<ActionDayBody> {
           icon: DoableIconData.calendar,
           title: l10n.actionDayEmptyTitle,
           text: l10n.actionDayEmptyText,
+          action: (
+            label: l10n.actionEditorTitle,
+            onPressed: () => unawaited(
+              context.router.root.push(
+                ActionEditorRoute(
+                  launch: ActionEditorLaunch(date: state.selection.date),
+                ),
+              ),
+            ),
+          ),
         ),
       )
     else ...[

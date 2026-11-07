@@ -4619,6 +4619,18 @@ abstract class AppLocalizations {
   /// **'Every action here serves one of your intentions.'**
   String get actionDayEmptyText;
 
+  /// Действие добавления на вкладке действий намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get detailsActionsAdd;
+
+  /// Доступное название добавления действия намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Add action'**
+  String get detailsActionsAddLabel;
+
   /// Обновление подтверждённого снимка экрана дня
   ///
   /// In en, this message translates to:

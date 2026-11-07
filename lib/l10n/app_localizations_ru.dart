@@ -3034,6 +3034,12 @@ class AppLocalizationsRu extends AppLocalizations {
       'Каждое действие здесь служит одному из ваших намерений.';
 
   @override
+  String get detailsActionsAdd => 'Добавить';
+
+  @override
+  String get detailsActionsAddLabel => 'Добавить действие';
+
+  @override
   String get actionDayRefreshing => 'Обновляем…';
 
   @override

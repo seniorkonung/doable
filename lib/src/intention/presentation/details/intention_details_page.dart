@@ -6,6 +6,7 @@ import 'package:flutter/material.dart' hide Badge, TextField;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../action/presentation/editor/action_editor_state.dart';
 import '../../../action/presentation/intention_actions/intention_actions_sliver.dart';
 import '../../../action/presentation/intention_actions/intention_actions_state.dart';
 import '../../../action/presentation/intention_actions/intention_actions_view_model.dart';
@@ -791,6 +792,23 @@ final class _LoadedDetails extends StatelessWidget {
                 intentionId: intention.id,
                 pageInstance: pageInstance,
                 today: today,
+                onAdd: intention.archiveState == IntentionArchiveState.active
+                    ? () => unawaited(
+                        context.router.root.push(
+                          ActionEditorRoute(
+                            launch: ActionEditorLaunch(
+                              date: today,
+                              path: ActionDraftPath(
+                                root: ActionDraftIntention(
+                                  id: intention.id,
+                                  title: intention.title,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                    : null,
               ),
             if (selectedTab == IntentionDetailsTab.statistics)
               statisticsSection,

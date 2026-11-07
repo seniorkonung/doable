@@ -886,6 +886,8 @@
   "actionDaySectionCompleted": "Выполненные",
   "actionDayEmptyTitle": "Нет действий на эту дату",
   "actionDayEmptyText": "Каждое действие здесь служит одному из ваших намерений.",
+  "detailsActionsAdd": "Добавить",
+  "detailsActionsAddLabel": "Добавить действие",
   "actionDayRefreshing": "Обновляем…",
   "actionDayScrollToTop": "Вернуться к началу",
   "actionDayLoadingMore": "Загружаем ещё действия…",

@@ -1,7 +1,9 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/action/domain/action_id.dart';
 import 'package:doable/src/app/app_runtime.dart';
+import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/action_check.dart';
 import 'package:doable/src/design_system/components/action_row.dart';
@@ -14,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/action_panel_controls.dart';
+import '../support/action_editor_controls.dart';
 import '../support/action_panel_edit_controls.dart';
 import '../support/action_panel_fixture.dart';
 import '../support/action_seed.dart';
@@ -65,6 +68,10 @@ Future<void> _start(WidgetTester tester) async {
     for (var number = 1; number <= 3; number++) {
       seedIntention(raw, seedUuid(number), 'Намерение $number');
     }
+    seedIntention(raw, seedUuid(4), 'Архивное намерение');
+    raw.execute('UPDATE intentions SET is_archived = 1 WHERE id = ?', [
+      seedUuid(4),
+    ]);
     seedRelation(raw, seedUuid(101), seedUuid(1), seedUuid(2));
     seedRelation(raw, seedUuid(102), seedUuid(2), seedUuid(3));
     seedAction(
@@ -125,6 +132,45 @@ String _tabLabel(WidgetTester tester) =>
         .detailsActionsTab;
 
 void main() {
+  testWidgets('на вкладке архивированного намерения нельзя добавить действие', (
+    tester,
+  ) async {
+    await _start(tester);
+    await _openIntention(tester, 'Намерение 1');
+    final context = tester.element(find.byType(IntentionDetailsPage));
+    context.router.root.push(
+      IntentionDetailsRoute(intentionId: seedIntentionId(4)),
+    );
+    await _until(tester, find.text('Архивное намерение'));
+    await tester.pumpAndSettle();
+    await openIntentionActionsTab(tester, waitFor: _until, tap: _tap);
+    expect(find.text('Добавить'), findsNothing);
+  });
+
+  testWidgets('добавление со страницы намерения создаёт действие с его путём', (
+    tester,
+  ) async {
+    await _start(tester);
+    await _openIntention(tester, 'Намерение 1');
+    await openIntentionActionsTab(tester, waitFor: _until, tap: _tap);
+    await _tap(tester, find.text('Добавить'));
+    await _until(tester, actionEditor);
+    expect(actionEditorValue('Намерение 1'), findsOneWidget);
+    expect(actionEditorValue('Сегодня'), findsOneWidget);
+    await tester.enterText(actionEditorTitleField, 'Новое действие намерения');
+    await _tap(tester, actionEditorCreateButton);
+    await _until(
+      tester,
+      find.descendant(
+        of: actionEditor,
+        matching: find.textContaining('Действие создано.'),
+      ),
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await _until(tester, find.text('Новое действие намерения'));
+    expect(find.text('Новое действие намерения'), findsOneWidget);
+  });
   testWidgets('число вкладки известно под «Обзором», а плитка с наибольшим '
       'числом открывается при первом показе', (tester) async {
     await _start(tester);

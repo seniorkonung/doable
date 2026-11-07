@@ -2994,6 +2994,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Every action here serves one of your intentions.';
 
   @override
+  String get detailsActionsAdd => 'Add';
+
+  @override
+  String get detailsActionsAddLabel => 'Add action';
+
+  @override
   String get actionDayRefreshing => 'Refreshing…';
 
   @override

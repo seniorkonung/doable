@@ -34,6 +34,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/controlled_local_date.dart';
 import '../support/action_day_provider.dart';
 import '../support/action_day_controls.dart';
+import '../support/action_editor_controls.dart';
 import '../support/action_seed.dart';
 import '../support/graph_durability_fixture.dart';
 import '../support/graph_seed.dart';
@@ -57,6 +58,23 @@ void main() {
   _registerAccessibilityTests();
   _registerQuickCreationFlowTests();
   _registerRelationPickerIntentionTest();
+  testWidgets('пустой день открывает лист с выбранной датой и без пути', (
+    tester,
+  ) async {
+    await _start(tester);
+    final date = CalendarDate.fromParts(2026, 10, 6);
+    await selectActionDayDate(tester, date);
+    await _until(
+      tester,
+      () => find.text('Нет действий на эту дату').evaluate().isNotEmpty,
+    );
+    await _tap(tester, find.text('Новое действие'));
+    expect(actionEditorValue('6 окт.'), findsOneWidget);
+    expect(actionEditorValue('Выберите причину'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(shownActionDayDate(tester), date);
+  });
   testWidgets('охват «Все» остаётся в каталоге при переходе к связям', (
     tester,
   ) async {
