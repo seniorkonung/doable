@@ -3,10 +3,14 @@ import 'dart:async';
 import 'package:doable/src/action/application/action_command.dart';
 import 'package:doable/src/action/application/action_details.dart';
 import 'package:doable/src/action/application/action_result.dart';
+import 'package:doable/src/action/domain/action_id.dart';
 import 'package:doable/src/action/domain/action_priority.dart';
 import 'package:doable/src/action/presentation/panel/action_panel_state.dart';
 import 'package:doable/src/action/presentation/panel/action_panel_view_model.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -179,6 +183,48 @@ void main() {
     });
   }
 
+  for (final succeeds in [true, false]) {
+    final outcome = succeeds ? 'успех' : 'отказ';
+    test(
+      'закрытие панели во время удаления в очереди сохраняет $outcome',
+      () async {
+        final harness = await _Harness.loaded(serialized: true);
+        addTearDown(harness.dispose);
+        final model = harness.model;
+        final shell = harness.coordinator.registerAppPresentation();
+        addTearDown(shell.release);
+
+        harness.coordinator.acceptActionUpdate(
+          UpdateActionFields(actionId: actionIdOf(2), patch: _patch),
+        );
+        await pumpEventQueue();
+        final deleted = model.delete();
+        expect(harness.repository.deletions, isEmpty);
+        harness.repository.emitMissing();
+        final state = model.state;
+        final operation = model.operation;
+        model.dispose();
+
+        harness.repository.succeedUpdate();
+        await pumpEventQueue();
+        expect(harness.repository.deletions, hasLength(1));
+        if (succeeds) {
+          harness.repository.succeedDelete();
+        } else {
+          harness.repository.failCommand(const ActionUnavailableFailure());
+        }
+
+        expect(await deleted, succeeds);
+        expect(model.state, same(state));
+        expect(model.operation, same(operation));
+        if (!succeeds) {
+          final claim = await shell.nextClaim();
+          expect(claim!.completions.single.isFailure, isTrue);
+        }
+      },
+    );
+  }
+
   test('остановка координатора даёт непредвиденный отказ', () async {
     final harness = await _Harness.loaded();
     addTearDown(harness.dispose);
@@ -282,17 +328,18 @@ const _patch = ActionFieldsPatch(priority: ActionFieldSet(ActionPriority.p1));
 const _completionPatch = ActionFieldsPatch(isCompleted: ActionFieldSet(true));
 
 final class _Harness {
-  _Harness() : repository = ActionPanelRepository() {
+  _Harness({bool serialized = false}) : repository = ActionPanelRepository() {
+    final PersonalGraphRepository graph = serialized
+        ? _SerializedRepository(repository)
+        : repository;
     container = ProviderContainer(
-      overrides: [
-        personalGraphRepositoryProvider.overrideWith((ref) => repository),
-      ],
+      overrides: [personalGraphRepositoryProvider.overrideWith((ref) => graph)],
     );
-    model = ActionPanelViewModel(repository, coordinator, actionIdOf(1));
+    model = ActionPanelViewModel(graph, coordinator, actionIdOf(1));
   }
 
-  static Future<_Harness> loaded() async {
-    final harness = _Harness();
+  static Future<_Harness> loaded({bool serialized = false}) async {
+    final harness = _Harness(serialized: serialized);
     harness.repository.emit(actionDetailsFixture(), revision: 1);
     await pumpEventQueue();
     return harness;
@@ -309,4 +356,27 @@ final class _Harness {
     await repository.dispose();
     container.dispose();
   }
+}
+
+final class _SerializedRepository implements PersonalGraphRepository {
+  _SerializedRepository(this.delegate);
+
+  final ActionPanelRepository delegate;
+  Future<void> _previous = Future.value();
+
+  @override
+  Stream<ActionReadResult> watchAction(ActionId id) => delegate.watchAction(id);
+
+  @override
+  Future<GraphCommandResult<TSuccess, TFailure>> execute<
+    TSuccess extends GraphCommandOutcome,
+    TFailure extends GraphCommandFailure
+  >(GraphCommand<TSuccess, TFailure> command) {
+    final result = _previous.then((_) => delegate.execute(command));
+    _previous = result.then((_) {});
+    return result;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

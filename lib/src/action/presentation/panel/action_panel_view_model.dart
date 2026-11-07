@@ -36,6 +36,7 @@ final class ActionPanelViewModel extends ChangeNotifier {
   /// запоминается в [_missingWhileDeleting].
   var _isDeleting = false;
   var _missingWhileDeleting = false;
+  var _disposed = false;
 
   /// Завершается, когда кончается [ActionPanelOperationAwaitingSnapshot].
   Completer<void>? _snapshotShown;
@@ -95,14 +96,15 @@ final class ActionPanelViewModel extends ChangeNotifier {
       _coordinator.acceptActionDelete(DeleteAction(_id)),
       locksCompletionOnFailure: false,
     );
-    _isDeleting = false;
-    final missing = _missingWhileDeleting;
-    _missingWhileDeleting = false;
     final deleted = switch (completion?.result) {
       GraphResultSuccess(value: ActionDeleted(:final action)) =>
         action.id == _id,
       _ => false,
     };
+    if (_disposed) return deleted;
+    _isDeleting = false;
+    final missing = _missingWhileDeleting;
+    _missingWhileDeleting = false;
     if (deleted) {
       _stopObserving();
       _setState(ActionPanelDeleted(state.details));
@@ -291,6 +293,7 @@ final class ActionPanelViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _stopObserving();
     final active = _activeToken;
     _activeToken = null;
