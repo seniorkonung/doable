@@ -547,3 +547,16 @@
   - **Зависимости:** нет.
   - **Предполагаемые файлы:** `test/graph_format/graph_format_file_test.dart`, `test/statistics/presentation/home_statistics_content_test.dart`, `test/long_term_relation/presentation/details/relation_details_tags_test.dart`, `test/app/action_day_app_flow_test.dart`.
   - **Размер:** XS.
+
+- [ ] 1.43 Продолжение списков «Корневое» и «Конечное» сливает роль «единственное» с многозвенной ролью без повторов и пропусков
+  - **Критерии приёмки:**
+    - В `test/graph/data/drift_intention_actions_read_test.dart` есть один поведенческий тест с русским названием. Он читает список роли «Корневое» или «Конечное» несколькими порциями малого размера (`pageSize` 2–3) через `nextCursor`.
+    - У читаемого намерения есть действия с путём из одного намерения (роль «единственное», путь `[намерение]`) и действия с многозвенным путём, где намерение стоит на читаемой роли. По ключу порядка (дата, час, последовательность) они чередуются, и действия обоих видов попадают на границу порции.
+    - Тест сверяет полный порядок идентификаторов по всем порциям без повторов и пропусков. Он падает, если в любой из двух ветвей `UNION ALL` в `lib/src/graph/data/drift_personal_graph_repository_intention_actions.dart` теряется условие курсора `(order_date, order_hour, order_sequence) < (?, ?, ?)` или его переменные привязаны неверно.
+    - Код `lib/`, `test/graph/data/drift_intention_actions_read_cost_test.dart` и бенчмарки не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_intention_actions_read_test.dart`.
+    - `mise exec --no-deps -- flutter analyze test` — без замечаний.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `test/graph/data/drift_intention_actions_read_test.dart`.
+  - **Размер:** XS.
