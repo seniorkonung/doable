@@ -1092,7 +1092,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/intention/presentation/details/intention_details_page.dart`, `intention_details_view_model.dart`, `intention_details_state.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`, тесты в `test/intention/presentation/details/`, `test/app/navigation/app_shell_page_matrix.dart`, `app_shell_pages_above_test.dart`, `test/app/intention_app_lifecycle_test.dart`, `intention_creation_sheet_integration_test.dart`; удаляются `lib/src/design_system/components/option_tiles.dart`, `test/design_system/option_tiles_test.dart`.
   - **Размер:** M.
 
-- [ ] 3.8 Панель создания намерения показывает вид вместо готовности к действию
+- [x] 3.8 Панель создания намерения показывает вид вместо готовности к действию
   - **Критерии приёмки:**
     - Под полем описания панели стоит `SegmentedControl` вида. При запуске кнопкой быстрого создания и из поиска начала пути выбрано «Главное», а «Вспомогательное» недоступно с объяснением в доступном названии; переключатель передаёт смысл, выбор и недоступность половин в семантике (требование «Панель создания намерения»).
     - Вид черновика не делает черновик изменённым, сохраняется при открытии и закрытии панели тегов и при ошибках, а новое открытие начинает с вида по месту запуска (требование «Черновик создания намерения»). Панель не передаёт выбор готовности и создаёт главное неготовое намерение; параметр `readiness` в `CreateIntention.withInitialState` остаётся до задачи 3.14.

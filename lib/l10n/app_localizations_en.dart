@@ -1135,32 +1135,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editorCloseFormAction => 'Close the form';
 
   @override
-  String get editorReadinessOption => 'Create as ready for action';
-
-  @override
-  String get editorReadinessOptionOn => 'Create as ready for action: on';
-
-  @override
-  String get editorReadinessOptionOff => 'Create as ready for action: off';
-
-  @override
-  String get editorReadinessConfirmationTitle => 'Create as ready for action?';
-
-  @override
-  String get editorReadinessOneDayCriterion =>
-      'It can be completed fully within one day.';
-
-  @override
-  String get editorReadinessClarityCriterion =>
-      'It is clear enough for a person to carry out.';
-
-  @override
-  String get editorReadinessCancelAction => 'Cancel';
-
-  @override
-  String get editorReadinessConfirmAction => 'Mark as ready';
-
-  @override
   String get editorChooseTags => 'Choose tags';
 
   @override

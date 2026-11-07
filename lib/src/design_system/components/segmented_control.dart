@@ -31,6 +31,7 @@ final class SegmentedControl<T extends Object> extends StatelessWidget {
     required this.value,
     required this.onChange,
     required this.label,
+    this.minHeight = 44,
     super.key,
   });
 
@@ -39,6 +40,7 @@ final class SegmentedControl<T extends Object> extends StatelessWidget {
   final T value;
   final ValueChanged<T>? onChange;
   final String label;
+  final double minHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -65,6 +67,7 @@ final class SegmentedControl<T extends Object> extends StatelessWidget {
                     item: item,
                     selected: item.id == value,
                     onChange: onChange,
+                    minHeight: minHeight,
                   ),
                 ),
             ],
@@ -80,11 +83,13 @@ final class _Segment<T extends Object> extends StatefulWidget {
     required this.item,
     required this.selected,
     required this.onChange,
+    required this.minHeight,
   });
 
   final SegmentItem<T> item;
   final bool selected;
   final ValueChanged<T>? onChange;
+  final double minHeight;
 
   @override
   State<_Segment<T>> createState() => _SegmentState<T>();
@@ -149,7 +154,7 @@ final class _SegmentState<T extends Object> extends State<_Segment<T>> {
               padding: const EdgeInsets.symmetric(vertical: 3),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
-                constraints: const BoxConstraints(minHeight: 38),
+                constraints: BoxConstraints(minHeight: widget.minHeight - 6),
                 decoration: BoxDecoration(
                   color: selected ? colors.raised : null,
                   borderRadius: radius,

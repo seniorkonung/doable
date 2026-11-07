@@ -20,9 +20,9 @@ part 'intention_editor_view_model.g.dart';
 
 /// Экранная сессия создания намерения по собственному ключу формы.
 ///
-/// До отправки владеет черновиком: правки текста, набора тегов и готовности
+/// До отправки владеет черновиком: правки текста, набора тегов и вида
 /// меняют только его и не отправляют команд графа. Отправка передаёт
-/// координатору одну команду с неизменяемым снимком всех четырёх полей и до
+/// координатору одну команду с неизменяемым снимком данных создания и до
 /// результата отвергает правки черновика и повторную отправку. Принятую
 /// отправку удерживает координатор: освобождение сессии её не отменяет и не
 /// снимает ограничение ключа формы. Сессия закрыта после успешного создания,
@@ -160,12 +160,11 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
     }
   }
 
-  /// Включает начальную готовность. Вызывается только после явного
-  /// подтверждения человеком обоих критериев действия; другие поля черновика
-  /// готовность не включают.
-  void confirmReadiness() => _changeReadiness(IntentionReadiness.ready);
-
-  void disableReadiness() => _changeReadiness(IntentionReadiness.notReady);
+  void changeKind(IntentionKind value) {
+    if (_acceptsDraftChanges) {
+      state = state.withKind(value);
+    }
+  }
 
   /// Передаёт координатору весь черновик одной командой.
   ///
@@ -182,7 +181,7 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
       CreateIntention.withInitialState(
         title: draft.title,
         description: draft.description.isEmpty ? null : draft.description,
-        readiness: draft.readiness,
+        readiness: IntentionReadiness.notReady,
         tagIds: draft.tagIds,
       ),
       target: target,
@@ -550,12 +549,6 @@ final class IntentionEditorViewModel extends _$IntentionEditorViewModel {
       observation.release();
     }
     _tagObservations.clear();
-  }
-
-  void _changeReadiness(IntentionReadiness value) {
-    if (_acceptsDraftChanges) {
-      state = state.withReadiness(value);
-    }
   }
 }
 

@@ -234,14 +234,12 @@ Future<void> _open(WidgetTester tester, _App app) async {
   expect(find.byType(IntentionEditorPage), findsOneWidget);
 }
 
-/// Название, описание, готовность и теги команды подготавливаются
+/// Название, описание и теги команды подготавливаются
 /// реальными панелью, панелью тегов и листом тега.
 Future<TagId> _prepare(WidgetTester tester, _App app) async {
   await _open(tester, app);
   await tester.enterText(_key('intention-editor-title'), _rawTitle);
   await tester.enterText(_key('intention-editor-description'), _description);
-  await _tap(tester, _key('intention-editor-readiness'));
-  await _tap(tester, _key('intention-editor-readiness-confirm'));
   await _tap(tester, _key('intention-editor-choose-tags'));
   await _include(tester, _home);
   // Локальные правки не маскируются событиями постоянных команд.
@@ -311,12 +309,8 @@ void _expectDraft(WidgetTester tester, List<TagId> tags) {
   for (final id in tags) {
     expect(_chip(id), findsOneWidget);
   }
-  expect(_icon(tester, 'intention-editor-readiness'), Icons.check_circle);
+  expect(find.text('Главное'), findsOneWidget);
 }
-
-IconData? _icon(WidgetTester tester, String key) => tester
-    .widget<Icon>(find.descendant(of: _key(key), matching: find.byType(Icon)))
-    .icon;
 
 String _text(WidgetTester tester, String key) =>
     tester.widget<TextField>(_key(key)).controller!.text;
@@ -412,12 +406,13 @@ void _expectFaultPoint(_App app, List<TagId> tags) {
     _title,
     'рисовать акварель',
     _description,
-    1,
+    'main',
+    0,
     0,
     isA<int>(),
     isA<int>(),
   ]);
-  expect(row[6], row[7]);
+  expect(row[7], row[8]);
   final assignments = point.graph['tag_assignments']!
       .where((assignment) => assignment[2] == row.first)
       .toList();
@@ -456,7 +451,7 @@ void _expectSaved(
   app.diagnostics.privateValues.add(intention.id.toCanonicalString());
   expect(intention.title, _title);
   expect(intention.description, _description);
-  expect(intention.readiness, IntentionReadiness.ready);
+  expect(intention.readiness, IntentionReadiness.notReady);
   expect(intention.archiveState, IntentionArchiveState.active);
   expect(intention.createdAt, intention.updatedAt);
   final stored = app.raw
@@ -467,7 +462,7 @@ void _expectSaved(
       .single
       .values
       .toList();
-  expect(stored, [_title, _description, 1, 0, isA<int>(), isA<int>()]);
+  expect(stored, [_title, _description, 0, 0, isA<int>(), isA<int>()]);
   expect(stored[4], stored[5]);
   expect(_storedGraph(app.raw)['ftsCreatedMatches'], hasLength(1));
   expect(

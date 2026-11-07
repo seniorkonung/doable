@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
+import '../../../design_system/components/segmented_control.dart';
 import '../../../design_system/components/text_field.dart'
     show lineBreakToSpaceFormatter;
 import '../../../graph/application/graph_command_coordinator.dart';
@@ -86,9 +87,6 @@ final class _IntentionEditorPageState
 
   /// Завершение создания одноразово: после него форма недоступна.
   var _routeState = _EditorRouteState.active;
-
-  /// Объяснение критериев действия уже открыто.
-  var _isConfirmingReadiness = false;
 
   /// Панель тегов открывается или открыта и удерживает запрет отправки до
   /// своего закрытия.
@@ -249,6 +247,26 @@ final class _IntentionEditorPageState
                   onChanged: notifier.changeDescription,
                 ),
               ),
+              const SizedBox(height: 12),
+              SegmentedControl<IntentionKind>(
+                minHeight: 48,
+                key: const ValueKey('intention-editor-kind'),
+                first: SegmentItem(
+                  id: IntentionKind.main,
+                  label: localizations.intentionKindMain,
+                  semanticLabel: localizations.intentionKindMainSemantics,
+                ),
+                second: SegmentItem(
+                  id: IntentionKind.supporting,
+                  label: localizations.intentionKindSupporting,
+                  semanticLabel:
+                      localizations.intentionKindSupportingUnavailable,
+                  disabled: true,
+                ),
+                value: editor.draft.kind,
+                label: localizations.intentionKindLabel,
+                onChange: isDraftFixed ? null : notifier.changeKind,
+              ),
               if (editor.selectedTags.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 IntentionCreationTags(
@@ -260,11 +278,8 @@ final class _IntentionEditorPageState
               ],
               const SizedBox(height: 8),
               _DraftOptions(
-                readiness: editor.draft.readiness,
                 enabled: !isDraftFixed,
                 onChooseTags: () => unawaited(_chooseTags()),
-                onEnableReadiness: () => unawaited(_confirmReadiness()),
-                onDisableReadiness: notifier.disableReadiness,
               ),
             ],
           ),
@@ -358,30 +373,6 @@ final class _IntentionEditorPageState
         // Ответа уже ожидает единственный диалог этой сессии.
         break;
     }
-  }
-
-  /// Объясняет оба критерия действия и включает начальную готовность
-  /// черновика только по явному подтверждению.
-  ///
-  /// Отказ, нажатие вне объяснения и «назад» оставляют готовность
-  /// выключенной. Подтверждение принимает только эта сессия и только пока её
-  /// черновик редактируется: запоздалый ответ не меняет отправленный или
-  /// закрытый черновик.
-  Future<void> _confirmReadiness() async {
-    if (_isConfirmingReadiness) {
-      return;
-    }
-    _isConfirmingReadiness = true;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      // Объяснение живёт в стеке маршрута своей формы и закрывается с ним.
-      useRootNavigator: false,
-      builder: (_) => _ReadinessConfirmationDialog(provider: _provider),
-    ).whenComplete(() => _isConfirmingReadiness = false);
-    if (!mounted || !(confirmed ?? false)) {
-      return;
-    }
-    ref.read(_provider.notifier).confirmReadiness();
   }
 
   /// Проверяет допуск заново: обработчик мог быть получен до открытия тегов
@@ -679,197 +670,25 @@ final class _CloseConfirmationDialogState
   }
 }
 
-/// Быстрые действия черновика: выбор тегов в панели тегов и начальная
-/// готовность.
-///
-/// Действия меняют только черновик сессии и не отправляют команд графа.
-/// Включённое состояние готовности отличается формой значка и признаком
-/// включения для экранного диктора, а подсказка называет назначение и
-/// состояние, не выдавая черновик за сохранённое намерение.
+/// Открывает выбор тегов, сохраняя фокус ввода.
 final class _DraftOptions extends StatelessWidget {
-  const _DraftOptions({
-    required this.readiness,
-    required this.enabled,
-    required this.onChooseTags,
-    required this.onEnableReadiness,
-    required this.onDisableReadiness,
-  });
+  const _DraftOptions({required this.enabled, required this.onChooseTags});
 
-  final IntentionReadiness readiness;
-
-  /// Черновик принимает правки: во время отправки и после завершения сессии
-  /// действия недоступны.
   final bool enabled;
   final VoidCallback onChooseTags;
 
-  /// Начинает включение готовности с объяснения критериев действия.
-  final VoidCallback onEnableReadiness;
-  final VoidCallback onDisableReadiness;
-
   @override
-  Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
-    // Нажатия действий не считаются нажатием вне поля ввода: ввод
-    // продолжается с прежним фокусом.
-    return TextFieldTapRegion(
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          IconButton(
-            key: const ValueKey('intention-editor-choose-tags'),
-            tooltip: localizations.editorChooseTags,
-            onPressed: enabled ? onChooseTags : null,
-            icon: const Icon(Icons.label_outline),
-          ),
-          switch (readiness) {
-            IntentionReadiness.ready => _DraftOptionButton(
-              optionKey: const ValueKey('intention-editor-readiness'),
-              label: localizations.editorReadinessOption,
-              tooltip: localizations.editorReadinessOptionOn,
-              isOn: true,
-              icon: Icons.check_circle,
-              onPressed: enabled ? onDisableReadiness : null,
-            ),
-            IntentionReadiness.notReady => _DraftOptionButton(
-              optionKey: const ValueKey('intention-editor-readiness'),
-              label: localizations.editorReadinessOption,
-              tooltip: localizations.editorReadinessOptionOff,
-              isOn: false,
-              icon: Icons.check_circle_outline,
-              onPressed: enabled ? onEnableReadiness : null,
-            ),
-          },
-        ],
-      ),
-    );
-  }
-}
-
-/// Переключатель одной быстрой отметки черновика.
-///
-/// Экранный диктор получает назначение [label] и признак включения [isOn];
-/// подсказка [tooltip] показывает их же текстом и потому не повторяется в
-/// семантике.
-final class _DraftOptionButton extends StatelessWidget {
-  const _DraftOptionButton({
-    required this.optionKey,
-    required this.label,
-    required this.tooltip,
-    required this.isOn,
-    required this.icon,
-    required this.onPressed,
-  });
-
-  final Key optionKey;
-  final String label;
-  final String tooltip;
-  final bool isOn;
-  final IconData icon;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) => Tooltip(
-    message: tooltip,
-    excludeFromSemantics: true,
-    child: MergeSemantics(
-      child: Semantics(
-        label: label,
-        toggled: isOn,
-        child: IconButton(
-          key: optionKey,
-          onPressed: onPressed,
-          color: isOn ? Theme.of(context).colorScheme.primary : null,
-          icon: Icon(icon),
-        ),
+  Widget build(BuildContext context) => TextFieldTapRegion(
+    child: Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: IconButton(
+        key: const ValueKey('intention-editor-choose-tags'),
+        tooltip: AppLocalizations.of(context).editorChooseTags,
+        onPressed: enabled ? onChooseTags : null,
+        icon: const Icon(Icons.label_outline),
       ),
     ),
   );
-}
-
-/// Объяснение обоих критериев действия перед включением начальной
-/// готовности черновика.
-///
-/// Подтверждение действует, пока черновик сессии редактируется и остаётся
-/// неготовым. Иначе оно становится недоступным, а объяснение закрывается без
-/// ответа, поэтому запоздалое нажатие не меняет черновик.
-final class _ReadinessConfirmationDialog extends ConsumerStatefulWidget {
-  const _ReadinessConfirmationDialog({required this.provider});
-
-  final IntentionEditorViewModelProvider provider;
-
-  @override
-  ConsumerState<_ReadinessConfirmationDialog> createState() =>
-      _ReadinessConfirmationDialogState();
-}
-
-final class _ReadinessConfirmationDialogState
-    extends ConsumerState<_ReadinessConfirmationDialog> {
-  var _isDismissing = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
-    final isPending = ref.watch(
-      widget.provider.select(
-        (editor) =>
-            editor.draft.readiness == IntentionReadiness.notReady &&
-            switch (editor.draftAvailability) {
-              IntentionDraftAvailability.editable => true,
-              IntentionDraftAvailability.submitting ||
-              IntentionDraftAvailability.closed => false,
-            },
-      ),
-    );
-    if (!isPending) {
-      _dismissOutdated();
-    }
-    return _ScrollableAlertDialog(
-      key: const ValueKey('intention-editor-readiness-confirmation'),
-      title: Text(localizations.editorReadinessConfirmationTitle),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(localizations.editorReadinessOneDayCriterion),
-          const SizedBox(height: 12),
-          Text(localizations.editorReadinessClarityCriterion),
-        ],
-      ),
-      actions: [
-        TextButton(
-          key: const ValueKey('intention-editor-readiness-cancel'),
-          onPressed: () => _answer(false),
-          child: Text(localizations.editorReadinessCancelAction),
-        ),
-        FilledButton(
-          key: const ValueKey('intention-editor-readiness-confirm'),
-          onPressed: isPending ? () => _answer(true) : null,
-          child: Text(localizations.editorReadinessConfirmAction),
-        ),
-      ],
-    );
-  }
-
-  /// Закрывает объяснение с ответом [confirmed], только пока оно остаётся
-  /// верхним маршрутом: ответ не может закрыть форму или другой маршрут.
-  void _answer(bool? confirmed) {
-    if (ModalRoute.of(context)?.isCurrent ?? false) {
-      Navigator.of(context).pop(confirmed);
-    }
-  }
-
-  void _dismissOutdated() {
-    if (_isDismissing) {
-      return;
-    }
-    _isDismissing = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _answer(null);
-      }
-    });
-  }
 }
 
 /// Диалог над панелью, в котором заголовок, текст и действия прокручиваются

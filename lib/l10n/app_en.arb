@@ -875,38 +875,6 @@
   "@editorCloseFormAction": {
     "description": "Подсказка кнопки закрытия панели создания намерения и доступное название её модального фона"
   },
-  "editorReadinessOption": "Create as ready for action",
-  "@editorReadinessOption": {
-    "description": "Доступное название быстрой отметки начальной готовности к действию в черновике нового намерения"
-  },
-  "editorReadinessOptionOn": "Create as ready for action: on",
-  "@editorReadinessOptionOn": {
-    "description": "Подсказка включённой быстрой отметки готовности: новое намерение будет создано готовым к действию, готовность ещё не сохранена"
-  },
-  "editorReadinessOptionOff": "Create as ready for action: off",
-  "@editorReadinessOptionOff": {
-    "description": "Подсказка выключенной быстрой отметки готовности к действию в черновике нового намерения"
-  },
-  "editorReadinessConfirmationTitle": "Create as ready for action?",
-  "@editorReadinessConfirmationTitle": {
-    "description": "Заголовок объяснения критериев действия перед включением начальной готовности в черновике"
-  },
-  "editorReadinessOneDayCriterion": "It can be completed fully within one day.",
-  "@editorReadinessOneDayCriterion": {
-    "description": "Критерий действия в объяснении начальной готовности: полная выполнимость в рамках одного дня"
-  },
-  "editorReadinessClarityCriterion": "It is clear enough for a person to carry out.",
-  "@editorReadinessClarityCriterion": {
-    "description": "Критерий действия в объяснении начальной готовности: операционная понятность человеку"
-  },
-  "editorReadinessCancelAction": "Cancel",
-  "@editorReadinessCancelAction": {
-    "description": "Отказ от включения начальной готовности; черновик остаётся неготовым"
-  },
-  "editorReadinessConfirmAction": "Mark as ready",
-  "@editorReadinessConfirmAction": {
-    "description": "Явное подтверждение обоих критериев действия, включающее начальную готовность только в черновике"
-  },
   "editorChooseTags": "Choose tags",
   "@editorChooseTags": {
     "description": "Подсказка и доступное название быстрого действия, открывающего общий выбор тегов для черновика нового намерения"

@@ -122,13 +122,6 @@ const _creationTables = [
 
 final _sheet = find.byKey(const ValueKey('intention-creation-sheet'));
 final _chooseTags = find.byKey(const ValueKey('intention-editor-choose-tags'));
-final _readiness = find.byKey(const ValueKey('intention-editor-readiness'));
-final _readinessConfirmation = find.byKey(
-  const ValueKey('intention-editor-readiness-confirmation'),
-);
-final _readinessConfirm = find.byKey(
-  const ValueKey('intention-editor-readiness-confirm'),
-);
 final _submit = find.byKey(const ValueKey('intention-editor-submit'));
 final _message = find.byKey(const ValueKey('graph-operation-message'));
 
@@ -176,12 +169,12 @@ void main() {
         );
         expect(app.completions, isEmpty);
 
-        // Все четыре поля черновика готовятся только через интерфейс панели,
+        // Поля черновика готовятся только через интерфейс панели,
         // панели тегов и листа тега.
         final sport = await _prepareFullDraft(tester, app, tags: [_homeTag]);
         expect(_text(tester, 'intention-editor-title'), _rawTitle);
         expect(_text(tester, 'intention-editor-description'), _description);
-        expect(_iconOf(tester, _readiness), Icons.check_circle);
+        expect(find.text('Главное'), findsOneWidget);
         // Созданный позже «Спорт» стоит первым в ручном порядке.
         expect(_chipNames(tester), [_sport, 'Дом']);
 
@@ -208,7 +201,7 @@ void main() {
           title: _title,
           description: _description,
           tags: [_sport, 'Дом'],
-          readiness: IntentionReadiness.ready,
+          readiness: IntentionReadiness.notReady,
         );
         final created = _createdId(creation);
         expect(created, isNot(_intentionId(_namesake)));
@@ -236,7 +229,7 @@ void main() {
         _expectConfirmedPackage(
           creation,
           tags: [_sport, 'Дом'],
-          readiness: IntentionReadiness.ready,
+          readiness: IntentionReadiness.notReady,
         );
         expect(_storedIntentionIds(app.raw), [...intentionsBefore, created]);
         _expectStoredIntention(
@@ -244,7 +237,7 @@ void main() {
           created,
           title: _title,
           description: _description,
-          readiness: IntentionReadiness.ready,
+          readiness: IntentionReadiness.notReady,
         );
         expect(_storedAssignments(app.raw, created), [
           home.toCanonicalString(),
@@ -279,7 +272,7 @@ void main() {
         final summary = catalog.items.first;
         expect(summary.title, _title);
         expect(summary.descriptionPreview, isNotNull);
-        expect(summary.readiness, IntentionReadiness.ready);
+        expect(summary.readiness, IntentionReadiness.notReady);
         expect(summary.archiveState, IntentionArchiveState.active);
         expect(summary.createdAt.value, summary.updatedAt.value);
         expect(
@@ -389,7 +382,7 @@ void main() {
           created,
           title: _title,
           description: _description,
-          readiness: IntentionReadiness.ready,
+          readiness: IntentionReadiness.notReady,
           tags: [_sport, 'Дом'],
         );
         await _expectDurableIntention(
@@ -668,8 +661,8 @@ Future<void> _openSheet(WidgetTester tester, _Launch app) async {
   ]);
 }
 
-/// Готовит в панели, открытой общей кнопкой, все четыре поля черновика: сырое
-/// название, описание, явно подтверждённую готовность и набор из
+/// Готовит в панели, открытой общей кнопкой, поля черновика: сырое
+/// название, описание и набор из
 /// существующих тегов [tags] и тега «Спорт», созданного настоящим листом из
 /// панели тегов. Возвращается в ту же панель и возвращает идентификатор
 /// созданного тега. Быстрый вызов сохранения после открытия панели тегов не
@@ -685,7 +678,7 @@ Future<TagId> _prepareFullDraft(
   expect(_text(tester, 'intention-editor-title'), isEmpty);
   expect(_text(tester, 'intention-editor-description'), isEmpty);
   expect(_chipNames(tester), isEmpty);
-  expect(_iconOf(tester, _readiness), Icons.check_circle_outline);
+  expect(find.text('Главное'), findsOneWidget);
   expect(tester.getRect(_sheet).top, greaterThanOrEqualTo(72));
   expect(
     appNavigationDestinations(skipOffstage: false).hitTestable(),
@@ -699,13 +692,6 @@ Future<TagId> _prepareFullDraft(
     find.byKey(const ValueKey('intention-editor-description')),
     _description,
   );
-  await _tap(tester, _readiness);
-  await _until(tester, _readinessConfirmation);
-  await tester.pumpAndSettle();
-  await _tap(tester, _readinessConfirm);
-  await tester.pumpAndSettle();
-  expect(_readinessConfirmation, findsNothing);
-
   await _tap(tester, _chooseTags);
   await _until(tester, _row(_tagId(_homeTag)));
   await tester.pumpAndSettle();
@@ -781,7 +767,7 @@ Future<TagId> _prepareFullDraft(
   expect(_chipNames(tester), hasLength(tags.length + 1));
   expect(_text(tester, 'intention-editor-title'), _rawTitle);
   expect(_text(tester, 'intention-editor-description'), _description);
-  expect(_iconOf(tester, _readiness), Icons.check_circle);
+  expect(find.text('Главное'), findsOneWidget);
   expect(app.completions.whereType<IntentionCommandCompletion>(), isEmpty);
   expect(_storedCreationTables(app.raw), graphBefore);
   expect(tester.widget<FilledButton>(_submit).onPressed, isNotNull);
@@ -1225,10 +1211,6 @@ bool _isMarked(WidgetTester tester, TagId id) =>
 
 String _text(WidgetTester tester, String key) =>
     tester.widget<TextField>(find.byKey(ValueKey(key))).controller!.text;
-
-IconData? _iconOf(WidgetTester tester, Finder button) => tester
-    .widget<Icon>(find.descendant(of: button, matching: find.byType(Icon)))
-    .icon;
 
 /// Названия выбранных тегов панели в показанном порядке.
 List<String> _chipNames(WidgetTester tester) => [

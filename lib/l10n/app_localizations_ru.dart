@@ -1141,33 +1141,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get editorCloseFormAction => 'Закрыть форму';
 
   @override
-  String get editorReadinessOption => 'Создать готовым к действию';
-
-  @override
-  String get editorReadinessOptionOn => 'Создать готовым к действию: включено';
-
-  @override
-  String get editorReadinessOptionOff =>
-      'Создать готовым к действию: выключено';
-
-  @override
-  String get editorReadinessConfirmationTitle => 'Создать готовым к действию?';
-
-  @override
-  String get editorReadinessOneDayCriterion =>
-      'Его можно полностью выполнить в течение одного дня.';
-
-  @override
-  String get editorReadinessClarityCriterion =>
-      'Человеку достаточно понятно, что именно нужно сделать.';
-
-  @override
-  String get editorReadinessCancelAction => 'Отмена';
-
-  @override
-  String get editorReadinessConfirmAction => 'Отметить готовым';
-
-  @override
   String get editorChooseTags => 'Выбрать теги';
 
   @override

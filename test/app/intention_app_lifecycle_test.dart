@@ -585,8 +585,10 @@ enum _SheetTransition {
         expect(find.text('Discard the draft?'), findsOneWidget);
       case _SheetTransition.chooser:
         // Сообщение временно перекрывает нижний край полей. Из названия
-        // переходим через описание к выбору тегов клавиатурой, сохраняя
+        // переходим через описание и вид к выбору тегов клавиатурой, сохраняя
         // сообщение на экране и его место в очереди.
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
         await tester.sendKeyEvent(LogicalKeyboardKey.tab);
         await tester.pump();
         await tester.sendKeyEvent(LogicalKeyboardKey.tab);
@@ -629,7 +631,7 @@ enum _SheetTransition {
 enum _FormOverlay {
   chooser('панель тегов'),
   editor('лист тега над панелью тегов'),
-  dialog('диалог объяснения готовности');
+  dialog('диалог подтверждения закрытия');
 
   const _FormOverlay(this.description);
 
@@ -645,12 +647,10 @@ enum _FormOverlay {
         await _FormOverlay.chooser.cover(tester);
         await _openNewTagSheet(tester);
       case _FormOverlay.dialog:
-        await tester.tap(
-          find.byKey(const ValueKey('intention-editor-readiness')),
-        );
+        await tester.tap(find.byKey(_close));
         await tester.pumpAndSettle();
         expect(
-          find.byKey(const ValueKey('intention-editor-readiness-confirmation')),
+          find.byKey(const ValueKey('intention-editor-close-confirmation')),
           findsOneWidget,
         );
     }
@@ -675,7 +675,7 @@ enum _FormOverlay {
         await tester.tap(find.text('Done'));
       case _FormOverlay.dialog:
         await tester.tap(
-          find.byKey(const ValueKey('intention-editor-readiness-cancel')),
+          find.byKey(const ValueKey('intention-editor-close-continue')),
         );
     }
     await tester.pumpAndSettle();

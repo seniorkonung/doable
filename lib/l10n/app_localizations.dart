@@ -1820,54 +1820,6 @@ abstract class AppLocalizations {
   /// **'Close the form'**
   String get editorCloseFormAction;
 
-  /// Доступное название быстрой отметки начальной готовности к действию в черновике нового намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Create as ready for action'**
-  String get editorReadinessOption;
-
-  /// Подсказка включённой быстрой отметки готовности: новое намерение будет создано готовым к действию, готовность ещё не сохранена
-  ///
-  /// In en, this message translates to:
-  /// **'Create as ready for action: on'**
-  String get editorReadinessOptionOn;
-
-  /// Подсказка выключенной быстрой отметки готовности к действию в черновике нового намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Create as ready for action: off'**
-  String get editorReadinessOptionOff;
-
-  /// Заголовок объяснения критериев действия перед включением начальной готовности в черновике
-  ///
-  /// In en, this message translates to:
-  /// **'Create as ready for action?'**
-  String get editorReadinessConfirmationTitle;
-
-  /// Критерий действия в объяснении начальной готовности: полная выполнимость в рамках одного дня
-  ///
-  /// In en, this message translates to:
-  /// **'It can be completed fully within one day.'**
-  String get editorReadinessOneDayCriterion;
-
-  /// Критерий действия в объяснении начальной готовности: операционная понятность человеку
-  ///
-  /// In en, this message translates to:
-  /// **'It is clear enough for a person to carry out.'**
-  String get editorReadinessClarityCriterion;
-
-  /// Отказ от включения начальной готовности; черновик остаётся неготовым
-  ///
-  /// In en, this message translates to:
-  /// **'Cancel'**
-  String get editorReadinessCancelAction;
-
-  /// Явное подтверждение обоих критериев действия, включающее начальную готовность только в черновике
-  ///
-  /// In en, this message translates to:
-  /// **'Mark as ready'**
-  String get editorReadinessConfirmAction;
-
   /// Подсказка и доступное название быстрого действия, открывающего общий выбор тегов для черновика нового намерения
   ///
   /// In en, this message translates to:
