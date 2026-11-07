@@ -5,6 +5,7 @@ import '../../application/action_details.dart';
 import '../../application/action_result.dart';
 import '../../domain/action_priority.dart';
 import '../../domain/action_schedule.dart';
+import '../path/path_segment.dart';
 
 /// Открытие листа нового действия: одна сессия черновика со своим ключом
 /// формы.
@@ -224,7 +225,14 @@ final class ActionEditorState {
       ActionEditorState._(
         draft: draft,
         pathState: value,
-        submission: submission,
+        submission: switch (submission) {
+          ActionEditorFailed(failure: ActionPathConflictFailure())
+              when value != null &&
+                  firstWholeSegment(value)?.intentions.length ==
+                      value.intentionCount =>
+            const ActionEditorEditing(),
+          _ => submission,
+        },
         isClosed: isClosed,
       );
 
@@ -273,7 +281,8 @@ final class ActionEditorState {
   );
 
   /// Правка значения снимает отказ создания, кроме конфликта пути: его снимает
-  /// только смена пути. Проверка текста остаётся у своего поля.
+  /// смена пути или подтверждённое целое состояние. Проверка текста остаётся
+  /// у своего поля.
   ActionEditorSubmission _failureAfterValueEdit() => switch (submission) {
     ActionEditorFailed(failure: ActionPathConflictFailure()) => submission,
     ActionEditorFailed() => const ActionEditorEditing(),

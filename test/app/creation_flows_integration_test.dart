@@ -399,6 +399,87 @@ void main() {
     );
   });
 
+  testWidgets('восстановленная связь снимает конфликт создания без сохранения '
+      'неизменённого пути', (tester) async {
+    final app = await _start(tester);
+    await _tap(tester, find.text('Новое действие'));
+    await tester.enterText(actionEditorTitleField, 'Прогулка');
+    await _tap(tester, actionEditorValue('Выберите причину'));
+    await _until(tester, () => find.text('Намерение 1').evaluate().isNotEmpty);
+    await _tap(tester, find.text('Намерение 1'));
+    await _until(tester, () => find.text('Намерение 2').evaluate().isNotEmpty);
+    await _tap(tester, find.text('Намерение 2'));
+    await _tap(tester, find.text('Сохранить'));
+    await _until(
+      tester,
+      () => actionEditorValue('Намерение 2').evaluate().isNotEmpty,
+    );
+
+    final repository = app.container.read(personalGraphRepositoryProvider);
+    var deleted = false;
+    unawaited(() async {
+      expect(
+        await repository.execute(
+          DeleteLongTermRelation(durabilityRelation(101)),
+        ),
+        isA<GraphCommandSucceeded>(),
+      );
+      deleted = true;
+    }());
+    await _until(tester, () => deleted);
+    await _until(
+      tester,
+      () => actionEditorValue('Удалено').evaluate().isNotEmpty,
+    );
+    await _tap(tester, actionEditorCreateButton);
+    await _until(
+      tester,
+      () =>
+          actionEditorValue(app.l10n.actionPathConflict).evaluate().isNotEmpty,
+    );
+    expect(actionEditorCanCreate(tester), isFalse);
+
+    await _tap(tester, actionEditorValue('Намерение 1'));
+    await settlePathScreen(tester);
+    expect(find.text('Намерение 2'), findsNothing);
+    await _tap(tester, find.text('Добавить'));
+    await _until(tester, () => find.text('Намерение 2').evaluate().isNotEmpty);
+    await _tap(tester, find.text('Намерение 2'));
+    await _tap(tester, find.text('Добавить 1 связь'));
+    await _until(
+      tester,
+      () =>
+          pathScreen.evaluate().isNotEmpty &&
+          find.text('Намерение 2').evaluate().isNotEmpty,
+    );
+    await _tap(tester, find.text('Намерение 2'));
+    expect(isPathSaveEnabled(tester), isFalse);
+    await tapPathBack(tester);
+    expect(find.text('Отменить изменения?'), findsNothing);
+    expect(actionEditor, findsOneWidget);
+    await _until(tester, () => actionEditorCanCreate(tester));
+    await _tap(tester, actionEditorCreateButton);
+    await _until(
+      tester,
+      () => tester
+          .widget<EditableText>(actionEditorTitleField)
+          .controller
+          .text
+          .isEmpty,
+    );
+    final actions = await tester.runAsync(
+      () => durabilityRows(app.database, 'actions'),
+    );
+    expect(actions!.single['title'], 'Прогулка');
+    final rows = await tester.runAsync(
+      () => durabilityRows(app.database, 'action_path_items'),
+    );
+    expect(rows!.map((row) => row['intention_id']), [
+      durabilityUuid(1),
+      durabilityUuid(2),
+    ]);
+  });
+
   testWidgets('пустой день открывает лист с выбранной датой и без пути', (
     tester,
   ) async {
