@@ -73,7 +73,7 @@ final class PathViewModelProvider
   }
 }
 
-String _$pathViewModelHash() => r'df119cf25ca4d060be29341d55358cc1db1a9d8d';
+String _$pathViewModelHash() => r'bc31f90aa4b84033c80427699f2edb950af46f08';
 
 /// Сессия построения пути и порционного чтения его продолжений.
 ///
