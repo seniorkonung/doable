@@ -29,6 +29,7 @@ import '../../../support/tag_positions.dart';
 import '../../../support/intention_title_order_key.dart';
 import '../details/details_test_support.dart'
     show testDetailsIntention, testDetailsSavedResult;
+import '../../../support/intention_holding_read_contract_test_fallback.dart';
 
 void main() {
   group('GraphCommandCoordinator', () {
@@ -1212,6 +1213,7 @@ IntentionCommandStart _acceptExisting(
 
 final class _ControlledGraphRepository
     with
+        IntentionHoldingReadContractTestFallback,
         ActionReadContractTestFallback,
         StatisticsReadContractTestFallback,
         TagReadContractTestFallback
@@ -1282,6 +1284,7 @@ final class _ControlledGraphRepository
 
 final class _ControlledPersonalGraphRepository
     with
+        IntentionHoldingReadContractTestFallback,
         ActionReadContractTestFallback,
         StatisticsReadContractTestFallback,
         TagReadContractTestFallback

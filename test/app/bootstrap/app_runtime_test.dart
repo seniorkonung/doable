@@ -36,6 +36,7 @@ import '../../support/tag_read_contract_test_fallback.dart';
 import '../../support/action_read_contract_test_fallback.dart';
 import '../../support/statistics_read_contract_test_fallback.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/intention_holding_read_contract_test_fallback.dart';
 
 const _unsupportedSchemaVersion = AppDatabase.currentSchemaVersion + 1;
 
@@ -325,6 +326,7 @@ CalendarDate _dateOf(DateTime moment) =>
 
 final class _ControlledPersonalGraphRepository
     with
+        IntentionHoldingReadContractTestFallback,
         ActionReadContractTestFallback,
         StatisticsReadContractTestFallback,
         TagReadContractTestFallback

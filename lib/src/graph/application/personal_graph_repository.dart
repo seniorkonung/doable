@@ -1,6 +1,7 @@
 import '../../action/application/action_read_contract.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_details.dart';
+import '../../intention/application/intention_holding.dart';
 import '../../intention/application/intention_result.dart';
 import '../../intention/domain/intention_id.dart';
 import '../../long_term_relation/application/relation_group_page.dart';
@@ -22,6 +23,7 @@ abstract interface class PersonalGraphRepository
     implements
         GraphCommandRepository,
         ActionReadContract,
+        IntentionHoldingReadContract,
         TagReadContract,
         StatisticsReadContract {
   Future<Result<IntentionCatalogPage>> getCatalogPage(

@@ -76,6 +76,7 @@ import '../../support/intention_catalog_controls.dart';
 import '../../support/intention_edit_screen.dart';
 import '../../support/intention_options.dart';
 import '../../support/tag_positions.dart';
+import '../../support/intention_holding_read_contract_test_fallback.dart';
 
 /// Активные намерения «Намерение 01» … «Намерение 40»: выдача каталога
 /// длиннее экрана.
@@ -1386,7 +1387,9 @@ final class _ArchiveWriteFaults extends LocalDatabaseConnectionObserver {
 /// Реальный адаптер, который считает обращения корневых страниц к своим
 /// выдачам и команды, а команду намерения удерживает до [releaseCommand].
 /// Удержание происходит до транзакции, поэтому чтения не ждут.
-final class _ObservedRepository implements PersonalGraphRepository {
+final class _ObservedRepository
+    with IntentionHoldingReadContractTestFallback
+    implements PersonalGraphRepository {
   _ObservedRepository(this._delegate);
 
   final PersonalGraphRepository _delegate;

@@ -18,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_positions.dart';
+import '../../../support/intention_holding_read_contract_test_fallback.dart';
 
 void main() {
   test(
@@ -302,7 +303,9 @@ final class _CommandRequest {
   final completer = Completer<TagCommandResult>();
 }
 
-final class _Repository extends Fake implements PersonalGraphRepository {
+final class _Repository extends Fake
+    with IntentionHoldingReadContractTestFallback
+    implements PersonalGraphRepository {
   final commands = <_CommandRequest>[];
 
   @override

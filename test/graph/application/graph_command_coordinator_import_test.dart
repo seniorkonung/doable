@@ -50,7 +50,7 @@ void main() {
       isA<GraphImportCompletion>().having(
         (completion) => completion.confirmedChange?.changes,
         'изменения',
-        [isA<GraphReplaced>()],
+        [isA<GraphReplaced>(), isA<IntentionHoldingChanged>()],
       ),
     ]);
     final afterImport = harness.startDeleteOf(5);

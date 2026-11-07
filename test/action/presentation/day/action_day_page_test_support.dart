@@ -42,6 +42,7 @@ import '../../../support/controlled_local_date.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/tag_positions.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
+import '../../../support/intention_holding_read_contract_test_fallback.dart';
 
 /// Открывает экран дня в оболочке приложения, как его видит
 /// человек: с панелью основной навигации и общей кнопкой быстрого создания.
@@ -102,7 +103,7 @@ Future<AppRouter> pumpActionDay(
 /// Записывает запросы выдачи в [queries], а отметок — в [dayStatusQueries].
 /// Ответы остаются незавершёнными до решения сценария по номеру запроса.
 final class ActionDayRepository
-    with TagReadContractTestFallback
+    with IntentionHoldingReadContractTestFallback, TagReadContractTestFallback
     implements PersonalGraphRepository {
   // Управляемые чтения невыполненных; completeFirst задаёт обе секции дня.
   final queries = <ActionDayQuery>[];

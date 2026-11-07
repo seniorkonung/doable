@@ -125,11 +125,11 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
   ///
   /// Номер изменения продолжает расти: курсоры и загрузка снимка связей
   /// статистики, которые сверяют только его, тоже устаревают. Кэши
-  /// статистики сбрасываются, а наблюдатели сущностей перечитывают их:
-  /// ревизии прежней эпохи с новой несравнимы. Наблюдатели тегов узнают о
-  /// замене от обновлений таблиц Drift, наблюдатели состава и лога — по
-  /// позиции пакета «сброс» [resetPosition], а наблюдатели списка копий —
-  /// если замена добавила копию перед заменой.
+  /// статистики и индекс удержания сбрасываются, а наблюдатели сущностей
+  /// перечитывают их: ревизии прежней эпохи с новой несравнимы. Наблюдатели
+  /// тегов узнают о замене от обновлений таблиц Drift, наблюдатели состава и
+  /// лога — по позиции пакета «сброс» [resetPosition], а наблюдатели списка
+  /// копий — если замена добавила копию перед заменой.
   ConfirmedGraphReplacement _startReplacedGraphEpoch(
     int resetPosition, {
     required bool addedBackup,
@@ -140,6 +140,7 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
     _statisticsRelationSnapshot = null;
     _throughRelationsResults.clear();
     _intentionStatisticsResults.clear();
+    _resetIntentionHoldingIndex();
     for (final watchers in List.of(_intentionWatchers.values)) {
       for (final watcher in List.of(watchers)) {
         watcher.add(null);

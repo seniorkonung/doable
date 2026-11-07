@@ -205,6 +205,30 @@ final class StatisticsReadDiagnosticsEvent extends DiagnosticsEvent {
   final StatisticsReadDiagnosticsStage stage;
 }
 
+enum IntentionHoldingIndexDiagnosticsStage {
+  /// Чтение вида и архивного состояния намерений.
+  intentions,
+
+  /// Чтение связей с признаком архива.
+  relations,
+
+  /// Обход удержания в фоновом изоляте.
+  computation,
+}
+
+/// Этап построения индекса удержания: исход, длительность и категория
+/// отказа. Пользовательский текст, идентификаторы, размеры графа и исходное
+/// исключение не входят в контракт события.
+/// Передача получателю — через [recordDiagnosticsSafely].
+final class IntentionHoldingIndexDiagnosticsEvent extends DiagnosticsEvent {
+  const IntentionHoldingIndexDiagnosticsEvent({
+    required this.stage,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final IntentionHoldingIndexDiagnosticsStage stage;
+}
+
 /// Команда действия. Событие не несёт ни содержимого действия, ни его
 /// идентификатора, даты и пути.
 final class ActionCommandDiagnosticsEvent extends DiagnosticsEvent {

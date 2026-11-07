@@ -47,6 +47,7 @@ import '../support/quick_creation.dart';
 import '../support/intention_description_preview.dart';
 import '../support/intention_edit_screen.dart';
 import '../support/intention_title_order_key.dart';
+import '../support/intention_holding_read_contract_test_fallback.dart';
 
 void main() {
   testWidgets(
@@ -755,6 +756,7 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
 
 final class _DelayedPersonalGraphRepository
     with
+        IntentionHoldingReadContractTestFallback,
         ActionReadContractTestFallback,
         StatisticsReadContractTestFallback,
         TagReadContractTestFallback

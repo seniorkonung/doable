@@ -32,6 +32,7 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 
 import '../../support/tag_positions.dart';
+import '../../support/intention_holding_read_contract_test_fallback.dart';
 
 final statisticsToday = CalendarDate.fromParts(2026, 10, 12);
 
@@ -132,7 +133,9 @@ final class IntentionStatisticsTestPage {
   void close() => subscription.close();
 }
 
-final class IntentionStatisticsReader implements PersonalGraphRepository {
+final class IntentionStatisticsReader
+    with IntentionHoldingReadContractTestFallback
+    implements PersonalGraphRepository {
   final queries = <IntentionStatisticsQuery>[];
   final responses = <Completer<IntentionStatisticsSectionResult>>[];
   final continuations = <PendingStatisticsBreakdown<Object?>>[];

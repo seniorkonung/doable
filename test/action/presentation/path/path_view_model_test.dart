@@ -18,8 +18,11 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../../support/action_seed.dart';
 import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
+import '../../../support/intention_holding_read_contract_test_fallback.dart';
 
-final class _ControlledRepository implements PersonalGraphRepository {
+final class _ControlledRepository
+    with IntentionHoldingReadContractTestFallback
+    implements PersonalGraphRepository {
   final requests = <Completer<PathCandidatesResult>>[];
 
   @override

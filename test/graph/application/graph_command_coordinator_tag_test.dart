@@ -18,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/tag_read_contract_test_fallback.dart';
+import '../../support/intention_holding_read_contract_test_fallback.dart';
 
 void main() {
   test('редактирование и удаление одного тега разделяют ключ', () async {
@@ -318,7 +319,7 @@ final _deletedSuccess = TagCommandSucceeded(
 );
 
 final class _ControlledRepository
-    with TagReadContractTestFallback
+    with IntentionHoldingReadContractTestFallback, TagReadContractTestFallback
     implements PersonalGraphRepository {
   final commands = <Object>[];
   final _results = <Completer<Object>>[];

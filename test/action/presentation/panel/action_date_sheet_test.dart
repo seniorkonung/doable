@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/controlled_local_date.dart';
+import '../../../support/intention_holding_read_contract_test_fallback.dart';
 
 void main() {
   testWidgets('лист называется датой действия, показывает месяц '
@@ -248,7 +249,9 @@ Future<_App> _pump(
   return app;
 }
 
-final class _Repository implements PersonalGraphRepository {
+final class _Repository
+    with IntentionHoldingReadContractTestFallback
+    implements PersonalGraphRepository {
   _Repository(this._marks, {required this.readFails});
 
   final Map<CalendarDate, ActionDayStatus> _marks;

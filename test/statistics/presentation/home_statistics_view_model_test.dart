@@ -15,6 +15,8 @@ import 'package:doable/src/statistics/presentation/home_statistics_view_model.da
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/intention_holding_read_contract_test_fallback.dart';
+
 void main() {
   test('новый экземпляр выбирает местные месяц и год до первого чтения', () {
     final harness = _Harness();
@@ -398,7 +400,9 @@ final class _Harness {
   }
 }
 
-final class _Reader implements PersonalGraphRepository {
+final class _Reader
+    with IntentionHoldingReadContractTestFallback
+    implements PersonalGraphRepository {
   final queries = <StatisticsQuery>[];
   final responses = <Completer<StatisticsPageResult>>[];
 

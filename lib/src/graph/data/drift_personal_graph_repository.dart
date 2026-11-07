@@ -46,6 +46,7 @@ import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_id_generator.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_details.dart';
+import '../../intention/application/intention_holding.dart';
 import '../../intention/application/intention_result.dart';
 import '../../intention/application/title_search_key.dart';
 import '../../intention/domain/intention.dart' as domain;
@@ -89,6 +90,7 @@ import 'drift_relation_count_aggregates.dart';
 import 'contribution_reachability.dart';
 import 'graph_fact_capture.dart';
 import 'graph_record_rows.dart';
+import 'intention_holding_computation.dart';
 import 'stored_graph_rows.dart';
 
 import 'package:drift/drift.dart';
@@ -116,6 +118,7 @@ part 'drift_statistics_seed_groups.dart';
 part 'drift_intention_statistics_source.dart';
 part 'drift_intention_statistics_reader.dart';
 part 'drift_through_relations_statistics_reader.dart';
+part 'drift_intention_holding_index.dart';
 
 final class DriftPersonalGraphRepository
     implements
@@ -133,6 +136,7 @@ final class DriftPersonalGraphRepository
     TagIdGenerator? tagIdGenerator,
     this._statisticsReachabilityRunner = runContributionReachabilityInIsolate,
     this._intentionStatisticsRunner = runIntentionContributionInIsolate,
+    this._intentionHoldingRunner = runIntentionHoldingInIsolate,
   }) : _relationIdGenerator =
            relationIdGenerator ?? UuidV7LongTermRelationIdGenerator(),
        _tagIdGenerator = tagIdGenerator ?? UuidV7TagIdGenerator();
@@ -161,6 +165,11 @@ final class DriftPersonalGraphRepository
   final List<_ThroughRelationsStatisticsResult> _throughRelationsResults = [];
   final IntentionContributionRunner _intentionStatisticsRunner;
   final List<_IntentionStatisticsResult> _intentionStatisticsResults = [];
+  var _lastHoldingChangeSequence = 0;
+  _IntentionHoldingIndex? _intentionHoldingIndex;
+  ({int sequence, Future<_IntentionHoldingIndex> index})?
+  _intentionHoldingBuild;
+  final IntentionHoldingRunner _intentionHoldingRunner;
 
   GraphRevision get _currentRevision =>
       _DriftGraphRevision(_epoch, _mutationSequence);
@@ -217,6 +226,10 @@ final class DriftPersonalGraphRepository
       );
     }
   }
+
+  @override
+  Future<IntentionHoldingResult> getIntentionHolding(Set<IntentionId> ids) =>
+      _readIntentionHolding(ids);
 
   @override
   Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) =>
@@ -703,6 +716,7 @@ final class DriftPersonalGraphRepository
   void _notifyGraphWatchersFor(Iterable<GraphChange> changes) {
     final stableChanges = List<GraphChange>.unmodifiable(changes);
     _invalidateStatisticsRelationSnapshot(stableChanges);
+    _invalidateIntentionHoldingIndex(stableChanges);
     _notifyIntentionWatchersFor(stableChanges);
     _notifyActionWatchersFor(stableChanges);
     _notifyRelationWatchersFor(stableChanges);
@@ -850,6 +864,7 @@ final class DriftPersonalGraphRepository
     final stored = await _readCommandSnapshot(command.id);
     if (stored == null) throw const StoredGraphCorruption();
     return _CommittedIntentionUpdated(
+      changesHolding: false,
       intention: stored.intention,
       before: before,
       after: await _catalogEntrySnapshot(stored),
@@ -893,6 +908,7 @@ final class DriftPersonalGraphRepository
     final stored = await _readCommandSnapshot(command.id);
     if (stored == null) throw const StoredGraphCorruption();
     return _CommittedIntentionUpdated(
+      changesHolding: true,
       intention: stored.intention,
       before: before,
       after: await _catalogEntrySnapshot(stored),
@@ -933,6 +949,7 @@ final class DriftPersonalGraphRepository
     final stored = await _readCommandSnapshot(id);
     if (stored == null) throw const StoredGraphCorruption();
     return _CommittedIntentionUpdated(
+      changesHolding: false,
       intention: stored.intention,
       before: before,
       after: await _catalogEntrySnapshot(stored),
@@ -986,6 +1003,7 @@ final class DriftPersonalGraphRepository
         ? await _readVerifiedRelationCountsFor([id, ...cascadedNeighborIds])
         : const <IntentionId, RelationCounts>{};
     return _CommittedIntentionUpdated(
+      changesHolding: true,
       intention: stored.intention,
       before: before,
       after: await _catalogEntrySnapshot(stored),
@@ -1742,6 +1760,7 @@ final class _CommittedIntentionUpdated extends _CommittedIntentionCommand {
     required this.intention,
     required this.before,
     required this.after,
+    required this.changesHolding,
     Map<IntentionId, RelationCounts> affectedCounts = const {},
     List<_CascadedRelationArchive> archivedRelations = const [],
   }) : affectedCounts = Map.unmodifiable(affectedCounts),
@@ -1752,6 +1771,10 @@ final class _CommittedIntentionUpdated extends _CommittedIntentionCommand {
   final IntentionCatalogEntrySnapshot after;
   final Map<IntentionId, RelationCounts> affectedCounts;
   final List<_CascadedRelationArchive> archivedRelations;
+
+  /// Изменение вида или архивного состояния, после которого пакет несёт
+  /// [IntentionHoldingChanged].
+  final bool changesHolding;
 
   @override
   IntentionId get intentionId => intention.id;
@@ -1775,6 +1798,7 @@ final class _CommittedIntentionUpdated extends _CommittedIntentionCommand {
           intentionId: entry.key,
           counts: entry.value,
         ),
+      if (changesHolding) IntentionHoldingChanged(revision: revision),
     ],
   );
 }
@@ -1820,6 +1844,7 @@ final class _CommittedIntentionDeleted extends _CommittedIntentionCommand {
   IntentionCommandSuccess toSuccess(GraphRevision revision) => IntentionDeleted(
     id,
     catalogMutation: IntentionCatalogDeleted(revision: revision, entry: before),
+    additionalChanges: [IntentionHoldingChanged(revision: revision)],
   );
 }
 

@@ -38,6 +38,7 @@ import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import 'action_day_calendar_test_support.dart';
 import 'action_day_page_test_support.dart';
+import '../../../support/intention_holding_read_contract_test_fallback.dart';
 
 void main() {
   for (final onDate in [false, true]) {
@@ -849,7 +850,7 @@ Future<AppRouter> _start(
 /// Выдачу, отметки и команды ведёт [day]. Панель получает отказ чтения: этим
 /// сценариям важно, что открыто действие нажатой строки, а не его содержимое.
 final class _PanelOpeningRepository
-    with TagReadContractTestFallback
+    with IntentionHoldingReadContractTestFallback, TagReadContractTestFallback
     implements PersonalGraphRepository {
   _PanelOpeningRepository(this.day);
 

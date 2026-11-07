@@ -20,6 +20,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
 import '../../support/action_read_contract_test_fallback.dart';
 import '../../support/statistics_read_contract_test_fallback.dart';
+import '../../support/intention_holding_read_contract_test_fallback.dart';
 
 void main() {
   group('GraphCommandCoordinator — создание долговременной связи', () {
@@ -139,6 +140,7 @@ AddLongTermRelations _addition() => AddLongTermRelations(
 
 final class _ControlledPersonalGraphRepository
     with
+        IntentionHoldingReadContractTestFallback,
         ActionReadContractTestFallback,
         StatisticsReadContractTestFallback,
         TagReadContractTestFallback

@@ -21,6 +21,7 @@ import '../relation_graph_test_support.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/action_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
+import '../../../support/intention_holding_read_contract_test_fallback.dart';
 
 /// Одно наблюдение подробных данных связи, которым управляет тест.
 final class ControlledRelationWatch {
@@ -58,6 +59,7 @@ final class ControlledRelationWatch {
 /// Управляемый граф для подробного просмотра связи и переходов к участникам.
 final class ControlledRelationDetailsRepository
     with
+        IntentionHoldingReadContractTestFallback,
         ActionReadContractTestFallback,
         StatisticsReadContractTestFallback,
         TagReadContractTestFallback

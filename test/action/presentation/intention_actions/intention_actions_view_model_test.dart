@@ -29,6 +29,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../intention/presentation/catalog/catalog_test_support.dart';
+import '../../../support/intention_holding_read_contract_test_fallback.dart';
 
 final _today = CalendarDate.fromParts(2026, 10, 8);
 
@@ -680,7 +681,7 @@ final class _Harness {
 }
 
 final class _Repository
-    with TagReadContractTestFallback
+    with IntentionHoldingReadContractTestFallback, TagReadContractTestFallback
     implements PersonalGraphRepository {
   final queries = <IntentionActionsQuery>[];
   final _pages = <Completer<IntentionActionsPageResult>>[];

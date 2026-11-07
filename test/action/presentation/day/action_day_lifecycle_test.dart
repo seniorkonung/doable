@@ -29,6 +29,7 @@ import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import 'action_day_calendar_test_support.dart';
 import 'action_day_page_test_support.dart';
+import '../../../support/intention_holding_read_contract_test_fallback.dart';
 
 // Обозначение сегодняшнего дня на экране дня следует за местными часами, которые
 // идут вместе с поддельным временем теста: полночь, сутки перевода часов и дни
@@ -524,7 +525,7 @@ Future<void> _openActionDay(
 }
 
 final class _Repository
-    with TagReadContractTestFallback
+    with IntentionHoldingReadContractTestFallback, TagReadContractTestFallback
     implements PersonalGraphRepository {
   @override
   Future<ActionDayStatusesReadResult> getActionDayStatuses(

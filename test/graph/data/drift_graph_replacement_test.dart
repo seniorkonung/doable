@@ -22,6 +22,7 @@ import 'package:doable/src/graph_format/graph_format_records.dart';
 import 'package:doable/src/graph_snapshots/graph_snapshot_store.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
+import 'package:doable/src/intention/application/intention_holding.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -53,6 +54,7 @@ const _goldenPath = 'test/graph_format/golden/graph_format_v1.jsonl';
 const _goldenHealthId = '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f11';
 const _goldenRunningId = '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f12';
 const _goldenFiveKilometersId = '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f13';
+const _goldenSwimmingId = '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f14';
 const _goldenSportTagId = '7b0e2f4c-1d3a-4c5e-8f60-0a1b2c3d4e12';
 const _goldenHealthRunningRelationId = '2a3b4c5d-6e7f-4a80-b91c-0d1e2f3a4b11';
 const _goldenActionId = '5e6f7a8b-9c0d-4eaf-b012-3a4b5c6d7e11';
@@ -436,6 +438,11 @@ void main() {
           'ревизия',
           GraphRevisionOrder.same,
         ),
+        isA<IntentionHoldingChanged>().having(
+          (change) => change.revision.compareTo(replacement.revision),
+          'ревизия',
+          GraphRevisionOrder.same,
+        ),
       ]);
       expect(
         before.compareTo(replacement.revision),
@@ -453,6 +460,36 @@ void main() {
       expect(
         (await intentionRevision(running.id)).compareTo(replacement.revision),
         GraphRevisionOrder.newer,
+      );
+    });
+
+    test('замена сбрасывает индекс удержания: удержание читается по новому '
+        'графу на ревизии новой эпохи', () async {
+      await createPreviousGraph();
+      final ids = {
+        _intentionId(_goldenRunningId),
+        _intentionId(_goldenSwimmingId),
+      };
+      expect(
+        await repository.getIntentionHolding(ids),
+        isA<IntentionHoldingRead>(),
+      );
+
+      final replacement = await replace(await goldenSnapshot());
+
+      final read = await repository.getIntentionHolding(ids);
+      expect(
+        read,
+        isA<IntentionHoldingRead>()
+            .having(
+              (read) => read.revision.compareTo(replacement.revision),
+              'ревизия',
+              GraphRevisionOrder.same,
+            )
+            .having((read) => read.holdings, 'удержание', {
+              _intentionId(_goldenRunningId): IntentionHolding.held,
+              _intentionId(_goldenSwimmingId): IntentionHolding.notHeld,
+            }),
       );
     });
 

@@ -21,10 +21,12 @@ import '../../support/action_read_contract_test_fallback.dart';
 import '../../support/statistics_read_contract_test_fallback.dart';
 import '../../support/intention_description_preview.dart';
 import '../../support/intention_title_order_key.dart';
+import '../../support/intention_holding_read_contract_test_fallback.dart';
 
 /// Управляемый граф: каждое чтение группы завершается тестом вручную.
 final class ControlledRelationGraphRepository
     with
+        IntentionHoldingReadContractTestFallback,
         ActionReadContractTestFallback,
         StatisticsReadContractTestFallback,
         TagReadContractTestFallback

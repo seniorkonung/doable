@@ -15,6 +15,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/intention_holding_read_contract_test_fallback.dart';
+
 void main() {
   testWidgets(
     'стрелки переходят через границу года, вкладки сохраняют периоды',
@@ -451,7 +453,9 @@ final class _Harness {
   }
 }
 
-final class _Reader implements PersonalGraphRepository {
+final class _Reader
+    with IntentionHoldingReadContractTestFallback
+    implements PersonalGraphRepository {
   final queries = <StatisticsQuery>[];
 
   @override

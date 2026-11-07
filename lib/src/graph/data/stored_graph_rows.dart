@@ -126,11 +126,7 @@ Intention decodeStoredIntention(
       id: decodeStoredIntentionId(requiredStoredString(data, '${prefix}id')),
       title: title,
       description: description,
-      kind: switch (requiredStoredString(data, '${prefix}kind')) {
-        'main' => IntentionKind.main,
-        'supporting' => IntentionKind.supporting,
-        _ => throw const StoredGraphCorruption(),
-      },
+      kind: decodeStoredIntentionKind(data, '${prefix}kind'),
       readiness: decodeStoredIntentionReadiness(
         data,
         '${prefix}is_action_ready',
@@ -171,6 +167,15 @@ IntentionReadiness decodeStoredIntentionReadiness(
 ) => switch (requiredStoredInteger(data, column)) {
   0 => IntentionReadiness.notReady,
   1 => IntentionReadiness.ready,
+  _ => throw const StoredGraphCorruption(),
+};
+
+IntentionKind decodeStoredIntentionKind(
+  Map<String, Object?> data,
+  String column,
+) => switch (requiredStoredString(data, column)) {
+  'main' => IntentionKind.main,
+  'supporting' => IntentionKind.supporting,
   _ => throw const StoredGraphCorruption(),
 };
 

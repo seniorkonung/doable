@@ -58,6 +58,11 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     'stage': stage.name,
     ..._encodeStatus(event.status),
   },
+  IntentionHoldingIndexDiagnosticsEvent(:final stage) => {
+    'operation': 'intentionHoldingIndex',
+    'stage': stage.name,
+    ..._encodeStatus(event.status),
+  },
   ActionCommandDiagnosticsEvent(:final commandType, :final stage) => {
     'operation': 'actionCommand',
     'commandType': commandType.name,

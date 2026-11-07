@@ -21,6 +21,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
+import '../../../support/intention_holding_read_contract_test_fallback.dart';
 
 void main() {
   testWidgets('устаревший список не показывает неработающую подгрузку', (
@@ -116,7 +117,7 @@ void main() {
 }
 
 final class _Repository
-    with TagReadContractTestFallback
+    with IntentionHoldingReadContractTestFallback, TagReadContractTestFallback
     implements PersonalGraphRepository {
   final requests = <Completer<IntentionActionsPageResult>>[];
 

@@ -21,6 +21,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_positions.dart';
+import '../../../support/intention_holding_read_contract_test_fallback.dart';
 
 void main() {
   test(
@@ -477,7 +478,9 @@ final class _Harness {
   void dispose() => container.dispose();
 }
 
-final class _Repository implements PersonalGraphRepository {
+final class _Repository
+    with IntentionHoldingReadContractTestFallback
+    implements PersonalGraphRepository {
   final queries = <ActionDayStatusQuery>[];
   final _reads = <Completer<ActionDayStatusesReadResult>>[];
   late TagCommandResult commandResult;

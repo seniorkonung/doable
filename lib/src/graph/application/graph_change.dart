@@ -84,11 +84,24 @@ final class GraphReplaced implements GraphChange {
   final GraphRevision revision;
 }
 
+/// Ревизия могла изменить удержание намерений (ADR-0056): её пакет меняет
+/// связи, вид, архивное состояние или состав намерений либо заменяет граф.
+/// Пакеты других операций его не несут.
+final class IntentionHoldingChanged implements GraphChange {
+  const IntentionHoldingChanged({required this.revision});
+
+  @override
+  final GraphRevision revision;
+}
+
 /// Результат подтверждённой замены графа: пакет ревизии новой эпохи из
-/// единственного изменения [GraphReplaced].
+/// изменения [GraphReplaced] и [IntentionHoldingChanged].
 final class ConfirmedGraphReplacement implements ConfirmedGraphChangePackage {
   ConfirmedGraphReplacement(this.revision)
-    : changes = List.unmodifiable([GraphReplaced(revision: revision)]);
+    : changes = List.unmodifiable([
+        GraphReplaced(revision: revision),
+        IntentionHoldingChanged(revision: revision),
+      ]);
 
   @override
   final GraphRevision revision;

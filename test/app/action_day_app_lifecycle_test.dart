@@ -60,6 +60,7 @@ import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/local_database_harness.dart';
+import '../support/intention_holding_read_contract_test_fallback.dart';
 
 part 'action_day_completion_lifecycle_scenarios.dart';
 
@@ -725,7 +726,9 @@ ScrollPosition _dayPosition(WidgetTester tester) => tester
 
 /// Реальный адаптер, который записывает условия чтений выдачи дня и дошедшие
 /// до хранилища команды.
-final class _ObservedRepository implements PersonalGraphRepository {
+final class _ObservedRepository
+    with IntentionHoldingReadContractTestFallback
+    implements PersonalGraphRepository {
   _ObservedRepository(this._delegate);
 
   final PersonalGraphRepository _delegate;

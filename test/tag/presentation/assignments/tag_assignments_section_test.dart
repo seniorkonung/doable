@@ -38,6 +38,7 @@ import '../../../support/in_memory_diagnostics_sink.dart';
 import '../../../support/tag_storage_fixture.dart';
 import '../../../support/tag_assignment_changed.dart';
 import '../../../support/tag_positions.dart';
+import '../../../support/intention_holding_read_contract_test_fallback.dart';
 
 TagId _tagId(int number) =>
     (TagId.decode(tagFixtureId(number)) as TagIdDecodingSuccess).id;
@@ -704,7 +705,9 @@ final class _Revision implements GraphRevision {
   };
 }
 
-final class _FailingRepository extends Fake implements PersonalGraphRepository {
+final class _FailingRepository extends Fake
+    with IntentionHoldingReadContractTestFallback
+    implements PersonalGraphRepository {
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
     TSuccess extends GraphCommandOutcome,
@@ -714,7 +717,9 @@ final class _FailingRepository extends Fake implements PersonalGraphRepository {
           as GraphCommandResult<TSuccess, TFailure>;
 }
 
-final class _PendingRepository extends Fake implements PersonalGraphRepository {
+final class _PendingRepository extends Fake
+    with IntentionHoldingReadContractTestFallback
+    implements PersonalGraphRepository {
   final commands = <RemoveTagAssignment>[];
   final result = Completer<TagCommandResult>();
 

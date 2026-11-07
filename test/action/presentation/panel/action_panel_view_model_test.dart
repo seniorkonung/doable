@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/action_panel_fixture.dart';
+import '../../../support/intention_holding_read_contract_test_fallback.dart';
 
 void main() {
   final id = actionIdOf(1);
@@ -358,7 +359,9 @@ final class _Harness {
   }
 }
 
-final class _SerializedRepository implements PersonalGraphRepository {
+final class _SerializedRepository
+    with IntentionHoldingReadContractTestFallback
+    implements PersonalGraphRepository {
   _SerializedRepository(this.delegate);
 
   final ActionPanelRepository delegate;

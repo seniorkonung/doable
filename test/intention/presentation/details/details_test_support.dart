@@ -29,6 +29,7 @@ import '../../../support/statistics_read_contract_test_fallback.dart';
 import '../../../support/intention_description_preview.dart';
 import '../../../support/intention_title_order_key.dart';
 import '../../../support/intention_type_counts.dart';
+import '../../../support/intention_holding_read_contract_test_fallback.dart';
 
 final class ControlledDetailRequest {
   ControlledDetailRequest({bool broadcast = false}) {
@@ -78,6 +79,7 @@ final class ControlledDetailRequest {
 
 final class ControlledDetailsRepository
     with
+        IntentionHoldingReadContractTestFallback,
         ActionReadContractTestFallback,
         StatisticsReadContractTestFallback,
         TagReadContractTestFallback

@@ -29,6 +29,7 @@ import 'action_read_contract_test_fallback.dart';
 import 'controlled_local_date.dart';
 import 'ordinary_page_test_app.dart';
 import 'tag_read_contract_test_fallback.dart';
+import 'intention_holding_read_contract_test_fallback.dart';
 
 /// Открытый лист нового действия.
 Finder get actionEditor => find.byType(ActionEditorPage);
@@ -181,7 +182,10 @@ final class _Change implements GraphChange {
 /// Репозиторий листа: команда создания остаётся незавершённой, пока тест не
 /// подтвердит или не отклонит её.
 final class ActionEditorRepository
-    with TagReadContractTestFallback, ActionReadContractTestFallback
+    with
+        IntentionHoldingReadContractTestFallback,
+        TagReadContractTestFallback,
+        ActionReadContractTestFallback
     implements PersonalGraphRepository {
   final creations = <CreateAction>[];
   final _requests = <Completer<ActionCommandResult>>[];

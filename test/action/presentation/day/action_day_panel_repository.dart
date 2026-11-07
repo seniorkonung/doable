@@ -10,6 +10,7 @@ import 'package:doable/src/intention/application/intention_result.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
 import 'action_day_page_test_support.dart';
+import '../../../support/intention_holding_read_contract_test_fallback.dart';
 
 /// Хранилище экрана дня, которое умеет открыть панель действия.
 ///
@@ -17,7 +18,7 @@ import 'action_day_page_test_support.dart';
 /// действия, нужное панели, молчит: страничным проверкам важно только, что
 /// нажатие на строку открыло панель именно этого действия.
 final class ActionDayPanelRepository
-    with TagReadContractTestFallback
+    with IntentionHoldingReadContractTestFallback, TagReadContractTestFallback
     implements PersonalGraphRepository {
   ActionDayPanelRepository(this.day);
 

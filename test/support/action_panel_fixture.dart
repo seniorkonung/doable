@@ -26,6 +26,7 @@ import 'package:doable/src/shared/domain/calendar_date.dart';
 
 import 'action_read_contract_test_fallback.dart';
 import 'tag_read_contract_test_fallback.dart';
+import 'intention_holding_read_contract_test_fallback.dart';
 
 String _uuid(int n) =>
     '018f0b5d-6b2e-7c80-8000-${n.toRadixString(16).padLeft(12, '0')}';
@@ -132,7 +133,10 @@ final class _Change implements GraphChange {
 /// Репозиторий панели действия: подписка управляется тестом, а команда
 /// остаётся незавершённой, пока тест не подтвердит или не отклонит её.
 final class ActionPanelRepository
-    with TagReadContractTestFallback, ActionReadContractTestFallback
+    with
+        IntentionHoldingReadContractTestFallback,
+        TagReadContractTestFallback,
+        ActionReadContractTestFallback
     implements PersonalGraphRepository {
   final controller = StreamController<ActionReadResult>.broadcast(sync: true);
   final commands = <UpdateActionFields>[];

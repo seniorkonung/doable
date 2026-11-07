@@ -24,6 +24,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/tag_positions.dart';
+import '../../support/intention_holding_read_contract_test_fallback.dart';
 
 void main() {
   test('скрытая модель не начинает чтений даже при смене условий', () async {
@@ -594,7 +595,9 @@ final class _Harness {
   void dispose() => container.dispose();
 }
 
-final class _Reader implements PersonalGraphRepository {
+final class _Reader
+    with IntentionHoldingReadContractTestFallback
+    implements PersonalGraphRepository {
   final queries = <StatisticsQuery>[];
   final responses = <Completer<StatisticsPageResult>>[];
   late TagCommandResult commandResult;

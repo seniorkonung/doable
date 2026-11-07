@@ -54,6 +54,30 @@ void main() {
       });
     });
 
+    test('отказ построения индекса удержания кодируется без данных графа', () {
+      final messages = <String>[];
+      final sink = DeveloperDiagnosticsSink(messages.add);
+
+      recordDiagnosticsSafely(
+        sink,
+        const IntentionHoldingIndexDiagnosticsEvent(
+          stage: IntentionHoldingIndexDiagnosticsStage.relations,
+          status: DiagnosticsFailed(
+            duration: Duration(microseconds: 4321),
+            code: DiagnosticsFailureCode.corruption,
+          ),
+        ),
+      );
+
+      expect(jsonDecode(messages.single), {
+        'operation': 'intentionHoldingIndex',
+        'stage': 'relations',
+        'outcome': 'failed',
+        'durationMicros': 4321,
+        'failureCode': 'corruption',
+      });
+    });
+
     test('успех чтения порции каталога кодируется с полем сортировки', () {
       final messages = <String>[];
       final sink = DeveloperDiagnosticsSink(messages.add);

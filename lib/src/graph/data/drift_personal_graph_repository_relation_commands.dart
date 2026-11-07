@@ -484,6 +484,7 @@ final class _CommittedLongTermRelationsAddition
               revision: revision,
               relation: relation,
             ),
+          IntentionHoldingChanged(revision: revision),
         ],
       );
 }
@@ -525,6 +526,7 @@ final class _CommittedLongTermRelationUpdate
                   before: before,
                   after: relation,
                 ),
+                IntentionHoldingChanged(revision: revision),
               ]
             : [
                 LongTermRelationUnchangedChange(
@@ -560,6 +562,7 @@ final class _CommittedLongTermRelationDeletion
               counts: entry.value,
             ),
           LongTermRelationDeletedChange(revision: revision, relation: relation),
+          IntentionHoldingChanged(revision: revision),
         ],
       );
 }

@@ -70,6 +70,7 @@ import '../../support/action_read_contract_test_fallback.dart';
 import '../../support/statistics_read_contract_test_fallback.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/tag_positions.dart';
+import '../../support/intention_holding_read_contract_test_fallback.dart';
 
 /// Контрольная точка согласования: каталог, подробные данные и вкладка
 /// «Связи» обслуживаются одним графом, одним coordinator и одним потоком
@@ -1660,6 +1661,7 @@ final class _CheckpointHarness {
 /// Управляемый граф, обслуживающий все чтения и команды контрольной точки.
 final class _CheckpointGraphRepository
     with
+        IntentionHoldingReadContractTestFallback,
         ActionReadContractTestFallback,
         StatisticsReadContractTestFallback,
         TagReadContractTestFallback

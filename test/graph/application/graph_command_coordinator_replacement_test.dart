@@ -51,7 +51,7 @@ void main() {
       isA<GraphBackupRestoreCompletion>().having(
         (completion) => completion.confirmedChange?.changes,
         'изменения',
-        [isA<GraphReplaced>()],
+        [isA<GraphReplaced>(), isA<IntentionHoldingChanged>()],
       ),
     ]);
     final afterRestore = harness.startDeleteOf(5);

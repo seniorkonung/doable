@@ -12,6 +12,8 @@ import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'intention_holding_read_contract_test_fallback.dart';
+
 final class TagCatalogTestRevision implements GraphRevision {
   const TagCatalogTestRevision([this.number = 1]);
 
@@ -29,6 +31,7 @@ final class TagCatalogTestRevision implements GraphRevision {
 }
 
 final class TagCatalogTestRepository extends Fake
+    with IntentionHoldingReadContractTestFallback
     implements PersonalGraphRepository {
   final reads = <Completer<TagCatalogResult>>[];
   final readModes = <TagCatalogMode>[];

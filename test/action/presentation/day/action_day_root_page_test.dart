@@ -47,6 +47,7 @@ import '../../../support/tag_read_contract_test_fallback.dart';
 import 'action_day_calendar_test_support.dart';
 import 'action_day_page_test_support.dart';
 import 'action_day_panel_repository.dart';
+import '../../../support/intention_holding_read_contract_test_fallback.dart';
 
 void main() {
   for (final onDate in [false, true]) {
@@ -1577,7 +1578,7 @@ Future<AppRouter> _open(
 }
 
 final class _Repository
-    with TagReadContractTestFallback
+    with IntentionHoldingReadContractTestFallback, TagReadContractTestFallback
     implements PersonalGraphRepository {
   _Repository({
     this.completedItems = const [],
