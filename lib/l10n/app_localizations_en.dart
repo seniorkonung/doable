@@ -3159,4 +3159,53 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get batchContinueAction => 'Continue selecting';
+
+  @override
+  String get actionEditorTitle => 'New action';
+
+  @override
+  String get actionEditorCreate => 'Create action';
+
+  @override
+  String get actionEditorDiscardTitle => 'Discard the new action?';
+
+  @override
+  String get actionEditorDiscardMessage =>
+      'The entered name and description won’t be saved.';
+
+  @override
+  String get actionEditorPathEmptyHint =>
+      'An action needs at least one intention it serves.';
+
+  @override
+  String actionEditorPathBetween(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions between',
+      one: '$count intention between',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String actionEditorPathThen(String previous, String next) {
+    return '$previous, then $next';
+  }
+
+  @override
+  String actionEditorPathLabel(String path) {
+    return 'Path: $path. Change the path';
+  }
+
+  @override
+  String actionEditorPriorityLabel(String priority) {
+    return 'Priority $priority. Change the priority';
+  }
+
+  @override
+  String get actionPriorityHighest => 'The highest';
+
+  @override
+  String get actionPriorityLowest => 'The lowest';
 }

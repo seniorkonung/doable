@@ -4846,6 +4846,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Continue selecting'**
   String get batchContinueAction;
+
+  /// Заголовок листа нового действия
+  ///
+  /// In en, this message translates to:
+  /// **'New action'**
+  String get actionEditorTitle;
+
+  /// Кнопка создания действия в листе нового действия
+  ///
+  /// In en, this message translates to:
+  /// **'Create action'**
+  String get actionEditorCreate;
+
+  /// Вопрос перед закрытием листа нового действия с введённым текстом
+  ///
+  /// In en, this message translates to:
+  /// **'Discard the new action?'**
+  String get actionEditorDiscardTitle;
+
+  /// Пояснение вопроса перед закрытием листа нового действия
+  ///
+  /// In en, this message translates to:
+  /// **'The entered name and description won’t be saved.'**
+  String get actionEditorDiscardMessage;
+
+  /// Подсказка под пустым свёрнутым путём листа нового действия
+  ///
+  /// In en, this message translates to:
+  /// **'An action needs at least one intention it serves.'**
+  String get actionEditorPathEmptyHint;
+
+  /// Число промежуточных намерений свёрнутого пути
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{{count} intention between} other{{count} intentions between}}'**
+  String actionEditorPathBetween(int count);
+
+  /// Соединение намерений в доступном названии свёрнутого пути
+  ///
+  /// In en, this message translates to:
+  /// **'{previous}, then {next}'**
+  String actionEditorPathThen(String previous, String next);
+
+  /// Доступное название непустого свёрнутого пути
+  ///
+  /// In en, this message translates to:
+  /// **'Path: {path}. Change the path'**
+  String actionEditorPathLabel(String path);
+
+  /// Доступное название значения приоритета в листе нового действия
+  ///
+  /// In en, this message translates to:
+  /// **'Priority {priority}. Change the priority'**
+  String actionEditorPriorityLabel(String priority);
+
+  /// Пояснение P1 в листе приоритета
+  ///
+  /// In en, this message translates to:
+  /// **'The highest'**
+  String get actionPriorityHighest;
+
+  /// Пояснение P4 в листе приоритета
+  ///
+  /// In en, this message translates to:
+  /// **'The lowest'**
+  String get actionPriorityLowest;
 }
 
 class _AppLocalizationsDelegate

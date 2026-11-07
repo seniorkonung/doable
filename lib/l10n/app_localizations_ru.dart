@@ -3205,4 +3205,55 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get batchContinueAction => 'Продолжить выбор';
+
+  @override
+  String get actionEditorTitle => 'Новое действие';
+
+  @override
+  String get actionEditorCreate => 'Создать действие';
+
+  @override
+  String get actionEditorDiscardTitle => 'Отменить новое действие?';
+
+  @override
+  String get actionEditorDiscardMessage =>
+      'Введённые название и описание не будут сохранены.';
+
+  @override
+  String get actionEditorPathEmptyHint =>
+      'Действию нужно хотя бы одно намерение, которому оно служит.';
+
+  @override
+  String actionEditorPathBetween(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count промежуточного намерения',
+      many: '$count промежуточных намерений',
+      few: '$count промежуточных намерения',
+      one: '$count промежуточное намерение',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String actionEditorPathThen(String previous, String next) {
+    return '$previous, затем $next';
+  }
+
+  @override
+  String actionEditorPathLabel(String path) {
+    return 'Путь: $path. Изменить путь';
+  }
+
+  @override
+  String actionEditorPriorityLabel(String priority) {
+    return 'Приоритет $priority. Изменить приоритет';
+  }
+
+  @override
+  String get actionPriorityHighest => 'Самый высокий';
+
+  @override
+  String get actionPriorityLowest => 'Самый низкий';
 }

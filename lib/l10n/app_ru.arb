@@ -938,5 +938,20 @@
   "batchDiscardMessage": "{count, plural, one{{count} связь не будет добавлена.} few{{count} связи не будут добавлены.} many{{count} связей не будут добавлены.} other{{count} связи не будут добавлены.}}",
   "batchCreatedRemain": "Созданные намерения останутся в каталоге.",
   "batchDiscardAction": "Сбросить",
-  "batchContinueAction": "Продолжить выбор"
+  "batchContinueAction": "Продолжить выбор",
+  "actionEditorTitle": "Новое действие",
+  "actionEditorCreate": "Создать действие",
+  "actionEditorDiscardTitle": "Отменить новое действие?",
+  "actionEditorDiscardMessage": "Введённые название и описание не будут сохранены.",
+  "actionEditorPathEmptyHint": "Действию нужно хотя бы одно намерение, которому оно служит.",
+  "actionEditorPathBetween": "{count, plural, one{{count} промежуточное намерение} few{{count} промежуточных намерения} many{{count} промежуточных намерений} other{{count} промежуточного намерения}}",
+  "actionEditorPathThen": "{previous}, затем {next}",
+  "actionEditorPathLabel": "Путь: {path}. Изменить путь",
+  "actionEditorPriorityLabel": "Приоритет {priority}. Изменить приоритет",
+  "actionPriorityHighest": "Самый высокий",
+  "actionPriorityLowest": "Самый низкий",
+  "@actionEditorPathBetween": {"placeholders": {"count": {"type": "int"}}},
+  "@actionEditorPathThen": {"placeholders": {"previous": {"type": "String"}, "next": {"type": "String"}}},
+  "@actionEditorPathLabel": {"placeholders": {"path": {"type": "String"}}},
+  "@actionEditorPriorityLabel": {"placeholders": {"priority": {"type": "String"}}}
 }
