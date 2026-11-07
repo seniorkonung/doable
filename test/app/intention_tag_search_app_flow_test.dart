@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/action_seed.dart';
 import '../support/app_root_pages.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
@@ -26,11 +27,11 @@ const _health = 301;
 const _sport = 302;
 const _rest = 303;
 
-/// Связь сохранённого дневного пути: её участники защищены от замены.
+/// Связь пути сохранённого действия.
 const _pathRelation = 101;
 const _archivedRelation = 102;
 const _activeRelation = 103;
-const _dailyChoice = 201;
+const _action = 201;
 
 /// Строка результата: название и строка тегов так, как они показаны.
 typedef _Row = (String title, String tags);
@@ -438,7 +439,7 @@ final class _App {
 }
 
 /// Намерения с тегами «Здоровье», «Спорт» и «Отдых», связи первого
-/// намерения и его дневной выбор с путём по одной из активных связей.
+/// намерения и действие с путём по одной из активных связей.
 void _seed(sqlite.Database database) {
   seedRawGraph(database, () {
     for (final (number, name) in [
@@ -488,23 +489,10 @@ void _seed(sqlite.Database database) {
         ],
       );
     }
-    database.execute(
-      'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
-      [
-        tagFixtureId(_dailyChoice),
-        tagFixtureId(1),
-        tagFixtureId(2),
-        '2026-09-25',
-        0,
-      ],
-    );
-    database.execute(
-      'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
-      [
-        tagFixtureId(202),
-        tagFixtureId(_dailyChoice),
-        tagFixtureId(_pathRelation),
-      ],
+    seedAction(
+      database,
+      id: tagFixtureId(_action),
+      path: [tagFixtureId(1), tagFixtureId(2)],
     );
   });
 }

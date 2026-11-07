@@ -4,8 +4,6 @@ import '../action/domain/action_path.dart';
 import '../action/domain/action_priority.dart';
 import '../action/domain/action_schedule.dart';
 import '../action/domain/action_text.dart';
-import '../daily_choice/domain/daily_choice.dart';
-import '../daily_choice/domain/daily_choice_id.dart';
 import '../intention/domain/intention.dart';
 import '../intention/domain/intention_id.dart';
 import '../intention/domain/intention_text.dart';
@@ -38,7 +36,6 @@ final class GraphRecordCounts {
     required this.longTermRelations,
     required this.deletedRelationPairs,
     required this.actions,
-    required this.dailyChoices,
   }) {
     RangeError.checkNotNegative(tags, 'tags');
     RangeError.checkNotNegative(intentions, 'intentions');
@@ -47,7 +44,6 @@ final class GraphRecordCounts {
     RangeError.checkNotNegative(longTermRelations, 'longTermRelations');
     RangeError.checkNotNegative(deletedRelationPairs, 'deletedRelationPairs');
     RangeError.checkNotNegative(actions, 'actions');
-    RangeError.checkNotNegative(dailyChoices, 'dailyChoices');
   }
 
   final int tags;
@@ -61,7 +57,6 @@ final class GraphRecordCounts {
   /// Надгробия удалённых связей пар, соседствующих в путях действий.
   final int deletedRelationPairs;
   final int actions;
-  final int dailyChoices;
 }
 
 /// Факт пакета лога: вид изменения сущности транзакцией.
@@ -113,7 +108,6 @@ sealed class GraphEntityRecord {
         relatedIntentionId: relatedIntentionId,
       ),
     ActionRecord(:final id) => ActionKey(id),
-    DailyChoiceRecord(:final choice) => DailyChoiceKey(choice.id),
   };
 }
 
@@ -242,24 +236,6 @@ final class ActionRecord extends GraphEntityRecord {
   final ActionTimestamp updatedAt;
 }
 
-final class DailyChoiceRecord extends GraphEntityRecord {
-  /// Путь выбора принадлежит этому дневному выбору.
-  factory DailyChoiceRecord({
-    required DailyChoice choice,
-    required StoredChoicePath path,
-  }) {
-    if (path.steps.first.dailyChoiceId != choice.id) {
-      throw ArgumentError.value(path, 'path');
-    }
-    return DailyChoiceRecord._(choice, path);
-  }
-
-  const DailyChoiceRecord._(this.choice, this.path);
-
-  final DailyChoice choice;
-  final StoredChoicePath path;
-}
-
 /// Ключ сущности графа. Ключи равны, когда указывают на одну сущность.
 sealed class GraphEntityKey {
   const GraphEntityKey();
@@ -363,16 +339,4 @@ final class ActionKey extends GraphEntityKey {
 
   @override
   int get hashCode => Object.hash(ActionKey, id);
-}
-
-final class DailyChoiceKey extends GraphEntityKey {
-  const DailyChoiceKey(this.id);
-
-  final DailyChoiceId id;
-
-  @override
-  bool operator ==(Object other) => other is DailyChoiceKey && other.id == id;
-
-  @override
-  int get hashCode => id.hashCode;
 }

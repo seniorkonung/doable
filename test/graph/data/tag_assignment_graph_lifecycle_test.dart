@@ -378,7 +378,7 @@ void main() {
   );
 
   test(
-    'теги участников дневного пути меняются независимо от связи и пути',
+    'теги намерений пути действия меняются независимо от связи и пути',
     () async {
       final relationBefore = row('long_term_relations', 101);
       final intentionsBefore = rows('intentions');

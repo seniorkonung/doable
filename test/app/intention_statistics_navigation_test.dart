@@ -544,26 +544,7 @@ Future<void> _seed(AppDatabase database) => seedGraph(database, () async {
         ],
       );
     }
-    await database.customStatement(
-      "INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, '2025-09-12', 1)",
-      [
-        durabilityUuid(4000 + i),
-        durabilityUuid(1000 + i),
-        durabilityUuid(2000 + i),
-      ],
-    );
-    for (var step = 0; step < 2; step++) {
-      await database.customStatement(
-        'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id, previous_step_id) VALUES (?, ?, ?, ?)',
-        [
-          durabilityUuid(5000 + i * 2 + step),
-          durabilityUuid(4000 + i),
-          durabilityUuid(firstRelation + step),
-          step == 0 ? null : durabilityUuid(5000 + i * 2),
-        ],
-      );
-    }
-    // Главная считает действия: путь действия повторяет путь выбора.
+    // Главная считает действия.
     await database.customStatement(
       "INSERT INTO actions (id, title, date, priority, is_completed, created_at, updated_at) VALUES (?, 'Действие', '2025-09-12', 4, 1, 1, 1)",
       [durabilityUuid(7000 + i)],

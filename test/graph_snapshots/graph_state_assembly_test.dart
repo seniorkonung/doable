@@ -6,9 +6,6 @@ import 'package:doable/src/action/domain/action_path.dart';
 import 'package:doable/src/action/domain/action_priority.dart';
 import 'package:doable/src/action/domain/action_schedule.dart';
 import 'package:doable/src/action/domain/action_text.dart';
-import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/graph_format/graph_format_codec.dart';
 import 'package:doable/src/graph_format/graph_format_records.dart';
 import 'package:doable/src/graph_snapshots/graph_state_assembly.dart';
@@ -43,7 +40,7 @@ void main() {
       final health = _intention(1, 'Здоровье', createdAt: _morning);
       final running = _intention(2, 'Бегать', createdAt: _morning.add(_minute));
       final needRunning = _relation(1, from: 1, to: 2);
-      final choice = _dailyChoice(1, from: 1, to: 2, through: 1);
+      final jogging = _action(1, 'Пробежка', path: [1, 2]);
       final sport = _tag(2, 'Спорт');
       final swimming = _intention(3, 'Плавать', createdAt: _evening);
       final canSwim = _relation(2, from: 1, to: 3);
@@ -57,7 +54,7 @@ void main() {
             running,
             _assignment(tag: 1, intention: 2),
             needRunning,
-            choice,
+            jogging,
           ]),
         ),
         Stream.fromIterable([
@@ -79,7 +76,7 @@ void main() {
         intentions: 3,
         tagAssignments: 3,
         longTermRelations: 2,
-        dailyChoices: 1,
+        actions: 1,
       ));
       expect(_lines(await state.records.toList()), [
         ..._lines([home, sport, health, running, swimming]),
@@ -88,7 +85,7 @@ void main() {
           _assignment(tag: 2, intention: 3),
           _assignment(tag: 1, intention: 3),
         ]),
-        ..._lines([needRunning, canSwim, choice]),
+        ..._lines([needRunning, canSwim, jogging]),
       ]);
     });
 
@@ -112,7 +109,7 @@ void main() {
         intentions: 1,
         tagAssignments: 1,
         longTermRelations: 0,
-        dailyChoices: 0,
+        actions: 0,
       ));
       expect(_lines(await state.records.toList()), _lines(base));
     });
@@ -176,7 +173,7 @@ void main() {
         intentions: 3,
         tagAssignments: 0,
         longTermRelations: 3,
-        dailyChoices: 0,
+        actions: 0,
       ));
       expect(
         _lines(await state.records.toList()),
@@ -231,7 +228,7 @@ void main() {
         intentions: 0,
         tagAssignments: 0,
         longTermRelations: 0,
-        dailyChoices: 0,
+        actions: 0,
       ));
       expect(
         _lines(await state.records.toList()),
@@ -272,7 +269,7 @@ void main() {
         intentions: 1,
         tagAssignments: 1,
         longTermRelations: 0,
-        dailyChoices: 0,
+        actions: 0,
       ));
       expect(
         _lines(await state.records.toList()),
@@ -314,7 +311,7 @@ void main() {
         intentions: 2,
         tagAssignments: 2,
         longTermRelations: 0,
-        dailyChoices: 0,
+        actions: 0,
       ));
       expect(
         _lines(await state.records.toList()),
@@ -368,7 +365,7 @@ void main() {
         intentions: 3,
         tagAssignments: 3,
         longTermRelations: 0,
-        dailyChoices: 0,
+        actions: 0,
       ));
       expect(
         _lines(await state.records.toList()),
@@ -514,7 +511,7 @@ const _noCounts = (
   intentions: 0,
   tagAssignments: 0,
   longTermRelations: 0,
-  dailyChoices: 0,
+  actions: 0,
 );
 
 typedef _Counts = ({
@@ -522,7 +519,7 @@ typedef _Counts = ({
   int intentions,
   int tagAssignments,
   int longTermRelations,
-  int dailyChoices,
+  int actions,
 });
 
 _Counts _counts(GraphRecordCounts counts) => (
@@ -530,7 +527,7 @@ _Counts _counts(GraphRecordCounts counts) => (
   intentions: counts.intentions,
   tagAssignments: counts.tagAssignments,
   longTermRelations: counts.longTermRelations,
-  dailyChoices: counts.dailyChoices,
+  actions: counts.actions,
 );
 
 /// Кодирование каноническое и передаёт каждое поле, поэтому совпадение строк
@@ -630,33 +627,6 @@ ActionRecord _action(int number, String title, {required List<int> path}) =>
       updatedAt: ActionTimestamp(_morning),
     );
 
-DailyChoiceRecord _dailyChoice(
-  int number, {
-  required int from,
-  required int to,
-  required int through,
-}) {
-  final id = _dailyChoiceId(number);
-  return DailyChoiceRecord(
-    choice: DailyChoice(
-      id: id,
-      sourceIntentionId: _intentionId(from),
-      selectedIntentionId: _intentionId(to),
-      date: CalendarDate.fromParts(2026, 10, 2),
-      description: null,
-      isCompleted: false,
-    ),
-    path: StoredChoicePath([
-      ChoicePathStep(
-        id: _stepId(number),
-        dailyChoiceId: id,
-        relationId: _relationId(through),
-        previousStepId: null,
-      ),
-    ]),
-  );
-}
-
 TagId _tagId(int number) =>
     (TagId.decode(_uuid('7b0e2f4c', number)) as TagIdDecodingSuccess).id;
 
@@ -667,14 +637,6 @@ IntentionId _intentionId(int number) => (IntentionId.decode(
 LongTermRelationId _relationId(int number) => (LongTermRelationId.decode(
   _uuid('2a3b4c5d', number),
 ) as LongTermRelationIdDecodingSuccess).id;
-
-DailyChoiceId _dailyChoiceId(int number) => (DailyChoiceId.decode(
-  _uuid('3c4d5e6f', number),
-) as DailyChoiceIdDecodingSuccess).id;
-
-ChoicePathStepId _stepId(int number) => (ChoicePathStepId.decode(
-  _uuid('4d5e6f7a', number),
-) as ChoicePathStepIdDecodingSuccess).id;
 
 /// Идентификаторы с одним префиксом упорядочены по [number].
 String _uuid(String prefix, int number) =>

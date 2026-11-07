@@ -52,13 +52,6 @@ CREATE TABLE graph_log_long_term_relation_marks (
   )
 );
 
-CREATE TABLE graph_log_daily_choice_marks (
-  daily_choice_id TEXT NOT NULL PRIMARY KEY,
-  first_operation TEXT NOT NULL CHECK (
-    first_operation IN ('insert', 'update', 'delete')
-  )
-);
-
 CREATE TABLE graph_log_action_marks (
   action_id TEXT NOT NULL PRIMARY KEY,
   first_operation TEXT NOT NULL CHECK (
@@ -326,80 +319,6 @@ BEGIN
   INSERT OR IGNORE INTO graph_log_long_term_relation_marks (
     long_term_relation_id, first_operation
   ) VALUES (old.id, 'delete');
-END;
-
-CREATE TRIGGER graph_log_mark_daily_choice_insert
-AFTER INSERT ON daily_choices
-WHEN (SELECT capture FROM graph_log_control) = 1
-BEGIN
-  SELECT RAISE(ABORT, 'graph write outside the graph write path')
-  FROM graph_log_control
-  WHERE writing = 0;
-  INSERT OR IGNORE INTO graph_log_daily_choice_marks (
-    daily_choice_id, first_operation
-  ) VALUES (new.id, 'insert');
-END;
-
-CREATE TRIGGER graph_log_mark_daily_choice_update
-AFTER UPDATE ON daily_choices
-WHEN (SELECT capture FROM graph_log_control) = 1
-BEGIN
-  SELECT RAISE(ABORT, 'graph write outside the graph write path')
-  FROM graph_log_control
-  WHERE writing = 0;
-  INSERT OR IGNORE INTO graph_log_daily_choice_marks (
-    daily_choice_id, first_operation
-  ) VALUES (new.id, 'update');
-END;
-
-CREATE TRIGGER graph_log_mark_daily_choice_delete
-AFTER DELETE ON daily_choices
-WHEN (SELECT capture FROM graph_log_control) = 1
-BEGIN
-  SELECT RAISE(ABORT, 'graph write outside the graph write path')
-  FROM graph_log_control
-  WHERE writing = 0;
-  INSERT OR IGNORE INTO graph_log_daily_choice_marks (
-    daily_choice_id, first_operation
-  ) VALUES (old.id, 'delete');
-END;
-
--- Путь — часть записи дневного выбора, поэтому изменение шага отмечает
--- изменение своего выбора.
-CREATE TRIGGER graph_log_mark_daily_choice_path_step_insert
-AFTER INSERT ON daily_choice_path_steps
-WHEN (SELECT capture FROM graph_log_control) = 1
-BEGIN
-  SELECT RAISE(ABORT, 'graph write outside the graph write path')
-  FROM graph_log_control
-  WHERE writing = 0;
-  INSERT OR IGNORE INTO graph_log_daily_choice_marks (
-    daily_choice_id, first_operation
-  ) VALUES (new.daily_choice_id, 'update');
-END;
-
-CREATE TRIGGER graph_log_mark_daily_choice_path_step_update
-AFTER UPDATE ON daily_choice_path_steps
-WHEN (SELECT capture FROM graph_log_control) = 1
-BEGIN
-  SELECT RAISE(ABORT, 'graph write outside the graph write path')
-  FROM graph_log_control
-  WHERE writing = 0;
-  INSERT OR IGNORE INTO graph_log_daily_choice_marks (
-    daily_choice_id, first_operation
-  ) VALUES (old.daily_choice_id, 'update'), (new.daily_choice_id, 'update');
-END;
-
-CREATE TRIGGER graph_log_mark_daily_choice_path_step_delete
-AFTER DELETE ON daily_choice_path_steps
-WHEN (SELECT capture FROM graph_log_control) = 1
-BEGIN
-  SELECT RAISE(ABORT, 'graph write outside the graph write path')
-  FROM graph_log_control
-  WHERE writing = 0;
-  INSERT OR IGNORE INTO graph_log_daily_choice_marks (
-    daily_choice_id, first_operation
-  ) VALUES (old.daily_choice_id, 'update');
 END;
 
 CREATE TRIGGER graph_log_mark_action_insert

@@ -45,10 +45,8 @@ import '../../support/local_database_harness.dart';
 import '../../support/transaction_storage_exhaustion.dart';
 
 /// Эталонный файл формата версии 1: все виды записей, синий и бесцветный
-/// теги, архивированные намерение и связь, путь дневного выбора через
-/// архивированную связь к намерению без готовности к действию и пути
-/// действий через архивированную связь, удалённое намерение и удалённую
-/// связь.
+/// теги, архивированные намерение и связь и пути действий через
+/// архивированную связь, удалённое намерение и удалённую связь.
 const _goldenPath = 'test/graph_format/golden/graph_format_v1.jsonl';
 
 /// Идентификаторы сущностей эталонного файла.
@@ -74,7 +72,6 @@ GraphRecordCounts _goldenCountsWith({
   longTermRelations: 3,
   deletedRelationPairs: deletedRelationPairs,
   actions: 3,
-  dailyChoices: 2,
 );
 
 void main() {
@@ -774,26 +771,6 @@ void main() {
             isA<SqliteConstraintFailure>(),
           ),
         ),
-      );
-
-      expect(await storedState(), before);
-    });
-
-    test('путь дневного выбора, который не доходит до выбранного намерения, '
-        'отклоняет записи снимка и оставляет граф, копии, лог и реестр '
-        'снимков прежними', () async {
-      await createPreviousGraph();
-      final before = await storedState();
-      final snapshot = await goldenSnapshot(
-        edit: (jsonl) => jsonl.replaceFirst(
-          '"selectedIntentionId":"1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f13"',
-          '"selectedIntentionId":"1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f12"',
-        ),
-      );
-
-      await expectLater(
-        replace(snapshot),
-        throwsA(isA<GraphReplacementRecordsRejected>()),
       );
 
       expect(await storedState(), before);

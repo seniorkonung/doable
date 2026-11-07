@@ -196,10 +196,14 @@ void main() {
     );
     expect(_assigned(raw, existingTagId, number), isTrue);
     expect(
-      raw.select('SELECT id FROM daily_choices WHERE id = ?', [
+      raw.select('SELECT id FROM actions WHERE id = ?', [tagFixtureId(201)]),
+      hasLength(1),
+    );
+    expect(
+      raw.select('SELECT position FROM action_path_items WHERE action_id = ?', [
         tagFixtureId(201),
       ]),
-      hasLength(1),
+      hasLength(2),
     );
     expect(retainedTagFixtureGraph(raw), graphBefore);
 

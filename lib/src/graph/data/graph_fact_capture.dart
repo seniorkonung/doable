@@ -32,7 +32,6 @@ final class GraphFactCapture {
       ...await _relationFacts(),
       ...await _deletedRelationPairFacts(),
       ...await _actionFacts(),
-      ...await _dailyChoiceFacts(),
     ];
     for (final marks in _markTables) {
       await _database.delete(marks).go();
@@ -48,7 +47,6 @@ final class GraphFactCapture {
     _database.graphLogLongTermRelationMarks,
     _database.graphLogDeletedRelationPairMarks,
     _database.graphLogActionMarks,
-    _database.graphLogDailyChoiceMarks,
   ];
 
   Future<Iterable<GraphFact>> _tagFacts() async {
@@ -260,46 +258,6 @@ final class GraphFactCapture {
           record: () => storedActionRecord(row.data, paths),
           key: () => ActionKey(
             decodeStoredActionId(requiredStoredString(row.data, 'mark_id')),
-          ),
-        ),
-    ];
-  }
-
-  Future<Iterable<GraphFact>> _dailyChoiceFacts() async {
-    final rows = await _database
-        .customSelect(
-          '''SELECT mark.daily_choice_id AS mark_id, mark.first_operation,
-                choice.id IS NOT NULL AS present, choice.creation_sequence,
-                choice.id, choice.source_intention_id,
-                choice.selected_intention_id, choice.choice_date,
-                choice.description, choice.is_completed,
-                choice.scheduled_minute, choice.priority
-         FROM graph_log_daily_choice_marks AS mark
-         LEFT JOIN daily_choices AS choice ON choice.id = mark.daily_choice_id
-         ORDER BY choice.creation_sequence IS NULL, choice.creation_sequence,
-                  mark.daily_choice_id''',
-          readsFrom: {
-            _database.graphLogDailyChoiceMarks,
-            _database.dailyChoices,
-          },
-        )
-        .get();
-    if (rows.isEmpty) return const [];
-    final paths = await readStoredChoicePaths(
-      _database,
-      choiceIds: 'SELECT daily_choice_id FROM graph_log_daily_choice_marks',
-      readsFrom: {_database.graphLogDailyChoiceMarks},
-    );
-    return [
-      for (final row in rows)
-        ?_factOf(
-          row,
-          record: () =>
-              storedDailyChoiceRecord(decodeStoredDailyChoice(row.data), paths),
-          key: () => DailyChoiceKey(
-            decodeStoredDailyChoiceId(
-              requiredStoredString(row.data, 'mark_id'),
-            ),
           ),
         ),
     ];

@@ -1115,7 +1115,7 @@ final class _ReplacementFailure extends LocalDatabaseConnectionObserver {
     final code = failsWith;
     if (code == null ||
         !statement.statements.any(
-          (sql) => sql.startsWith('DELETE FROM daily_choices '),
+          (sql) => sql.startsWith('DELETE FROM deleted_relation_pairs '),
         )) {
       return null;
     }

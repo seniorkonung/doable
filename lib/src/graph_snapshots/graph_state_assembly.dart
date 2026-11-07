@@ -110,7 +110,6 @@ abstract final class GraphStateAssembly {
         longTermRelations: counts[_Section.longTermRelations.index],
         deletedRelationPairs: counts[_Section.deletedRelationPairs.index],
         actions: counts[_Section.actions.index],
-        dailyChoices: counts[_Section.dailyChoices.index],
       ),
       _assembledRecords(base, outcomes, _Creations(created)),
     );
@@ -304,8 +303,7 @@ enum _Section {
   tagAssignments,
   longTermRelations,
   deletedRelationPairs,
-  actions,
-  dailyChoices;
+  actions;
 
   static _Section of(GraphEntityRecord record) => switch (record) {
     TagRecord() => tags,
@@ -315,6 +313,5 @@ enum _Section {
     LongTermRelationRecord() => longTermRelations,
     DeletedRelationPairRecord() => deletedRelationPairs,
     ActionRecord() => actions,
-    DailyChoiceRecord() => dailyChoices,
   };
 }

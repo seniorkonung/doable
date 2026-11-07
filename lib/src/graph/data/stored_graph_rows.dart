@@ -4,12 +4,6 @@ import '../../action/domain/action_path.dart';
 import '../../action/domain/action_priority.dart';
 import '../../action/domain/action_schedule.dart';
 import '../../action/domain/action_text.dart';
-import '../../daily_choice/domain/choice_path_step_id.dart';
-import '../../daily_choice/domain/daily_choice.dart';
-import '../../daily_choice/domain/daily_choice_description.dart';
-import '../../daily_choice/domain/daily_choice_id.dart';
-import '../../daily_choice/domain/daily_choice_priority.dart';
-import '../../daily_choice/domain/daily_choice_schedule.dart';
 import '../../intention/domain/intention.dart';
 import '../../intention/domain/intention_id.dart';
 import '../../intention/domain/intention_text.dart';
@@ -79,22 +73,10 @@ LongTermRelationId decodeStoredRelationId(String value) =>
         throw const StoredGraphCorruption(),
     };
 
-DailyChoiceId decodeStoredDailyChoiceId(String value) =>
-    switch (DailyChoiceId.decode(value)) {
-      DailyChoiceIdDecodingSuccess(:final id) => id,
-      InvalidDailyChoiceIdDecoding() => throw const StoredGraphCorruption(),
-    };
-
 ActionId decodeStoredActionId(String value) => switch (ActionId.decode(value)) {
   ActionIdDecodingSuccess(:final id) => id,
   InvalidActionIdDecoding() => throw const StoredGraphCorruption(),
 };
-
-ChoicePathStepId _decodeStoredChoicePathStepId(String value) =>
-    switch (ChoicePathStepId.decode(value)) {
-      ChoicePathStepIdDecodingSuccess(:final id) => id,
-      InvalidChoicePathStepIdDecoding() => throw const StoredGraphCorruption(),
-    };
 
 /// Тег из столбцов `id`, `name`, `color` и `position`. Название проверяет
 /// `CHECK` схемы той же функцией [TagName.fromStored], поэтому здесь оно
@@ -365,54 +347,6 @@ RelationScope decodeStoredRelationScope(Map<String, Object?> data) =>
       _ => throw const StoredGraphCorruption(),
     };
 
-/// Дневной выбор из столбцов таблицы `daily_choices`.
-DailyChoice decodeStoredDailyChoice(Map<String, Object?> data) {
-  if (requiredStoredInteger(data, 'creation_sequence') <= 0) {
-    throw const StoredGraphCorruption();
-  }
-  final id = decodeStoredDailyChoiceId(requiredStoredString(data, 'id'));
-  final sourceId = decodeStoredIntentionId(
-    requiredStoredString(data, 'source_intention_id'),
-  );
-  final selectedId = decodeStoredIntentionId(
-    requiredStoredString(data, 'selected_intention_id'),
-  );
-  final description = _nullableStoredString(data, 'description');
-  final schedule = switch (data['scheduled_minute']) {
-    null => const DailyChoiceAllDay(),
-    final int minute when minute >= 0 && minute <= 1439 => DailyChoiceTime(
-      hour: minute ~/ 60,
-      minute: minute % 60,
-    ),
-    _ => throw const StoredGraphCorruption(),
-  };
-  final priority = switch (requiredStoredInteger(data, 'priority')) {
-    1 => DailyChoicePriority.p1,
-    2 => DailyChoicePriority.p2,
-    3 => DailyChoicePriority.p3,
-    4 => DailyChoicePriority.p4,
-    _ => throw const StoredGraphCorruption(),
-  };
-  try {
-    return DailyChoice(
-      id: id,
-      sourceIntentionId: sourceId,
-      selectedIntentionId: selectedId,
-      date: decodeStoredChoiceDate(data),
-      description: description == null
-          ? null
-          : DailyChoiceDescription.fromStored(description),
-      isCompleted: decodeStoredChoiceCompletion(data),
-      schedule: schedule,
-      priority: priority,
-    );
-  } on DailyChoiceDescriptionValidationException {
-    throw const StoredGraphCorruption();
-  } on ArgumentError {
-    throw const StoredGraphCorruption();
-  }
-}
-
 /// Поля действия из столбцов таблицы `actions`, общие для полного действия и
 /// строки выдачи дня.
 typedef StoredActionFields = ({
@@ -527,38 +461,3 @@ bool decodeStoredActionCompletion(Map<String, Object?> data) =>
       1 => true,
       _ => throw const StoredGraphCorruption(),
     };
-
-/// Дата дневного выбора из столбца `choice_date`.
-CalendarDate decodeStoredChoiceDate(Map<String, Object?> data) {
-  final value = requiredStoredString(data, 'choice_date');
-  try {
-    return CalendarDate.parseCanonical(value);
-  } on CalendarDateValidationException {
-    throw const StoredGraphCorruption();
-  }
-}
-
-/// Выполнение дневного выбора из столбца `is_completed`.
-bool decodeStoredChoiceCompletion(Map<String, Object?> data) =>
-    switch (requiredStoredInteger(data, 'is_completed')) {
-      0 => false,
-      1 => true,
-      _ => throw const StoredGraphCorruption(),
-    };
-
-/// Шаг пути дневного выбора из столбцов таблицы `daily_choice_path_steps`.
-ChoicePathStep decodeStoredChoicePathStep(Map<String, Object?> data) {
-  final previous = _nullableStoredString(data, 'previous_step_id');
-  return ChoicePathStep(
-    id: _decodeStoredChoicePathStepId(requiredStoredString(data, 'id')),
-    dailyChoiceId: decodeStoredDailyChoiceId(
-      requiredStoredString(data, 'daily_choice_id'),
-    ),
-    relationId: decodeStoredRelationId(
-      requiredStoredString(data, 'long_term_relation_id'),
-    ),
-    previousStepId: previous == null
-        ? null
-        : _decodeStoredChoicePathStepId(previous),
-  );
-}

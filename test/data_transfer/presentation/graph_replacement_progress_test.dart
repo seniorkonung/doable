@@ -771,7 +771,7 @@ final class _ReplacementControl extends LocalDatabaseConnectionObserver {
     if (_hold != _ReplacementHold.previousGraphDeletion ||
         _isReached ||
         !statement.statements.any(
-          (sql) => sql.startsWith('DELETE FROM daily_choices '),
+          (sql) => sql.startsWith('DELETE FROM deleted_relation_pairs '),
         )) {
       return null;
     }

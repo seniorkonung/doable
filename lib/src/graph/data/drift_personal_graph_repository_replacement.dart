@@ -164,8 +164,7 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
       .write(local.GraphLogControlCompanion(capture: Value(capture)));
 
   /// Удаляет прежний граф операторами не больше чем по
-  /// [_replacementBatchRowLimit] строк в порядке, обратном ссылкам: дневные
-  /// выборы вместе с шагами путей, которые каскадом удаляются с ними,
+  /// [_replacementBatchRowLimit] строк в порядке, обратном ссылкам:
   /// надгробия, действия вместе со строками путей, затем связи, назначения
   /// тегов, теги и намерения. Назначения удаляются отдельно, а не каскадом
   /// тегов, а надгробия — отдельно, а не триггером освобождения после
@@ -178,10 +177,6 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
   ) async {
     final tables =
         <(TableInfo<Table, Object?>, Set<TableInfo<Table, Object?>>)>[
-          (
-            _database.dailyChoices,
-            {_database.dailyChoices, _database.dailyChoicePathSteps},
-          ),
           (_database.deletedRelationPairs, {_database.deletedRelationPairs}),
           (_database.deletedIntentions, {_database.deletedIntentions}),
           (_database.actions, {_database.actions, _database.actionPathItems}),
@@ -208,9 +203,8 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
 
   /// Вставляет записи снимка [records] в порядке файла пакетами не больше
   /// чем по [_replacementBatchRowLimit] строк: действие занимает строку и по
-  /// строке на каждое намерение пути, а дневной выбор — строку и по строке
-  /// на каждый шаг пути. Пакет из одной записи может быть больше: длина
-  /// записи ограничена пределом записи формата.
+  /// строке на каждое намерение пути. Пакет из одной записи может быть
+  /// больше: длина записи ограничена пределом записи формата.
   Future<void> _insertSnapshotRecords(
     Stream<GraphEntityRecord> records,
     _ReplacementProgress progress,
@@ -230,7 +224,6 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
     await for (final record in records) {
       final rows = switch (record) {
         ActionRecord(:final path) => 1 + path.intentions.length,
-        DailyChoiceRecord(:final path) => 1 + path.steps.length,
         _ => 1,
       };
       if (batchRows + rows > _replacementBatchRowLimit) await flush();
@@ -241,10 +234,8 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
   }
 
   /// Вставляет [records] одним пакетом операторов. Ссылки, уникальность и
-  /// активность участников активной связи проверяет схема, а непрерывность
-  /// путей вставленных выборов — общая проверка сохранённого пути.
+  /// активность участников активной связи проверяет схема.
   Future<void> _insertRecordBatch(List<GraphEntityRecord> records) async {
-    final choices = <DailyChoice>[];
     await _database.batch((batch) {
       for (final record in records) {
         switch (record) {
@@ -355,68 +346,9 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
                   ),
                 ),
             ]);
-          case DailyChoiceRecord(:final choice, :final path):
-            batch.insert(
-              _database.dailyChoices,
-              local.DailyChoicesCompanion.insert(
-                id: choice.id.toCanonicalString(),
-                sourceIntentionId: choice.sourceIntentionId.toCanonicalString(),
-                selectedIntentionId: choice.selectedIntentionId
-                    .toCanonicalString(),
-                choiceDate: choice.date.toCanonicalString(),
-                description: Value(choice.description?.value),
-                isCompleted: choice.isCompleted,
-                scheduledMinute: Value(switch (choice.schedule) {
-                  DailyChoiceAllDay() => null,
-                  DailyChoiceTime(:final minuteOfDay) => minuteOfDay,
-                }),
-                priority: Value(choice.priority.level),
-              ),
-            );
-            batch.insertAll(_database.dailyChoicePathSteps, [
-              for (final step in path.steps)
-                local.DailyChoicePathStepsCompanion.insert(
-                  id: step.id.toCanonicalString(),
-                  dailyChoiceId: step.dailyChoiceId.toCanonicalString(),
-                  longTermRelationId: step.relationId.toCanonicalString(),
-                  previousStepId: Value(
-                    step.previousStepId?.toCanonicalString(),
-                  ),
-                ),
-            ]);
-            choices.add(choice);
         }
       }
     });
-    if (choices.isNotEmpty) await _verifyInsertedChoicePaths(choices);
-  }
-
-  /// Проверяет сохранённые пути вставленных выборов [choices] по их шагам
-  /// и концам связей этих шагов: схема не выражает непрерывности пути.
-  Future<void> _verifyInsertedChoicePaths(List<DailyChoice> choices) async {
-    final paths = await readStoredChoicePaths(
-      _database,
-      choiceIds: List.filled(choices.length, '?').join(', '),
-      variables: [
-        for (final choice in choices)
-          Variable.withString(choice.id.toCanonicalString()),
-      ],
-      readsFrom: const {},
-    );
-    try {
-      for (final choice in choices) {
-        verifyStoredChoicePath(
-          choice: choice,
-          steps: paths.steps[choice.id] ?? const [],
-          relations: paths.relations,
-        );
-      }
-    } on StoredGraphCorruption catch (_, stackTrace) {
-      Error.throwWithStackTrace(
-        const GraphReplacementRecordsRejected(),
-        stackTrace,
-      );
-    }
   }
 
   /// Проверяет правила целостности сохранённых путей действий, которых не
@@ -486,8 +418,7 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
             (SELECT count(*) FROM long_term_relations) AS long_term_relations,
             (SELECT count(*) FROM deleted_relation_pairs)
               AS deleted_relation_pairs,
-            (SELECT count(*) FROM actions) AS actions,
-            (SELECT count(*) FROM daily_choices) AS daily_choices''',
+            (SELECT count(*) FROM actions) AS actions''',
           readsFrom: {
             _database.tags,
             _database.intentions,
@@ -496,7 +427,6 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
             _database.longTermRelations,
             _database.deletedRelationPairs,
             _database.actions,
-            _database.dailyChoices,
           },
         )
         .getSingle();
@@ -508,7 +438,6 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
       longTermRelations: row.read<int>('long_term_relations'),
       deletedRelationPairs: row.read<int>('deleted_relation_pairs'),
       actions: row.read<int>('actions'),
-      dailyChoices: row.read<int>('daily_choices'),
     );
   }
 }
@@ -520,8 +449,7 @@ int _recordTotal(GraphRecordCounts counts) =>
     counts.tagAssignments +
     counts.longTermRelations +
     counts.deletedRelationPairs +
-    counts.actions +
-    counts.dailyChoices;
+    counts.actions;
 
 bool _sameRecordCounts(GraphRecordCounts a, GraphRecordCounts b) =>
     a.tags == b.tags &&
@@ -530,8 +458,7 @@ bool _sameRecordCounts(GraphRecordCounts a, GraphRecordCounts b) =>
     a.tagAssignments == b.tagAssignments &&
     a.longTermRelations == b.longTermRelations &&
     a.deletedRelationPairs == b.deletedRelationPairs &&
-    a.actions == b.actions &&
-    a.dailyChoices == b.dailyChoices;
+    a.actions == b.actions;
 
 /// Ход замены графа: доля обработанных записей от [_total], которая
 /// сообщается, когда достигает следующей сотой доли.

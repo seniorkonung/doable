@@ -143,7 +143,7 @@ void _registerPageMatrixTests() {
         .element(find.byType(IntentionDetailsPage, skipOffstage: false))
         .markNeedsBuild();
     await tester.pump();
-    unawaited(router.push(ActionDayDateRoute(date: _choiceDate)));
+    unawaited(router.push(ActionDayDateRoute(date: _actionDate)));
     await _until(tester, find.byType(ActionDayDatePage));
     await tester.pumpAndSettle();
     expect(find.byType(AppNavigationBar), findsOneWidget);
@@ -166,7 +166,7 @@ void _registerPageMatrixTests() {
     final router = await _start(tester);
     await _select(tester, AppDestination.intentionGraph);
     await _open(tester, intentionCatalogRow('Читать'), IntentionDetailsPage);
-    unawaited(router.push(ActionDayDateRoute(date: _choiceDate)));
+    unawaited(router.push(ActionDayDateRoute(date: _actionDate)));
     await _until(tester, find.byType(ActionDayDatePage));
     await tester.pumpAndSettle();
     _expectAboveShell(

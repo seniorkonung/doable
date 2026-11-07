@@ -190,7 +190,6 @@ GraphFormatHeader _header({
     longTermRelations: longTermRelations,
     deletedRelationPairs: 6,
     actions: actions,
-    dailyChoices: 0,
   ),
 );
 

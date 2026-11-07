@@ -119,12 +119,6 @@ final class ActionOrderKey extends GraphRecordOrderKey {
   final int creationSequence;
 }
 
-final class DailyChoiceOrderKey extends GraphRecordOrderKey {
-  const DailyChoiceOrderKey(this.creationSequence);
-
-  final int creationSequence;
-}
-
 /// Порция записей графа, прочитанная одним коротким обращением к базе.
 final class GraphRecordPortion {
   const GraphRecordPortion({

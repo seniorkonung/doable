@@ -7,12 +7,6 @@ import '../action/domain/action_path.dart';
 import '../action/domain/action_priority.dart';
 import '../action/domain/action_schedule.dart';
 import '../action/domain/action_text.dart';
-import '../daily_choice/domain/choice_path_step_id.dart';
-import '../daily_choice/domain/daily_choice.dart';
-import '../daily_choice/domain/daily_choice_description.dart';
-import '../daily_choice/domain/daily_choice_id.dart';
-import '../daily_choice/domain/daily_choice_priority.dart';
-import '../daily_choice/domain/daily_choice_schedule.dart';
 import '../intention/domain/intention.dart';
 import '../intention/domain/intention_id.dart';
 import '../intention/domain/intention_text.dart';
@@ -155,7 +149,6 @@ abstract final class GraphFormatCodec {
           'longTermRelations': counts.longTermRelations,
           'deletedRelationPairs': counts.deletedRelationPairs,
           'actions': counts.actions,
-          'dailyChoices': counts.dailyChoices,
         },
       }),
     );
@@ -267,8 +260,6 @@ abstract final class GraphFormatCodec {
       throw const GraphFormatCorruption();
     } on LongTermRelationTextValidationException {
       throw const GraphFormatCorruption();
-    } on DailyChoiceDescriptionValidationException {
-      throw const GraphFormatCorruption();
     } on CalendarDateValidationException {
       throw const GraphFormatCorruption();
     } on ArgumentError {
@@ -288,7 +279,6 @@ const _tagAssignmentKind = 'tagAssignment';
 const _relationKind = 'longTermRelation';
 const _deletedRelationPairKind = 'deletedRelationPair';
 const _actionKind = 'action';
-const _dailyChoiceKind = 'dailyChoice';
 
 const _createdFact = 'created';
 const _changedFact = 'changed';
@@ -388,33 +378,6 @@ Map<String, Object?> _writeRecord(GraphEntityRecord record) => switch (record) {
     'createdAt': _writeTimestamp(action.createdAt.value),
     'updatedAt': _writeTimestamp(action.updatedAt.value),
   },
-  DailyChoiceRecord(:final choice, :final path) => {
-    'kind': _dailyChoiceKind,
-    'id': choice.id.toCanonicalString(),
-    'sourceIntentionId': choice.sourceIntentionId.toCanonicalString(),
-    'selectedIntentionId': choice.selectedIntentionId.toCanonicalString(),
-    'date': choice.date.toCanonicalString(),
-    'time': switch (choice.schedule) {
-      DailyChoiceAllDay() => null,
-      DailyChoiceTime(:final hour, :final minute) =>
-        '${_digits(hour, 2)}:${_digits(minute, 2)}',
-    },
-    'priority': switch (choice.priority) {
-      DailyChoicePriority.p1 => 'P1',
-      DailyChoicePriority.p2 => 'P2',
-      DailyChoicePriority.p3 => 'P3',
-      DailyChoicePriority.p4 => 'P4',
-    },
-    'completed': choice.isCompleted,
-    'description': choice.description?.value,
-    'path': [
-      for (final step in path.steps)
-        {
-          'id': step.id.toCanonicalString(),
-          'relationId': step.relationId.toCanonicalString(),
-        },
-    ],
-  },
 };
 
 String _writeRelationType(LongTermRelationType type) => switch (type) {
@@ -447,10 +410,6 @@ Map<String, Object?> _writeEntityKey(GraphEntityKey entity) => switch (entity) {
       'relatedIntentionId': relatedIntentionId.toCanonicalString(),
     },
   ActionKey(:final id) => {'entity': _actionKind, 'id': id.toCanonicalString()},
-  DailyChoiceKey(:final id) => {
-    'entity': _dailyChoiceKind,
-    'id': id.toCanonicalString(),
-  },
 };
 
 Map<String, Object?> _writeTagAssignment(TagAssignment assignment) => {
@@ -504,7 +463,6 @@ GraphEntityRecord _readEntity(String kind, _JsonFields fields) =>
         type: _readRelationType(fields.string('type')),
       ),
       _actionKind => _readAction(fields),
-      _dailyChoiceKind => _readDailyChoice(fields),
       _ => throw const GraphFormatCorruption(),
     };
 
@@ -523,7 +481,6 @@ GraphEntityKey _readEntityKey(_JsonFields fields) => switch (fields.string(
     relatedIntentionId: _readIntentionId(fields.string('relatedIntentionId')),
   ),
   _actionKind => ActionKey(_readActionId(fields.string('id'))),
-  _dailyChoiceKind => DailyChoiceKey(_readDailyChoiceId(fields.string('id'))),
   _ => throw const GraphFormatCorruption(),
 };
 
@@ -631,50 +588,6 @@ ActionRecord _readAction(_JsonFields fields) {
   );
 }
 
-DailyChoiceRecord _readDailyChoice(_JsonFields fields) {
-  final id = _readDailyChoiceId(fields.string('id'));
-  final description = fields.nullableString('description');
-  final steps = <ChoicePathStep>[];
-  ChoicePathStepId? previousStepId;
-  for (final element in fields.list('path')) {
-    final step = _JsonFields(element);
-    final stepId = _readStepId(step.string('id'));
-    steps.add(
-      ChoicePathStep(
-        id: stepId,
-        dailyChoiceId: id,
-        relationId: _readRelationId(step.string('relationId')),
-        previousStepId: previousStepId,
-      ),
-    );
-    step.ensureAllRead();
-    previousStepId = stepId;
-  }
-  return DailyChoiceRecord(
-    choice: DailyChoice(
-      id: id,
-      sourceIntentionId: _readIntentionId(fields.string('sourceIntentionId')),
-      selectedIntentionId: _readIntentionId(
-        fields.string('selectedIntentionId'),
-      ),
-      date: CalendarDate.parseCanonical(fields.string('date')),
-      description: description == null
-          ? null
-          : DailyChoiceDescription.fromStored(description),
-      isCompleted: fields.boolean('completed'),
-      schedule: _readSchedule(fields.nullableString('time')),
-      priority: switch (fields.string('priority')) {
-        'P1' => DailyChoicePriority.p1,
-        'P2' => DailyChoicePriority.p2,
-        'P3' => DailyChoicePriority.p3,
-        'P4' => DailyChoicePriority.p4,
-        _ => throw const GraphFormatCorruption(),
-      },
-    ),
-    path: StoredChoicePath(steps),
-  );
-}
-
 final _timestampPattern = RegExp(
   r'^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})\.([0-9]{6})Z$',
 );
@@ -701,19 +614,6 @@ DateTime _readTimestamp(String text) {
   return timestamp;
 }
 
-final _timeOfDayPattern = RegExp(r'^([0-9]{2}):([0-9]{2})$');
-
-DailyChoiceSchedule _readSchedule(String? text) {
-  if (text == null) return const DailyChoiceAllDay();
-  final match =
-      _timeOfDayPattern.firstMatch(text) ??
-      (throw const GraphFormatCorruption());
-  return DailyChoiceTime(
-    hour: int.parse(match.group(1)!),
-    minute: int.parse(match.group(2)!),
-  );
-}
-
 GraphRecordCounts _readCounts(Map<String, Object?> object) {
   final fields = _JsonFields(object);
   final counts = GraphRecordCounts(
@@ -724,7 +624,6 @@ GraphRecordCounts _readCounts(Map<String, Object?> object) {
     longTermRelations: fields.integer('longTermRelations'),
     deletedRelationPairs: fields.integer('deletedRelationPairs'),
     actions: fields.integer('actions'),
-    dailyChoices: fields.integer('dailyChoices'),
   );
   fields.ensureAllRead();
   return counts;
@@ -766,18 +665,6 @@ ActionId _readActionId(String text) => switch (ActionId.decode(text)) {
   ActionIdDecodingSuccess(:final id) => id,
   InvalidActionIdDecoding() => throw const GraphFormatCorruption(),
 };
-
-DailyChoiceId _readDailyChoiceId(String text) =>
-    switch (DailyChoiceId.decode(text)) {
-      DailyChoiceIdDecodingSuccess(:final id) => id,
-      InvalidDailyChoiceIdDecoding() => throw const GraphFormatCorruption(),
-    };
-
-ChoicePathStepId _readStepId(String text) =>
-    switch (ChoicePathStepId.decode(text)) {
-      ChoicePathStepIdDecodingSuccess(:final id) => id,
-      InvalidChoicePathStepIdDecoding() => throw const GraphFormatCorruption(),
-    };
 
 /// Поля объекта записи. Каждое поле обязательно и читается один раз, поэтому
 /// непрочитанное поле — неизвестное.

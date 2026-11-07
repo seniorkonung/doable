@@ -1,4 +1,4 @@
-import 'daily_choice_schema.drift';
+import 'long_term_relation_schema.drift';
 
 CREATE TABLE tags (
   creation_sequence INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT

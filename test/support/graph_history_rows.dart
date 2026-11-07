@@ -44,7 +44,6 @@ Future<GraphSnapshotEntry> insertSameGraphReplacement(
               .whereType<DeletedRelationPairRecord>()
               .length,
           actions: records.whereType<ActionRecord>().length,
-          dailyChoices: records.whereType<DailyChoiceRecord>().length,
         ),
       ),
       Stream.fromIterable(records),

@@ -405,7 +405,7 @@ typedef _Counts = ({
   int intentions,
   int tagAssignments,
   int longTermRelations,
-  int dailyChoices,
+  int actions,
 });
 
 _Counts _counts(GraphRecordCounts counts) => (
@@ -413,7 +413,7 @@ _Counts _counts(GraphRecordCounts counts) => (
   intentions: counts.intentions,
   tagAssignments: counts.tagAssignments,
   longTermRelations: counts.longTermRelations,
-  dailyChoices: counts.dailyChoices,
+  actions: counts.actions,
 );
 
 _Counts _countsOf(List<GraphEntityRecord> records) => (
@@ -421,5 +421,5 @@ _Counts _countsOf(List<GraphEntityRecord> records) => (
   intentions: records.whereType<IntentionRecord>().length,
   tagAssignments: records.whereType<TagAssignmentRecord>().length,
   longTermRelations: records.whereType<LongTermRelationRecord>().length,
-  dailyChoices: records.whereType<DailyChoiceRecord>().length,
+  actions: records.whereType<ActionRecord>().length,
 );

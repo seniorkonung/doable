@@ -353,7 +353,6 @@ Future<UnregisteredGraphSnapshot> _writeReplacementSnapshot(
     longTermRelations: 0,
     deletedRelationPairs: 0,
     actions: 0,
-    dailyChoices: 0,
   );
   final records = [
     {
@@ -368,7 +367,6 @@ Future<UnregisteredGraphSnapshot> _writeReplacementSnapshot(
         'longTermRelations': counts.longTermRelations,
         'deletedRelationPairs': counts.deletedRelationPairs,
         'actions': counts.actions,
-        'dailyChoices': counts.dailyChoices,
       },
     },
     {

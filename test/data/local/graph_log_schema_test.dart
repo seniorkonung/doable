@@ -16,9 +16,6 @@ const _createdRelation = '018f0b5d-6b2e-7c80-8000-000000000013';
 const _recreatedRelation = '018f0b5d-6b2e-7c80-8000-000000000014';
 const _tag = '018f0b5d-6b2e-7c80-8000-000000000021';
 const _secondTag = '018f0b5d-6b2e-7c80-8000-000000000022';
-const _choice = '018f0b5d-6b2e-7c80-8000-000000000031';
-const _firstStep = '018f0b5d-6b2e-7c80-8000-000000000041';
-const _secondStep = '018f0b5d-6b2e-7c80-8000-000000000042';
 const _action = '018f0b5d-6b2e-7c80-8000-000000000051';
 
 typedef _Mark = (String kind, String entity, String firstOperation);
@@ -172,45 +169,6 @@ void main() {
       },
     ),
     (
-      'создание дневного выбора',
-      () => _addChoice(raw, _choice),
-      {('dailyChoice', _choice, 'insert')},
-    ),
-    (
-      'добавление шага пути',
-      () => _addStep(raw, _firstStep, _choice, _relation),
-      {('dailyChoice', _choice, 'update')},
-    ),
-    (
-      'изменение шага пути',
-      () => raw.execute(
-        'UPDATE daily_choice_path_steps SET long_term_relation_id = ? '
-        'WHERE id = ?',
-        [_secondRelation, _firstStep],
-      ),
-      {('dailyChoice', _choice, 'update')},
-    ),
-    (
-      'удаление шага пути',
-      () => raw.execute('DELETE FROM daily_choice_path_steps WHERE id = ?', [
-        _firstStep,
-      ]),
-      {('dailyChoice', _choice, 'update')},
-    ),
-    (
-      'изменение дневного выбора',
-      () => raw.execute(
-        'UPDATE daily_choices SET is_completed = 1 WHERE id = ?',
-        [_choice],
-      ),
-      {('dailyChoice', _choice, 'update')},
-    ),
-    (
-      'удаление дневного выбора',
-      () => raw.execute('DELETE FROM daily_choices WHERE id = ?', [_choice]),
-      {('dailyChoice', _choice, 'delete')},
-    ),
-    (
       'удаление намерения пути',
       () => raw.execute('DELETE FROM intentions WHERE id = ?', [_created]),
       {
@@ -274,8 +232,8 @@ void main() {
       _addAssignment(raw, _secondTag, _source);
       raw.execute('DELETE FROM tag_assignments');
       _addAssignment(raw, _secondTag, _source);
-      _addChoice(raw, _choice);
-      _addStep(raw, _firstStep, _choice, _relation);
+      _addAction(raw, _action);
+      _addPath(raw, _action, [_source, _selected]);
     });
 
     expect(_marks(raw), {
@@ -284,7 +242,7 @@ void main() {
       ('tagAssignment', '$_tag/$_source', 'delete'),
       ('tag', _secondTag, 'insert'),
       ('tagAssignment', '$_secondTag/$_source', 'insert'),
-      ('dailyChoice', _choice, 'insert'),
+      ('action', _action, 'insert'),
     });
   });
 
@@ -297,9 +255,6 @@ void main() {
       _addAssignment(raw, _tag, _selected);
       _addAssignment(raw, _tag, _created);
       _addAssignment(raw, _secondTag, _created);
-      _addChoice(raw, _choice);
-      _addStep(raw, _firstStep, _choice, _relation);
-      _addStep(raw, _secondStep, _choice, _secondRelation, _firstStep);
     });
 
     _writeGraph(
@@ -322,24 +277,12 @@ void main() {
       ('intention', _created, 'delete'),
       ('tagAssignment', '$_secondTag/$_created', 'delete'),
     });
-    _clearMarks(raw);
-
-    _writeGraph(
-      raw,
-      () => raw.execute('DELETE FROM daily_choices WHERE id = ?', [_choice]),
-    );
-    expect(raw.select('SELECT * FROM daily_choice_path_steps'), isEmpty);
-    // Каскад удаляет шаги раньше, чем срабатывает AFTER DELETE самого
-    // выбора, поэтому первая операция — изменение шагов его пути.
-    expect(_marks(raw), {('dailyChoice', _choice, 'update')});
   });
 
   test('выключенный захват не оставляет отметок', () {
     addGraph();
     seedRawGraph(raw, () {
       _addAssignment(raw, _tag, _source);
-      _addChoice(raw, _choice);
-      _addStep(raw, _firstStep, _choice, _relation);
     });
     raw.execute('UPDATE graph_log_control SET capture = 0');
 
@@ -365,15 +308,6 @@ void main() {
     raw.execute('DELETE FROM long_term_relations WHERE id = ?', [
       _createdRelation,
     ]);
-    raw.execute(
-      'UPDATE daily_choice_path_steps SET long_term_relation_id = ? '
-      'WHERE id = ?',
-      [_secondRelation, _firstStep],
-    );
-    raw.execute('UPDATE daily_choices SET is_completed = 1 WHERE id = ?', [
-      _choice,
-    ]);
-    raw.execute('DELETE FROM daily_choices WHERE id = ?', [_choice]);
     raw.execute('DELETE FROM tags WHERE id = ?', [_tag]);
     raw.execute('DELETE FROM intentions WHERE id = ?', [_created]);
     raw.execute('DELETE FROM actions WHERE id = ?', [_action]);
@@ -539,9 +473,6 @@ Set<_Mark> _marks(sqlite.Database db) => {
     SELECT 'longTermRelation', long_term_relation_id, first_operation
     FROM graph_log_long_term_relation_marks
     UNION ALL
-    SELECT 'dailyChoice', daily_choice_id, first_operation
-    FROM graph_log_daily_choice_marks
-    UNION ALL
     SELECT 'action', action_id, first_operation
     FROM graph_log_action_marks
     UNION ALL
@@ -561,15 +492,13 @@ Set<_Mark> _marks(sqlite.Database db) => {
     ),
 };
 
-/// Строки таблиц графа, шагов и строк пути и надгробий.
+/// Строки таблиц графа, строк пути и надгробий.
 List<Map<String, Object?>> _graphRows(sqlite.Database db) => [
   for (final table in [
     'tags',
     'intentions',
     'tag_assignments',
     'long_term_relations',
-    'daily_choices',
-    'daily_choice_path_steps',
     'actions',
     'action_path_items',
     'deleted_intentions',
@@ -597,7 +526,6 @@ void _clearMarks(sqlite.Database db) {
     'graph_log_intention_marks',
     'graph_log_tag_assignment_marks',
     'graph_log_long_term_relation_marks',
-    'graph_log_daily_choice_marks',
     'graph_log_action_marks',
     'graph_log_deleted_intention_marks',
     'graph_log_deleted_relation_pair_marks',
@@ -640,31 +568,6 @@ void _addAssignment(sqlite.Database db, String tagId, String intentionId) {
   db.execute(
     'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
     [tagId, intentionId],
-  );
-}
-
-void _addChoice(sqlite.Database db, String id) {
-  db.execute(
-    '''INSERT INTO daily_choices
-       (id, source_intention_id, selected_intention_id,
-        choice_date, is_completed)
-       VALUES (?, ?, ?, '2026-09-23', 0)''',
-    [id, _source, _selected],
-  );
-}
-
-void _addStep(
-  sqlite.Database db,
-  String id,
-  String owner,
-  String relation, [
-  String? previous,
-]) {
-  db.execute(
-    '''INSERT INTO daily_choice_path_steps
-       (id, daily_choice_id, long_term_relation_id, previous_step_id)
-       VALUES (?, ?, ?, ?)''',
-    [id, owner, relation, previous],
   );
 }
 

@@ -108,11 +108,7 @@ final class GraphChangeTally {
         return;
       case TagAssignmentKey(:final assignment):
         _reassigned.add(IntentionKey(assignment.intentionId));
-      case TagKey() ||
-          IntentionKey() ||
-          LongTermRelationKey() ||
-          ActionKey() ||
-          DailyChoiceKey():
+      case TagKey() || IntentionKey() || LongTermRelationKey() || ActionKey():
         _presences.update(
           entity,
           (presence) => (existed: presence.existed, exists: exists),

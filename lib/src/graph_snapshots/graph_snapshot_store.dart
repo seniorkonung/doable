@@ -839,8 +839,7 @@ int _total(GraphRecordCounts counts) =>
     counts.tagAssignments +
     counts.longTermRelations +
     counts.deletedRelationPairs +
-    counts.actions +
-    counts.dailyChoices;
+    counts.actions;
 
 /// Пишет [bytes] в [file] без сброса на диск: файлы порций пересборки и
 /// состояния — не снимки, и после сбоя процесса они не нужны.

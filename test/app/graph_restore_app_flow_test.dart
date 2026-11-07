@@ -684,7 +684,7 @@ final class _HeldReplacement extends LocalDatabaseConnectionObserver {
     final hold = this.hold;
     if (hold == null ||
         !statement.statements.any(
-          (sql) => sql.startsWith('DELETE FROM daily_choices '),
+          (sql) => sql.startsWith('DELETE FROM deleted_relation_pairs '),
         )) {
       return null;
     }

@@ -140,8 +140,8 @@ void _registerQuickCreationFlowTests() {
     for (final table in [
       'intentions',
       'long_term_relations',
-      'daily_choices',
-      'daily_choice_path_steps',
+      'actions',
+      'action_path_items',
     ]) {
       expect(
         await tester.runAsync(() => durabilityRows(app.database, table)),

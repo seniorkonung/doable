@@ -9,12 +9,6 @@ import 'package:doable/src/action/domain/action_path.dart';
 import 'package:doable/src/action/domain/action_priority.dart';
 import 'package:doable/src/action/domain/action_schedule.dart';
 import 'package:doable/src/action/domain/action_text.dart';
-import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/graph_format/graph_format_codec.dart';
 import 'package:doable/src/graph_format/graph_format_file.dart';
 import 'package:doable/src/graph_format/graph_format_records.dart';
@@ -179,10 +173,9 @@ void main() {
           gzip.encode(utf8.encode('${lines.join('\n')}\n'));
       final compressed = gzip.encode(golden);
       final deletion =
-          '{"kind":"deletion","entity":"dailyChoice",'
-          '"id":"${_dailyChoiceIds[1]}"}';
-      // Положение строк эталона: надгробия и действия между намерениями,
-      // связями и дневными выборами.
+          '{"kind":"deletion","entity":"action","id":"${_actionIds[1]}"}';
+      // Положение строк эталона: надгробие намерения после намерений,
+      // надгробие пары после связей, действия последними.
       const deletedIntention = 7;
       const deletedPair = 14;
       const firstAction = 15;
@@ -191,8 +184,7 @@ void main() {
       const previousHeader =
           '{"format":"doable-graph","version":1,'
           '"writtenAt":"2026-10-03T18:42:07.654321Z","counts":{"tags":2,'
-          '"intentions":4,"tagAssignments":3,"longTermRelations":3,'
-          '"dailyChoices":2}}';
+          '"intentions":4,"tagAssignments":3,"longTermRelations":3}}';
       final firstActionPath =
           '"path":["${_intentionIds[0]}","${_intentionIds[1]}",'
           '"${_intentionIds[3]}"]';
@@ -347,11 +339,11 @@ void main() {
         writtenAt: DateTime.utc(2026, 10, 17),
         counts: _counts(tags: 1, intentions: 2),
       );
-      final [tag, _, health, running, ..., lastChoice] =
+      final [tag, _, health, running, ..., lastAction] =
           _expectedGoldenRecords();
       final invalidRecords = {
         'запись вне своей секции': [health, tag, running],
-        'записей больше, чем в заголовке': [tag, health, running, lastChoice],
+        'записей больше, чем в заголовке': [tag, health, running, lastAction],
         'записей меньше, чем в заголовке': [tag, health],
         'намерения не в каноническом порядке': [tag, running, health],
       };
@@ -558,21 +550,11 @@ const _relationIds = [
   '2a3b4c5d-6e7f-4a80-b91c-0d1e2f3a4b12',
   '2a3b4c5d-6e7f-4a80-b91c-0d1e2f3a4b13',
 ];
-const _dailyChoiceIds = [
-  '3c4d5e6f-7a8b-4c9d-a0e1-1f2a3b4c5d11',
-  '3c4d5e6f-7a8b-4c9d-a0e1-1f2a3b4c5d12',
-];
 const _actionIds = [
   '5e6f7a8b-9c0d-4eaf-b012-3a4b5c6d7e11',
   '5e6f7a8b-9c0d-4eaf-b012-3a4b5c6d7e12',
   '5e6f7a8b-9c0d-4eaf-b012-3a4b5c6d7e13',
 ];
-const _stepIds = [
-  '4d5e6f7a-8b9c-4dae-bf01-2a3b4c5d6e11',
-  '4d5e6f7a-8b9c-4dae-bf01-2a3b4c5d6e12',
-  '4d5e6f7a-8b9c-4dae-bf01-2a3b4c5d6e13',
-];
-
 GraphFormatHeader _expectedGoldenHeader() => GraphFormatHeader(
   writtenAt: DateTime.utc(2026, 10, 3, 18, 42, 7, 654, 321),
   counts: _counts(
@@ -583,7 +565,6 @@ GraphFormatHeader _expectedGoldenHeader() => GraphFormatHeader(
     longTermRelations: 3,
     deletedRelationPairs: 1,
     actions: 3,
-    dailyChoices: 2,
   ),
 );
 
@@ -595,7 +576,6 @@ GraphRecordCounts _counts({
   int longTermRelations = 0,
   int deletedRelationPairs = 0,
   int actions = 0,
-  int dailyChoices = 0,
 }) => GraphRecordCounts(
   tags: tags,
   intentions: intentions,
@@ -604,7 +584,6 @@ GraphRecordCounts _counts({
   longTermRelations: longTermRelations,
   deletedRelationPairs: deletedRelationPairs,
   actions: actions,
-  dailyChoices: dailyChoices,
 );
 
 /// Допустимый сохранённый граф: путь первого действия проходит через ныне
@@ -623,8 +602,6 @@ List<GraphEntityRecord> _expectedGoldenRecords() {
   final needRunning = _relationId(_relationIds[0]);
   final needJogging = _relationId(_relationIds[1]);
   final canSwim = _relationId(_relationIds[2]);
-  final allDayChoice = _dailyChoiceId(_dailyChoiceIds[0]);
-  final midnightChoice = _dailyChoiceId(_dailyChoiceIds[1]);
 
   return [
     TagRecord(
@@ -769,51 +746,6 @@ List<GraphEntityRecord> _expectedGoldenRecords() {
       createdAt: ActionTimestamp(DateTime.utc(2026, 10, 1, 7, 2)),
       updatedAt: ActionTimestamp(DateTime.utc(2026, 10, 1, 7, 2)),
     ),
-    DailyChoiceRecord(
-      choice: DailyChoice(
-        id: allDayChoice,
-        sourceIntentionId: health,
-        selectedIntentionId: swimming,
-        date: CalendarDate.fromParts(2026, 10, 2),
-        description: null,
-        isCompleted: false,
-        priority: DailyChoicePriority.p2,
-      ),
-      path: StoredChoicePath([
-        ChoicePathStep(
-          id: _stepId(_stepIds[0]),
-          dailyChoiceId: allDayChoice,
-          relationId: needRunning,
-          previousStepId: null,
-        ),
-        ChoicePathStep(
-          id: _stepId(_stepIds[1]),
-          dailyChoiceId: allDayChoice,
-          relationId: canSwim,
-          previousStepId: _stepId(_stepIds[0]),
-        ),
-      ]),
-    ),
-    DailyChoiceRecord(
-      choice: DailyChoice(
-        id: midnightChoice,
-        sourceIntentionId: health,
-        selectedIntentionId: jogging,
-        date: CalendarDate.fromParts(2026, 2, 28),
-        description: DailyChoiceDescription.fromStored('  утром\n'),
-        isCompleted: true,
-        schedule: DailyChoiceTime(hour: 0, minute: 0),
-        priority: DailyChoicePriority.p4,
-      ),
-      path: StoredChoicePath([
-        ChoicePathStep(
-          id: _stepId(_stepIds[2]),
-          dailyChoiceId: midnightChoice,
-          relationId: needJogging,
-          previousStepId: null,
-        ),
-      ]),
-    ),
   ];
 }
 
@@ -827,9 +759,3 @@ LongTermRelationId _relationId(String value) =>
 
 ActionId _actionId(String value) =>
     (ActionId.decode(value) as ActionIdDecodingSuccess).id;
-
-DailyChoiceId _dailyChoiceId(String value) =>
-    (DailyChoiceId.decode(value) as DailyChoiceIdDecodingSuccess).id;
-
-ChoicePathStepId _stepId(String value) =>
-    (ChoicePathStepId.decode(value) as ChoicePathStepIdDecodingSuccess).id;

@@ -38,6 +38,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/action_seed.dart';
 import '../../support/app_root_pages.dart';
 import '../../support/controlled_local_date.dart';
 import '../../support/graph_seed.dart';
@@ -56,25 +57,25 @@ part 'app_shell_page_matrix.dart';
 part 'app_shell_unnamed_page_scenarios.dart';
 
 /// Активное готовое намерение «Читать» с тегом «Дом»: исходный
-/// участник связи и исходное намерение дневного выбора.
+/// участник связи и первое намерение пути действия.
 const _read = 1;
 
-/// Активное готовое намерение «Бегать»: связанный участник связи и выбранное
-/// действие дневного выбора.
+/// Активное готовое намерение «Бегать»: связанный участник связи и
+/// последнее намерение пути действия.
 const _run = 2;
 
-/// Активное намерение «Гулять» без связей и дневных выборов: его удаление
+/// Активное намерение «Гулять» без связей: его удаление
 /// доступно в параметрах.
 const _walk = 3;
 
-/// Связь «Читать» → «Бегать» — единственный шаг пути дневного выбора.
+/// Связь «Читать» → «Бегать» — единственный шаг пути действия.
 const _relation = 101;
-const _choice = 201;
+const _action = 201;
 const _tag = 301;
 
-/// День дневного выбора — локальное сегодня приложения: каталог дневных
-/// выборов открывается на дне с его строкой.
-final _choiceDate = CalendarDate.fromParts(2026, 9, 25);
+/// День действия — локальное сегодня приложения: каталог дня
+/// открывается на дне с его строкой.
+final _actionDate = CalendarDate.fromParts(2026, 9, 25);
 
 void main() {
   _registerPageMatrixTests();
@@ -286,7 +287,7 @@ Future<AppRouter> _start(
     connectionFactory: () =>
         openInMemoryLocalDatabase(setup: (database) => raw = database),
     diagnosticsSink: InMemoryDiagnosticsSink(),
-    localDateSource: ControlledLocalDate(_choiceDate).read,
+    localDateSource: ControlledLocalDate(_actionDate).read,
     graphFilesFactory: graphFiles?.create,
   );
   addTearDown(() async {
@@ -305,7 +306,7 @@ Future<AppRouter> _start(
   return ready.container.read(appRouterProvider);
 }
 
-/// Два намерения, связь между ними, дневной выбор по этой связи, тег и
+/// Два намерения, связь между ними, действие с путём по этой связи, тег и
 /// свободное намерение: каждая страница приложения получает свои данные.
 void _seed(sqlite.Database database) {
   seedRawGraph(database, () {
@@ -333,21 +334,11 @@ void _seed(sqlite.Database database) {
         0,
       ],
     );
-    database.execute(
-      'INSERT INTO daily_choices (id, source_intention_id, '
-      'selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
-      [
-        tagFixtureId(_choice),
-        tagFixtureId(_read),
-        tagFixtureId(_run),
-        _choiceDate.toCanonicalString(),
-        0,
-      ],
-    );
-    database.execute(
-      'INSERT INTO daily_choice_path_steps (id, daily_choice_id, '
-      'long_term_relation_id) VALUES (?, ?, ?)',
-      [tagFixtureId(211), tagFixtureId(_choice), tagFixtureId(_relation)],
+    seedAction(
+      database,
+      id: tagFixtureId(_action),
+      path: [tagFixtureId(_read), tagFixtureId(_run)],
+      date: _actionDate.toCanonicalString(),
     );
     database.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
       tagFixtureId(_tag),

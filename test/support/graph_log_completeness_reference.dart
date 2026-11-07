@@ -4,12 +4,6 @@ import 'package:doable/src/action/domain/action_path.dart';
 import 'package:doable/src/action/domain/action_priority.dart';
 import 'package:doable/src/action/domain/action_schedule.dart';
 import 'package:doable/src/action/domain/action_text.dart';
-import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
 import 'package:doable/src/data/local/app_database.dart' as local;
 import 'package:doable/src/graph_format/graph_format_records.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -33,7 +27,7 @@ import 'tag_positions.dart';
 ///
 /// Записи идут в каноническом порядке файла формата: секции тегов,
 /// намерений, надгробий намерений, назначений, долговременных связей,
-/// надгробий пар, действий и дневных выборов, внутри секции — по
+/// надгробий пар и действий, внутри секции — по
 /// последовательности создания, намерения — по времени создания и
 /// идентификатору, а надгробия — по ключу.
 Future<List<GraphEntityRecord>> referenceGraphRecords(
@@ -75,14 +69,6 @@ Future<List<GraphEntityRecord>> referenceGraphRecords(
         .putIfAbsent(item.actionId, () => [])
         .add(_intentionId(item.intentionId));
   }
-  final choices = await (database.select(
-    database.dailyChoices,
-  )..orderBy([(row) => OrderingTerm.asc(row.creationSequence)])).get();
-  final stepsByChoice = <String, List<local.DailyChoicePathStep>>{};
-  for (final step
-      in await database.select(database.dailyChoicePathSteps).get()) {
-    stepsByChoice.putIfAbsent(step.dailyChoiceId, () => []).add(step);
-  }
 
   return [
     for (final row in tags)
@@ -119,11 +105,6 @@ Future<List<GraphEntityRecord>> referenceGraphRecords(
       ),
     for (final row in actions)
       _action(row, ActionPath(pathByAction[row.id] ?? const [])),
-    for (final row in choices)
-      DailyChoiceRecord(
-        choice: _dailyChoice(row),
-        path: _path(stepsByChoice[row.id] ?? const []),
-      ),
   ];
 }
 
@@ -184,40 +165,6 @@ ActionRecord _action(local.Action row, ActionPath path) => ActionRecord(
   updatedAt: ActionTimestamp(_instant(row.updatedAt)),
 );
 
-DailyChoice _dailyChoice(local.DailyChoice row) => DailyChoice(
-  id: _dailyChoiceId(row.id),
-  sourceIntentionId: _intentionId(row.sourceIntentionId),
-  selectedIntentionId: _intentionId(row.selectedIntentionId),
-  date: CalendarDate.parseCanonical(row.choiceDate),
-  description: switch (row.description) {
-    final description? => DailyChoiceDescription.fromStored(description),
-    null => null,
-  },
-  isCompleted: row.isCompleted,
-  schedule: switch (row.scheduledMinute) {
-    final minute? => DailyChoiceTime(hour: minute ~/ 60, minute: minute % 60),
-    null => const DailyChoiceAllDay(),
-  },
-  priority: DailyChoicePriority.values.byName('p${row.priority}'),
-);
-
-/// Шаги пути от корня по ссылкам на предыдущий шаг.
-StoredChoicePath _path(List<local.DailyChoicePathStep> rows) {
-  final byPrevious = {for (final row in rows) row.previousStepId: row};
-  return StoredChoicePath([
-    for (var row = byPrevious[null]; row != null; row = byPrevious[row.id])
-      ChoicePathStep(
-        id: _stepId(row.id),
-        dailyChoiceId: _dailyChoiceId(row.dailyChoiceId),
-        relationId: _relationId(row.longTermRelationId),
-        previousStepId: switch (row.previousStepId) {
-          final previous? => _stepId(previous),
-          null => null,
-        },
-      ),
-  ]);
-}
-
 TagId _tagId(String value) => (TagId.decode(value) as TagIdDecodingSuccess).id;
 
 TagColor _tagColor(String code) =>
@@ -228,9 +175,3 @@ IntentionId _intentionId(String value) =>
 
 LongTermRelationId _relationId(String value) =>
     (LongTermRelationId.decode(value) as LongTermRelationIdDecodingSuccess).id;
-
-DailyChoiceId _dailyChoiceId(String value) =>
-    (DailyChoiceId.decode(value) as DailyChoiceIdDecodingSuccess).id;
-
-ChoicePathStepId _stepId(String value) =>
-    (ChoicePathStepId.decode(value) as ChoicePathStepIdDecodingSuccess).id;

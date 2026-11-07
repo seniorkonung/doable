@@ -11,8 +11,8 @@ import 'graph_format_records.dart';
 
 /// Файл формата — gzip поверх JSON Lines в UTF-8: строка заголовка, затем
 /// секции тегов, намерений, надгробий удалённых намерений, назначений тегов,
-/// долговременных связей, надгробий удалённых связей, действий с путями и
-/// дневных выборов по строке на запись. Так устроены файл экспорта и снимок.
+/// долговременных связей, надгробий удалённых связей и действий с путями по
+/// строке на запись. Так устроены файл экспорта и снимок.
 abstract final class GraphFormatFile {
   /// Сжатые байты файла с заголовком [header] и записями [records].
   ///
@@ -452,8 +452,7 @@ enum _Section {
   tagAssignments,
   longTermRelations,
   deletedRelationPairs,
-  actions,
-  dailyChoices;
+  actions;
 
   static _Section of(GraphEntityRecord record) => switch (record) {
     TagRecord() => tags,
@@ -463,7 +462,6 @@ enum _Section {
     LongTermRelationRecord() => longTermRelations,
     DeletedRelationPairRecord() => deletedRelationPairs,
     ActionRecord() => actions,
-    DailyChoiceRecord() => dailyChoices,
   };
 
   int countIn(GraphRecordCounts counts) => switch (this) {
@@ -474,6 +472,5 @@ enum _Section {
     longTermRelations => counts.longTermRelations,
     deletedRelationPairs => counts.deletedRelationPairs,
     actions => counts.actions,
-    dailyChoices => counts.dailyChoices,
   };
 }

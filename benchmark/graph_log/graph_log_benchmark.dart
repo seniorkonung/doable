@@ -562,7 +562,6 @@ Future<void> _writeRecordsOfLength(
         longTermRelations: 0,
         deletedRelationPairs: 0,
         actions: 0,
-        dailyChoices: 0,
       ),
     ),
     generate(),

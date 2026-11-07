@@ -18,8 +18,6 @@ import '../../action/domain/action_schedule.dart';
 import '../../data/local/app_database.dart' as local;
 import '../../data/local/fts_query.dart';
 import '../../data/local/sqlite_failure_classifier.dart';
-import '../../daily_choice/domain/daily_choice.dart';
-import '../../daily_choice/domain/daily_choice_schedule.dart';
 import '../../data_transfer/application/graph_composition.dart';
 import '../../data_transfer/application/graph_replacement.dart';
 import '../../graph_backups/graph_backup_registry.dart';
@@ -29,7 +27,6 @@ import '../../graph_format/graph_format_codec.dart'
 import '../../graph_format/graph_format_records.dart'
     show
         ActionRecord,
-        DailyChoiceRecord,
         DeletedIntentionRecord,
         DeletedRelationPairRecord,
         GraphEntityRecord,
@@ -91,7 +88,6 @@ import 'drift_relation_count_aggregates.dart';
 import 'contribution_reachability.dart';
 import 'graph_fact_capture.dart';
 import 'graph_record_rows.dart';
-import 'stored_choice_path_verification.dart';
 import 'stored_graph_rows.dart';
 
 import 'package:drift/drift.dart';

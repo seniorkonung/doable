@@ -53,8 +53,7 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
 
   /// Порция заполняется секциями по порядку файла формата, поэтому неполная
   /// порция дошла до конца последней секции. Транзакция согласует строки
-  /// порции, в том числе действия и дневные выборы с их путями, с позицией
-  /// лога.
+  /// порции, в том числе действия с их путями, с позицией лога.
   Future<GraphRecordPortion> _readGraphRecordPortion(
     GraphRecordOrderKey? after,
   ) => _sequencer.run(
@@ -89,10 +88,6 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
           after: after is ActionOrderKey ? after.creationSequence : 0,
           limit: limit,
         ),
-        (limit) => _readDailyChoiceRecords(
-          after: after is DailyChoiceOrderKey ? after.creationSequence : 0,
-          limit: limit,
-        ),
       ];
       final firstSection = switch (after) {
         null || TagOrderKey() => 0,
@@ -102,7 +97,6 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
         LongTermRelationOrderKey() => 4,
         DeletedRelationPairOrderKey() => 5,
         ActionOrderKey() => 6,
-        DailyChoiceOrderKey() => 7,
       };
       final records = <_OrderedRecord>[];
       for (final read in sections.skip(firstSection)) {
@@ -338,44 +332,6 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
         (
           ActionOrderKey(row.read<int>('creation_sequence')),
           storedActionRecord(row.data, paths),
-        ),
-    ];
-  }
-
-  Future<List<_OrderedRecord>> _readDailyChoiceRecords({
-    required int after,
-    required int limit,
-  }) async {
-    final rows = await _database
-        .customSelect(
-          '''SELECT creation_sequence, id, source_intention_id,
-                selected_intention_id, choice_date, description, is_completed,
-                scheduled_minute, priority
-         FROM daily_choices
-         WHERE creation_sequence > ?
-         ORDER BY creation_sequence
-         LIMIT ?''',
-          variables: [Variable.withInt(after), Variable.withInt(limit)],
-          readsFrom: {_database.dailyChoices},
-        )
-        .get();
-    if (rows.isEmpty) return const [];
-    final paths = await readStoredChoicePaths(
-      _database,
-      choiceIds:
-          'SELECT id FROM daily_choices '
-          'WHERE creation_sequence > ? AND creation_sequence <= ?',
-      variables: [
-        Variable.withInt(after),
-        Variable.withInt(rows.last.read<int>('creation_sequence')),
-      ],
-      readsFrom: {_database.dailyChoices},
-    );
-    return [
-      for (final row in rows)
-        (
-          DailyChoiceOrderKey(row.read<int>('creation_sequence')),
-          storedDailyChoiceRecord(decodeStoredDailyChoice(row.data), paths),
         ),
     ];
   }

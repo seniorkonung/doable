@@ -371,7 +371,6 @@ List<String> _factKinds(GraphLogPackage package) => [
         LongTermRelationKey() => 'удаление связи',
         DeletedRelationPairKey() => 'удаление надгробия связи',
         ActionKey() => 'удаление действия',
-        DailyChoiceKey() => 'удаление дневного выбора',
       },
     },
 ];
@@ -384,7 +383,6 @@ String _entityOf(GraphEntityRecord record) => switch (record) {
   LongTermRelationRecord() => 'связи',
   DeletedRelationPairRecord() => 'надгробия связи',
   ActionRecord() => 'действия',
-  DailyChoiceRecord() => 'дневного выбора',
 };
 
 /// Описание одного-двух графемных кластеров, с которым запись [intention],

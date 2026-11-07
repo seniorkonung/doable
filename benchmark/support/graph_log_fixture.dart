@@ -58,7 +58,6 @@ final class GraphLogFixture {
     longTermRelations: longTermRelations,
     deletedRelationPairs: deletedRelationPairs,
     actions: actions,
-    dailyChoices: 0,
   );
 
   /// Намерения полос: все, кроме узла каскада.
