@@ -276,7 +276,7 @@ final class _Sections {
 
   /// Намерения и надгробия намерений предшествующих строк: на них могут
   /// ссылаться путь действия и пара надгробия связи.
-  final _knownIntentions = <IntentionId>{};
+  final _knownIntentions = _KnownIntentions();
 
   bool get isComplete => _remaining.every((count) => count == 0);
 
@@ -321,6 +321,125 @@ final class _Sections {
     }
     _remaining[_current]--;
     return true;
+  }
+}
+
+/// Множество идентификаторов намерений по 16 байт на идентификатор: память
+/// чтения и записи файла растёт с графом не больше, чем на сами
+/// идентификаторы. Секции намерений и их надгробий предшествуют ссылкам на
+/// них, поэтому все добавления идут до первой проверки. Она собирает порции
+/// в один массив, освобождая каждую после копирования, и сортирует его на
+/// месте для двоичного поиска.
+final class _KnownIntentions {
+  /// Идентификаторов в порции: память растёт порциями, а не удвоением.
+  static const _chunkIds = 4096;
+
+  /// Старшие и младшие 64 бита идентификаторов поочерёдно.
+  List<Int64List?>? _chunks = [];
+  var _length = 0;
+  Int64List? _sorted;
+
+  void add(IntentionId id) {
+    final chunks = _chunks;
+    if (chunks == null) {
+      throw StateError('Намерение добавлено после проверки ссылок.');
+    }
+    final offset = _length % _chunkIds;
+    if (offset == 0) chunks.add(Int64List(2 * _chunkIds));
+    final (high, low) = _bits(id);
+    chunks.last!
+      ..[2 * offset] = high
+      ..[2 * offset + 1] = low;
+    _length++;
+  }
+
+  bool contains(IntentionId id) {
+    final sorted = _sorted ??= _collect();
+    final (high, low) = _bits(id);
+    var start = 0, end = _length;
+    while (start < end) {
+      final middle = (start + end) >> 1;
+      final order = _compare(sorted, middle, high, low);
+      if (order == 0) return true;
+      if (order < 0) {
+        start = middle + 1;
+      } else {
+        end = middle;
+      }
+    }
+    return false;
+  }
+
+  Int64List _collect() {
+    final chunks = _chunks!;
+    _chunks = null;
+    final values = Int64List(2 * _length);
+    for (var chunk = 0; chunk < chunks.length; chunk++) {
+      final start = chunk * 2 * _chunkIds;
+      values.setRange(
+        start,
+        math.min(start + 2 * _chunkIds, values.length),
+        chunks[chunk]!,
+      );
+      chunks[chunk] = null;
+    }
+    // Пирамидальная сортировка не требует памяти сверх массива.
+    for (var root = _length ~/ 2 - 1; root >= 0; root--) {
+      _siftDown(values, root, _length);
+    }
+    for (var end = _length - 1; end > 0; end--) {
+      _swap(values, 0, end);
+      _siftDown(values, 0, end);
+    }
+    return values;
+  }
+
+  static void _siftDown(Int64List values, int root, int end) {
+    while (true) {
+      var largest = root;
+      for (var child = 2 * root + 1; child <= 2 * root + 2; child++) {
+        if (child < end &&
+            _compare(
+                  values,
+                  largest,
+                  values[2 * child],
+                  values[2 * child + 1],
+                ) <
+                0) {
+          largest = child;
+        }
+      }
+      if (largest == root) return;
+      _swap(values, root, largest);
+      root = largest;
+    }
+  }
+
+  static void _swap(Int64List values, int a, int b) {
+    final high = values[2 * a], low = values[2 * a + 1];
+    values
+      ..[2 * a] = values[2 * b]
+      ..[2 * a + 1] = values[2 * b + 1]
+      ..[2 * b] = high
+      ..[2 * b + 1] = low;
+  }
+
+  /// Порядок идентификатора с номером [index] относительно ([high], [low]).
+  static int _compare(Int64List values, int index, int high, int low) {
+    final byHigh = values[2 * index].compareTo(high);
+    return byHigh != 0 ? byHigh : values[2 * index + 1].compareTo(low);
+  }
+
+  /// Биты канонической записи `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`;
+  /// сдвиг в знаковый разряд сохраняет различие значений.
+  static (int, int) _bits(IntentionId id) {
+    final text = id.toCanonicalString();
+    int hex(int start, int end) =>
+        int.parse(text.substring(start, end), radix: 16);
+    return (
+      hex(0, 8) << 32 | hex(9, 13) << 16 | hex(14, 18),
+      hex(19, 23) << 48 | hex(24, 36),
+    );
   }
 }
 

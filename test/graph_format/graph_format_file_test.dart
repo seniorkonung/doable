@@ -401,6 +401,73 @@ void main() {
         );
       }
     });
+
+    test('ссылки путей проверяются по намерениям из нескольких порций '
+        'учёта', () async {
+      // Больше одной порции учёта ссылок в 4096 намерений; псевдослучайные
+      // идентификаторы задают и старшие биты.
+      const count = 4100;
+      String hex(int value, int digits) =>
+          (value % (1 << (4 * digits))).toRadixString(16).padLeft(digits, '0');
+      IntentionId id(int index) {
+        final mixed = (index + 1) * 0x9E3779B1;
+        return _intentionId(
+          '${hex(mixed, 8)}-${hex(index, 4)}-7${hex(mixed >> 7, 3)}-'
+          '8${hex(mixed >> 13, 3)}-${hex(index * 7919, 12)}',
+        );
+      }
+
+      final deleted = id(count);
+      ActionRecord action(int number, List<IntentionId> path) => ActionRecord(
+        id: _actionId(_actionIds[number]),
+        title: ActionTitle('Действие $number'),
+        description: null,
+        path: ActionPath(path),
+        date: CalendarDate.fromParts(2026, 10, 2),
+        schedule: const ActionAllDay(),
+        priority: ActionPriority.p2,
+        isCompleted: false,
+        createdAt: ActionTimestamp(DateTime.utc(2026, 10, 1)),
+        updatedAt: ActionTimestamp(DateTime.utc(2026, 10, 1)),
+      );
+      List<GraphEntityRecord> records(List<IntentionId> lastPath) => [
+        for (var index = 0; index < count; index++)
+          IntentionRecord(
+            Intention(
+              id: id(index),
+              title: 'Намерение $index',
+              description: null,
+              readiness: IntentionReadiness.notReady,
+              archiveState: IntentionArchiveState.active,
+              createdAt: IntentionTimestamp(
+                DateTime.utc(2026).add(Duration(seconds: index)),
+              ),
+              updatedAt: IntentionTimestamp(DateTime.utc(2026)),
+            ),
+          ),
+        DeletedIntentionRecord(id: deleted, title: 'Удалённое'),
+        action(0, [id(0), id(4095), id(4096)]),
+        action(1, [id(count - 1), deleted]),
+        action(2, lastPath),
+      ];
+      final header = GraphFormatHeader(
+        writtenAt: DateTime.utc(2026, 10, 17),
+        counts: _counts(intentions: count, deletedIntentions: 1, actions: 3),
+      );
+
+      // Кодирование каноническое, поэтому совпадение байтов означает
+      // совпадение прочитанного с записанным.
+      final written = await _decompressed(header, records([id(2048), id(17)]));
+      final read = await _readAll(Stream.value(gzip.encode(written)));
+      expect(await _decompressed(header, read), written);
+      await expectLater(
+        GraphFormatFile.write(
+          header,
+          Stream.fromIterable(records([id(2048), id(count + 1)])),
+        ).drain<void>(),
+        throwsStateError,
+      );
+    });
   });
 }
 
