@@ -19,25 +19,25 @@ import '../../support/app_root_pages.dart';
 
 const _russianNames = {
   AppDestination.home: 'Главная',
-  AppDestination.dailyChoices: 'Дневные выборы',
+  AppDestination.actions: 'Действия',
   AppDestination.intentionGraph: 'Граф намерений',
 };
 
 const _englishNames = {
   AppDestination.home: 'Home',
-  AppDestination.dailyChoices: 'Daily choices',
+  AppDestination.actions: 'Actions',
   AppDestination.intentionGraph: 'Intention graph',
 };
 
 const _outlinedIcons = {
   AppDestination.home: DoableIconData.home,
-  AppDestination.dailyChoices: DoableIconData.calendarDays,
+  AppDestination.actions: DoableIconData.calendarDays,
   AppDestination.intentionGraph: DoableIconData.graph,
 };
 
 const _filledIcons = {
   AppDestination.home: DoableIconData.homeFilled,
-  AppDestination.dailyChoices: DoableIconData.calendarDaysFilled,
+  AppDestination.actions: DoableIconData.calendarDaysFilled,
   AppDestination.intentionGraph: DoableIconData.graphFilled,
 };
 
@@ -133,7 +133,6 @@ void main() {
     await tester.pumpWidget(
       _testApp(
         locale: const Locale('ru'),
-        quickCreationMode: QuickCreationMode.dailyChoice,
         onQuickCreate: () => launches++,
         onChangeQuickCreationMode: () => menus++,
         onSelected: selections.add,

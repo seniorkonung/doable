@@ -1,5 +1,6 @@
 import 'package:auto_route/auto_route.dart';
 
+import '../../action/presentation/editor/action_editor_page.dart';
 import '../navigation/app_destination.dart';
 import 'app_router.gr.dart';
 
@@ -18,8 +19,6 @@ final class AppRouter extends RootStackRouter {
           AutoRoute(page: destination.page),
       ],
     ),
-    AutoRoute(page: DailyChoiceActionPickerRoute.page),
-    AutoRoute(page: DailyChoiceSourcePickerRoute.page),
     // Создание намерения — модальная нижняя панель над сохранённой корневой
     // страницей в этом же стеке (ADR-0018). Маршрут прозрачен и сам по фону
     // не закрывается: закрытие решает сессия создания, а вход и выход
@@ -33,12 +32,20 @@ final class AppRouter extends RootStackRouter {
       duration: const Duration(milliseconds: 250),
       reverseDuration: const Duration(milliseconds: 200),
     ),
+    // Лист нового действия — маршрут этого же стека над сохранённой
+    // страницей, чтобы сброс истории видел его черновик (ADR-0058). Лист
+    // движется и закрывается по правилам нижних панелей, а закрытие с
+    // введённым текстом решает его сессия.
+    CustomRoute<void>(
+      page: ActionEditorRoute.page,
+      customRouteBuilder: actionEditorRoute,
+    ),
     AutoRoute(page: IntentionDetailsRoute.page),
     AutoRoute(page: IntentionEditRoute.page),
-    AutoRoute(page: DailyChoiceDateCatalogRoute.page),
-    AutoRoute(page: ChoicePathRoute.page),
-    AutoRoute(page: DailyChoiceCreationRoute.page),
+    AutoRoute(page: ActionDayDateRoute.page),
     AutoRoute(page: RelationBatchPickerRoute.page),
+    AutoRoute(page: PathStartPickerRoute.page),
+    AutoRoute(page: PathRoute.page),
     AutoRoute(page: SettingsRoute.page),
   ];
 }

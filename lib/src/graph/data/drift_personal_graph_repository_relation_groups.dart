@@ -2,25 +2,19 @@ part of 'drift_personal_graph_repository.dart';
 
 extension _RelationGroupPageReading on DriftPersonalGraphRepository {
   Future<RelationGroupPageResult> _readRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) async {
     final stopwatch = Stopwatch()..start();
     final isContinuation = query.cursor != null;
     void record(DiagnosticsStatus status, {bool requiresNewSnapshot = false}) {
-      _recordDiagnostics(switch (query) {
-        DailyChoiceGroupQuery() => DailyChoiceGroupPageReadDiagnosticsEvent(
+      _recordDiagnostics(
+        RelationGroupPageReadDiagnosticsEvent(
           pageSize: query.pageSize,
           isContinuation: isContinuation,
           requiresNewSnapshot: requiresNewSnapshot,
           status: status,
         ),
-        RelationGroupQuery() => RelationGroupPageReadDiagnosticsEvent(
-          pageSize: query.pageSize,
-          isContinuation: isContinuation,
-          requiresNewSnapshot: requiresNewSnapshot,
-          status: status,
-        ),
-      });
+      );
     }
 
     record(const DiagnosticsStarted());
@@ -47,17 +41,6 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
   }
 
   Future<RelationGroupPage> _readRelationGroupPageOnCurrentSnapshot(
-    RelationGroupPageQuery query,
-  ) => switch (query) {
-    RelationGroupQuery() => _readLongTermRelationGroupPageOnCurrentSnapshot(
-      query,
-    ),
-    DailyChoiceGroupQuery() => _readDailyChoiceGroupPageOnCurrentSnapshot(
-      query,
-    ),
-  };
-
-  Future<RelationGroupPage> _readLongTermRelationGroupPageOnCurrentSnapshot(
     RelationGroupQuery query,
   ) async {
     final _DriftRelationGroupCursor? cursor = switch (query.cursor) {
@@ -130,118 +113,6 @@ extension _RelationGroupPageReading on DriftPersonalGraphRepository {
           : null,
       revision: cursor.revision,
     );
-  }
-
-  Future<RelationGroupPage> _readDailyChoiceGroupPageOnCurrentSnapshot(
-    DailyChoiceGroupQuery query,
-  ) async {
-    final _DriftDailyChoiceGroupCursor? cursor = switch (query.cursor) {
-      null => null,
-      final _DriftDailyChoiceGroupCursor own => own,
-      _ => throw StateError('Недопустимый курсор группы дневных выборов.'),
-    };
-    if (cursor != null &&
-        cursor.revision.compareTo(_currentRevision) !=
-            GraphRevisionOrder.same) {
-      throw const _RelationGroupSnapshotHasExpired();
-    }
-
-    await _requireRelationGroupOwner(query.intentionId);
-    final counts = cursor == null
-        ? await _readVerifiedRelationCounts(query.intentionId)
-        : null;
-    final rawRows = await _readDailyChoiceGroupRows(query, cursor: cursor);
-    final selectedRows = rawRows.take(query.pageSize).toList(growable: false);
-    final choices = <DailyChoice>[];
-    for (final row in selectedRows) {
-      final choice = decodeStoredDailyChoice(row.data);
-      final directParticipant = switch (query.role) {
-        DailyChoiceRelationRole.source => choice.sourceIntentionId,
-        DailyChoiceRelationRole.selected => choice.selectedIntentionId,
-      };
-      if (directParticipant != query.intentionId) {
-        throw const StoredGraphCorruption();
-      }
-      choices.add(choice);
-    }
-    final items = await _verifyDailyChoiceCatalogItems(choices);
-    final hasNextPage = rawRows.length > query.pageSize;
-    final expectedCount =
-        counts?.forSelection(query.group) ?? cursor!.expectedCount;
-    final returnedCount = (cursor?.returnedCount ?? 0) + items.length;
-    _verifyRelationGroupProgress(
-      returnedCount: returnedCount,
-      expectedCount: expectedCount,
-      hasNextPage: hasNextPage,
-    );
-    final revision = _currentRevision;
-    final nextCursor = hasNextPage
-        ? _DriftDailyChoiceGroupCursor(
-            revision: revision,
-            boundaryDate: requiredStoredString(
-              selectedRows.last.data,
-              'choice_date',
-            ),
-            boundaryCreationSequence: requiredStoredInteger(
-              selectedRows.last.data,
-              'creation_sequence',
-            ),
-            expectedCount: expectedCount,
-            returnedCount: returnedCount,
-          )
-        : null;
-    return cursor == null
-        ? DailyChoiceGroupFirstPage(
-            items: items,
-            counts: counts!,
-            nextCursor: nextCursor,
-            revision: revision,
-          )
-        : DailyChoiceGroupContinuationPage(
-            items: items,
-            nextCursor: nextCursor,
-            revision: revision,
-          );
-  }
-
-  Future<List<QueryRow>> _readDailyChoiceGroupRows(
-    DailyChoiceGroupQuery query, {
-    required _DriftDailyChoiceGroupCursor? cursor,
-  }) {
-    final (ownerColumn, indexName) = switch (query.role) {
-      DailyChoiceRelationRole.source => (
-        'source_intention_id',
-        'daily_choices_source_date_creation_order',
-      ),
-      DailyChoiceRelationRole.selected => (
-        'selected_intention_id',
-        'daily_choices_selected_date_creation_order',
-      ),
-    };
-    final continuation = cursor == null
-        ? ''
-        : '''AND (choice_date < ? OR
-          (choice_date = ? AND creation_sequence < ?))''';
-    return _database
-        .customSelect(
-          '''SELECT creation_sequence, id, source_intention_id,
-              selected_intention_id, choice_date, description, is_completed,
-              scheduled_minute, priority
-           FROM daily_choices INDEXED BY $indexName
-           WHERE $ownerColumn = ? $continuation
-           ORDER BY choice_date DESC, creation_sequence DESC LIMIT ?''',
-          variables: [
-            Variable<String>(query.intentionId.toCanonicalString()),
-            if (cursor != null) ...[
-              Variable<String>(cursor.boundaryDate),
-              Variable<String>(cursor.boundaryDate),
-              Variable<int>(cursor.boundaryCreationSequence),
-            ],
-            Variable<int>(query.pageSize + 1),
-          ],
-          readsFrom: {_database.dailyChoices},
-        )
-        .get();
   }
 
   Future<void> _requireRelationGroupOwner(IntentionId id) async {
@@ -470,25 +341,9 @@ final class _DriftRelationGroupCursor implements RelationGroupCursor {
   final int returnedCount;
 }
 
-final class _DriftDailyChoiceGroupCursor implements RelationGroupCursor {
-  const _DriftDailyChoiceGroupCursor({
-    required this.revision,
-    required this.boundaryDate,
-    required this.boundaryCreationSequence,
-    required this.expectedCount,
-    required this.returnedCount,
-  });
-
-  final GraphRevision revision;
-  final String boundaryDate;
-  final int boundaryCreationSequence;
-  final int expectedCount;
-  final int returnedCount;
-}
-
 RelationGroupReadFailure _classifyRelationGroupReadFailure(
   Object error,
-  RelationGroupPageQuery query,
+  RelationGroupQuery query,
 ) {
   if (error is _RelationGroupSnapshotHasExpired) {
     return const RelationGroupSnapshotExpired();

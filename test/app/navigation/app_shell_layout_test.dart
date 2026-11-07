@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/main.dart';
+import 'package:doable/src/action/application/action_day.dart';
+import 'package:doable/src/action/domain/action_id.dart';
+import 'package:doable/src/action/presentation/day/action_day_root_page.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
@@ -12,10 +14,6 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/list_state.dart';
 import 'package:doable/src/design_system/components/relation_head.dart';
@@ -24,18 +22,19 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
-import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
+import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
-import '../../support/daily_choice_details_controls.dart';
-
+import '../../support/action_day_controls.dart';
+import '../../support/action_panel_controls.dart';
+import '../../support/action_seed.dart';
 import '../../support/app_root_pages.dart';
-import '../../support/daily_choice_catalog_controls.dart';
-import '../../support/daily_choice_local_date.dart';
+import '../../support/controlled_local_date.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/intention_catalog_controls.dart';
@@ -49,17 +48,16 @@ part 'ordinary_page_layout_scenarios.dart';
 /// панель, нижний безопасный отступ и клавиатура.
 const _screen = Size(400, 800);
 
-/// Размер порции каталога намерений и каталога дневных выборов.
+/// Размер порции каталога намерений и экрана дня.
 const _intentionPageSize = 100;
-const _dailyChoicePageSize = 50;
+const _actionDayPageSize = 50;
 
-/// Связь «Намерение 001» → «Намерение 002» — путь каждого дневного выбора.
+/// Связь «Намерение 001» → «Намерение 002» — путь каждого действия.
 const _relation = 1001;
-const _firstChoice = 2001;
-const _firstPathStep = 4001;
+const _firstAction = 2001;
 
-/// Локальное сегодня приложения и день всех дневных выборов фикстуры:
-/// каталог дневных выборов открывается на дне со всей выдачей.
+/// Локальное сегодня приложения и день всех действий фикстуры: экран дня
+/// открывается на дне со всей выдачей.
 final _today = CalendarDate.fromParts(2026, 9, 25);
 
 /// Системные вставки окна, как их сообщает платформа.
@@ -152,7 +150,7 @@ void main() {
     }
   });
 
-  group('содержимое каталогов над панелью', () {
+  group('содержимое корневых страниц над панелью', () {
     for (final insets in _insetVariants) {
       testWidgets('каталог намерений, ${insets.name}: последняя строка выдачи, '
           'загруженной до конца, занимает доступную область до панели', (
@@ -258,26 +256,21 @@ void main() {
     // Язык раскладку не ветвит: русский даёт самые длинные подписи строк.
     const locale = Locale('ru');
     for (final insets in _insetVariants) {
-      testWidgets('каталог дневных выборов, ${locale.languageCode}, '
+      testWidgets('экран дня, ${locale.languageCode}, '
           '${insets.name}: выдача догружается сама, а последняя строка видна '
           'над панелью без зарезервированного места', (tester) async {
-        const count = _dailyChoicePageSize + 5;
-        await _start(
-          tester,
-          dailyChoices: count,
-          insets: insets,
-          locale: locale,
-        );
-        await _select(tester, AppDestination.dailyChoices);
+        const count = _actionDayPageSize + 5;
+        await _start(tester, actions: count, insets: insets, locale: locale);
+        await _select(tester, AppDestination.actions);
         await _until(
           tester,
-          dailyChoiceSectionWithCount(
-            completed: false,
+          actionDaySectionWithCount(
+            section: ActionDaySection.incomplete,
             count: count,
             skipOffstage: false,
           ),
         );
-        final page = find.byType(DailyChoiceCatalogPage);
+        final page = find.byType(ActionDayRootPage);
 
         if (insets.keyboard > 0) {
           _expectDateControlAboveKeyboard(tester, insets);
@@ -286,58 +279,54 @@ void main() {
         await _scrollToEnd(tester, page);
         await _waitFor(
           tester,
-          () => dailyChoiceCatalogPageFooter(
-            completed: false,
+          () => actionDayPageFooter(
+            section: ActionDaySection.incomplete,
             skipOffstage: false,
           ).evaluate().isEmpty,
         );
         await tester.pumpAndSettle();
-        expect(find.byType(DailyChoiceActionPickerPage), findsNothing);
         await _scrollToEnd(tester, page);
 
-        final lastRow = _dailyChoiceRow(count);
+        final lastRow = _actionDayRow(count);
         _expectFullyVisible(tester, lastRow, insets);
-        _expectDailyChoiceEnd(tester, lastRow, insets);
+        _expectActionDayEnd(tester, lastRow, insets);
         expect(lastRow.hitTestable(), findsOneWidget);
 
         await tester.tap(lastRow);
-        await _until(tester, dailyChoiceDetails);
+        await _until(tester, actionPanel);
         await tester.pumpAndSettle();
-        // При равных времени и приоритете записи идут по созданию: последний
-        // созданный дневной выбор стоит последним.
-        expect(
-          shownDailyChoice(tester),
-          _dailyChoiceId(_firstChoice + count - 1),
-        );
+        // При равных времени и приоритете действия идут по созданию: последнее
+        // созданное действие стоит последним.
+        expect(shownActionId(tester), _actionId(_firstAction + count - 1));
         expect(tester.takeException(), isNull);
       });
     }
 
     for (final insets in [_safeArea, _keyboardOpen]) {
-      testWidgets('каталог дневных выборов, ${locale.languageCode}, '
+      testWidgets('экран дня, ${locale.languageCode}, '
           '${insets.name}: отказ продолжения выдачи и повтор видны над '
           'панелью без зарезервированного места, а повтор '
           'догружает выдачу', (tester) async {
-        const count = _dailyChoicePageSize + 5;
+        const count = _actionDayPageSize + 5;
         final l10n = lookupAppLocalizations(locale);
         final faults = _ReadFaults();
         await _start(
           tester,
-          dailyChoices: count,
+          actions: count,
           insets: insets,
           locale: locale,
           observer: faults,
         );
-        await _select(tester, AppDestination.dailyChoices);
+        await _select(tester, AppDestination.actions);
         await _until(
           tester,
-          dailyChoiceSectionWithCount(
-            completed: false,
+          actionDaySectionWithCount(
+            section: ActionDaySection.incomplete,
             count: count,
             skipOffstage: false,
           ),
         );
-        final page = find.byType(DailyChoiceCatalogPage);
+        final page = find.byType(ActionDayRootPage);
         if (insets.keyboard > 0) {
           _expectDateControlAboveKeyboard(tester, insets);
         }
@@ -346,7 +335,7 @@ void main() {
 
         final failure = find.descendant(
           of: page,
-          matching: find.text(l10n.dailyChoiceCatalogUnavailable),
+          matching: find.text(l10n.actionDayUnavailable),
         );
         await _until(tester, failure);
         await tester.pumpAndSettle();
@@ -363,21 +352,20 @@ void main() {
 
         faults.isFailing = false;
         await tester.tap(retry);
-        // Повтор догружает выдачу до конца, а не открывает поиск действия.
+        // Повтор догружает выдачу до конца.
         await _waitFor(
           tester,
-          () => dailyChoiceCatalogPageFooter(
-            completed: false,
+          () => actionDayPageFooter(
+            section: ActionDaySection.incomplete,
             skipOffstage: false,
           ).evaluate().isEmpty,
         );
         await tester.pumpAndSettle();
-        expect(find.byType(DailyChoiceActionPickerPage), findsNothing);
         await _scrollToEnd(tester, page);
 
-        final lastRow = _dailyChoiceRow(count);
+        final lastRow = _actionDayRow(count);
         _expectFullyVisible(tester, lastRow, insets);
-        _expectDailyChoiceEnd(tester, lastRow, insets);
+        _expectActionDayEnd(tester, lastRow, insets);
         expect(lastRow.hitTestable(), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
@@ -413,19 +401,11 @@ void main() {
             greaterThanOrEqualTo(message.bottom),
           );
           expect(create.hitTestable(), findsOneWidget);
-          if (destination == AppDestination.dailyChoices) {
-            await openDailyChoiceQuickCreation(
-              tester,
-              ChoicePathDraftDirection.bottomUp,
-              openedPage: find.byType(DailyChoiceActionPickerPage),
-            );
-          } else {
-            await openQuickCreation(
-              tester,
-              QuickCreationMode.intention,
-              openedPage: find.byType(IntentionEditorPage),
-            );
-          }
+          await openQuickCreation(
+            tester,
+            QuickCreationMode.intention,
+            openedPage: find.byType(IntentionEditorPage),
+          );
         }
         expect(tester.takeException(), isNull);
       });
@@ -498,25 +478,24 @@ void main() {
 
 const _names = {
   AppDestination.home: 'Главная',
-  AppDestination.dailyChoices: 'Дневные выборы',
+  AppDestination.actions: 'Действия',
   AppDestination.intentionGraph: 'Граф намерений',
 };
 
 /// Корневая страница каждого пункта.
 const _rootPages = {
   AppDestination.home: HomePage,
-  AppDestination.dailyChoices: DailyChoiceCatalogPage,
+  AppDestination.actions: ActionDayRootPage,
   AppDestination.intentionGraph: IntentionCatalogPage,
 };
 
-/// Строка выдачи каталога дневных выборов с номером [number].
-Finder _dailyChoiceRow(int number) =>
-    find.byKey(ValueKey('daily-choice-row-$number'));
+/// Строка выдачи экрана дня с номером [number].
+Finder _actionDayRow(int number) =>
+    find.byKey(ValueKey('action-day-row-$number'));
 
-/// Дневной выбор, засеянный под номером [number].
-DailyChoiceId _dailyChoiceId(int number) => (DailyChoiceId.decode(
-  tagFixtureId(number),
-) as DailyChoiceIdDecodingSuccess).id;
+/// Действие, засеянное под номером [number].
+ActionId _actionId(int number) =>
+    (ActionId.decode(tagFixtureId(number)) as ActionIdDecodingSuccess).id;
 
 const _messageKey = ValueKey('graph-operation-message');
 
@@ -584,7 +563,7 @@ void _apply(WidgetTester tester, _Insets insets) {
 Future<_App> _start(
   WidgetTester tester, {
   int intentions = 40,
-  int dailyChoices = 2,
+  int actions = 2,
   _Insets insets = _plain,
   Locale locale = const Locale('en'),
   LocalDatabaseConnectionObserver? observer,
@@ -617,14 +596,14 @@ Future<_App> _start(
       };
     },
     diagnosticsSink: InMemoryDiagnosticsSink(),
-    dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(_today).read,
+    localDateSource: ControlledLocalDate(_today).read,
   );
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());
     await runtime.shutdown();
   });
   await tester.runAsync(runtime.bootstrap);
-  _seed(raw, intentions: intentions, dailyChoices: dailyChoices);
+  _seed(raw, intentions: intentions, actions: actions);
   seedAdditional?.call(raw);
   await tester.pumpWidget(MainApp(runtime: runtime));
   await _until(tester, find.byType(HomePage));
@@ -640,12 +619,12 @@ Future<_App> _start(
   );
 }
 
-/// Намерения, связь и дневные выборы по ней на
-/// локальное сегодня: каждая корневая страница получает содержимое.
+/// Намерения, связь и действия на локальное сегодня с путём по этой связи:
+/// каждая корневая страница получает содержимое.
 void _seed(
   sqlite.Database database, {
   required int intentions,
-  required int dailyChoices,
+  required int actions,
 }) {
   seedRawGraph(database, () {
     for (var number = 1; number <= intentions; number++) {
@@ -661,27 +640,12 @@ void _seed(
       'VALUES (?, ?, ?, ?, ?, ?, 0, 0)',
       [tagFixtureId(_relation), tagFixtureId(1), tagFixtureId(2), 'need', 2, 0],
     );
-    for (var index = 0; index < dailyChoices; index++) {
-      database.execute(
-        'INSERT INTO daily_choices (id, source_intention_id, '
-        'selected_intention_id, choice_date, is_completed) '
-        'VALUES (?, ?, ?, ?, ?)',
-        [
-          tagFixtureId(_firstChoice + index),
-          tagFixtureId(1),
-          tagFixtureId(2),
-          _today.toCanonicalString(),
-          0,
-        ],
-      );
-      database.execute(
-        'INSERT INTO daily_choice_path_steps (id, daily_choice_id, '
-        'long_term_relation_id) VALUES (?, ?, ?)',
-        [
-          tagFixtureId(_firstPathStep + index),
-          tagFixtureId(_firstChoice + index),
-          tagFixtureId(_relation),
-        ],
+    for (var index = 0; index < actions; index++) {
+      seedAction(
+        database,
+        id: tagFixtureId(_firstAction + index),
+        path: [tagFixtureId(1), tagFixtureId(2)],
+        date: _today.toCanonicalString(),
       );
     }
   });
@@ -812,18 +776,17 @@ void _expectCatalogEnd(WidgetTester tester, Finder last, _Insets insets) {
   expect(find.byKey(const ValueKey('catalog-create-intention')), findsNothing);
 }
 
-/// Выбор дня в начале каталога дневных выборов виден над клавиатурой
-/// и принимает нажатия.
+/// Выбор дня в начале экрана дня виден над клавиатурой и принимает нажатия.
 void _expectDateControlAboveKeyboard(WidgetTester tester, _Insets insets) {
-  expect(dailyChoiceCatalogDay(_today).hitTestable(), findsOneWidget);
-  _expectFullyVisible(tester, dailyChoiceCatalogDateControl, insets);
+  expect(actionDayDay(_today).hitTestable(), findsOneWidget);
+  _expectFullyVisible(tester, actionDayDateControl, insets);
   expect(find.byType(FloatingActionButton), findsNothing);
 }
 
-/// Выдача дневных выборов заканчивается свободным местом в 72 у панели либо
+/// Выдача экрана дня заканчивается свободным местом в 72 у панели либо
 /// клавиатуры.
-void _expectDailyChoiceEnd(WidgetTester tester, Finder last, _Insets insets) {
-  final completed = find.byKey(const ValueKey('daily-choice-section-true'));
+void _expectActionDayEnd(WidgetTester tester, Finder last, _Insets insets) {
+  final completed = find.byKey(const ValueKey('action-day-section-completed'));
   // Второй заголовок стоит на 2 ниже строк первой секции.
   expect(
     tester.getRect(last).bottom,
@@ -841,8 +804,7 @@ void _expectDailyChoiceEnd(WidgetTester tester, Finder last, _Insets insets) {
 /// Жест начинается у левого верхнего края видимой части прокрутки выдачи —
 /// в точке, доступной для нажатия. Прокрутка выдачи —
 /// самая вложенная прокрутка страницы: собственный список выдачи каталога
-/// намерений либо прокрутка, которую выдача каталога дневных выборов делит с
-/// фильтрами.
+/// намерений либо прокрутка, которую выдача экрана дня делит с календарём.
 Future<void> _scrollToEnd(WidgetTester tester, Finder page) async {
   final list = find
       .descendant(

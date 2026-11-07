@@ -4,8 +4,6 @@ import 'dart:typed_data';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/data/drift_relation_count_aggregates.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/graph_seed.dart';
@@ -139,121 +137,6 @@ void main() {
   });
 
   test(
-    'считает обе прямые дневные роли, не приписывая их середине пути',
-    () async {
-      final source = _uuid(3000);
-      final middle = _uuid(3001);
-      final selected = _uuid(3002);
-      for (final id in [source, middle, selected]) {
-        await _insertIntention(database, id);
-      }
-      final firstRelation = _uuid(3010);
-      final secondRelation = _uuid(3011);
-      await _insertRelation(
-        database,
-        id: firstRelation,
-        sourceId: source,
-        relatedId: middle,
-        type: 'need',
-        isArchived: false,
-      );
-      await _insertRelation(
-        database,
-        id: secondRelation,
-        sourceId: middle,
-        relatedId: selected,
-        type: 'can',
-        isArchived: false,
-      );
-
-      for (var index = 0; index < 3; index++) {
-        final choice = _uuid(3020 + index);
-        await _insertDailyChoice(
-          database,
-          id: choice,
-          sourceId: source,
-          selectedId: selected,
-          completed: index.isEven,
-        );
-        await _insertStep(
-          database,
-          id: _uuid(3030 + index * 2),
-          choiceId: choice,
-          relationId: firstRelation,
-        );
-        await _insertStep(
-          database,
-          id: _uuid(3031 + index * 2),
-          choiceId: choice,
-          relationId: secondRelation,
-          previousId: _uuid(3030 + index * 2),
-        );
-      }
-      await seedGraph(
-        database,
-        () => database.customStatement(
-          'UPDATE long_term_relations SET is_archived = 1 WHERE id = ?',
-          [firstRelation],
-        ),
-      );
-
-      final counts = await aggregates.read([
-        _id(source),
-        _id(middle),
-        _id(selected),
-      ]);
-      expect(counts[_id(source)]!.counts.dailySource, 3);
-      expect(counts[_id(source)]!.counts.dailySelected, 0);
-      expect(counts[_id(middle)]!.counts.dailyTotal, 0);
-      expect(counts[_id(selected)]!.counts.dailySource, 0);
-      expect(counts[_id(selected)]!.counts.dailySelected, 3);
-      expect(counts[_id(middle)]!.counts.total, 2);
-
-      final permissions = await aggregates.readPermissions([
-        _relationId(firstRelation),
-        _relationId(secondRelation),
-      ]);
-      for (final value in permissions.values) {
-        expect(
-          value.restriction,
-          LongTermRelationPermissionRestriction.referencedByDailyPath,
-        );
-        expect(value.canDelete, isFalse);
-        expect(value.canEditDescriptionAndPriority, isTrue);
-        expect(value.canChangeArchiveState, isTrue);
-      }
-
-      await seedGraph(
-        database,
-        () => database.customStatement(
-          'DELETE FROM daily_choices WHERE id = ?',
-          [_uuid(3020)],
-        ),
-      );
-      expect(
-        (await aggregates.readPermissions([
-          _relationId(firstRelation),
-        ]))[_relationId(firstRelation)]!.canDelete,
-        isFalse,
-      );
-      await seedGraph(database, () async {
-        for (var index = 1; index < 3; index++) {
-          await database.customStatement(
-            'DELETE FROM daily_choices WHERE id = ?',
-            [_uuid(3020 + index)],
-          );
-        }
-      });
-      expect(
-        (await aggregates.readPermissions([
-          _relationId(firstRelation),
-        ]))[_relationId(firstRelation)]!.canDelete,
-        isTrue,
-      );
-    },
-  );
-
-  test(
     'обнаруживает повреждение до фильтрации групп без частичной выдачи',
     () async {
       // Каждое повреждение схема пропускает: формат и тип идентификаторов она
@@ -351,12 +234,9 @@ void main() {
     },
   );
 
-  test('ошибка агрегата не выдаёт нули или свободное разрешение', () async {
+  test('ошибка агрегата не выдаёт нули', () async {
     await database.close();
-    final fault = _AggregateSelectFault(
-      failCounts: true,
-      failPermissions: true,
-    );
+    final fault = _AggregateSelectFault();
     database = AppDatabase(
       observeConfiguredLocalDatabaseConnection(
         openInMemoryLocalDatabase(),
@@ -379,18 +259,11 @@ void main() {
     );
 
     await expectLater(aggregates.read([_id(source)]), throwsStateError);
-    await expectLater(
-      aggregates.readPermissions([_relationId(relation)]),
-      throwsStateError,
-    );
   });
 }
 
 IntentionId _id(String value) =>
     (IntentionId.decode(value) as IntentionIdDecodingSuccess).id;
-
-LongTermRelationId _relationId(String value) =>
-    (LongTermRelationId.decode(value) as LongTermRelationIdDecodingSuccess).id;
 
 Future<void> _insertIntention(AppDatabase database, String id) => seedGraph(
   database,
@@ -440,42 +313,6 @@ Future<void> _insertRelation(
   ),
 );
 
-Future<void> _insertDailyChoice(
-  AppDatabase database, {
-  required String id,
-  required String sourceId,
-  required String selectedId,
-  required bool completed,
-}) => seedGraph(
-  database,
-  () => database.customStatement(
-    '''
-    INSERT INTO daily_choices
-      (id, source_intention_id, selected_intention_id, choice_date, is_completed)
-    VALUES (?, ?, ?, '2026-09-23', ?)
-  ''',
-    [id, sourceId, selectedId, completed ? 1 : 0],
-  ),
-);
-
-Future<void> _insertStep(
-  AppDatabase database, {
-  required String id,
-  required String choiceId,
-  required String relationId,
-  String? previousId,
-}) => seedGraph(
-  database,
-  () => database.customStatement(
-    '''
-    INSERT INTO daily_choice_path_steps
-      (id, daily_choice_id, long_term_relation_id, previous_step_id)
-    VALUES (?, ?, ?, ?)
-  ''',
-    [id, choiceId, relationId, previousId],
-  ),
-);
-
 Future<void> _insertRawRelation(
   AppDatabase database, {
   required Object id,
@@ -505,24 +342,15 @@ Future<void> _insertRawRelation(
 String _uuid(int suffix) =>
     '018f0b5d-6b2e-7c80-8002-${suffix.toString().padLeft(12, '0')}';
 
-/// Отказывает при чтении агрегатов счётчиков и разрешений.
+/// Отказывает при чтении агрегатов счётчиков.
 final class _AggregateSelectFault extends LocalDatabaseConnectionObserver {
-  _AggregateSelectFault({
-    this.failCounts = false,
-    this.failPermissions = false,
-  });
-
-  final bool failCounts;
-  final bool failPermissions;
-
   @override
   List<Map<String, Object?>> afterSelect(
     LocalDatabaseSqlStatement statement,
     List<Map<String, Object?>> rows,
   ) {
     final sql = statement.statements.single;
-    if ((failCounts && sql.contains('doable_relation_count_aggregates')) ||
-        (failPermissions && sql.contains('doable_daily_path_permissions'))) {
+    if (sql.contains('doable_relation_count_aggregates')) {
       throw StateError('Искусственный отказ агрегата.');
     }
     return rows;

@@ -5,7 +5,6 @@ import '../domain/long_term_relation.dart';
 import '../domain/long_term_relation_description.dart';
 import '../domain/long_term_relation_id.dart';
 import 'intention_relation_group.dart';
-import 'long_term_relation_permissions.dart';
 
 sealed class LongTermRelationCommand
     implements
@@ -171,16 +170,6 @@ final class LongTermRelationPairOccupiedFailure
   GraphFailureCategory get category => GraphFailureCategory.conflict;
 }
 
-final class LongTermRelationReferencedByDailyPathFailure
-    extends LongTermRelationCommandFailure {
-  const LongTermRelationReferencedByDailyPathFailure(this.relationId);
-
-  final LongTermRelationId relationId;
-
-  @override
-  GraphFailureCategory get category => GraphFailureCategory.conflict;
-}
-
 /// Набор правок архивированной связи меняет её тип.
 ///
 /// Архивированная связь сохраняет тип до восстановления, поэтому отклоняется
@@ -280,14 +269,12 @@ final class LongTermRelationUpdated extends LongTermRelationCommandSuccess {
     required this.before,
     required this.relation,
     required this.description,
-    this.permissions = const LongTermRelationPermissions.unknown(),
     required super.changes,
   });
 
   final LongTermRelation before;
   final LongTermRelation relation;
   final LongTermRelationDescription? description;
-  final LongTermRelationPermissions permissions;
 }
 
 final class LongTermRelationDeleted extends LongTermRelationCommandSuccess {

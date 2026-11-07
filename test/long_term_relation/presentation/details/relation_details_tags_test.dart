@@ -29,14 +29,10 @@ LongTermRelationId _relationId(int number) => (LongTermRelationId.decode(
 ) as LongTermRelationIdDecodingSuccess).id;
 
 void main() {
-  // Активность связи и защита дневным путём управляют независимыми частями
-  // панели, а тип меняет только шапку: двух комбинаций хватает на все значения.
-  for (final (number, usedByDailyPath, type) in [
-    (101, false, 'need'),
-    (102, true, 'can'),
-  ]) {
+  // Активность и тип связи не влияют на отсутствие её собственных тегов.
+  for (final (number, type) in [(101, 'need'), (102, 'can')]) {
     testWidgets(
-      'связь «${type == 'need' ? 'нужно' : 'можно'}» ${number == 101 ? 'активна' : 'в архиве'}, ${usedByDailyPath ? 'в дневном пути' : 'без пути'}: собственных тегов нет',
+      'связь «${type == 'need' ? 'нужно' : 'можно'}» ${number == 101 ? 'активна' : 'в архиве'}: собственных тегов нет',
       (tester) async {
         final semantics = tester.ensureSemantics();
         tester.view.physicalSize = const Size(1200, 6000);
@@ -50,36 +46,10 @@ void main() {
         addTearDown(database.close);
         seedTagStorageFixture(raw);
         seedRawGraph(raw, () {
-          if (number == 101) {
-            raw.execute('DELETE FROM daily_choices WHERE id = ?', [
-              tagFixtureId(201),
-            ]);
-          }
           raw.execute(
             'UPDATE long_term_relations SET type = ?, description = ? WHERE id = ?',
             [type, 'Описание связи $number', tagFixtureId(number)],
           );
-          if (usedByDailyPath) {
-            final choiceNumber = number == 101 ? 201 : 203;
-            raw.execute(
-              'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
-              [
-                tagFixtureId(choiceNumber),
-                tagFixtureId(1),
-                tagFixtureId(number == 101 ? 3 : 2),
-                '2026-09-26',
-                1,
-              ],
-            );
-            raw.execute(
-              'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
-              [
-                tagFixtureId(choiceNumber + 1),
-                tagFixtureId(choiceNumber),
-                tagFixtureId(number),
-              ],
-            );
-          }
         });
         final graphBefore = _storedGraph(raw);
         final repository = DriftPersonalGraphRepository(
@@ -147,15 +117,6 @@ void main() {
           find.text(l10n.relationSheetArchivedNote),
           number == 101 ? findsNothing : findsOneWidget,
         );
-
-        await tester.tap(find.bySemanticsLabel(l10n.relationSheetOptionsLabel));
-        await tester.pumpAndSettle();
-        expect(
-          find.text(l10n.relationDetailsPathProtection),
-          usedByDailyPath ? findsOneWidget : findsNothing,
-        );
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
 
         for (final (participantNumber, tagNumber) in [
           (1, firstTagNumber),

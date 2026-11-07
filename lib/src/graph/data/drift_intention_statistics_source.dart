@@ -7,10 +7,11 @@ part of 'drift_personal_graph_repository.dart';
 final class IntentionStatisticsSourceSnapshot {
   IntentionStatisticsSourceSnapshot._({
     required this.revision,
-    required this.periodSummary,
-    required this.sourceIntentions,
+    required this.view,
+    required this.periodCounts,
+    required this.rootIntentions,
     required this.intermediateIntentions,
-    required this.selectedActions,
+    required this.terminalIntentions,
     required this.savedPathDetails,
     required List<IntentionContributionGroup<CalendarDate>> groups,
     required List<ContributionOutgoingRelation> activeOutgoingRelations,
@@ -18,22 +19,25 @@ final class IntentionStatisticsSourceSnapshot {
        activeOutgoingRelations = List.unmodifiable(activeOutgoingRelations);
 
   final GraphRevision revision;
-  final StatisticsPeriodSummary periodSummary;
-  final ContributionCounts sourceIntentions;
-  final ContributionCounts intermediateIntentions;
-  final ContributionCounts selectedActions;
 
-  /// null для вида «Весь вклад»: его данные вычисляются по активному графу.
+  /// Вид запроса либо выбранный по всем действиям намерения.
+  final StatisticsView view;
+  final ContributionCounts periodCounts;
+  final ContributionCounts rootIntentions;
+  final ContributionCounts intermediateIntentions;
+  final ContributionCounts terminalIntentions;
+
+  /// null для вида «Через связи»: его данные вычисляются по активному графу.
   final IntentionSavedPathStatistics? savedPathDetails;
   final List<IntentionContributionGroup<CalendarDate>> groups;
   final List<ContributionOutgoingRelation> activeOutgoingRelations;
 }
 
-/// Агрегаты выбранного вида по сохранённому пути без отображаемых данных.
+/// Агрегаты роли выбранного вида без отображаемых данных.
 /// Ключи разбивок соответствуют выбранному виду; строки уже упорядочены.
 final class IntentionSavedPathStatistics {
   IntentionSavedPathStatistics._({
-    required this.summary,
+    required this.counts,
     required Map<CalendarDate, ContributionCounts> calendarCounts,
     required Map<StatisticsBreakdown, List<ContributionReachabilityEntry>>
     breakdowns,
@@ -45,7 +49,7 @@ final class IntentionSavedPathStatistics {
            ),
        });
 
-  final StatisticsPeriodSummary summary;
+  final ContributionCounts counts;
   final Map<CalendarDate, ContributionCounts> calendarCounts;
   final Map<StatisticsBreakdown, List<ContributionReachabilityEntry>>
   breakdowns;
@@ -74,62 +78,53 @@ extension DriftIntentionStatisticsSourceReading
               .getSingleOrNull();
           if (exists == null) return null;
 
-          // Общая сводка также проверяет исходные даты и выполнение до того,
-          // как SQL свернёт их до календарных частей и суммарных весов.
-          final periodSummary = await _readStatisticsSummary(
-            query.period,
-            query.localDate,
-          );
-          final rows = await _readIntentionContributionGroups(query);
+          final view =
+              query.view ??
+              await _readDefaultIntentionStatisticsView(query.intentionId);
+          final periodCounts = await _readStatisticsSummary(query.period);
+          final rows = await _readIntentionContributionGroups(query, view);
           final groups = <IntentionContributionGroup<CalendarDate>>[];
-          final source = _IntentionStatisticsTotal();
+          final root = _IntentionStatisticsTotal();
           final intermediate = _IntentionStatisticsTotal();
-          final selected = _IntentionStatisticsTotal();
+          final terminal = _IntentionStatisticsTotal();
           final calendar = <CalendarDate, _IntentionStatisticsTotal>{};
           final breakdowns =
               <
                 StatisticsBreakdown,
                 Map<IntentionId, _IntentionStatisticsTotal>
               >{
-                if (query.view != StatisticsView.throughRelations)
-                  for (final breakdown in query.view.breakdowns) breakdown: {},
+                if (view != StatisticsView.throughRelations)
+                  for (final breakdown in view.breakdowns) breakdown: {},
               };
           final chosen = _IntentionStatisticsTotal();
           for (final row in rows) {
             final data = row.data;
-            final action = decodeStoredIntentionId(
-              requiredStoredString(data, 'selected_intention_id'),
-            );
-            final predecessor = _nullableStatisticsId(data, 'predecessor_id');
+            final isOnPath = _statisticsFlag(data, 'is_on_path');
+            final isRoot = _statisticsFlag(data, 'is_root');
+            final isTerminal = _statisticsFlag(data, 'is_terminal');
             final following = _nullableStatisticsId(
               data,
               'following_relation_id',
             );
-            final position = action == query.intentionId
-                ? const ContributionSelectedOnPath()
-                : following == null
+            if (((isRoot || isTerminal) && !isOnPath) ||
+                (following != null && (!isOnPath || isTerminal))) {
+              throw const StatisticsDataValidationException();
+            }
+            final position = !isOnPath
                 ? const ContributionOutsidePath()
-                : ContributionBeforeSelectedAction(
-                    predecessorId: predecessor == null
+                : isTerminal
+                ? ContributionTerminalOnPath(isRoot: isRoot)
+                : ContributionBeforeTerminal(
+                    isRoot: isRoot,
+                    followingRelationId: following == null
                         ? null
-                        : decodeStoredIntentionId(predecessor),
-                    followingRelationId: decodeStoredRelationId(following),
+                        : decodeStoredRelationId(following),
                   );
-            final archivedSeeds = _nullableStatisticsId(
-              data,
-              'archived_seed_key',
+            final counts = ContributionCounts(
+              planned: requiredStoredInteger(data, 'planned'),
+              contribution: requiredStoredInteger(data, 'contribution'),
             );
-            final summary = StatisticsPeriodSummary(
-              counts: ContributionCounts(
-                planned: requiredStoredInteger(data, 'planned'),
-                contribution: requiredStoredInteger(data, 'contribution'),
-              ),
-              uncompleted: UncompletedSplit(
-                missed: requiredStoredInteger(data, 'missed'),
-                upcoming: requiredStoredInteger(data, 'upcoming'),
-              ),
-            );
-            if (summary.counts.planned == 0) {
+            if (counts.planned == 0) {
               throw const StatisticsDataValidationException();
             }
             final part = CalendarDate.parseCanonical(
@@ -139,49 +134,51 @@ extension DriftIntentionStatisticsSourceReading
                 (query.period is StatisticsYear && part.day != 1)) {
               throw const StatisticsDataValidationException();
             }
+            final terminalIntention = _nullableStatisticsId(
+              data,
+              'terminal_intention_id',
+            );
             groups.add(
               IntentionContributionGroup(
                 seeds: [
-                  action,
-                  if (archivedSeeds != null)
-                    for (final seed in archivedSeeds.split(','))
-                      decodeStoredIntentionId(seed),
+                  for (final seed in requiredStoredString(
+                    data,
+                    'seed_key',
+                  ).split(','))
+                    decodeStoredIntentionId(seed),
                 ],
-                selectedActionId: action,
+                terminalIntentionId: terminalIntention == null
+                    ? null
+                    : decodeStoredIntentionId(terminalIntention),
                 calendarPart: part,
                 pathPosition: position,
-                summary: summary,
+                counts: counts,
               ),
             );
-            final (role, total) = switch (position) {
-              ContributionOutsidePath() => (null, null),
-              ContributionSelectedOnPath() => (
-                StatisticsView.selectedActions,
-                selected,
-              ),
-              ContributionBeforeSelectedAction(predecessorId: null) => (
-                StatisticsView.sourceIntentions,
-                source,
-              ),
-              ContributionBeforeSelectedAction() => (
-                StatisticsView.intermediateIntentions,
-                intermediate,
-              ),
+            final roles = {
+              if (isRoot) StatisticsView.rootIntentions: root,
+              if (isOnPath && !isRoot && !isTerminal)
+                StatisticsView.intermediateIntentions: intermediate,
+              if (isTerminal) StatisticsView.terminalIntentions: terminal,
             };
-            total?.add(summary);
-            if (role != query.view) continue;
-            chosen.add(summary);
-            (calendar[part] ??= _IntentionStatisticsTotal()).add(summary);
+            for (final total in roles.values) {
+              total.add(counts);
+            }
+            if (!roles.containsKey(view)) continue;
+            chosen.add(counts);
+            (calendar[part] ??= _IntentionStatisticsTotal()).add(counts);
             for (final entry in breakdowns.entries) {
-              final id = switch (entry.key) {
-                StatisticsBreakdown.sourceIntentions => decodeStoredIntentionId(
-                  requiredStoredString(data, 'breakdown_source_id'),
-                ),
-                StatisticsBreakdown.selectedActions => action,
+              final id = _nullableStatisticsId(data, switch (entry.key) {
+                StatisticsBreakdown.rootIntentions => 'breakdown_root_id',
+                StatisticsBreakdown.terminalIntentions =>
+                  'breakdown_terminal_id',
                 StatisticsBreakdown.relations =>
                   throw const StatisticsDataValidationException(),
-              };
-              (entry.value[id] ??= _IntentionStatisticsTotal()).add(summary);
+              });
+              if (id == null) continue;
+              (entry.value[decodeStoredIntentionId(id)] ??=
+                      _IntentionStatisticsTotal())
+                  .add(counts);
             }
           }
           final outgoing = await _database
@@ -196,17 +193,18 @@ extension DriftIntentionStatisticsSourceReading
               .get();
           return IntentionStatisticsSourceSnapshot._(
             revision: _currentRevision,
-            periodSummary: periodSummary,
-            sourceIntentions: source.summary.counts,
-            intermediateIntentions: intermediate.summary.counts,
-            selectedActions: selected.summary.counts,
-            savedPathDetails: query.view == StatisticsView.throughRelations
+            view: view,
+            periodCounts: periodCounts,
+            rootIntentions: root.counts,
+            intermediateIntentions: intermediate.counts,
+            terminalIntentions: terminal.counts,
+            savedPathDetails: view == StatisticsView.throughRelations
                 ? null
                 : IntentionSavedPathStatistics._(
-                    summary: chosen.summary,
+                    counts: chosen.counts,
                     calendarCounts: {
                       for (final entry in calendar.entries)
-                        entry.key: entry.value.summary.counts,
+                        entry.key: entry.value.counts,
                     },
                     breakdowns: {
                       for (final entry in breakdowns.entries)
@@ -235,60 +233,164 @@ extension DriftIntentionStatisticsSourceReading
     }
   }
 
+  /// Роль с наибольшим числом действий намерения за всё время, при равенстве
+  /// первая в порядке видов. Без них — «Через связи», если активные связи
+  /// ведут от намерения к намерению какого-либо пути, иначе корневая роль.
+  Future<StatisticsView> _readDefaultIntentionStatisticsView(
+    IntentionId intentionId,
+  ) async {
+    final id = Variable<String>(intentionId.toCanonicalString());
+    // Строки намерения находятся по индексу ролей, следующая позиция того же
+    // пути — по первичному ключу строк пути.
+    final roles = await _database
+        .customSelect(
+          '''SELECT COALESCE(SUM(p.position = 0), 0) AS root_actions,
+                COALESCE(SUM(p.position > 0 AND n.action_id IS NOT NULL), 0)
+                  AS intermediate_actions,
+                COALESCE(SUM(n.action_id IS NULL), 0) AS terminal_actions
+         FROM action_path_items p
+           INDEXED BY action_path_items_intention_action
+         LEFT JOIN action_path_items n
+           ON n.action_id = p.action_id AND n.position = p.position + 1
+         WHERE p.intention_id = ?''',
+          variables: [id],
+          readsFrom: {_database.actionPathItems},
+        )
+        .getSingle();
+    var view = StatisticsView.rootIntentions;
+    var most = 0;
+    for (final (role, column) in [
+      (StatisticsView.rootIntentions, 'root_actions'),
+      (StatisticsView.intermediateIntentions, 'intermediate_actions'),
+      (StatisticsView.terminalIntentions, 'terminal_actions'),
+    ]) {
+      final count = requiredStoredInteger(roles.data, column);
+      if (count < 0) throw const StatisticsDataValidationException();
+      if (count > most) (view, most) = (role, count);
+    }
+    if (most > 0) return view;
+    // UNION отбрасывает уже пройденные намерения, поэтому циклы конечны:
+    // https://www.sqlite.org/lang_with.html#recursive_query_examples
+    // Активные связи соединяют только существующие намерения. Строки путей
+    // ищутся по индексу для каждого достигнутого намерения, а не просмотром.
+    final reached = await _database
+        .customSelect(
+          '''WITH RECURSIVE reachable(id) AS (
+               SELECT ?1
+               UNION
+               SELECT r.related_intention_id
+               FROM reachable
+               JOIN long_term_relations r ON r.source_intention_id = reachable.id
+               WHERE r.is_archived = 0
+             )
+             SELECT EXISTS (
+               SELECT 1 FROM reachable WHERE EXISTS (
+                 SELECT 1 FROM action_path_items p
+                   INDEXED BY action_path_items_intention_action
+                 WHERE p.intention_id = reachable.id
+               )
+             ) AS reached''',
+          variables: [id],
+          readsFrom: {_database.longTermRelations, _database.actionPathItems},
+        )
+        .getSingle();
+    return _statisticsFlag(reached.data, 'reached')
+        ? StatisticsView.throughRelations
+        : StatisticsView.rootIntentions;
+  }
+
   Future<List<QueryRow>> _readIntentionContributionGroups(
     IntentionStatisticsQuery query,
+    StatisticsView view,
   ) {
     final calendar = switch (query.period) {
-      StatisticsMonth() => 'choice_date',
-      StatisticsYear() => "substr(choice_date, 1, 7) || '-01'",
+      StatisticsMonth() => 'date',
+      StatisticsYear() => "substr(date, 1, 7) || '-01'",
     };
-    // Исходное намерение нужно только для выбранной разбивки. Остальные
-    // группы не разделяются по неиспользуемому исходному участнику.
-    final breakdownSource = switch (query.view) {
-      StatisticsView.intermediateIntentions => 'CASE WHEN following_relation_id IS NOT NULL AND predecessor_id IS NOT NULL THEN source_intention_id END',
-      StatisticsView.selectedActions =>
-        'CASE WHEN selected_intention_id = ?1 THEN source_intention_id END',
-      StatisticsView.sourceIntentions ||
-      StatisticsView.throughRelations => 'NULL',
+    // Другие намерения пути нужны только разбивкам выбранного вида.
+    // Остальные группы не разделяются по неиспользуемым участникам.
+    final (breakdownRoot, breakdownTerminal) = switch (view) {
+      StatisticsView.rootIntentions => (
+        'NULL',
+        'CASE WHEN is_root AND NOT is_terminal THEN terminal_id END',
+      ),
+      StatisticsView.intermediateIntentions => (
+        'CASE WHEN is_on_path AND NOT is_root AND NOT is_terminal '
+            'THEN root_id END',
+        'CASE WHEN is_on_path AND NOT is_root AND NOT is_terminal '
+            'THEN terminal_id END',
+      ),
+      StatisticsView.terminalIntentions => (
+        'CASE WHEN is_terminal AND NOT is_root THEN root_id END',
+        'NULL',
+      ),
+      StatisticsView.throughRelations => ('NULL', 'NULL'),
     };
-    // Простой сохранённый путь гарантирует единственных соседей X. Сначала
-    // извлекаем их из шагов, затем группируем самостоятельные выборы. Сортировка
-    // архивных оснований даёт одинаковый ключ независимо от порядка шагов:
+    final through = view == StatisticsView.throughRelations;
+    final following = through ? 'next_relation_id' : 'NULL';
+    final terminalIntention = through
+        ? 'CASE WHEN NOT is_terminal THEN terminal_id END'
+        : 'NULL';
+    // Следующая позиция того же пути ищется по первичному ключу строк пути,
+    // связь пары — по её уникальному ключу. Опорное намерение опускается,
+    // если следующее за ним в пути достижимо активной связью их пары и не
+    // является рассматриваемым: всё, от чего достижимо опущенное, достигает
+    // следующего, в том числе в обход рассматриваемого. Удалённые намерения
+    // опорными, корневыми и конечными элементами не бывают. ORDER BY внутри
+    // агрегата даёт равным наборам одинаковый ключ:
     // https://www.sqlite.org/lang_aggfunc.html#group_concat
-    // Уточнённый набор однозначно задан старым набором и предшественником X;
-    // его строит computeIntentionContribution, без повторного чтения пути.
     return _database
         .customSelect(
-          '''WITH choice_bases AS (
-        SELECT c.id, c.source_intention_id, c.selected_intention_id,
-               c.choice_date, c.is_completed,
-               group_concat(r.source_intention_id ORDER BY r.source_intention_id)
-                 FILTER (WHERE r.is_archived = 1) AS archived_seed_key,
-               MAX(CASE WHEN r.related_intention_id = ?1 THEN r.source_intention_id END) AS predecessor_id,
-               MAX(CASE WHEN r.source_intention_id = ?1 THEN r.id END) AS following_relation_id
-        FROM daily_choices c INDEXED BY daily_choices_date_creation_order
-        JOIN daily_choice_path_steps s ON s.daily_choice_id = c.id
-        JOIN long_term_relations r ON r.id = s.long_term_relation_id
-        WHERE c.choice_date BETWEEN ?2 AND ?3
-        GROUP BY c.id
-      )
-      SELECT selected_intention_id, archived_seed_key, predecessor_id,
-             following_relation_id, $calendar AS calendar_part,
-             $breakdownSource AS breakdown_source_id,
-             COUNT(*) AS planned, SUM(is_completed) AS contribution,
-             SUM(CASE WHEN is_completed = 0 AND choice_date < ?4 THEN 1 ELSE 0 END) AS missed,
-             SUM(CASE WHEN is_completed = 0 AND choice_date >= ?4 THEN 1 ELSE 0 END) AS upcoming
-      FROM choice_bases
-      GROUP BY selected_intention_id, archived_seed_key, predecessor_id,
-               following_relation_id, calendar_part, breakdown_source_id''',
+          '''WITH path_rows AS (
+               SELECT a.id AS action_id, a.date, a.is_completed, p.position,
+                      p.intention_id, i.id AS existing_id,
+                      n.action_id IS NULL AS is_last, r.id AS relation_id,
+                      i.id IS NOT NULL AND NOT COALESCE(
+                        r.is_archived = 0 AND n.intention_id <> ?1, 0
+                      ) AS is_seed
+               FROM actions a INDEXED BY actions_date_completion_schedule_order
+               JOIN action_path_items p ON p.action_id = a.id
+               LEFT JOIN intentions i ON i.id = p.intention_id
+               LEFT JOIN action_path_items n
+                 ON n.action_id = p.action_id AND n.position = p.position + 1
+               LEFT JOIN long_term_relations r
+                 ON r.source_intention_id = p.intention_id
+                AND r.related_intention_id = n.intention_id
+               WHERE a.date BETWEEN ?2 AND ?3
+             ), action_bases AS (
+               SELECT date, is_completed,
+                      MAX(intention_id = ?1) AS is_on_path,
+                      MAX(intention_id = ?1 AND position = 0) AS is_root,
+                      MAX(intention_id = ?1 AND is_last) AS is_terminal,
+                      MAX(CASE WHEN intention_id = ?1 THEN relation_id END)
+                        AS next_relation_id,
+                      MAX(CASE WHEN position = 0 THEN existing_id END) AS root_id,
+                      MAX(CASE WHEN is_last THEN existing_id END) AS terminal_id,
+                      group_concat(existing_id ORDER BY existing_id)
+                        FILTER (WHERE is_seed) AS seed_key
+               FROM path_rows
+               GROUP BY action_id, date, is_completed
+             )
+             SELECT seed_key, is_on_path, is_root, is_terminal,
+                    $following AS following_relation_id,
+                    $terminalIntention AS terminal_intention_id,
+                    $calendar AS calendar_part,
+                    $breakdownRoot AS breakdown_root_id,
+                    $breakdownTerminal AS breakdown_terminal_id,
+                    COUNT(*) AS planned, SUM(is_completed) AS contribution
+             FROM action_bases
+             WHERE seed_key IS NOT NULL
+             GROUP BY seed_key, is_on_path, is_root, is_terminal,
+                      following_relation_id, terminal_intention_id,
+                      calendar_part, breakdown_root_id, breakdown_terminal_id''',
           variables: [
             Variable<String>(query.intentionId.toCanonicalString()),
             ..._statisticsPeriodVariables(query.period),
-            Variable<String>(query.localDate.toCanonicalString()),
           ],
           readsFrom: {
-            _database.dailyChoices,
-            _database.dailyChoicePathSteps,
+            _database.actions,
+            _database.actionPathItems,
+            _database.intentions,
             _database.longTermRelations,
           },
         )
@@ -303,23 +405,24 @@ String? _nullableStatisticsId(Map<String, Object?> data, String key) =>
       _ => throw const StatisticsDataValidationException(),
     };
 
+bool _statisticsFlag(Map<String, Object?> data, String key) =>
+    switch (requiredStoredInteger(data, key)) {
+      0 => false,
+      1 => true,
+      _ => throw const StatisticsDataValidationException(),
+    };
+
 final class _IntentionStatisticsTotal {
   int planned = 0;
   int contribution = 0;
-  int missed = 0;
-  int upcoming = 0;
 
-  void add(StatisticsPeriodSummary summary) {
-    planned += summary.counts.planned;
-    contribution += summary.counts.contribution;
-    missed += summary.uncompleted.missed;
-    upcoming += summary.uncompleted.upcoming;
+  void add(ContributionCounts counts) {
+    planned += counts.planned;
+    contribution += counts.contribution;
   }
 
-  StatisticsPeriodSummary get summary => StatisticsPeriodSummary(
-    counts: ContributionCounts(planned: planned, contribution: contribution),
-    uncompleted: UncompletedSplit(missed: missed, upcoming: upcoming),
-  );
+  ContributionCounts get counts =>
+      ContributionCounts(planned: planned, contribution: contribution);
 }
 
 List<ContributionReachabilityEntry> _sortedIntentionStatisticsCounts(
@@ -327,12 +430,14 @@ List<ContributionReachabilityEntry> _sortedIntentionStatisticsCounts(
 ) =>
     [
       for (final entry in totals.entries)
-        (intentionId: entry.key, counts: entry.value.summary.counts),
+        (intentionId: entry.key, counts: entry.value.counts),
     ]..sort((a, b) {
+      final planned = b.counts.planned.compareTo(a.counts.planned);
+      if (planned != 0) return planned;
       final contribution = b.counts.contribution.compareTo(
         a.counts.contribution,
       );
-      if (contribution != 0) return contribution;
-      final planned = b.counts.planned.compareTo(a.counts.planned);
-      return planned != 0 ? planned : b.intentionId.compareTo(a.intentionId);
+      return contribution != 0
+          ? contribution
+          : b.intentionId.compareTo(a.intentionId);
     });

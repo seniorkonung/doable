@@ -1,11 +1,11 @@
 part of 'drift_personal_graph_repository.dart';
 
-enum _SavedPathStatisticsView { source, intermediate, selected }
+enum _PathRoleStatisticsView { root, intermediate, terminal }
 
 extension _StatisticsReading on DriftPersonalGraphRepository {
   Future<StatisticsPageResult> _readStatisticsPage(
     StatisticsQuery query,
-    _SavedPathStatisticsView view,
+    _PathRoleStatisticsView view,
   ) async {
     var stage = StatisticsReadDiagnosticsStage.sourceData;
     final stopwatch = Stopwatch()..start();
@@ -30,7 +30,7 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
             _ => throw const StatisticsSnapshotExpired(),
           };
           final summary = cursor == null
-              ? await _readStatisticsSummary(query.period, query.localDate)
+              ? await _readStatisticsSummary(query.period)
               : null;
           final aggregate = _statisticsAggregate(
             view,
@@ -41,25 +41,25 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
           // https://www.sqlite.org/rowvalue.html#scrolling_window_queries
           final boundary = cursor == null
               ? ''
-              : 'HAVING (contribution, planned, intention_id) < (?, ?, ?)';
+              : 'HAVING (planned, contribution, intention_id) < (?, ?, ?)';
           final rows = await _database
               .customSelect(
                 '''$aggregate $boundary
-             ORDER BY contribution DESC, planned DESC, intention_id DESC
+             ORDER BY planned DESC, contribution DESC, intention_id DESC
              LIMIT ?''',
                 variables: [
                   ...variables,
                   if (cursor != null) ...[
-                    Variable<int>(cursor.counts.contribution),
                     Variable<int>(cursor.counts.planned),
+                    Variable<int>(cursor.counts.contribution),
                     Variable<String>(cursor.intentionId.toCanonicalString()),
                   ],
                   Variable<int>(query.pageSize + 1),
                 ],
                 readsFrom: {
-                  _database.dailyChoices,
-                  _database.dailyChoicePathSteps,
-                  _database.longTermRelations,
+                  _database.actions,
+                  _database.actionPathItems,
+                  _database.intentions,
                 },
               )
               .get();
@@ -216,55 +216,34 @@ extension _StatisticsReading on DriftPersonalGraphRepository {
     return items;
   }
 
-  Future<StatisticsPeriodSummary> _readStatisticsSummary(
+  /// Сводка считает действия периода, а не их засчитывания намерениям,
+  /// поэтому не зависит от вида и от удаления намерений их путей.
+  Future<ContributionCounts> _readStatisticsSummary(
     StatisticsPeriod period,
-    CalendarDate localDate,
   ) async {
-    // Группы дат и выполнения ограничены календарным периодом. Декодирование
-    // проверяет необходимые значения, не материализуя выборы и их пути.
+    // Группы дат и выполнения читаются из индекса дня. Декодирование проверяет
+    // необходимые значения, не материализуя действия и их пути.
     final rows = await _database
         .customSelect(
-          '''SELECT choice_date, is_completed, COUNT(*) AS planned,
-           SUM(CASE WHEN is_completed = 0 AND choice_date < ? THEN 1 ELSE 0 END) AS missed,
-           SUM(CASE WHEN is_completed = 0 AND choice_date >= ? THEN 1 ELSE 0 END) AS upcoming
-         FROM daily_choices INDEXED BY daily_choices_date_creation_order
-         WHERE choice_date BETWEEN ? AND ?
-         GROUP BY choice_date, is_completed''',
-          variables: [
-            Variable<String>(localDate.toCanonicalString()),
-            Variable<String>(localDate.toCanonicalString()),
-            ..._statisticsPeriodVariables(period),
-          ],
-          readsFrom: {_database.dailyChoices},
+          '''SELECT date, is_completed, COUNT(*) AS planned
+         FROM actions INDEXED BY actions_date_completion_schedule_order
+         WHERE date BETWEEN ? AND ?
+         GROUP BY date, is_completed''',
+          variables: _statisticsPeriodVariables(period),
+          readsFrom: {_database.actions},
         )
         .get();
     var planned = 0;
     var contribution = 0;
-    var missed = 0;
-    var upcoming = 0;
     for (final row in rows) {
-      decodeStoredChoiceDate(row.data);
-      final completed = decodeStoredChoiceCompletion(row.data);
+      decodeStoredActionDate(row.data);
+      final completed = decodeStoredActionCompletion(row.data);
       final count = requiredStoredInteger(row.data, 'planned');
-      final group = StatisticsPeriodSummary(
-        counts: ContributionCounts(
-          planned: count,
-          contribution: completed ? count : 0,
-        ),
-        uncompleted: UncompletedSplit(
-          missed: requiredStoredInteger(row.data, 'missed'),
-          upcoming: requiredStoredInteger(row.data, 'upcoming'),
-        ),
-      );
-      planned += group.counts.planned;
-      contribution += group.counts.contribution;
-      missed += group.uncompleted.missed;
-      upcoming += group.uncompleted.upcoming;
+      if (count <= 0) throw const StatisticsDataValidationException();
+      planned += count;
+      if (completed) contribution += count;
     }
-    return StatisticsPeriodSummary(
-      counts: ContributionCounts(planned: planned, contribution: contribution),
-      uncompleted: UncompletedSplit(missed: missed, upcoming: upcoming),
-    );
+    return ContributionCounts(planned: planned, contribution: contribution);
   }
 }
 
@@ -274,32 +253,32 @@ List<Variable> _statisticsPeriodVariables(StatisticsPeriod period) => [
 ];
 
 String _statisticsAggregate(
-  _SavedPathStatisticsView view, {
+  _PathRoleStatisticsView view, {
   required bool includeTotal,
 }) {
-  final id = switch (view) {
-    _SavedPathStatisticsView.source => 'c.source_intention_id',
-    _SavedPathStatisticsView.intermediate => 'r.related_intention_id',
-    _SavedPathStatisticsView.selected => 'c.selected_intention_id',
+  // Следующая позиция того же пути ищется по первичному ключу строк пути.
+  const hasNextPosition =
+      'EXISTS (SELECT 1 FROM action_path_items n '
+      'WHERE n.action_id = p.action_id AND n.position = p.position + 1)';
+  final role = switch (view) {
+    _PathRoleStatisticsView.root => 'p.position = 0',
+    _PathRoleStatisticsView.intermediate =>
+      'p.position > 0 AND $hasNextPosition',
+    _PathRoleStatisticsView.terminal => 'NOT $hasNextPosition',
   };
-  final path = view == _SavedPathStatisticsView.intermediate
-      ? '''JOIN daily_choice_path_steps s ON s.daily_choice_id = c.id
-         JOIN long_term_relations r ON r.id = s.long_term_relation_id'''
-      : '';
-  final intermediate = view == _SavedPathStatisticsView.intermediate
-      ? 'AND r.related_intention_id <> c.selected_intention_id'
-      : '';
-  // Простой сохранённый путь содержит промежуточное намерение один раз.
-  // COUNT учитывает самостоятельные выборы, включая полные дубликаты.
-  // Окно считает группы до LIMIT, без повторной агрегации всех шагов:
+  // Намерение встречается в пути не больше одного раза, поэтому COUNT считает
+  // самостоятельные действия, включая полные дубликаты. Соединение с
+  // намерениями исключает удалённые, не передавая их роль соседям.
+  // Окно считает группы до LIMIT, без повторной агрегации всех строк:
   // https://www.sqlite.org/windowfunctions.html#aggregate_window_functions
   final total = includeTotal ? ', COUNT(*) OVER() AS total_items' : '';
-  return '''SELECT $id AS intention_id, COUNT(*) AS planned,
-              SUM(c.is_completed) AS contribution $total
-            FROM daily_choices c INDEXED BY daily_choices_date_creation_order
-            $path
-            WHERE c.choice_date BETWEEN ? AND ? $intermediate
-            GROUP BY $id''';
+  return '''SELECT p.intention_id AS intention_id, COUNT(*) AS planned,
+              SUM(a.is_completed) AS contribution $total
+            FROM actions a INDEXED BY actions_date_completion_schedule_order
+            JOIN action_path_items p ON p.action_id = a.id
+            JOIN intentions i ON i.id = p.intention_id
+            WHERE a.date BETWEEN ? AND ? AND $role
+            GROUP BY p.intention_id''';
 }
 
 final class _DriftStatisticsCursor implements StatisticsCursor {
@@ -310,12 +289,10 @@ final class _DriftStatisticsCursor implements StatisticsCursor {
     required this.counts,
   }) : period = query.period,
        view = query.view,
-       localDate = query.localDate,
        pageSize = query.pageSize;
 
   final StatisticsPeriod period;
   final StatisticsView view;
-  final CalendarDate localDate;
   final int pageSize;
   final GraphRevision revision;
   final IntentionId intentionId;
@@ -324,7 +301,6 @@ final class _DriftStatisticsCursor implements StatisticsCursor {
   bool matches(StatisticsQuery query, GraphRevision currentRevision) =>
       period == query.period &&
       view == query.view &&
-      localDate == query.localDate &&
       pageSize == query.pageSize &&
       revision.compareTo(currentRevision) == GraphRevisionOrder.same;
 }

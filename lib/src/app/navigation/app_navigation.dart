@@ -4,7 +4,11 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../action/presentation/day/action_day_root_page.dart';
+import '../../action/presentation/day/action_day_view_model.dart';
+import '../../shared/domain/calendar_date.dart';
 import '../quick_creation/quick_creation_launcher.dart';
+import '../quick_creation/quick_creation_mode.dart';
 import '../quick_creation/quick_creation_mode_controller.dart';
 import '../quick_creation/quick_creation_mode_menu.dart';
 import '../routing/app_router.gr.dart';
@@ -19,11 +23,13 @@ import 'app_navigation_bar.dart';
 /// и выбирает сохранённую корневую страницу, включая повторный выбор пункта.
 /// Страницы не управляют индексами вкладок или удалением маршрутов.
 final class AppNavigation extends ConsumerStatefulWidget {
-  const AppNavigation({this.sourceRoute, super.key});
+  const AppNavigation({this.sourceRoute, this.actionDate, super.key});
 
   /// Контекст выбранной корневой страницы для панели вне вкладок.
   /// На обычной странице используется её собственный контекст.
   final RouteData? sourceRoute;
+
+  final CalendarDate Function()? actionDate;
 
   @override
   ConsumerState<AppNavigation> createState() => _AppNavigationState();
@@ -32,6 +38,14 @@ final class AppNavigation extends ConsumerStatefulWidget {
 final class _AppNavigationState extends ConsumerState<AppNavigation> {
   static const _heroTag = 'app-primary-navigation';
   final _launcher = QuickCreationLauncher();
+
+  CalendarDate? _actionDate() {
+    final date = widget.actionDate;
+    if (date != null) return date();
+    if (widget.sourceRoute?.name != ActionDayRootRoute.name) return null;
+    final instance = ref.read(actionDayRootInstanceProvider);
+    return ref.read(actionDayViewModelProvider(instance)).selection.date;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +71,13 @@ final class _AppNavigationState extends ConsumerState<AppNavigation> {
                 selected: AppDestination.values[tabs.activeIndex],
                 quickCreationMode: mode,
                 onQuickCreate: () => unawaited(
-                  _launcher.launch(sourceContext: sourceContext, mode: mode),
+                  _launcher.launch(
+                    sourceContext: sourceContext,
+                    mode: mode,
+                    actionDate: mode == QuickCreationMode.action
+                        ? _actionDate()
+                        : null,
+                  ),
                 ),
                 onChangeQuickCreationMode: () =>
                     unawaited(showQuickCreationModeMenu(sourceContext)),

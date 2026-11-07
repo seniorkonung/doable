@@ -4,12 +4,8 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/settings/settings_page.dart';
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/action/application/action_details.dart';
+import 'package:doable/src/action/domain/action_id.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show AppDatabase, openFileBackedLocalDatabase;
 import 'package:doable/src/data_transfer/application/document_access.dart';
@@ -26,25 +22,28 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_root_pages.dart';
-import '../support/daily_choice_catalog_controls.dart';
-import '../support/daily_choice_durability_fixture.dart';
-import '../support/daily_choice_local_date.dart';
+import '../support/controlled_local_date.dart';
+import '../support/action_day_controls.dart';
+import '../support/action_seed.dart';
 import '../support/file_document_access.dart';
+import '../support/graph_durability_fixture.dart';
+import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/local_database_harness.dart';
 import '../support/temporary_graph_files.dart';
 
-/// Локальное сегодня каталога дневных выборов и дата выбора графа.
+/// Локальное сегодня экрана дня и дата действия графа.
 final _today = CalendarDate.fromParts(2026, 10, 18);
 
 void main() {
-  testWidgets('пока экспорт, начатый на странице «Настройки», задержан, выбор '
-      'в каталоге дневных выборов, открытом пунктом панели, отмечается '
+  testWidgets('пока экспорт, начатый на странице «Настройки», задержан, '
+      'действие на экране дня, открытом пунктом панели, отмечается '
       'выполненным, а после окончания экспорта появляется «Данные сохранены '
       'в файл»', (tester) async {
     final held = _HeldStateWrite();
@@ -53,17 +52,17 @@ void main() {
     await app.startExport();
     await _waitFor(tester, () => held.isReached);
 
-    await openDailyChoices(tester);
+    await openActions(tester);
     final completion = find.byKey(
-      ValueKey('daily-choice-completion-${app.choice.toCanonicalString()}'),
+      ValueKey('action-day-completion-${app.action.toCanonicalString()}'),
     );
     await _until(tester, completion);
     // Флажок стоит у левого края и уходит за него, пока идёт переход страницы.
     await tester.pump(const Duration(seconds: 1));
     await tester.tap(completion);
-    await _until(tester, dailyChoiceCatalogDayMark(_today, mark: DayMark.done));
+    await _until(tester, actionDayDayMark(_today, mark: DayMark.done));
 
-    expect(await app.isChoiceCompleted(), isTrue);
+    expect(await app.isActionCompleted(), isTrue);
     expect(app.documents.created.single.lengthSync(), 0);
     expect(find.text('Данные сохранены в файл'), findsNothing);
     // Сброс истории закрыл «Настройки»; экспорт завершается после того, как
@@ -131,7 +130,7 @@ void main() {
 }
 
 /// Приложение над файловым хранилищем с графом из двух намерений, связи
-/// между ними и невыполненного дневного выбора на [_today]. Документы
+/// между ними и невыполненного действия на [_today]. Документы
 /// экспорта — файлы временного каталога без системных диалогов.
 final class _ExportApp {
   _ExportApp._(
@@ -139,14 +138,14 @@ final class _ExportApp {
     this._harness,
     this._ready,
     this._files,
-    this.choice,
+    this.action,
   );
 
   final WidgetTester _tester;
   final LocalDatabaseHarness _harness;
   final AppRuntimeReady _ready;
   final TemporaryGraphFiles _files;
-  final DailyChoiceId choice;
+  final ActionId action;
 
   FileDocumentAccess get documents => _files.documents;
 
@@ -161,11 +160,11 @@ final class _ExportApp {
     addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
     final harness = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
     addTearDown(() => tester.runAsync(harness.dispose));
-    final choice = (await tester.runAsync(() async {
+    final action = (await tester.runAsync(() async {
       final database = await harness.openReadyDatabase();
-      final choice = await _seedGraph(database);
+      final action = await _seedGraph(database);
       await harness.closePersistenceObjectGraph();
-      return choice;
+      return action;
     }))!;
     final files = TemporaryGraphFiles(
       stateWriteRunner: held?.run ?? runGraphStateWriteInIsolate,
@@ -176,7 +175,7 @@ final class _ExportApp {
       diagnosticsSink: InMemoryDiagnosticsSink(),
       quickCreationModeStore: InMemoryQuickCreationModeStore(),
       graphFilesFactory: files.create,
-      dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(_today).read,
+      localDateSource: ControlledLocalDate(_today).read,
     );
     addTearDown(() async {
       held?.release();
@@ -195,7 +194,7 @@ final class _ExportApp {
       tester,
       () => find.byType(CircularProgressIndicator).evaluate().isEmpty,
     );
-    return _ExportApp._(tester, harness, ready, files, choice);
+    return _ExportApp._(tester, harness, ready, files, action);
   }
 
   /// Открывает с Главной страницу «Настройки» и ждёт прочитанный состав
@@ -222,16 +221,17 @@ final class _ExportApp {
     await _tester.pump();
   }
 
-  /// Выполнен ли дневной выбор графа в подтверждённом состоянии хранилища.
-  Future<bool> isChoiceCompleted() async {
+  /// Выполнено ли действие графа в подтверждённом состоянии хранилища.
+  Future<bool> isActionCompleted() async {
     final read =
         (await _tester.runAsync(
               () => _ready.container
                   .read(personalGraphRepositoryProvider)
-                  .getDailyChoice(choice),
+                  .watchAction(action)
+                  .first,
             ))!
-            as DailyChoiceReadSuccess;
-    return read.value.value!.choice.isCompleted;
+            as ActionReadSuccess;
+    return read.value.value!.action.isCompleted;
   }
 
   /// Всё содержимое файла хранилища, включая лог фактов и реестр снимков.
@@ -259,9 +259,10 @@ final class _HeldStateWrite {
   }
 }
 
-/// Создаёт граф командами, поэтому он полностью отражён в логе фактов, и
-/// возвращает его невыполненный дневной выбор.
-Future<DailyChoiceId> _seedGraph(AppDatabase database) async {
+/// Создаёт намерения и связь командами, поэтому они отражены в логе фактов, и
+/// возвращает идентификатор невыполненного действия с путём по этой связи.
+/// Команды создания действия нет, поэтому действие записывается напрямую.
+Future<ActionId> _seedGraph(AppDatabase database) async {
   final repository = DriftPersonalGraphRepository(
     database,
     UuidV7IntentionIdGenerator(),
@@ -311,24 +312,26 @@ Future<DailyChoiceId> _seedGraph(AppDatabase database) async {
       ),
     ),
   );
-  final created = await confirm<DailyChoiceCreated>(
-    CreateDailyChoice(
-      sourceIntentionId: health.id,
-      selectedIntentionId: running.id,
-      path: ConfirmedChoicePath([
-        ConfirmedChoicePathStep(
-          relationId: relation.id,
-          sourceIntentionId: health.id,
-          type: relation.type,
-          relatedIntentionId: running.id,
-        ),
-      ]),
-      date: _today,
-      description: null,
-      isCompleted: false,
-    ),
-  );
-  return created.choice.id;
+  final action = seedUuid(1);
+  await seedGraph(database, () async {
+    await database.customStatement(
+      '''INSERT INTO actions
+         (id, title, description, date, scheduled_hour, priority, is_completed,
+          created_at, updated_at)
+         VALUES (?, 'Пробежка', NULL, ?, NULL, 4, 0, 1, 1)''',
+      [action, _today.toCanonicalString()],
+    );
+    for (final (position, intention) in [health.id, running.id].indexed) {
+      await database.customStatement(insertActionPathItem, [
+        action,
+        position,
+        intention.toCanonicalString(),
+        position == 0 ? null : health.id.toCanonicalString(),
+        actionPathRole(position, 2),
+      ]);
+    }
+  });
+  return (ActionId.decode(action) as ActionIdDecodingSuccess).id;
 }
 
 Future<void> _until(WidgetTester tester, Finder finder) =>

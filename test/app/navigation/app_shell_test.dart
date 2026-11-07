@@ -1,14 +1,12 @@
 import 'dart:ui' show Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
 import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
-import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
+import 'package:doable/src/action/presentation/day/action_day_root_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/intention/application/intention_catalog.dart'
@@ -26,26 +24,24 @@ import '../../support/intention_catalog_controls.dart';
 import '../../support/quick_creation.dart';
 
 void main() {
-  testWidgets('пункт календаря открывает каталог дневных выборов', (
-    tester,
-  ) async {
+  testWidgets('пункт календаря открывает экран дня', (tester) async {
     final semantics = tester.ensureSemantics();
     await _start(tester);
 
-    await _select(tester, AppDestination.dailyChoices);
+    await _select(tester, AppDestination.actions);
 
-    expect(find.byType(DailyChoiceCatalogPage), findsOneWidget);
+    expect(find.byType(ActionDayRootPage), findsOneWidget);
     expect(find.byType(HomePage), findsNothing);
-    expect(_selected(tester), AppDestination.dailyChoices);
-    await openDailyChoiceQuickCreation(
+    expect(_selected(tester), AppDestination.actions);
+    await openQuickCreation(
       tester,
-      ChoicePathDraftDirection.bottomUp,
-      openedPage: find.byType(DailyChoiceActionPickerPage),
+      QuickCreationMode.intention,
+      openedPage: find.byType(IntentionEditorPage),
     );
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.byType(DailyChoiceCatalogPage), findsOneWidget);
-    expect(_selected(tester), AppDestination.dailyChoices);
+    expect(find.byType(ActionDayRootPage), findsOneWidget);
+    expect(_selected(tester), AppDestination.actions);
     semantics.dispose();
   });
 
@@ -83,15 +79,15 @@ void main() {
   });
 
   for (final locale in const [Locale('en'), Locale('ru')]) {
-    testWidgets('шапка каталога намерений не ведёт ни к каталогу дневных '
-        'выборов, ни к тегам (${locale.languageCode})', (tester) async {
+    testWidgets('шапка каталога намерений не ведёт ни к экрану дня, '
+        'ни к тегам (${locale.languageCode})', (tester) async {
       final localizations = lookupAppLocalizations(locale);
       await _start(tester, locale: locale);
       await _select(tester, AppDestination.intentionGraph);
 
       expect(intentionCatalogHeading(tester), findsOneWidget);
       for (final destination in [
-        localizations.appDestinationDailyChoices,
+        localizations.appDestinationActions,
         localizations.tagsPanelTitle,
       ]) {
         expect(
@@ -112,10 +108,10 @@ void main() {
 
     // Один кадр без продвижения времени: страница уже показана целиком, а
     // прежняя не остаётся под переходом.
-    await tester.tap(appNavigationDestination(AppDestination.dailyChoices));
+    await tester.tap(appNavigationDestination(AppDestination.actions));
     await tester.pump();
 
-    expect(find.byType(DailyChoiceCatalogPage), findsOneWidget);
+    expect(find.byType(ActionDayRootPage), findsOneWidget);
     expect(find.byType(HomePage), findsNothing);
   });
 }

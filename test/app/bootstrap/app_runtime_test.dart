@@ -1,14 +1,5 @@
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
-
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
-
-import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show
@@ -32,14 +23,17 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-import '../../support/daily_choice_local_date.dart';
+import '../../support/controlled_local_date.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
+import '../../support/action_read_contract_test_fallback.dart';
 import '../../support/statistics_read_contract_test_fallback.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 
@@ -60,9 +54,7 @@ void main() {
 
         final ready = await runtime.bootstrap() as AppRuntimeReady;
         final before = DateTime.now();
-        final reading = ready.container.read(
-          dailyChoiceLocalDateSourceProvider,
-        )();
+        final reading = ready.container.read(localDateSourceProvider)();
         final after = DateTime.now();
 
         // Допускаем полночь между двумя показаниями часов теста.
@@ -71,7 +63,7 @@ void main() {
     );
 
     test('передаёт каталогу подставленный источник даты, который показывает новый день', () async {
-      final localDate = ControlledDailyChoiceLocalDate(
+      final localDate = ControlledLocalDate(
         CalendarDate.fromParts(2026, 10, 5),
       );
       final runtime = AppRuntime(
@@ -79,18 +71,18 @@ void main() {
         connectionFactory: openInMemoryLocalDatabase,
         diagnosticsSink: InMemoryDiagnosticsSink(),
         repositoryFactory: (_) => _ControlledPersonalGraphRepository(),
-        dailyChoiceLocalDateSource: localDate.read,
+        localDateSource: localDate.read,
       );
       addTearDown(runtime.shutdown);
 
       final ready = await runtime.bootstrap() as AppRuntimeReady;
-      final source = ready.container.read(dailyChoiceLocalDateSourceProvider);
+      final source = ready.container.read(localDateSourceProvider);
 
       expect(source().date, CalendarDate.fromParts(2026, 10, 5));
 
       localDate.today = CalendarDate.fromParts(2026, 10, 6);
       expect(
-        ready.container.read(dailyChoiceLocalDateSourceProvider)().date,
+        ready.container.read(localDateSourceProvider)().date,
         CalendarDate.fromParts(2026, 10, 6),
       );
     });
@@ -158,7 +150,7 @@ void main() {
         const GraphComposition(
           intentionCount: 0,
           relationCount: 0,
-          dailyChoiceCount: 0,
+          actionCount: 0,
           tagCount: 1,
         ),
       );
@@ -332,32 +324,11 @@ CalendarDate _dateOf(DateTime moment) =>
     CalendarDate.fromParts(moment.year, moment.month, moment.day);
 
 final class _ControlledPersonalGraphRepository
-    with StatisticsReadContractTestFallback, TagReadContractTestFallback
+    with
+        ActionReadContractTestFallback,
+        StatisticsReadContractTestFallback,
+        TagReadContractTestFallback
     implements PersonalGraphRepository {
-  @override
-  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
-    DailyChoiceDayStatusQuery query,
-  ) => throw UnsupportedError(
-    'Чтение состояний дней не используется в этом тесте.',
-  );
-
-  @override
-  Future<ChoicePathContinuationResult> getChoicePathContinuations(
-    ChoicePathContinuationQuery query,
-  ) => throw UnimplementedError();
-
-  @override
-  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Чтение дневного выбора не используется этим тестом.',
-      );
-
-  @override
-  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Наблюдение дневного выбора не используется этим тестом.',
-      );
-
   Completer<Object>? _pendingCommand;
 
   @override
@@ -380,15 +351,8 @@ final class _ControlledPersonalGraphRepository
   ) => throw UnsupportedError('Каталог не используется в этих тестах.');
 
   @override
-  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
-    DailyChoiceCatalogQuery query,
-  ) => throw UnsupportedError(
-    'Каталог дневных выборов не используется в этом тесте.',
-  );
-
-  @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) => throw UnsupportedError('Группы связей не используются в этих тестах.');
 
   @override

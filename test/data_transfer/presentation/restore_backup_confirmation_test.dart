@@ -1,19 +1,19 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data_transfer/application/graph_restore.dart';
 import 'package:doable/src/data_transfer/presentation/restore_backup_confirmation.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph_backups/graph_backup_registry.dart';
 import 'package:doable/src/graph_backups/graph_backups_provider.dart';
 import 'package:doable/src/graph_backups/graph_change_summary.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../support/daily_choice_local_date.dart';
+import '../../support/controlled_local_date.dart';
 
 /// Текущий момент проверок подтверждения: 7 октября 2026 года, полдень.
 final _now = DateTime(2026, 10, 7, 12);
@@ -145,9 +145,7 @@ void main() {
   testWidgets('с наступлением следующей местной даты подтверждение называет '
       'сегодняшнюю копию сделанной вчера', (tester) async {
     var now = _now;
-    final localDate = ControlledDailyChoiceLocalDate(
-      CalendarDate.fromParts(2026, 10, 7),
-    );
+    final localDate = ControlledLocalDate(CalendarDate.fromParts(2026, 10, 7));
     await _openConfirmation(
       tester,
       backup: _backup(DateTime(2026, 10, 7, 8, 15)),
@@ -255,7 +253,7 @@ Future<Future<bool>> _openConfirmation(
   required Future<GraphChangesSinceBackup> changesSince,
   String language = 'ru',
   DateTime Function() clock = _readNow,
-  ControlledDailyChoiceLocalDate? localDate,
+  ControlledLocalDate? localDate,
 }) async {
   late Future<bool> confirmation;
   await tester.pumpWidget(

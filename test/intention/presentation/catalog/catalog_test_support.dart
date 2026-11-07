@@ -1,14 +1,5 @@
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
-
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
-
-import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -32,36 +23,18 @@ import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
+import '../../../support/action_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
 import '../../../support/intention_description_preview.dart';
 import '../../../support/intention_title_order_key.dart';
 import '../../../support/intention_type_counts.dart';
 
 final class ControlledCatalogRepository
-    with StatisticsReadContractTestFallback, TagReadContractTestFallback
+    with
+        ActionReadContractTestFallback,
+        StatisticsReadContractTestFallback,
+        TagReadContractTestFallback
     implements PersonalGraphRepository {
-  @override
-  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
-    DailyChoiceDayStatusQuery query,
-  ) => Completer<DailyChoiceDayStatusesReadResult>().future;
-
-  @override
-  Future<ChoicePathContinuationResult> getChoicePathContinuations(
-    ChoicePathContinuationQuery query,
-  ) => throw UnimplementedError();
-
-  @override
-  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Чтение дневного выбора не используется этим тестом.',
-      );
-
-  @override
-  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Наблюдение дневного выбора не используется этим тестом.',
-      );
-
   final queries = <IntentionCatalogQuery>[];
   final _requests = <Completer<Result<IntentionCatalogPage>>>[];
   final commands = <IntentionCommand>[];
@@ -69,8 +42,6 @@ final class ControlledCatalogRepository
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   final relationCommands = <LongTermRelationCommand>[];
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
-  final dailyChoiceCommands = <DailyChoiceCommand>[];
-  final _dailyChoiceCommandRequests = <Completer<DailyChoiceCommandResult>>[];
   final tagCommands = <TagCommand>[];
   final _tagCommandRequests = <Completer<TagCommandResult>>[];
 
@@ -131,10 +102,6 @@ final class ControlledCatalogRepository
     _relationCommandRequests[index].complete(result);
   }
 
-  void completeDailyChoiceCommand(int index, DailyChoiceCommandResult result) {
-    _dailyChoiceCommandRequests[index].complete(result);
-  }
-
   void completeTagCommand(int index, TagCommandResult result) {
     _tagCommandRequests[index].complete(result);
   }
@@ -150,15 +117,8 @@ final class ControlledCatalogRepository
   }
 
   @override
-  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
-    DailyChoiceCatalogQuery query,
-  ) => throw UnsupportedError(
-    'Каталог дневных выборов не используется в этом тесте.',
-  );
-
-  @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) =>
       throw UnsupportedError('Группы связей не используются в тесте каталога.');
 
@@ -177,9 +137,6 @@ final class ControlledCatalogRepository
       ),
       final LongTermRelationCommand relationCommand =>
         await _executeLongTermRelation(relationCommand),
-      final DailyChoiceCommand choiceCommand => await _executeDailyChoice(
-        choiceCommand,
-      ),
       final TagCommand tagCommand => await _executeTag(tagCommand),
       _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
     };
@@ -192,15 +149,6 @@ final class ControlledCatalogRepository
     relationCommands.add(command);
     final request = Completer<LongTermRelationCommandResult>();
     _relationCommandRequests.add(request);
-    return request.future;
-  }
-
-  Future<DailyChoiceCommandResult> _executeDailyChoice(
-    DailyChoiceCommand command,
-  ) {
-    dailyChoiceCommands.add(command);
-    final request = Completer<DailyChoiceCommandResult>();
-    _dailyChoiceCommandRequests.add(request);
     return request.future;
   }
 

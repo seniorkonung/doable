@@ -113,7 +113,6 @@ extension _LongTermRelationDetailsReading on DriftPersonalGraphRepository {
               participants[relation.relatedIntentionId] ??
               (throw const StoredGraphCorruption()),
           description: stored.description,
-          permissions: await _readRelationPermissions(relation.id),
         ),
         revision: _currentRevision,
       );
@@ -140,13 +139,6 @@ extension _LongTermRelationDetailsReading on DriftPersonalGraphRepository {
           if (afterId != null) affectedIntentionIds.add(afterId);
         case LongTermRelationChange(:final id):
           affectedRelationIds.add(id);
-        case DailyChoiceChange(
-          :final releasedRelationIds,
-          :final occupiedRelationIds,
-        ):
-          affectedRelationIds
-            ..addAll(releasedRelationIds)
-            ..addAll(occupiedRelationIds);
         case GraphChange():
           break;
       }

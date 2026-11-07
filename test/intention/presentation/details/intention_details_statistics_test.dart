@@ -4,8 +4,6 @@ import 'dart:ui' show SemanticsAction, Tristate;
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/design_system/components/tabs.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -16,6 +14,8 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_tabs.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:doable/src/statistics/application/contribution_counts.dart';
 import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
 import 'package:doable/src/statistics/application/intention_statistics_calendar.dart';
@@ -54,7 +54,7 @@ void main() {
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
-        var date = CalendarDate.fromParts(2026, 10, 12);
+        final date = CalendarDate.fromParts(2026, 10, 12);
         final reader = IntentionStatisticsReader();
         final repository = ControlledDetailsRepository()
           ..onStatisticsSection = reader.getIntentionStatisticsSection;
@@ -63,8 +63,8 @@ void main() {
           ProviderScope(
             overrides: [
               personalGraphRepositoryProvider.overrideWithValue(repository),
-              dailyChoiceLocalDateSourceProvider.overrideWithValue(
-                () => DailyChoiceLocalDay(
+              localDateSourceProvider.overrideWithValue(
+                () => LocalDay(
                   date: date,
                   untilNextDate: const Duration(hours: 1),
                 ),
@@ -97,16 +97,7 @@ void main() {
             .descendant(of: scrollView, matching: find.byType(Scrollable))
             .first;
         final position = tester.state<ScrollableState>(scrollable).position;
-        final cardLabel = find.text(texts.statisticsThroughRelations);
-        final card = size.height < 400
-            ? find.descendant(
-                of: find.widgetWithText(
-                  OutlinedButton,
-                  texts.statisticsThroughRelations,
-                ),
-                matching: find.text(texts.statisticsContributionCounts(30, 30)),
-              )
-            : cardLabel;
+        final card = find.text(texts.statisticsTileThroughRelations);
         await _placeInFreeArea(tester, card, position);
         final cardOffset = position.pixels;
 
@@ -124,13 +115,28 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        date = CalendarDate.fromParts(2026, 10, 13);
-        WidgetsBinding.instance.handleAppLifecycleStateChanged(
-          AppLifecycleState.paused,
+        final coordinator = ProviderScope.containerOf(
+          tester.element(find.byType(IntentionDetailsPage)),
+          listen: false,
+        ).read(graphCommandCoordinatorProvider.notifier);
+        final before = testDetailsIntention(index: 2);
+        final after = testDetailsIntention(
+          index: 2,
+          archiveState: IntentionArchiveState.archived,
         );
-        WidgetsBinding.instance.handleAppLifecycleStateChanged(
-          AppLifecycleState.resumed,
+        final accepted = coordinator.acceptExisting(
+          ArchiveIntention(before.id),
+          presentationTitle: before.title,
+        ) as IntentionCommandAccepted;
+        repository.completeCommand(
+          0,
+          testDetailsSavedResult(
+            after,
+            before: before,
+            revision: const StatisticsTestRevision(1),
+          ),
         );
+        await accepted.future;
         await tester.pumpAndSettle();
         expect(repository.statisticsQueries, hasLength(1));
         await tester.tap(find.text('Закрыть'));
@@ -142,7 +148,7 @@ void main() {
         _expectFullyVisible(tester, updating);
         await _placeInFreeArea(tester, card, position, notice: updating);
         expect(card.hitTestable(), findsOneWidget);
-        final summary = find.text(texts.statisticsMissed(0));
+        final summary = find.text(texts.statisticsPeriodCompleted(30, 30));
         await _placeInFreeArea(tester, summary, position, notice: updating);
         final calendar = period is StatisticsMonth
             ? find.descendant(of: find.byType(Table), matching: find.text('15'))
@@ -151,7 +157,7 @@ void main() {
 
         final breakdowns = [
           StatisticsBreakdown.relations,
-          StatisticsBreakdown.selectedActions,
+          StatisticsBreakdown.terminalIntentions,
         ];
         final breakdownOffsets = <double>[];
         for (final breakdown in breakdowns) {
@@ -230,9 +236,8 @@ void main() {
           repository.statisticsQueries.last.view,
           StatisticsView.throughRelations,
         );
-        expect(repository.statisticsQueries.last.localDate, date);
         _expectFullyVisible(tester, updating);
-        reader.section(2, count: 29);
+        reader.section(2, count: 29, revision: 1);
         await tester.pumpAndSettle();
         expect(updating, findsNothing);
         expect(failed, findsNothing);
@@ -241,13 +246,13 @@ void main() {
         await tester.pumpAndSettle();
         await _placeInFreeArea(
           tester,
-          find.text(texts.statisticsContributionCounts(29, 29)).first,
+          find.descendant(
+            of: find.byKey(const ValueKey(StatisticsView.throughRelations)),
+            matching: find.text('29'),
+          ),
           position,
         );
 
-        date = CalendarDate.fromParts(2026, 10, 14);
-        await tester.pump(const Duration(hours: 1));
-        await tester.pumpAndSettle();
         final relations = find.text(texts.detailsRelationsTab).first;
         await tester.ensureVisible(relations);
         await tester.pumpAndSettle();
@@ -270,8 +275,8 @@ void main() {
           ProviderScope(
             overrides: [
               personalGraphRepositoryProvider.overrideWithValue(repository),
-              dailyChoiceLocalDateSourceProvider.overrideWithValue(
-                () => DailyChoiceLocalDay(
+              localDateSourceProvider.overrideWithValue(
+                () => LocalDay(
                   date: CalendarDate.fromParts(2026, 10, 12),
                   untilNextDate: const Duration(hours: 12),
                 ),
@@ -309,11 +314,16 @@ void main() {
         final query = repository.statisticsQueries.single;
         expect(query.intentionId, intention.id);
         expect(query.period, StatisticsMonth(2026, 10));
-        expect(query.view, StatisticsView.throughRelations);
-        expect(query.localDate, CalendarDate.fromParts(2026, 10, 12));
+        expect(query.view, isNull);
         expect(find.byType(TagAssignmentsSection), findsNothing);
         expect(statistics.hitTestable(), findsOneWidget);
-        expect(find.textContaining('октябрь 2026'), findsOneWidget);
+        expect(
+          find.text(
+            lookupAppLocalizations(const Locale('ru'))
+                .statisticsMonthPeriod(DateTime.utc(2026, 10)),
+          ),
+          findsOneWidget,
+        );
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
       }
@@ -332,8 +342,8 @@ void main() {
         ProviderScope(
           overrides: [
             personalGraphRepositoryProvider.overrideWithValue(repository),
-            dailyChoiceLocalDateSourceProvider.overrideWithValue(
-              () => DailyChoiceLocalDay(
+            localDateSourceProvider.overrideWithValue(
+              () => LocalDay(
                 date: CalendarDate.fromParts(2026, 10, 12),
                 untilNextDate: const Duration(hours: 12),
               ),
@@ -475,7 +485,7 @@ void main() {
 
       final nextTarget = StatisticsTarget(
         IntentionStatisticsTarget(
-          view: StatisticsView.sourceIntentions,
+          view: StatisticsView.rootIntentions,
           period: StatisticsYear(2030),
         ),
       );
@@ -517,7 +527,7 @@ void main() {
       expect(repository.statisticsQueries.last.intentionId, second.id);
       expect(
         repository.statisticsQueries.last.view,
-        StatisticsView.sourceIntentions,
+        StatisticsView.rootIntentions,
       );
       expect(
         tester
@@ -547,8 +557,8 @@ void main() {
         overrides: [
           inMemoryQuickCreationModeOverride,
           personalGraphRepositoryProvider.overrideWithValue(repository),
-          dailyChoiceLocalDateSourceProvider.overrideWithValue(
-            () => DailyChoiceLocalDay(
+          localDateSourceProvider.overrideWithValue(
+            () => LocalDay(
               date: CalendarDate.fromParts(2026, 10, 12),
               untilNextDate: const Duration(hours: 12),
             ),
@@ -630,7 +640,7 @@ void main() {
             intentionId: intention.id,
             target: StatisticsTarget(
               IntentionStatisticsTarget(
-                view: StatisticsView.sourceIntentions,
+                view: StatisticsView.rootIntentions,
                 period: StatisticsYear(2020),
               ),
             ),
@@ -663,13 +673,13 @@ void main() {
         find.text('Statistics', skipOffstage: false).first,
       );
       await tester.pumpAndSettle();
-      expect(find.textContaining('October 2026'), findsOneWidget);
+      expect(find.text('October 2026'), findsOneWidget);
       expect(repository.statisticsQueries.last.period, StatisticsYear(2019));
     },
   );
 
   testWidgets(
-    'полночь и возврат приложения обновляют только видимую статистику без смены условий',
+    'полночь и возврат приложения не запускают новое чтение статистики',
     (tester) async {
       var date = CalendarDate.fromParts(2026, 10, 12);
       final repository = ControlledDetailsRepository()
@@ -679,11 +689,9 @@ void main() {
         ProviderScope(
           overrides: [
             personalGraphRepositoryProvider.overrideWithValue(repository),
-            dailyChoiceLocalDateSourceProvider.overrideWithValue(
-              () => DailyChoiceLocalDay(
-                date: date,
-                untilNextDate: const Duration(hours: 1),
-              ),
+            localDateSourceProvider.overrideWithValue(
+              () =>
+                  LocalDay(date: date, untilNextDate: const Duration(hours: 1)),
             ),
           ],
           child: OrdinaryPageTestApp(
@@ -701,12 +709,7 @@ void main() {
       date = CalendarDate.fromParts(2026, 10, 13);
       await tester.pump(const Duration(hours: 1));
       await tester.pumpAndSettle();
-      expect(repository.statisticsQueries, hasLength(2));
-      expect(repository.statisticsQueries.last.localDate, date);
-      expect(
-        repository.statisticsQueries.last.period,
-        StatisticsMonth(2026, 10),
-      );
+      expect(repository.statisticsQueries, hasLength(1));
 
       unawaited(
         showDialog<void>(
@@ -730,19 +733,9 @@ void main() {
         AppLifecycleState.resumed,
       );
       await tester.pumpAndSettle();
-      expect(repository.statisticsQueries, hasLength(2));
       await tester.tap(find.text('Закрыть'));
       await tester.pumpAndSettle();
-      expect(repository.statisticsQueries, hasLength(3));
-      expect(repository.statisticsQueries.last.localDate, date);
-      expect(
-        repository.statisticsQueries.last.period,
-        StatisticsMonth(2026, 10),
-      );
-      expect(
-        repository.statisticsQueries.last.view,
-        StatisticsView.throughRelations,
-      );
+      expect(repository.statisticsQueries, hasLength(1));
     },
   );
 }
@@ -793,43 +786,38 @@ IntentionStatisticsSectionResult _emptySection(
     totalItems: 0,
     nextCursor: null,
   );
-  final split = UncompletedSplit(missed: 0, upcoming: 0);
   return IntentionStatisticsSectionSuccess(
     IntentionStatisticsSection(
       query: query,
       revision: TestDetailsRevision(revision),
       cards: IntentionStatisticsCards(
-        sourceIntentions: zero,
+        rootIntentions: zero,
         intermediateIntentions: zero,
-        selectedActions: zero,
+        terminalIntentions: zero,
         throughRelations: zero,
       ),
       periodCounts: zero,
-      details: switch (query.view) {
-        StatisticsView.sourceIntentions => IntentionStatisticsSourceDetails(
-          uncompleted: split,
-          selectedActions: intentions,
+      details: switch (query.view ?? StatisticsView.throughRelations) {
+        StatisticsView.rootIntentions => IntentionStatisticsRootDetails(
+          terminalIntentions: intentions,
         ),
         StatisticsView.intermediateIntentions =>
           IntentionStatisticsIntermediateDetails(
-            uncompleted: split,
-            sourceIntentions: intentions,
-            selectedActions: intentions,
+            rootIntentions: intentions,
+            terminalIntentions: intentions,
           ),
-        StatisticsView.selectedActions => IntentionStatisticsSelectedDetails(
-          uncompleted: split,
-          sourceIntentions: intentions,
+        StatisticsView.terminalIntentions => IntentionStatisticsTerminalDetails(
+          rootIntentions: intentions,
         ),
         StatisticsView.throughRelations =>
           IntentionStatisticsThroughRelationsDetails(
-            uncompleted: split,
-            explicitPathChoices: 0,
+            explicitPathActions: 0,
             relations: StatisticsBreakdownFirstPage(
               items: const [],
               totalItems: 0,
               nextCursor: null,
             ),
-            selectedActions: intentions,
+            terminalIntentions: intentions,
           ),
       },
       calendar: switch (query.period) {

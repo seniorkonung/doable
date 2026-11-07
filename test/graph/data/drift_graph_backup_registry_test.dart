@@ -1,10 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show
         AppDatabase,
@@ -21,9 +17,6 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -34,6 +27,7 @@ import '../../support/encoded_diagnostics_log.dart';
 import '../../support/graph_history_rows.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
+import '../../support/reference_graph_replacement.dart';
 
 void main() {
   late LocalDatabaseHarness harness;
@@ -158,51 +152,16 @@ void main() {
     expect(_shown(backup.summary), (added: 2, changed: 1, deleted: 0));
   });
 
-  test('первая копия считает добавленной каждую сущность состава графа, но '
-      'не назначения тегов', () async {
-    final home = await createTag('Дом');
-    final health = await createIntention('Здоровье');
-    final running = (await confirm<IntentionSaved>(
-      CreateIntention.withInitialState(
-        title: 'Бегать',
-        description: null,
-        readiness: IntentionReadiness.ready,
-        tagIds: const {},
-      ),
-    )).intention;
-    await confirm<TagAssignmentChanged>(
-      AssignTag(tagId: home.id, intentionId: running.id),
-    );
-    final needRunning = (await confirm<LongTermRelationsAdded>(
-      AddLongTermRelations(
-        pageIntentionId: health.id,
-        group: IntentionRelationGroup.needs,
-        candidateIds: [running.id],
-      ),
-    )).relations.single;
-    await confirm<DailyChoiceCreated>(
-      CreateDailyChoice(
-        sourceIntentionId: health.id,
-        selectedIntentionId: running.id,
-        path: ConfirmedChoicePath([
-          ConfirmedChoicePathStep(
-            relationId: needRunning.id,
-            sourceIntentionId: health.id,
-            type: LongTermRelationType.need,
-            relatedIntentionId: running.id,
-          ),
-        ]),
-        date: CalendarDate.fromParts(2026, 10, 18),
-        description: null,
-        isCompleted: false,
-      ),
-    );
+  test('первая копия считает добавленной каждую сущность состава графа — '
+      'теги, намерения, связи и действия, — но не назначения тегов и не '
+      'надгробия', () async {
+    await replaceWithReferenceGraph(repository, snapshots);
 
     await repository.insertManualBackup(since: null);
 
     final backup = (await backups()).single;
     expect(backup.position, await repository.readCurrentPosition());
-    expect(_shown(backup.summary), (added: 5, changed: 0, deleted: 0));
+    expect(_shown(backup.summary), (added: 12, changed: 0, deleted: 0));
   });
 
   test('копия, перед которой граф заменён после того, как вызывающий не '

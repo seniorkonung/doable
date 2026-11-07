@@ -1,12 +1,11 @@
 import 'dart:convert';
 
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
+import 'package:doable/src/action/domain/action.dart';
+import 'package:doable/src/action/domain/action_id.dart';
+import 'package:doable/src/action/domain/action_path.dart';
+import 'package:doable/src/action/domain/action_priority.dart';
+import 'package:doable/src/action/domain/action_schedule.dart';
+import 'package:doable/src/action/domain/action_text.dart';
 import 'package:doable/src/data/local/app_database.dart' show AppDatabase;
 import 'package:doable/src/graph/data/graph_fact_capture.dart';
 import 'package:doable/src/graph_format/graph_format_codec.dart';
@@ -15,6 +14,7 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
@@ -22,6 +22,7 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/action_seed.dart';
 import '../../support/graph_seed.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/tag_positions.dart';
@@ -36,10 +37,8 @@ const _secondRelation = '018f0b5d-6b2e-7c80-8000-000000000012';
 const _directRelation = '018f0b5d-6b2e-7c80-8000-000000000013';
 const _tagA = '018f0b5d-6b2e-7c80-8000-000000000021';
 const _tagB = '018f0b5d-6b2e-7c80-8000-000000000022';
-const _choice = '018f0b5d-6b2e-7c80-8000-000000000031';
-const _firstStep = '018f0b5d-6b2e-7c80-8000-000000000041';
-const _secondStep = '018f0b5d-6b2e-7c80-8000-000000000042';
-const _directStep = '018f0b5d-6b2e-7c80-8000-000000000043';
+const _fullAction = '018f0b5d-6b2e-7c80-8000-000000000051';
+const _shortAction = '018f0b5d-6b2e-7c80-8000-000000000052';
 
 final _createdAt = DateTime.utc(2026, 10, 17, 9);
 final _relationCreatedAt = DateTime.utc(2026, 10, 17, 9, 30);
@@ -120,20 +119,26 @@ void main() {
     [tagId, intentionId],
   );
 
-  Future<void> addChoice() => write(
-    'INSERT INTO daily_choices '
-    '(id, source_intention_id, selected_intention_id, choice_date, '
-    'description, is_completed, scheduled_minute, priority) '
-    "VALUES (?, ?, ?, '2026-10-17', 'Сначала прогулка', 0, 570, 2)",
-    [_choice, _source, _other],
-  );
-
-  Future<void> addStep(String id, String relation, [String? previous]) => write(
-    'INSERT INTO daily_choice_path_steps '
-    '(id, daily_choice_id, long_term_relation_id, previous_step_id) '
-    'VALUES (?, ?, ?, ?)',
-    [id, _choice, relation, previous],
-  );
+  Future<void> addAction(String id, List<String> path) async {
+    await write(
+      'INSERT INTO actions (id, title, date, priority, is_completed, '
+      "created_at, updated_at) VALUES (?, 'Пробежка', '2026-10-17', 4, 0, ?, ?)",
+      [
+        id,
+        _createdAt.microsecondsSinceEpoch,
+        _createdAt.microsecondsSinceEpoch,
+      ],
+    );
+    for (final (position, intention) in path.indexed) {
+      await write(insertActionPathItem, [
+        id,
+        position,
+        intention,
+        position == 0 ? null : path[position - 1],
+        actionPathRole(position, path.length),
+      ]);
+    }
+  }
 
   /// Три намерения, связи «источник → выбранное → другое» и два тега.
   Future<void> addGraph() => arrange(() async {
@@ -153,7 +158,9 @@ void main() {
         (SELECT count(*) FROM graph_log_intention_marks) +
         (SELECT count(*) FROM graph_log_tag_assignment_marks) +
         (SELECT count(*) FROM graph_log_long_term_relation_marks) +
-        (SELECT count(*) FROM graph_log_daily_choice_marks) AS marks
+        (SELECT count(*) FROM graph_log_action_marks) +
+        (SELECT count(*) FROM graph_log_deleted_intention_marks) +
+        (SELECT count(*) FROM graph_log_deleted_relation_pair_marks) AS marks
     ''').getSingle();
     return row.read<int>('marks');
   }
@@ -359,74 +366,145 @@ void main() {
     );
   });
 
-  group('дневной выбор', () {
-    test('создание даёт факт «создана» со всем путём от исходного намерения '
-        'к выбранному', () async {
-      await addGraph();
-
-      final facts = await capture(() async {
-        await addChoice();
-        await addStep(_secondStep, _secondRelation, _firstStep);
-        await addStep(_firstStep, _relation);
-      });
-
-      expect(
-        _lines(facts),
-        _lines([
-          GraphEntityCreated(
-            _choiceRecord([
-              _step(_firstStep, _relation),
-              _step(_secondStep, _secondRelation, _firstStep),
-            ]),
-          ),
-        ]),
-      );
-    });
-
-    test('замена пути даёт факт «изменена» с новым путём', () async {
+  group('действие и надгробия', () {
+    /// Граф [addGraph] с действием по всему пути «источник → выбранное →
+    /// другое» и действием по его началу.
+    Future<void> addActions() async {
       await addGraph();
       await arrange(() async {
-        await addRelation(_directRelation, _source, _other);
-        await addChoice();
-        await addStep(_firstStep, _relation);
-        await addStep(_secondStep, _secondRelation, _firstStep);
+        await addAction(_fullAction, [_source, _selected, _other]);
+        await addAction(_shortAction, [_source, _selected]);
       });
+    }
+
+    test('изменение полей действия даёт один факт «изменена» с полями и '
+        'путём', () async {
+      await addActions();
 
       final facts = await capture(() async {
-        await write('DELETE FROM daily_choice_path_steps');
-        await addStep(_directStep, _directRelation);
+        await write("UPDATE actions SET title = 'Черновик' WHERE id = ?", [
+          _fullAction,
+        ]);
+        await write(
+          "UPDATE actions SET title = 'Пробежка у реки', "
+          "description = 'Не спеша', date = '2026-10-19', "
+          'scheduled_hour = 7, priority = 1, is_completed = 1, '
+          'updated_at = ? WHERE id = ?',
+          [_updatedAt.microsecondsSinceEpoch, _fullAction],
+        );
       });
 
       expect(
         _lines(facts),
         _lines([
           GraphEntityChanged(
-            _choiceRecord([_step(_directStep, _directRelation)]),
+            ActionRecord(
+              id: _actionId(_fullAction),
+              title: ActionTitle('Пробежка у реки'),
+              description: ActionDescription.fromInput('Не спеша'),
+              path: _actionPath([_source, _selected, _other]),
+              date: CalendarDate.parseCanonical('2026-10-19'),
+              schedule: ActionAtHour(7),
+              priority: ActionPriority.p1,
+              isCompleted: true,
+              createdAt: ActionTimestamp(_createdAt),
+              updatedAt: ActionTimestamp(_updatedAt),
+            ),
           ),
         ]),
       );
     });
 
-    test(
-      'удаление вместе с шагами пути даёт факт «удалена» для выбора',
-      () async {
-        await addGraph();
-        await arrange(() async {
-          await addChoice();
-          await addStep(_firstStep, _relation);
-          await addStep(_secondStep, _secondRelation, _firstStep);
-        });
+    test('удаление намерения со связями из путей двух действий даёт по '
+        'факту на надгробие и ни одного факта действий', () async {
+      await addActions();
 
-        final facts = await capture(
-          () => write('DELETE FROM daily_choices WHERE id = ?', [_choice]),
-        );
+      final facts = await capture(() async {
+        await write('DELETE FROM long_term_relations WHERE id IN (?, ?)', [
+          _relation,
+          _secondRelation,
+        ]);
+        await write('DELETE FROM intentions WHERE id = ?', [_selected]);
+      });
 
-        expect(
-          _lines(facts),
-          _lines([GraphEntityDeleted(DailyChoiceKey(_dailyChoiceId(_choice)))]),
-        );
-      },
-    );
+      expect(
+        _lines(facts),
+        _lines([
+          GraphEntityDeleted(IntentionKey(_intentionId(_selected))),
+          GraphEntityCreated(
+            DeletedIntentionRecord(
+              id: _intentionId(_selected),
+              title: 'Выбранное действие',
+            ),
+          ),
+          GraphEntityDeleted(LongTermRelationKey(_relationId(_relation))),
+          GraphEntityDeleted(LongTermRelationKey(_relationId(_secondRelation))),
+          GraphEntityCreated(_pair(_source, _selected)),
+          GraphEntityCreated(_pair(_selected, _other)),
+        ]),
+      );
+    });
+
+    test('новая связь пары снимает её надгробие фактом «удалена»', () async {
+      await addActions();
+      await arrange(
+        () =>
+            write('DELETE FROM long_term_relations WHERE id = ?', [_relation]),
+      );
+
+      final facts = await capture(
+        () => addRelation(_directRelation, _source, _selected),
+      );
+
+      expect(
+        _lines(facts),
+        _lines([
+          GraphEntityCreated(
+            _relationRecord(
+              _directRelation,
+              _source,
+              _selected,
+              archived: false,
+            ),
+          ),
+          GraphEntityDeleted(
+            DeletedRelationPairKey(
+              sourceIntentionId: _intentionId(_source),
+              relatedIntentionId: _intentionId(_selected),
+            ),
+          ),
+        ]),
+      );
+    });
+
+    test('удаление последнего действия с удалёнными звеньями снимает их '
+        'надгробия, а путь не даёт своих фактов', () async {
+      await addActions();
+      await arrange(() async {
+        await write('DELETE FROM long_term_relations WHERE id = ?', [
+          _secondRelation,
+        ]);
+        await write('DELETE FROM intentions WHERE id = ?', [_other]);
+      });
+
+      final facts = await capture(
+        () => write('DELETE FROM actions WHERE id = ?', [_fullAction]),
+      );
+
+      expect(
+        _lines(facts),
+        _lines([
+          GraphEntityDeleted(DeletedIntentionKey(_intentionId(_other))),
+          GraphEntityDeleted(
+            DeletedRelationPairKey(
+              sourceIntentionId: _intentionId(_selected),
+              relatedIntentionId: _intentionId(_other),
+            ),
+          ),
+          GraphEntityDeleted(ActionKey(_actionId(_fullAction))),
+        ]),
+      );
+    });
   });
 
   test('сущности, созданные и удалённые в одной транзакции, фактов не '
@@ -503,27 +581,18 @@ LongTermRelationRecord _relationRecord(
   updatedAt: RelationTimestamp(_relationUpdatedAt),
 );
 
-DailyChoiceRecord _choiceRecord(List<ChoicePathStep> path) => DailyChoiceRecord(
-  choice: DailyChoice(
-    id: _dailyChoiceId(_choice),
-    sourceIntentionId: _intentionId(_source),
-    selectedIntentionId: _intentionId(_other),
-    date: CalendarDate.parseCanonical('2026-10-17'),
-    description: DailyChoiceDescription.fromStored('Сначала прогулка'),
-    isCompleted: false,
-    schedule: DailyChoiceTime(hour: 9, minute: 30),
-    priority: DailyChoicePriority.p2,
-  ),
-  path: StoredChoicePath(path),
-);
-
-ChoicePathStep _step(String id, String relation, [String? previous]) =>
-    ChoicePathStep(
-      id: _stepId(id),
-      dailyChoiceId: _dailyChoiceId(_choice),
-      relationId: _relationId(relation),
-      previousStepId: previous == null ? null : _stepId(previous),
+DeletedRelationPairRecord _pair(String source, String related) =>
+    DeletedRelationPairRecord(
+      sourceIntentionId: _intentionId(source),
+      relatedIntentionId: _intentionId(related),
+      type: LongTermRelationType.need,
     );
+
+ActionPath _actionPath(List<String> intentions) =>
+    ActionPath([for (final id in intentions) _intentionId(id)]);
+
+ActionId _actionId(String value) =>
+    (ActionId.decode(value) as ActionIdDecodingSuccess).id;
 
 TagId _tagId(String value) => (TagId.decode(value) as TagIdDecodingSuccess).id;
 
@@ -532,9 +601,3 @@ IntentionId _intentionId(String value) =>
 
 LongTermRelationId _relationId(String value) =>
     (LongTermRelationId.decode(value) as LongTermRelationIdDecodingSuccess).id;
-
-DailyChoiceId _dailyChoiceId(String value) =>
-    (DailyChoiceId.decode(value) as DailyChoiceIdDecodingSuccess).id;
-
-ChoicePathStepId _stepId(String value) =>
-    (ChoicePathStepId.decode(value) as ChoicePathStepIdDecodingSuccess).id;

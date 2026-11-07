@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/action/application/action_command.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -14,7 +14,8 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/action_seed.dart';
+import '../../support/graph_durability_fixture.dart';
 import '../../support/graph_seed.dart';
 import '../../support/local_database_harness.dart';
 
@@ -117,18 +118,32 @@ void main() {
     expect(probe.reads, greaterThan(reads));
   });
 
-  test('изменения выборов и данных намерений не перечитывают связи', () async {
+  test('изменения действий и данных намерений не перечитывают связи', () async {
+    await seedGraph(database, () async {
+      await database.customStatement(
+        '''INSERT INTO actions
+         (id, title, date, priority, is_completed, created_at, updated_at)
+         VALUES (?, 'Пробежка', '2026-09-23', 4, 1, 1, 1)''',
+        [seedUuid(201)],
+      );
+      for (final (position, number) in [1, 2, 3].indexed) {
+        await database.customStatement(insertActionPathItem, [
+          seedUuid(201),
+          position,
+          seedUuid(number),
+          position == 0 ? null : seedUuid(number - 1),
+          actionPathRole(position, 3),
+        ]);
+      }
+    });
     await repository.loadStatisticsRelationSnapshot();
     final reads = probe.reads;
-    for (final command in <DailyChoiceCommand>[
-      durabilityCreate(),
-      UpdateDailyChoiceFields(
-        choiceId: durabilityChoice(201),
-        patch: const DailyChoiceFieldsPatch(
-          isCompleted: DailyChoiceFieldSet(false),
-        ),
+    for (final command in <ActionCommand>[
+      UpdateActionFields(
+        actionId: seedActionId(201),
+        patch: const ActionFieldsPatch(isCompleted: ActionFieldSet(false)),
       ),
-      DeleteDailyChoice(durabilityChoice(201)),
+      DeleteAction(seedActionId(201)),
     ]) {
       expect(await repository.execute(command), isA<GraphCommandSucceeded>());
       await repository.loadStatisticsRelationSnapshot();
@@ -300,7 +315,6 @@ void main() {
         ['  Описание связи\n'],
       );
     });
-    await repository.execute(durabilityCreate());
     await repository.loadStatisticsRelationSnapshot();
     final reads = probe.reads;
     probe.cascadedRelationRows = [];
@@ -341,12 +355,11 @@ void main() {
         durabilityRelation(105),
       ]),
     );
-    for (final (number, source, related, type, priority, sequence, referenced)
-        in [
-          (101, 1, 2, LongTermRelationType.need, RelationPriority.p2, 1, true),
-          (102, 2, 3, LongTermRelationType.can, RelationPriority.p2, 2, true),
-          (105, 4, 2, LongTermRelationType.need, RelationPriority.p4, 5, false),
-        ]) {
+    for (final (number, source, related, type, priority, sequence) in [
+      (101, 1, 2, LongTermRelationType.need, RelationPriority.p2, 1),
+      (102, 2, 3, LongTermRelationType.can, RelationPriority.p2, 2),
+      (105, 4, 2, LongTermRelationType.need, RelationPriority.p4, 5),
+    ]) {
       final change = changes.singleWhere(
         (change) => change.id == durabilityRelation(number),
       );
@@ -360,10 +373,6 @@ void main() {
       }
       expect(change.before.scope, RelationScope.active);
       expect(change.after.scope, RelationScope.archived);
-      expect(change.permissions.isConfirmed, isTrue);
-      expect(change.permissions.canDelete, !referenced);
-      expect(change.permissions.canEditDescriptionAndPriority, isTrue);
-      expect(change.permissions.canChangeArchiveState, isTrue);
     }
     expect(probe.reads, reads, reason: 'Пересборка ленивая');
     final graph = await repository.loadStatisticsRelationSnapshot();
@@ -471,14 +480,13 @@ final class _SnapshotProbe extends LocalDatabaseConnectionObserver {
     LocalDatabaseSqlStatement statement,
     List<Map<String, Object?>> rows,
   ) async {
-    if (cascadedRelationRows case final captured?) {
+    if (cascadedRelationRows case final captured?
+        when statement.statements.single.contains(
+          'WHERE relation.is_archived = 0',
+        )) {
       for (final row in rows) {
-        if (row.containsKey('source_intention_id') &&
-            row.containsKey('related_intention_id') &&
-            row.containsKey('is_referenced')) {
-          expect(_inTransaction, isTrue);
-          captured.add(Map.of(row));
-        }
+        expect(_inTransaction, isTrue);
+        captured.add(Map.of(row));
       }
     }
     if (!statement.statements.single.startsWith(

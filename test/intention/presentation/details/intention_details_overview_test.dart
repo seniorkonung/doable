@@ -1,6 +1,5 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/design_system/components/button.dart';
 import 'package:doable/src/design_system/components/option_tiles.dart';
 import 'package:doable/src/design_system/components/tag_chip.dart';
@@ -14,6 +13,7 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_options.dart';
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
@@ -22,7 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../../support/daily_choice_local_date.dart';
+import '../../../support/controlled_local_date.dart';
 import '../../../support/intention_options.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import 'details_test_support.dart';
@@ -288,8 +288,7 @@ void main() {
       repository,
       intention,
       overrides: [
-        ControlledDailyChoiceLocalDate(CalendarDate.fromParts(2026, 10, 29))
-            .override,
+        ControlledLocalDate(CalendarDate.fromParts(2026, 10, 29)).override,
         tagAssignmentsReaderProvider.overrideWithValue(_NoTagReads()),
       ],
     );

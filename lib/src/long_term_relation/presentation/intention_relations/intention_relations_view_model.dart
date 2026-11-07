@@ -153,7 +153,7 @@ final class IntentionRelationsViewModel extends _$IntentionRelationsViewModel {
         RelationsTarget(:final group?) => group,
         RelationsTarget() ||
         OverviewTarget() ||
-        ChoicesTarget() ||
+        ActionsTarget() ||
         StatisticsTarget() => switch (intention.readiness) {
           IntentionReadiness.notReady => IntentionRelationGroup.needs,
           IntentionReadiness.ready => IntentionRelationGroup.neededFor,
@@ -304,9 +304,6 @@ final class IntentionRelationsViewModel extends _$IntentionRelationsViewModel {
                 nextCursor: page.nextCursor,
               ),
             ),
-          GraphResultSuccess() => const GraphResultFailure(
-            RelationGroupUnexpectedFailure(),
-          ),
           GraphResultFailure(:final failure) => GraphResultFailure(failure),
         },
   );
@@ -352,9 +349,6 @@ final class IntentionRelationsViewModel extends _$IntentionRelationsViewModel {
       case IntentionRelationCountsChanged(:final intentionId, :final counts)
           when intentionId == _intentionId:
         return differsFromPublished(counts);
-      case DailyChoiceChange(:final intentionCounts):
-        final counts = intentionCounts[_intentionId];
-        return counts != null && differsFromPublished(counts);
       case LongTermRelationChange(:final id, :final before, :final after):
         final partBefore = before == null
             ? null

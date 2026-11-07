@@ -1,14 +1,14 @@
 import 'dart:async';
-import 'dart:ui' show Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:doable/src/statistics/application/contribution_counts.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:doable/src/statistics/presentation/home_statistics_content.dart';
@@ -27,7 +27,7 @@ void main() {
       final semantics = tester.ensureSemantics();
       for (final locale in ['ru', 'en']) {
         final item = _item(1, 'Высыпаться', 3, 7, archived: true);
-        final harness = _Harness(_data([item], summary: _summary(4, 8, 3, 1)));
+        final harness = _Harness(_data([item], summary: _summary(4, 8)));
         await harness.pump(tester, locale: Locale(locale));
         final texts = harness.texts(tester);
         final row = find.bySemanticsLabel(RegExp('^Высыпаться'));
@@ -41,7 +41,7 @@ void main() {
           data.label,
           contains(texts.statisticsContributionCountsSemantics(3, 7)),
         );
-        expect(data.label, contains(texts.statisticsContributionShare(.75)));
+        expect(data.label, contains(texts.statisticsPeriodActionsShare(7 / 8)));
         final button = find.widgetWithText(TextButton, 'Высыпаться');
         Focus.of(tester.element(find.text('Высыпаться'))).requestFocus();
         await tester.pump();
@@ -57,111 +57,145 @@ void main() {
     },
   );
 
-  testWidgets('каталог сохраняет порядок, точное число и доли периода', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(800, 1000);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    final harness = _Harness(
-      _data([
-        _item(1, 'Высыпаться', 3, 7),
-        _item(2, 'Быть в форме', 1, 5),
-        _item(3, 'Учить испанский', 0, 5),
-        _item(4, 'Читать книги', 0, 2),
-      ], summary: _summary(4, 19, 10, 5)),
-    );
-    await harness.pump(tester);
-    final texts = harness.texts(tester);
-
-    expect(find.text(texts.statisticsPeriodSummary), findsOneWidget);
-    expect(find.text(texts.statisticsPlannedContribution(19)), findsOneWidget);
-    expect(find.text(texts.statisticsContribution(4)), findsOneWidget);
-    expect(find.text(texts.statisticsMissed(10)), findsOneWidget);
-    expect(find.text(texts.statisticsUpcoming(5)), findsOneWidget);
-    expect(find.text(texts.statisticsTotalItems(4)), findsOneWidget);
-    expect(find.text(texts.statisticsContributionCounts(3, 7)), findsOneWidget);
-    expect(find.text(texts.statisticsContributionShare(.75)), findsOneWidget);
-    expect(find.text(texts.statisticsContributionShare(.25)), findsOneWidget);
-    expect(find.text(texts.statisticsContributionShare(0)), findsNWidgets(2));
-    final titles = [
-      'Высыпаться',
-      'Быть в форме',
-      'Учить испанский',
-      'Читать книги',
-    ];
-    for (var i = 1; i < titles.length; ++i) {
-      expect(
-        tester.getTopLeft(find.text(titles[i])).dy,
-        greaterThan(tester.getTopLeft(find.text(titles[i - 1])).dy),
-      );
-    }
-    final views = [
-      texts.statisticsSourceIntentions,
-      texts.statisticsIntermediateIntentions,
-      texts.statisticsSelectedActions,
-      texts.statisticsThroughRelations,
-    ];
-    for (var i = 1; i < views.length; ++i) {
-      final previous = tester.getTopLeft(
-        find.widgetWithText(TextButton, views[i - 1]),
-      );
-      final current = tester.getTopLeft(
-        find.widgetWithText(TextButton, views[i]),
-      );
-      expect(
-        current.dy > previous.dy ||
-            (current.dy == previous.dy && current.dx > previous.dx),
-        isTrue,
-      );
-    }
-
-    await tester.tap(find.text(texts.statisticsIntermediateIntentions));
-    await tester.pump();
-    expect(harness.selectedViews, [StatisticsView.intermediateIntentions]);
-  });
-
-  testWidgets('нулевой вклад скрывает доли и объясняет их отсутствие диктору', (
-    tester,
-  ) async {
-    final harness = _Harness(
-      _data([_item(1, 'Читать книги', 0, 2)], summary: _summary(0, 2, 0, 2)),
-      view: StatisticsView.throughRelations,
-    );
-    await harness.pump(tester);
-    final texts = harness.texts(tester);
-
-    expect(find.text(texts.statisticsContributionCounts(0, 2)), findsOneWidget);
-    expect(find.textContaining('Доля'), findsNothing);
-    expect(
-      find.bySemanticsLabel(RegExp(texts.statisticsNoContributionShare)),
-      findsOneWidget,
-    );
-  });
-
   testWidgets(
-    'в виде «Весь вклад» один выбор даёт каждому намерению полный вклад и долю 100%',
+    'каталог сохраняет порядок, точное число и доли действий периода',
     (tester) async {
+      tester.view.physicalSize = const Size(800, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final harness = _Harness(
         _data([
-          _item(1, 'Лечь до полуночи', 1, 1),
-          _item(2, 'Высыпаться', 1, 1),
-          _item(3, 'Быть здоровым', 1, 1),
-        ], summary: _summary(1, 1, 0, 0)),
-        view: StatisticsView.throughRelations,
+          _item(1, 'Высыпаться', 3, 8),
+          _item(2, 'Быть в форме', 1, 5),
+          _item(3, 'Учить испанский', 0, 5),
+          _item(4, 'Читать книги', 0, 2),
+        ], summary: _summary(4, 20)),
       );
       await harness.pump(tester);
       final texts = harness.texts(tester);
+
+      expect(find.text(texts.statisticsPeriodSummary), findsOneWidget);
+      expect(find.text(texts.statisticsPeriodActions(20)), findsOneWidget);
+      expect(find.text(texts.statisticsPeriodCompleted(4, 20)), findsOneWidget);
+      // Невыполненное не делится на пропущенное и предстоящее.
+      expect(find.textContaining(RegExp('Пропущено|Предстоит')), findsNothing);
+      expect(find.text(texts.statisticsTotalItems(4)), findsOneWidget);
       expect(
-        find.text(texts.statisticsContributionCounts(1, 1)),
-        findsNWidgets(3),
+        find.text(texts.statisticsContributionCounts(3, 8)),
+        findsOneWidget,
       );
-      expect(find.text(texts.statisticsContributionShare(1)), findsNWidgets(3));
+      expect(find.text(texts.statisticsPeriodActionsShare(.4)), findsOneWidget);
+      expect(
+        find.text(texts.statisticsPeriodActionsShare(.25)),
+        findsNWidgets(2),
+      );
+      expect(find.text(texts.statisticsPeriodActionsShare(.1)), findsOneWidget);
+      final titles = [
+        'Высыпаться',
+        'Быть в форме',
+        'Учить испанский',
+        'Читать книги',
+      ];
+      for (var i = 1; i < titles.length; ++i) {
+        expect(
+          tester.getTopLeft(find.text(titles[i])).dy,
+          greaterThan(tester.getTopLeft(find.text(titles[i - 1])).dy),
+        );
+      }
     },
   );
+
   testWidgets(
-    'загрузка, пустой вид и обновление различаются без ложных нулей',
+    'выбор вида показывает название и точное число элементов и открывает лист с четырьмя видами и пояснениями',
+    (tester) async {
+      final harness = _Harness(
+        _data([_item(1, 'Высыпаться', 3, 8)], summary: _summary(3, 20)),
+      );
+      await harness.pump(tester);
+      final texts = harness.texts(tester);
+      expect(find.text(texts.statisticsRootIntentions), findsOneWidget);
+      expect(find.text(texts.statisticsTotalItems(1)), findsOneWidget);
+
+      await tester.tap(find.text(texts.statisticsRootIntentions));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Считать действия по'), findsOneWidget);
+      final rows = find.byType(OptionRow);
+      expect(rows, findsNWidgets(4));
+      final names = [
+        for (final row in tester.widgetList<OptionRow>(rows)) row.name,
+      ];
+      expect(names, [
+        'Корневые намерения',
+        'Промежуточные намерения',
+        'Конечные намерения',
+        'Через связи',
+      ]);
+      final hints = [
+        for (final row in tester.widgetList<OptionRow>(rows)) row.hint,
+      ];
+      expect(hints, [
+        'С чего начинается каждый путь',
+        'Звенья между корневым и конечным',
+        'Последняя причина прямо над действием',
+        'Все намерения, которым служит действие',
+      ]);
+      expect(
+        tester
+            .widgetList<OptionRow>(rows)
+            .where((row) => row.trailing == OptionRowTrailing.selected)
+            .map((row) => row.name),
+        ['Корневые намерения'],
+      );
+    },
+  );
+
+  testWidgets('вид выбирается в листе, применяется сразу и закрывает лист', (
+    tester,
+  ) async {
+    final harness = _Harness(_data([_item(1, 'Высыпаться', 3, 8)]));
+    await harness.pump(tester);
+    final texts = harness.texts(tester);
+
+    await tester.tap(find.text(texts.statisticsRootIntentions));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.widgetWithText(OptionRow, texts.statisticsTerminalIntentions),
+    );
+    await tester.pumpAndSettle();
+
+    expect(harness.selectedViews, [StatisticsView.terminalIntentions]);
+    expect(find.byType(OptionRow), findsNothing);
+    expect(find.text(texts.statisticsViewSheetTitle), findsNothing);
+    expect(find.text(texts.statisticsTerminalIntentions), findsOneWidget);
+  });
+
+  testWidgets(
+    'пояснение о связях на сейчас стоит только над видом «Через связи»',
+    (tester) async {
+      final harness = _Harness(_data([_item(1, 'Высыпаться', 3, 8)]));
+      await harness.pump(tester);
+      final texts = harness.texts(tester);
+      expect(find.text(texts.statisticsThroughRelationsNote), findsNothing);
+
+      harness.state.value = HomeStatisticsState(
+        selection: harness.state.value.selection.copyWith(
+          view: StatisticsView.throughRelations,
+        ),
+        read: _data([_item(1, 'Высыпаться', 3, 8)]),
+      );
+      await tester.pump();
+
+      expect(
+        find.text('Вид считает по связям на сейчас и меняется вместе с ними.'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'загрузка, пустой период, пустой вид и обновление различаются без ложных нулей',
     (tester) async {
       final harness = _Harness(
         const HomeStatisticsInitialLoad(),
@@ -170,34 +204,35 @@ void main() {
       await harness.pump(tester);
       final texts = harness.texts(tester);
       expect(find.text(texts.statisticsLoading), findsOneWidget);
-      expect(find.text(texts.statisticsPlannedContribution(0)), findsNothing);
+      expect(find.text(texts.statisticsPeriodActions(0)), findsNothing);
       expect(find.text(texts.statisticsTotalItems(0)), findsNothing);
 
       harness.show(
-        HomeStatisticsEmpty(
-          summary: _summary(4, 21, 10, 7),
-          revision: _revision,
-        ),
+        HomeStatisticsViewEmpty(summary: _summary(4, 21), revision: _revision),
       );
       await tester.pump();
-      expect(find.text(texts.statisticsEmpty), findsOneWidget);
-      expect(find.text(texts.statisticsTotalItems(0)), findsOneWidget);
-      expect(find.text(texts.statisticsContribution(4)), findsOneWidget);
       expect(
-        find.text(texts.statisticsPlannedContribution(21)),
+        find.text(
+          'В виде «Промежуточные намерения» в этом периоде элементов нет.',
+        ),
         findsOneWidget,
       );
-      expect(find.text(texts.statisticsMissed(10)), findsOneWidget);
-      expect(find.text(texts.statisticsUpcoming(7)), findsOneWidget);
+      expect(find.text(texts.statisticsTotalItems(0)), findsOneWidget);
+      expect(find.text(texts.statisticsPeriodActions(21)), findsOneWidget);
+      expect(find.text(texts.statisticsPeriodCompleted(4, 21)), findsOneWidget);
 
-      harness.show(
-        HomeStatisticsEmpty(summary: _summary(0, 0, 0, 0), revision: _revision),
-      );
+      harness.show(HomeStatisticsPeriodEmpty(revision: _revision));
       await tester.pump();
-      expect(find.text(texts.statisticsPlannedContribution(0)), findsOneWidget);
-      expect(find.text(texts.statisticsContribution(0)), findsOneWidget);
-      expect(find.text(texts.statisticsMissed(0)), findsOneWidget);
-      expect(find.text(texts.statisticsUpcoming(0)), findsOneWidget);
+      expect(
+        find.text(
+          'В этом периоде действий нет. Действия, датированные им, будут посчитаны здесь.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(texts.statisticsPeriodSummary), findsNothing);
+      expect(find.text(texts.statisticsViewLabel), findsNothing);
+      expect(find.text(texts.statisticsIntermediateIntentions), findsNothing);
+      expect(find.text(texts.statisticsTotalItems(0)), findsNothing);
 
       harness.show(
         _data([
@@ -206,7 +241,7 @@ void main() {
       );
       await tester.pump();
       expect(find.text(texts.statisticsRefreshing), findsOneWidget);
-      expect(find.text(texts.statisticsContribution(3)), findsOneWidget);
+      expect(find.text(texts.statisticsPeriodCompleted(3, 7)), findsOneWidget);
       expect(find.text('Высыпаться'), findsOneWidget);
       expect(find.text(texts.statisticsLoading), findsNothing);
     },
@@ -266,7 +301,7 @@ void main() {
       );
       await tester.pump();
       expect(find.text(scenario.refresh), findsOneWidget);
-      expect(find.text(texts.statisticsContribution(3)), findsOneWidget);
+      expect(find.text(texts.statisticsPeriodCompleted(3, 7)), findsOneWidget);
       expect(find.text('Высыпаться'), findsOneWidget);
       expect(
         find.text(texts.commonRetry),
@@ -283,7 +318,7 @@ void main() {
         _data(
           items,
           totalItems: 2,
-          summary: _summary(4, 8, 2, 2),
+          summary: _summary(4, 8),
           cursor: const _Cursor(),
           pageStatus: HomeStatisticsPageFailure(scenario.failure),
         ),
@@ -318,8 +353,8 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           personalGraphRepositoryProvider.overrideWithValue(reader),
-          dailyChoiceLocalDateSourceProvider.overrideWithValue(
-            () => DailyChoiceLocalDay(
+          localDateSourceProvider.overrideWithValue(
+            () => LocalDay(
               date: CalendarDate.fromParts(2026, 10, 12),
               untilNextDate: const Duration(hours: 12),
             ),
@@ -362,7 +397,7 @@ void main() {
       reader.responses.single.complete(
         StatisticsPageSuccess(
           StatisticsFirstPage(
-            summary: _summary(150, 150, 0, 0),
+            summary: _summary(150, 150),
             totalItems: 150,
             items: first,
             revision: _revision,
@@ -534,7 +569,7 @@ void main() {
 
     harness.state.value = HomeStatisticsState(
       selection: harness.state.value.selection.copyWith(
-        view: StatisticsView.selectedActions,
+        view: StatisticsView.terminalIntentions,
       ),
       read: const HomeStatisticsInitialLoad(),
     );
@@ -564,7 +599,7 @@ void main() {
               archived: true,
             ),
             _item(2, 'Другое намерение', 1, 14),
-          ], summary: _summary(4, 21, 10, 7)),
+          ], summary: _summary(4, 21)),
         );
         await harness.pump(tester, locale: locale);
         var texts = harness.texts(tester);
@@ -576,7 +611,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         final rowLabel =
-            'Высыпаться и соблюдать вечерний ритуал\n${texts.detailsArchived}\n${texts.statisticsContributionCountsSemantics(3, 7)}\n${texts.statisticsContributionShare(.75)}';
+            'Высыпаться и соблюдать вечерний ритуал\n${texts.detailsArchived}\n${texts.statisticsContributionCountsSemantics(3, 7)}\n${texts.statisticsPeriodActionsShare(7 / 21)}';
         expect(find.bySemanticsLabel(rowLabel), findsOneWidget);
         expect(find.text(texts.detailsArchived), findsOneWidget);
         expect(
@@ -584,12 +619,12 @@ void main() {
           findsOneWidget,
         );
         await tester.scrollUntilVisible(
-          find.text(texts.statisticsContributionShare(.75)),
+          find.text(texts.statisticsPeriodActionsShare(7 / 21)),
           200,
           maxScrolls: 10,
         );
         expect(
-          find.text(texts.statisticsContributionShare(.75)).hitTestable(),
+          find.text(texts.statisticsPeriodActionsShare(7 / 21)).hitTestable(),
           findsOneWidget,
         );
 
@@ -599,35 +634,20 @@ void main() {
         );
         await tester.pumpAndSettle();
         await tester.scrollUntilVisible(
-          find.text(texts.statisticsSourceIntentions),
+          find.text(texts.statisticsRootIntentions),
           250,
           maxScrolls: 20,
         );
         await tester.pumpAndSettle();
-        final source = find.text(texts.statisticsSourceIntentions);
-        final node = tester.getSemantics(source).getSemanticsData();
-        expect(node.flagsCollection.isSelected, Tristate.isTrue);
-        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-        await tester.pump();
-        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.tap(find.text(texts.statisticsRootIntentions));
         await tester.pumpAndSettle();
-        expect(
-          find.text(texts.statisticsThroughRelations).hitTestable(),
-          findsOneWidget,
+        await tester.tap(
+          find.widgetWithText(OptionRow, texts.statisticsThroughRelations),
         );
-        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-        await tester.pump();
+        await tester.pumpAndSettle();
         expect(harness.selectedViews.last, StatisticsView.throughRelations);
-        expect(
-          tester
-              .getSemantics(find.text(texts.statisticsThroughRelations))
-              .getSemanticsData()
-              .flagsCollection
-              .isSelected,
-          Tristate.isTrue,
-        );
+        expect(find.byType(OptionRow), findsNothing);
+        expect(find.text(texts.statisticsThroughRelations), findsOneWidget);
 
         final selection = harness.state.value.selection;
         await harness.pump(
@@ -659,15 +679,8 @@ final class _Revision implements GraphRevision {
       : GraphRevisionOrder.differentEpoch;
 }
 
-StatisticsPeriodSummary _summary(
-  int contribution,
-  int planned,
-  int missed,
-  int upcoming,
-) => StatisticsPeriodSummary(
-  counts: ContributionCounts(planned: planned, contribution: contribution),
-  uncompleted: UncompletedSplit(missed: missed, upcoming: upcoming),
-);
+ContributionCounts _summary(int contribution, int planned) =>
+    ContributionCounts(planned: planned, contribution: contribution);
 
 StatisticsItem _item(
   int id,
@@ -693,7 +706,7 @@ StatisticsItem _item(
 
 HomeStatisticsData _data(
   List<StatisticsItem> items, {
-  StatisticsPeriodSummary? summary,
+  ContributionCounts? summary,
   int? totalItems,
   StatisticsCursor? cursor,
   HomeStatisticsPageStatus pageStatus = const HomeStatisticsPageIdle(),
@@ -705,8 +718,7 @@ HomeStatisticsData _data(
     (sum, item) => sum + item.counts.contribution,
   );
   return HomeStatisticsData(
-    summary:
-        summary ?? _summary(contribution, planned, 0, planned - contribution),
+    summary: summary ?? _summary(contribution, planned),
     totalItems: totalItems ?? items.length,
     items: items,
     revision: _revision,
@@ -719,7 +731,7 @@ HomeStatisticsData _data(
 final class _Harness {
   _Harness(
     HomeStatisticsReadState read, {
-    StatisticsView view = StatisticsView.sourceIntentions,
+    StatisticsView view = StatisticsView.rootIntentions,
   }) : state = ValueNotifier(
          HomeStatisticsState(
            selection: HomeStatisticsSelection.initial(

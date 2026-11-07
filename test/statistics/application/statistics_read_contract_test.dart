@@ -1,4 +1,3 @@
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -11,8 +10,7 @@ void main() {
   test('запрос допускает порции от 1 до 100 и отклоняет выход за границы', () {
     StatisticsQuery query(int pageSize) => StatisticsQuery(
       period: StatisticsMonth(2026, 10),
-      view: StatisticsView.sourceIntentions,
-      localDate: CalendarDate.fromParts(2026, 10, 12),
+      view: StatisticsView.rootIntentions,
       pageSize: pageSize,
     );
 
@@ -40,32 +38,6 @@ void main() {
     },
   );
 
-  test('деление невыполненного отклоняет отрицательные числа', () {
-    for (final (missed, upcoming) in [(-1, 0), (0, -1)]) {
-      expect(
-        () => UncompletedSplit(missed: missed, upcoming: upcoming),
-        throwsA(isA<StatisticsDataValidationException>()),
-      );
-    }
-  });
-
-  test('сводка связывает пропущенное и предстоящее со всем невыполненным', () {
-    final counts = ContributionCounts(planned: 21, contribution: 4);
-    final summary = StatisticsPeriodSummary(
-      counts: counts,
-      uncompleted: UncompletedSplit(missed: 10, upcoming: 7),
-    );
-
-    expect(summary.counts.uncompleted, 17);
-    expect(
-      () => StatisticsPeriodSummary(
-        counts: counts,
-        uncompleted: UncompletedSplit(missed: 10, upcoming: 6),
-      ),
-      throwsA(isA<StatisticsDataValidationException>()),
-    );
-  });
-
   test('элемент отклоняет отсутствие запланированного вклада', () {
     expect(
       () => StatisticsItem(
@@ -82,10 +54,7 @@ void main() {
     expect(
       () => StatisticsFirstPage(
         items: const [],
-        summary: StatisticsPeriodSummary(
-          counts: ContributionCounts(planned: 0, contribution: 0),
-          uncompleted: UncompletedSplit(missed: 0, upcoming: 0),
-        ),
+        summary: ContributionCounts(planned: 0, contribution: 0),
         totalItems: -1,
         revision: const _TestRevision(),
         nextCursor: null,
@@ -106,10 +75,7 @@ void main() {
       final source = [item];
       final StatisticsPage page = StatisticsFirstPage(
         items: source,
-        summary: StatisticsPeriodSummary(
-          counts: ContributionCounts(planned: 21, contribution: 4),
-          uncompleted: UncompletedSplit(missed: 10, upcoming: 7),
-        ),
+        summary: ContributionCounts(planned: 21, contribution: 4),
         totalItems: 1,
         revision: const _TestRevision(),
         nextCursor: null,

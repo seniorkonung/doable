@@ -41,16 +41,18 @@ import '../support/stalling_replacement_snapshot_reads.dart';
 void main() {
   final reference = referenceGraphFileLines();
   // Три активных намерения и две связи от первого ко второму и третьему.
-  // Дневных выборов нет, поэтому изменение связи не затрагивает путь.
-  final relationsWithoutChoices = withEditedLine(
-    [reference.first, ...reference.sublist(3, 6), ...reference.sublist(10, 12)],
+  // Действий нет, поэтому изменение связи не затрагивает путь.
+  final relationsWithoutActions = withEditedLine(
+    [reference.first, ...reference.sublist(3, 6), ...reference.sublist(11, 13)],
     0,
     (header) => header['counts'] = {
       'tags': 0,
       'intentions': 3,
+      'deletedIntentions': 0,
       'tagAssignments': 0,
       'longTermRelations': 2,
-      'dailyChoices': 0,
+      'deletedRelationPairs': 0,
+      'actions': 0,
     },
   );
 
@@ -265,10 +267,10 @@ void main() {
   ];
 
   test('сценарий «Сохранённое состояние импортируется как есть»: эталонный '
-      'файл версии 1 с дневным выбором, путь которого проходит через '
-      'архивированную связь к намерению без готовности к действию, заменяет '
-      'непустой граф графом, выгрузка которого совпадает с записями файла, а '
-      'прежнее состояние становится копией перед заменой', () async {
+      'файл версии 1 с путями действий через архивированную связь, удалённое '
+      'намерение и удалённую связь заменяет непустой граф графом, выгрузка '
+      'которого совпадает с записями файла, а прежнее состояние становится '
+      'копией перед заменой', () async {
     await createGraph();
     final before = await graphState();
 
@@ -277,7 +279,7 @@ void main() {
       file.header.writtenAt,
       DateTime.utc(2026, 10, 3, 18, 42, 7, 654, 321),
     );
-    expect(_countsOf(file.header.counts), [2, 4, 3, 3, 2]);
+    expect(_countsOf(file.header.counts), [2, 4, 1, 3, 3, 1, 3]);
     expect(await importFile(file), isA<GraphImported>());
 
     expect(await graphState(), reference.skip(1));
@@ -296,13 +298,13 @@ void main() {
     expect(await storedBackups(), isEmpty);
   });
 
-  test('исправная основа проверки правил связей без дневных выборов '
+  test('исправная основа проверки правил связей без действий '
       'успешно импортируется', () async {
-    final file = await readFile(graphExportFileOf(relationsWithoutChoices));
+    final file = await readFile(graphExportFileOf(relationsWithoutActions));
 
     expect(await importFile(file), isA<GraphImported>());
 
-    expect(await graphState(), relationsWithoutChoices.skip(1));
+    expect(await graphState(), relationsWithoutActions.skip(1));
   });
 
   test('успешный импорт диагностируется успехом без пользовательских '
@@ -327,15 +329,16 @@ void main() {
     final before = await storedState();
     List<int> edited(int line, void Function(Map<String, Object?> json) edit) =>
         graphExportFileOf(withEditedLine(reference, line, edit));
-    // Строки эталона: 1–2 — теги, 3–6 — намерения, 7–9 — назначения тегов,
-    // 10–12 — долговременные связи, 13–14 — дневные выборы.
+    // Строки эталона: 1–2 — теги, 3–6 — намерения, 7 — надгробие намерения,
+    // 8–10 — назначения тегов, 11–13 — долговременные связи, 14 — надгробие
+    // пары, 15–17 — действия.
     final cases = <String, (List<int>, (_Detection, GraphImportFailure))>{
       'файл, обрезанный посередине': (
         truncatedGraphExportFile(),
         (_Detection.snapshotWrite, GraphImportFailure.invalidFile),
       ),
       'недопустимое значение поля': (
-        edited(10, (relation) => relation['priority'] = 'P5'),
+        edited(11, (relation) => relation['priority'] = 'P5'),
         (_Detection.snapshotWrite, GraphImportFailure.invalidFile),
       ),
       'намерения не по каноническому порядку': (
@@ -349,7 +352,7 @@ void main() {
       ),
       'ссылка на отсутствующую сущность': (
         edited(
-          7,
+          8,
           (assignment) => assignment['intentionId'] =
               '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f99',
         ),
@@ -366,10 +369,10 @@ void main() {
       'совпадение направленных пар связей': (
         graphExportFileOf(
           withEditedLine(
-            relationsWithoutChoices,
+            relationsWithoutActions,
             5,
             (relation) => relation['relatedIntentionId'] = jsonDecode(
-              relationsWithoutChoices[4],
+              relationsWithoutActions[4],
             )['relatedIntentionId'],
           ),
         ),
@@ -378,7 +381,7 @@ void main() {
       'самосвязь': (
         graphExportFileOf(
           withEditedLine(
-            relationsWithoutChoices,
+            relationsWithoutActions,
             4,
             (relation) =>
                 relation['relatedIntentionId'] = relation['sourceIntentionId'],
@@ -387,15 +390,7 @@ void main() {
         (_Detection.replacement, GraphImportFailure.invalidFile),
       ),
       'активная связь с архивированным участником': (
-        edited(12, (relation) => relation['archived'] = false),
-        (_Detection.replacement, GraphImportFailure.invalidFile),
-      ),
-      'путь, который не доходит до выбранного намерения': (
-        edited(
-          14,
-          (choice) => choice['selectedIntentionId'] =
-              '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f12',
-        ),
+        edited(13, (relation) => relation['archived'] = false),
         (_Detection.replacement, GraphImportFailure.invalidFile),
       ),
     };
@@ -549,7 +544,7 @@ void main() {
 
       expect(result, isA<GraphImportFileRead>());
       final file = (result as GraphImportFileRead).file;
-      expect(_countsOf(file.header.counts), [2, 4, 3, 3, 2]);
+      expect(_countsOf(file.header.counts), [2, 4, 1, 3, 3, 1, 3]);
       expect(
         file.header.writtenAt,
         DateTime.utc(2026, 10, 3, 18, 42, 7, 654, 321),
@@ -668,9 +663,11 @@ void main() {
               'counts': {
                 'tags': 1,
                 'intentions': 0,
+                'deletedIntentions': 0,
                 'tagAssignments': 0,
                 'longTermRelations': 0,
-                'dailyChoices': 0,
+                'deletedRelationPairs': 0,
+                'actions': 0,
               },
             }),
             reference[1],
@@ -729,7 +726,7 @@ void main() {
           expect(reading, isA<GraphImportFileRead>());
           final file = (reading as GraphImportFileRead).file;
           expect(file.header.writtenAt, DateTime.utc(2026, 10, 19, 9));
-          expect(_countsOf(file.header.counts), [1, 0, 0, 0, 0]);
+          expect(_countsOf(file.header.counts), [1, 0, 0, 0, 0, 0, 0]);
           expect(await importFile(file), isA<GraphImported>());
           expect(await graphState(), secondLines.skip(1));
         },
@@ -1090,7 +1087,7 @@ void main() {
         awaiting.header.writtenAt,
         DateTime.utc(2026, 10, 3, 18, 42, 7, 654, 321),
       );
-      expect(_countsOf(awaiting.header.counts), [2, 4, 3, 3, 2]);
+      expect(_countsOf(awaiting.header.counts), [2, 4, 1, 3, 3, 1, 3]);
       expect(await storedState(), before);
       controller().confirm();
       expect(await (await started)!.future, isA<GraphImported>());
@@ -1561,9 +1558,11 @@ Future<Set<String>> _fileNamesIn(Directory directory) async => {
 List<int> _countsOf(GraphRecordCounts counts) => [
   counts.tags,
   counts.intentions,
+  counts.deletedIntentions,
   counts.tagAssignments,
   counts.longTermRelations,
-  counts.dailyChoices,
+  counts.deletedRelationPairs,
+  counts.actions,
 ];
 
 List<String> _lines(List<GraphEntityRecord> records) => [

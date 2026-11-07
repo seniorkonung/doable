@@ -3,8 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../l10n/app_localizations.dart';
-import '../../daily_choice/application/daily_choice_day_statuses.dart';
-import '../../daily_choice/domain/calendar_date.dart';
+import '../../action/application/action_day_statuses.dart';
+import '../../shared/domain/calendar_date.dart';
 import '../application/contribution_counts.dart';
 import '../application/intention_statistics_calendar.dart';
 
@@ -105,7 +105,7 @@ final class _Day extends StatelessWidget {
     required this.onDaySelected,
   });
   final CalendarDate date;
-  final DailyChoiceDayStatus? status;
+  final ActionDayStatus? status;
   final ValueChanged<CalendarDate> onDaySelected;
 
   @override
@@ -124,11 +124,11 @@ final class _Day extends StatelessWidget {
         label: texts.statisticsCalendarDaySemantics(
           DateTime.utc(date.year, date.month, date.day),
           switch (status) {
-            DailyChoiceDayStatus.allCompleted =>
+            ActionDayStatus.allCompleted =>
               texts.statisticsCalendarDayAllCompleted,
-            DailyChoiceDayStatus.hasIncomplete =>
+            ActionDayStatus.hasIncomplete =>
               texts.statisticsCalendarDayHasIncomplete,
-            null => texts.statisticsCalendarDayNoChoices,
+            null => texts.statisticsCalendarDayNoActions,
           },
         ),
         child: Column(
@@ -141,8 +141,8 @@ final class _Day extends StatelessWidget {
                 null => null,
                 final status => Icon(
                   switch (status) {
-                    DailyChoiceDayStatus.allCompleted => Icons.check,
-                    DailyChoiceDayStatus.hasIncomplete => Icons.circle_outlined,
+                    ActionDayStatus.allCompleted => Icons.check,
+                    ActionDayStatus.hasIncomplete => Icons.circle_outlined,
                   },
                   size: 16,
                   applyTextScaling: true,

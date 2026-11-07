@@ -1,8 +1,8 @@
 import 'dart:ui' show SemanticsAction, Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/action/application/action_day_statuses.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/statistics/application/contribution_counts.dart';
 import 'package:doable/src/statistics/application/intention_statistics_calendar.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
@@ -24,7 +24,7 @@ void main() {
       for (final (day, status, icon) in [
         (5, texts.statisticsCalendarDayAllCompleted, Icons.check),
         (7, texts.statisticsCalendarDayHasIncomplete, Icons.circle_outlined),
-        (9, texts.statisticsCalendarDayNoChoices, null),
+        (9, texts.statisticsCalendarDayNoActions, null),
       ]) {
         final label = texts.statisticsCalendarDaySemantics(
           DateTime.utc(2026, 10, day),
@@ -159,8 +159,8 @@ void main() {
 IntentionStatisticsMonthCalendar _month() => IntentionStatisticsMonthCalendar(
   period: StatisticsMonth(2026, 10),
   statuses: {
-    CalendarDate.fromParts(2026, 10, 5): DailyChoiceDayStatus.allCompleted,
-    CalendarDate.fromParts(2026, 10, 7): DailyChoiceDayStatus.hasIncomplete,
+    CalendarDate.fromParts(2026, 10, 5): ActionDayStatus.allCompleted,
+    CalendarDate.fromParts(2026, 10, 7): ActionDayStatus.hasIncomplete,
   },
 );
 

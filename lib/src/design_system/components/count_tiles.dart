@@ -69,11 +69,44 @@ final class CountTile<T extends Object> {
   final Key? key;
 }
 
+/// Плитка на всю ширину под сеткой: число и подпись слева, значок в `muted`
+/// справа. Глифа направления и отметки архива у неё нет.
+final class CountTileWide<T extends Object> {
+  const CountTileWide({
+    required this.id,
+    required this.count,
+    required this.name,
+    required this.semanticLabel,
+    required this.icon,
+    this.key,
+  }) : assert(count >= 0);
+
+  final T id;
+  final int count;
+  final String name;
+
+  /// Доступное название плитки: число называет оно.
+  final String semanticLabel;
+  final DoableIconData icon;
+
+  /// Ключ плитки, по которому потребитель находит её в дереве.
+  final Key? key;
+
+  CountTile<T> get _tile => CountTile(
+    id: id,
+    count: count,
+    name: name,
+    semanticLabel: semanticLabel,
+    key: key,
+  );
+}
+
 /// Плитки с числом и подписью в сетке равных колонок; ровно одна плитка
 /// открыта. Открытую плитку хранит потребитель.
 ///
 /// Нажатие на закрытую плитку вызывает [onPick], а на открытую ничего не
-/// делает. Число плиток кратно числу колонок.
+/// делает. Число плиток кратно числу колонок. Необязательная [wide] стоит
+/// под сеткой на всю ширину и входит в ту же радиогруппу.
 final class CountTiles<T extends Object> extends StatelessWidget {
   const CountTiles({
     required this.tiles,
@@ -81,11 +114,15 @@ final class CountTiles<T extends Object> extends StatelessWidget {
     required this.value,
     required this.onPick,
     required this.label,
+    this.wide,
     super.key,
   });
 
   final List<CountTile<T>> tiles;
   final CountTileColumns columns;
+
+  /// Плитка на всю ширину под сеткой.
+  final CountTileWide<T>? wide;
 
   /// Идентификатор открытой плитки.
   final T value;
@@ -97,9 +134,10 @@ final class CountTiles<T extends Object> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final columnCount = columns.count;
+    final ids = [...tiles.map((tile) => tile.id), ?wide?.id];
     assert(tiles.isNotEmpty && tiles.length % columnCount == 0);
-    assert(tiles.map((tile) => tile.id).toSet().length == tiles.length);
-    assert(tiles.any((tile) => tile.id == value));
+    assert(ids.toSet().length == ids.length);
+    assert(ids.contains(value));
     return Semantics(
       container: true,
       explicitChildNodes: true,
@@ -126,6 +164,20 @@ final class CountTiles<T extends Object> extends StatelessWidget {
                 ],
               ),
             ),
+          if (wide case final wide?)
+            Row(
+              children: [
+                Expanded(
+                  child: _Tile(
+                    key: wide.key,
+                    tile: wide._tile,
+                    icon: wide.icon,
+                    open: wide.id == value,
+                    onPick: onPick,
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );
@@ -137,10 +189,14 @@ final class _Tile<T extends Object> extends StatefulWidget {
     required this.tile,
     required this.open,
     required this.onPick,
+    this.icon,
     super.key,
   });
 
   final CountTile<T> tile;
+
+  /// Значок в конце плитки на всю ширину; у плитки сетки его нет.
+  final DoableIconData? icon;
   final bool open;
   final ValueChanged<T> onPick;
 
@@ -178,6 +234,46 @@ final class _TileState<T extends Object> extends State<_Tile<T>> {
         _focused &&
         FocusManager.instance.highlightMode == FocusHighlightMode.traditional;
     final numberColor = tile.count == 0 ? colors.grip : colors.ink;
+
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 2,
+      children: [
+        Row(
+          spacing: 6,
+          children: [
+            Expanded(
+              child: Row(
+                spacing: 6,
+                children: [
+                  Flexible(
+                    child: Text(
+                      '${tile.count}',
+                      style: DoableType.headline.copyWith(
+                        color: numberColor,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                  if (tile.archived)
+                    DoableIcon(
+                      DoableIconData.archive,
+                      size: 14,
+                      color: colors.muted,
+                    ),
+                ],
+              ),
+            ),
+            if (tile.glyph case final glyph?)
+              _DirectionGlyph(glyph: glyph, color: numberColor),
+          ],
+        ),
+        Text(
+          tile.name,
+          style: DoableType.caption.copyWith(color: colors.muted),
+        ),
+      ],
+    );
 
     return MergeSemantics(
       child: Semantics(
@@ -225,49 +321,16 @@ final class _TileState<T extends Object> extends State<_Tile<T>> {
                       DoableMetrics.space3,
                       DoableMetrics.space3,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      spacing: 2,
-                      children: [
-                        Row(
-                          spacing: 6,
-                          children: [
-                            Expanded(
-                              child: Row(
-                                spacing: 6,
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      '${tile.count}',
-                                      style: DoableType.headline.copyWith(
-                                        color: numberColor,
-                                        fontFeatures: const [
-                                          FontFeature.tabularFigures(),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  if (tile.archived)
-                                    DoableIcon(
-                                      DoableIconData.archive,
-                                      size: 14,
-                                      color: colors.muted,
-                                    ),
-                                ],
-                              ),
-                            ),
-                            if (tile.glyph case final glyph?)
-                              _DirectionGlyph(glyph: glyph, color: numberColor),
-                          ],
-                        ),
-                        Text(
-                          tile.name,
-                          style: DoableType.caption.copyWith(
-                            color: colors.muted,
-                          ),
-                        ),
-                      ],
-                    ),
+                    child: switch (widget.icon) {
+                      null => content,
+                      final icon => Row(
+                        spacing: DoableMetrics.space3,
+                        children: [
+                          Expanded(child: content),
+                          DoableIcon(icon, size: 24, color: colors.muted),
+                        ],
+                      ),
+                    },
                   ),
                 ),
               ),

@@ -162,7 +162,7 @@ void main() {
 
   testWidgets('при тексте масштаба 2 длинное название переносится, а '
       'заголовок растёт без переполнения', (tester) async {
-    const title = 'Невыполненные дневные выборы на выбранный день';
+    const title = 'Невыполненные действия на выбранный день';
     await tester.pumpWidget(
       _app(textScale: 2, width: 280, child: _header(title: title, count: 128)),
     );

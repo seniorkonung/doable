@@ -30,12 +30,14 @@ final class RelationBatchPickerPage extends ConsumerStatefulWidget {
     required this.pageIntentionId,
     required this.pageTitle,
     required this.group,
+    this.anchor = const RelationBatchPageAnchor(),
     super.key,
   });
 
   final IntentionId pageIntentionId;
   final String pageTitle;
   final IntentionRelationGroup group;
+  final RelationBatchAnchor anchor;
 
   @override
   ConsumerState<RelationBatchPickerPage> createState() =>
@@ -66,8 +68,11 @@ final class _RelationBatchPickerPageState
     );
     final batch = ref.watch(provider);
     ref.listen(provider, (previous, next) {
-      if (next.operation is RelationBatchAdded &&
-          previous?.operation is! RelationBatchAdded) {
+      if (next.operation case RelationBatchAdded(:final relations)
+          when previous?.operation is! RelationBatchAdded) {
+        if (widget.anchor case RelationBatchPathEndAnchor(:final onAdded)) {
+          onAdded(relations);
+        }
         // removeRoute снимает маршрут по его matchId, что бы ни стояло над ним:
         // https://pub.dev/documentation/auto_route/11.1.0/auto_route/StackRouter/removeRoute.html
         context.router.removeRoute(context.routeData);
@@ -106,6 +111,7 @@ final class _RelationBatchPickerPageState
         purposeDescription: relationBatchPickerPurpose(
           l10n,
           widget.group,
+          widget.anchor,
           provider,
           batch.selected.length,
         ),
@@ -138,6 +144,11 @@ final class _RelationBatchPickerPageState
                       ref
                           .read(provider.notifier)
                           .acceptCreated(id, createdTitle);
+                      if (widget.anchor case RelationBatchPathEndAnchor(
+                        :final onIntentionCreated,
+                      )) {
+                        onIntentionCreated();
+                      }
                       clearTitle();
                     },
                   ),

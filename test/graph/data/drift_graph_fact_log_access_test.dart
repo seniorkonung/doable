@@ -1,9 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show AppDatabase, GraphLogPackagesCompanion, GraphSnapshotsCompanion;
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -26,6 +23,8 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/action_seed.dart'
+    show actionPathRole, insertAction, insertActionPathItem, seedUuid;
 import '../../support/graph_log_completeness_reference.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
@@ -270,7 +269,7 @@ void main() {
       'границами внутри каждой секции и группы намерений с одним временем '
       'создания', () async {
     // По 100 записей в порции границы приходятся на середину секции тегов,
-    // намерений, назначений, связей и дневных выборов. После 149 тегов
+    // намерений, назначений, связей и действий. После 149 тегов
     // граница в секции намерений проходит внутри пары с одним временем
     // создания.
     expect(graphFactLogPortionLimit, 100);
@@ -304,31 +303,23 @@ void main() {
       );
     }
     for (final intention in related) {
-      final relation = (await confirm<LongTermRelationsAdded>(
+      await confirm<LongTermRelationsAdded>(
         AddLongTermRelations(
           pageIntentionId: root.id,
           group: IntentionRelationGroup.needs,
           candidateIds: [intention.id],
         ),
-      )).relations.single;
-      await confirm(
-        CreateDailyChoice(
-          sourceIntentionId: root.id,
-          selectedIntentionId: intention.id,
-          path: ConfirmedChoicePath([
-            ConfirmedChoicePathStep(
-              relationId: relation.id,
-              sourceIntentionId: root.id,
-              type: relation.type,
-              relatedIntentionId: intention.id,
-            ),
-          ]),
-          date: CalendarDate.fromParts(2026, 10, 17),
-          description: null,
-          isCompleted: false,
-        ),
       );
     }
+    await seedGraph(database, () async {
+      for (final (index, intention) in related.indexed) {
+        await insertAction(
+          database,
+          id: seedUuid(5000 + index),
+          path: [root.id.toCanonicalString(), intention.id.toCanonicalString()],
+        );
+      }
+    });
 
     final portions = await readAllRecordPortions();
 
@@ -349,6 +340,88 @@ void main() {
       portions.map((portion) => portion.position),
       everyElement(await repository.readCurrentPosition()),
     );
+    expect(
+      _lines(portions.expand((portion) => portion.records)),
+      _lines(await referenceGraphRecords(database)),
+    );
+  });
+
+  test('надгробия и действия отдаются порциями по ключу и порядку создания '
+      'с границами внутри секций', () async {
+    // 150 удалённых намерений дают 150 надгробий намерений, 150 надгробий пар
+    // и 150 действий: с корнем это 451 запись, и границы порций приходятся
+    // на середину надгробий намерений, надгробий пар с разными первыми
+    // намерениями и действий.
+    expect(graphFactLogPortionLimit, 100);
+    const count = 150;
+    final root = seedUuid(1);
+    String deleted(int index) => seedUuid(1000 + index);
+    await seedGraph(database, () async {
+      Future<void> write(String sql, List<Object?> arguments) =>
+          database.customStatement(sql, arguments);
+      await write(
+        'INSERT INTO intentions (id, title, created_at, updated_at) '
+        "VALUES (?, 'Корень', 1, 1)",
+        [root],
+      );
+      for (var index = 0; index < count; index++) {
+        final path = index % 5 == 0
+            ? [root, deleted(index)]
+            : [deleted(index), root];
+        await write(
+          'INSERT INTO intentions (id, title, created_at, updated_at) '
+          'VALUES (?, ?, 1, 1)',
+          [deleted(index), 'Намерение $index'],
+        );
+        await write(
+          'INSERT INTO long_term_relations (id, source_intention_id, '
+          'related_intention_id, type, priority, created_at, updated_at) '
+          "VALUES (?, ?, ?, 'need', 1, 1, 1)",
+          [seedUuid(3000 + index), path.first, path.last],
+        );
+        await write(
+          'INSERT INTO actions (id, title, date, priority, is_completed, '
+          "created_at, updated_at) VALUES (?, ?, '2026-10-17', 4, 0, 1, 1)",
+          [seedUuid(5000 + index), 'Действие $index'],
+        );
+        for (final (position, intention) in path.indexed) {
+          await write(insertActionPathItem, [
+            seedUuid(5000 + index),
+            position,
+            intention,
+            position == 0 ? null : path.first,
+            actionPathRole(position, path.length),
+          ]);
+        }
+      }
+      // Удаление в обратном порядке расходится с порядком ключей.
+      await write('DELETE FROM long_term_relations', []);
+      for (var index = count - 1; index >= 0; index--) {
+        await write('DELETE FROM intentions WHERE id = ?', [deleted(index)]);
+      }
+    });
+
+    final portions = await readAllRecordPortions();
+
+    expect(portions.map((portion) => portion.records.length), [
+      100,
+      100,
+      100,
+      100,
+      51,
+    ]);
+    expect(portions[1].records.first, isA<DeletedIntentionRecord>());
+    expect(
+      [portions[1].records.last, portions[2].records.first],
+      everyElement(
+        isA<DeletedRelationPairRecord>().having(
+          (pair) => pair.relatedIntentionId.toCanonicalString(),
+          'второе намерение',
+          root,
+        ),
+      ),
+    );
+    expect(portions[4].records.first, isA<ActionRecord>());
     expect(
       _lines(portions.expand((portion) => portion.records)),
       _lines(await referenceGraphRecords(database)),

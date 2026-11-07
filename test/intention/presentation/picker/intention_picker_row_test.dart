@@ -9,9 +9,6 @@ import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
-import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_row.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
@@ -20,7 +17,6 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter/material.dart' hide Badge;
 import 'package:flutter_test/flutter_test.dart';
 
-import '../catalog/catalog_test_support.dart';
 import '../../../support/intention_description_preview.dart';
 import '../../../support/tag_positions.dart';
 import '../../../support/intention_title_order_key.dart';
@@ -49,15 +45,20 @@ void main() {
         _tag(6, 'Привычки'),
       ],
     );
-    final purpose = SelectDailyChoiceAction(session: IntentionSearchSession());
 
-    for (final (locale, tagsLabel) in const [
-      (Locale('ru'), 'Теги: Утро, Спорт, Здоровье, Сила, Дом, Привычки'),
-      (Locale('en'), 'Tags: Утро, Спорт, Здоровье, Сила, Дом, Привычки'),
+    for (final (locale, kind, tagsLabel) in const [
+      (
+        Locale('ru'),
+        'действие',
+        'Теги: Утро, Спорт, Здоровье, Сила, Дом, Привычки',
+      ),
+      (
+        Locale('en'),
+        'action',
+        'Tags: Утро, Спорт, Здоровье, Сила, Дом, Привычки',
+      ),
     ]) {
-      await tester.pumpWidget(
-        _app(locale: locale, purpose: purpose, summary: summary),
-      );
+      await tester.pumpWidget(_app(locale: locale, summary: summary));
 
       expect(find.text('Сделать силовую тренировку'), findsOneWidget);
       expect(find.text(preview), findsOneWidget);
@@ -70,7 +71,7 @@ void main() {
       );
       expect(
         find.bySemanticsLabel(
-          'Сделать силовую тренировку, $preview, $tagsLabel',
+          'Сделать силовую тренировку, $kind, $preview, $tagsLabel',
         ),
         findsOneWidget,
       );
@@ -78,64 +79,42 @@ void main() {
     semantics.dispose();
   });
 
-  for (final (search, purpose) in [
-    (
-      'исходного намерения',
-      SelectDailyChoiceSource(session: IntentionSearchSession()),
-    ),
-    (
-      'участника',
-      SelectRelationParticipant(
-        session: IntentionSearchSession(),
-        pairProbe: RelationPairProbe(
-          counterpartId: testSummary(index: 999).id,
-          candidateRole: RelationParticipantRole.related,
-        ),
+  testWidgets('молния и доступное название отличают '
+      'действие от намерения на двух языках', (tester) async {
+    final semantics = tester.ensureSemantics();
+
+    for (final (locale, intention, action) in const [
+      (
+        Locale('ru'),
+        'Быть здоровым, намерение, Без тегов',
+        'Пройти пешком до парка, действие, Без тегов',
       ),
-    ),
-  ]) {
-    testWidgets('в поиске $search молния и доступное название отличают '
-        'действие от намерения на двух языках', (tester) async {
-      final semantics = tester.ensureSemantics();
-
-      for (final (locale, intention, action) in const [
-        (
-          Locale('ru'),
-          'Быть здоровым, намерение, Без тегов',
-          'Пройти пешком до парка, действие, Без тегов',
-        ),
-        (
-          Locale('en'),
-          'Быть здоровым, intention, No tags',
-          'Пройти пешком до парка, action, No tags',
-        ),
-      ]) {
-        await tester.pumpWidget(
-          _app(
-            locale: locale,
-            purpose: purpose,
-            summary: _summary(
-              'Быть здоровым',
-              readiness: IntentionReadiness.notReady,
-            ),
+      (
+        Locale('en'),
+        'Быть здоровым, intention, No tags',
+        'Пройти пешком до парка, action, No tags',
+      ),
+    ]) {
+      await tester.pumpWidget(
+        _app(
+          locale: locale,
+          summary: _summary(
+            'Быть здоровым',
+            readiness: IntentionReadiness.notReady,
           ),
-        );
-        expect(_marks(tester), isEmpty);
-        expect(find.bySemanticsLabel(intention), findsOneWidget);
+        ),
+      );
+      expect(_marks(tester), isEmpty);
+      expect(find.bySemanticsLabel(intention), findsOneWidget);
 
-        await tester.pumpWidget(
-          _app(
-            locale: locale,
-            purpose: purpose,
-            summary: _summary('Пройти пешком до парка'),
-          ),
-        );
-        expect(_marks(tester), [(DoableIconData.bolt, BadgeTone.ink)]);
-        expect(find.bySemanticsLabel(action), findsOneWidget);
-      }
-      semantics.dispose();
-    });
-  }
+      await tester.pumpWidget(
+        _app(locale: locale, summary: _summary('Пройти пешком до парка')),
+      );
+      expect(_marks(tester), [(DoableIconData.bolt, BadgeTone.ink)]);
+      expect(find.bySemanticsLabel(action), findsOneWidget);
+    }
+    semantics.dispose();
+  });
 
   testWidgets('теги из фильтра стоят первыми и выделены, а цвет тега '
       'сохраняется', (tester) async {
@@ -144,7 +123,6 @@ void main() {
 
     await tester.pumpWidget(
       _app(
-        purpose: SelectDailyChoiceAction(session: IntentionSearchSession()),
         summary: _summary(
           'Бегать по утрам',
           tags: [_tag(1, 'Утро'), _tag(2, 'Спорт'), health],
@@ -165,7 +143,9 @@ void main() {
       ],
     );
     expect(
-      find.bySemanticsLabel('Бегать по утрам, Теги: Здоровье, Утро, Спорт'),
+      find.bySemanticsLabel(
+        'Бегать по утрам, действие, Теги: Здоровье, Утро, Спорт',
+      ),
       findsOneWidget,
     );
     semantics.dispose();
@@ -180,13 +160,13 @@ void main() {
     for (final (locale, label, actionPage, intentionPage) in const [
       (
         Locale('ru'),
-        'Бегать по утрам, Без тегов',
+        'Бегать по утрам, действие, Без тегов',
         'Открыть страницу действия «Бегать по утрам»',
         'Открыть страницу намерения «Быть здоровым»',
       ),
       (
         Locale('en'),
-        'Бегать по утрам, No tags',
+        'Бегать по утрам, action, No tags',
         'Open the page of action Бегать по утрам',
         'Open the page of intention Быть здоровым',
       ),
@@ -194,7 +174,6 @@ void main() {
       await tester.pumpWidget(
         _app(
           locale: locale,
-          purpose: SelectDailyChoiceAction(session: IntentionSearchSession()),
           summary: _summary('Бегать по утрам'),
           onPick: () => picks++,
           onOpenPage: () => pageOpenings++,
@@ -211,7 +190,6 @@ void main() {
       await tester.pumpWidget(
         _app(
           locale: locale,
-          purpose: SelectDailyChoiceSource(session: IntentionSearchSession()),
           summary: _summary(
             'Быть здоровым',
             readiness: IntentionReadiness.notReady,
@@ -259,7 +237,6 @@ Tag _tag(int number, String name, {TagColor? color}) => Tag(
 );
 
 Widget _app({
-  required IntentionPickerPurpose purpose,
   required IntentionSummary summary,
   Locale locale = const Locale('ru'),
   Set<TagId> requiredTagIds = const {},
@@ -275,7 +252,6 @@ Widget _app({
       child: SizedBox(
         width: 300,
         child: IntentionPickerRow(
-          purpose: purpose,
           summary: summary,
           requiredTagIds: requiredTagIds,
           onPick: onPick ?? () {},

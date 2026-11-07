@@ -1,9 +1,11 @@
 import 'dart:convert';
 
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/action/domain/action.dart';
+import 'package:doable/src/action/domain/action_id.dart';
+import 'package:doable/src/action/domain/action_path.dart';
+import 'package:doable/src/action/domain/action_priority.dart';
+import 'package:doable/src/action/domain/action_schedule.dart';
+import 'package:doable/src/action/domain/action_text.dart';
 import 'package:doable/src/graph_format/graph_format_codec.dart';
 import 'package:doable/src/graph_format/graph_format_records.dart';
 import 'package:doable/src/graph_snapshots/graph_state_assembly.dart';
@@ -11,6 +13,7 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_id.dart';
@@ -37,7 +40,7 @@ void main() {
       final health = _intention(1, 'Здоровье', createdAt: _morning);
       final running = _intention(2, 'Бегать', createdAt: _morning.add(_minute));
       final needRunning = _relation(1, from: 1, to: 2);
-      final choice = _dailyChoice(1, from: 1, to: 2, through: 1);
+      final jogging = _action(1, 'Пробежка', path: [1, 2]);
       final sport = _tag(2, 'Спорт');
       final swimming = _intention(3, 'Плавать', createdAt: _evening);
       final canSwim = _relation(2, from: 1, to: 3);
@@ -51,7 +54,7 @@ void main() {
             running,
             _assignment(tag: 1, intention: 2),
             needRunning,
-            choice,
+            jogging,
           ]),
         ),
         Stream.fromIterable([
@@ -73,7 +76,7 @@ void main() {
         intentions: 3,
         tagAssignments: 3,
         longTermRelations: 2,
-        dailyChoices: 1,
+        actions: 1,
       ));
       expect(_lines(await state.records.toList()), [
         ..._lines([home, sport, health, running, swimming]),
@@ -82,7 +85,7 @@ void main() {
           _assignment(tag: 2, intention: 3),
           _assignment(tag: 1, intention: 3),
         ]),
-        ..._lines([needRunning, canSwim, choice]),
+        ..._lines([needRunning, canSwim, jogging]),
       ]);
     });
 
@@ -106,7 +109,7 @@ void main() {
         intentions: 1,
         tagAssignments: 1,
         longTermRelations: 0,
-        dailyChoices: 0,
+        actions: 0,
       ));
       expect(_lines(await state.records.toList()), _lines(base));
     });
@@ -170,7 +173,7 @@ void main() {
         intentions: 3,
         tagAssignments: 0,
         longTermRelations: 3,
-        dailyChoices: 0,
+        actions: 0,
       ));
       expect(
         _lines(await state.records.toList()),
@@ -225,7 +228,7 @@ void main() {
         intentions: 0,
         tagAssignments: 0,
         longTermRelations: 0,
-        dailyChoices: 0,
+        actions: 0,
       ));
       expect(
         _lines(await state.records.toList()),
@@ -266,7 +269,7 @@ void main() {
         intentions: 1,
         tagAssignments: 1,
         longTermRelations: 0,
-        dailyChoices: 0,
+        actions: 0,
       ));
       expect(
         _lines(await state.records.toList()),
@@ -308,7 +311,7 @@ void main() {
         intentions: 2,
         tagAssignments: 2,
         longTermRelations: 0,
-        dailyChoices: 0,
+        actions: 0,
       ));
       expect(
         _lines(await state.records.toList()),
@@ -362,7 +365,7 @@ void main() {
         intentions: 3,
         tagAssignments: 3,
         longTermRelations: 0,
-        dailyChoices: 0,
+        actions: 0,
       ));
       expect(
         _lines(await state.records.toList()),
@@ -428,6 +431,59 @@ void main() {
       );
     });
 
+    test('созданные надгробия встают по ключу между надгробиями базы, '
+        'созданные действия — после действий базы', () async {
+      final state = await GraphStateAssembly.assemble(
+        GraphStateBase(
+          position: 3,
+          readRecords: () => Stream.fromIterable([
+            _deletedIntention(2),
+            _deletedIntention(4),
+            _deletedPair(from: 1, to: 3),
+            _deletedPair(from: 3, to: 1),
+            _action(2, 'Размяться', path: [3]),
+          ]),
+        ),
+        Stream.fromIterable([
+          GraphFactPackage(
+            position: 4,
+            facts: [
+              GraphEntityCreated(_deletedIntention(3)),
+              GraphEntityCreated(_deletedIntention(1)),
+              GraphEntityDeleted(DeletedIntentionKey(_intentionId(4))),
+              GraphEntityCreated(_deletedPair(from: 2, to: 1)),
+              GraphEntityCreated(_deletedPair(from: 1, to: 2)),
+              GraphEntityCreated(_action(1, 'Пробежка', path: [1, 2])),
+              GraphEntityChanged(_action(2, 'Разминка', path: [3])),
+            ],
+          ),
+        ]),
+      );
+
+      expect(
+        [
+          state.counts.deletedIntentions,
+          state.counts.deletedRelationPairs,
+          state.counts.actions,
+        ],
+        [3, 4, 2],
+      );
+      expect(
+        _lines(await state.records.toList()),
+        _lines([
+          _deletedIntention(1),
+          _deletedIntention(2),
+          _deletedIntention(3),
+          _deletedPair(from: 1, to: 2),
+          _deletedPair(from: 1, to: 3),
+          _deletedPair(from: 2, to: 1),
+          _deletedPair(from: 3, to: 1),
+          _action(2, 'Разминка', path: [3]),
+          _action(1, 'Пробежка', path: [1, 2]),
+        ]),
+      );
+    });
+
     test('записи базового состояния выдаются по мере чтения, не дожидаясь '
         'его конца', () async {
       const tagCount = 100000;
@@ -455,7 +511,7 @@ const _noCounts = (
   intentions: 0,
   tagAssignments: 0,
   longTermRelations: 0,
-  dailyChoices: 0,
+  actions: 0,
 );
 
 typedef _Counts = ({
@@ -463,7 +519,7 @@ typedef _Counts = ({
   int intentions,
   int tagAssignments,
   int longTermRelations,
-  int dailyChoices,
+  int actions,
 });
 
 _Counts _counts(GraphRecordCounts counts) => (
@@ -471,7 +527,7 @@ _Counts _counts(GraphRecordCounts counts) => (
   intentions: counts.intentions,
   tagAssignments: counts.tagAssignments,
   longTermRelations: counts.longTermRelations,
-  dailyChoices: counts.dailyChoices,
+  actions: counts.actions,
 );
 
 /// Кодирование каноническое и передаёт каждое поле, поэтому совпадение строк
@@ -543,32 +599,33 @@ LongTermRelationRecord _relation(
   updatedAt: RelationTimestamp(DateTime.utc(2026, 10, 17, 9)),
 );
 
-DailyChoiceRecord _dailyChoice(
-  int number, {
-  required int from,
-  required int to,
-  required int through,
-}) {
-  final id = _dailyChoiceId(number);
-  return DailyChoiceRecord(
-    choice: DailyChoice(
-      id: id,
+DeletedIntentionRecord _deletedIntention(int number) => DeletedIntentionRecord(
+  id: _intentionId(number),
+  title: 'Удалённое $number',
+);
+
+DeletedRelationPairRecord _deletedPair({required int from, required int to}) =>
+    DeletedRelationPairRecord(
       sourceIntentionId: _intentionId(from),
-      selectedIntentionId: _intentionId(to),
-      date: CalendarDate.fromParts(2026, 10, 2),
+      relatedIntentionId: _intentionId(to),
+      type: LongTermRelationType.can,
+    );
+
+ActionRecord _action(int number, String title, {required List<int> path}) =>
+    ActionRecord(
+      id: (ActionId.decode(
+        _uuid('5e6f7a8b', number),
+      ) as ActionIdDecodingSuccess).id,
+      title: ActionTitle(title),
       description: null,
+      path: ActionPath([for (final intention in path) _intentionId(intention)]),
+      date: CalendarDate.fromParts(2026, 10, 2),
+      schedule: const ActionAllDay(),
+      priority: ActionPriority.p4,
       isCompleted: false,
-    ),
-    path: StoredChoicePath([
-      ChoicePathStep(
-        id: _stepId(number),
-        dailyChoiceId: id,
-        relationId: _relationId(through),
-        previousStepId: null,
-      ),
-    ]),
-  );
-}
+      createdAt: ActionTimestamp(_morning),
+      updatedAt: ActionTimestamp(_morning),
+    );
 
 TagId _tagId(int number) =>
     (TagId.decode(_uuid('7b0e2f4c', number)) as TagIdDecodingSuccess).id;
@@ -580,14 +637,6 @@ IntentionId _intentionId(int number) => (IntentionId.decode(
 LongTermRelationId _relationId(int number) => (LongTermRelationId.decode(
   _uuid('2a3b4c5d', number),
 ) as LongTermRelationIdDecodingSuccess).id;
-
-DailyChoiceId _dailyChoiceId(int number) => (DailyChoiceId.decode(
-  _uuid('3c4d5e6f', number),
-) as DailyChoiceIdDecodingSuccess).id;
-
-ChoicePathStepId _stepId(int number) => (ChoicePathStepId.decode(
-  _uuid('4d5e6f7a', number),
-) as ChoicePathStepIdDecodingSuccess).id;
 
 /// Идентификаторы с одним префиксом упорядочены по [number].
 String _uuid(String prefix, int number) =>

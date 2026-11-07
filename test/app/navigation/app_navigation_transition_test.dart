@@ -37,21 +37,15 @@ void main() {
       addTearDown(tester.view.reset);
       final router = await _start(tester);
       final rect = tester.getRect(_bar);
-      var mode = QuickCreationMode.intention;
+      const mode = QuickCreationMode.intention;
 
       for (final title in ['Первая страница', 'Вторая страница']) {
         unawaited(router.pushNativeRoute<void>(_ordinary(title)));
         await _expectStationaryFrames(tester, rect, mode: mode);
         await tester.longPress(quickCreationAction());
         await tester.pumpAndSettle();
-        final nextTitle = title == 'Первая страница'
-            ? 'Новый дневной выбор'
-            : 'Новое намерение';
-        await tester.tap(find.widgetWithText(OptionRow, nextTitle));
+        await tester.tap(find.widgetWithText(OptionRow, 'Новое намерение'));
         await tester.pumpAndSettle();
-        mode = title == 'Первая страница'
-            ? QuickCreationMode.dailyChoice
-            : QuickCreationMode.intention;
         expect(tester.getRect(_bar), rect);
       }
       if (platform == TargetPlatform.iOS) {

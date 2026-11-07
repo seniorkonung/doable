@@ -6,7 +6,7 @@ sealed class GraphChangeSummary {
   const GraphChangeSummary();
 }
 
-/// Числа намерений, тегов, долговременных связей и дневных выборов, которые
+/// Числа намерений, тегов, долговременных связей и действий, которые
 /// добавлены, изменены и удалены между позициями.
 final class GraphChangeCounts extends GraphChangeSummary {
   const GraphChangeCounts({
@@ -95,21 +95,26 @@ final class GraphChangeTally {
   }
 
   /// Первый факт сущности говорит, была ли она до диапазона, последний — есть
-  /// ли она после.
+  /// ли она после. Надгробия удалённых намерений и пар не сущности сводки:
+  /// их факты следуют за удалением самой сущности и не меняют действия,
+  /// чьи пути на них ссылаются.
   void _note(
     GraphEntityKey entity, {
     required bool existed,
     required bool exists,
   }) {
-    if (entity case TagAssignmentKey(:final assignment)) {
-      _reassigned.add(IntentionKey(assignment.intentionId));
-      return;
+    switch (entity) {
+      case DeletedIntentionKey() || DeletedRelationPairKey():
+        return;
+      case TagAssignmentKey(:final assignment):
+        _reassigned.add(IntentionKey(assignment.intentionId));
+      case TagKey() || IntentionKey() || LongTermRelationKey() || ActionKey():
+        _presences.update(
+          entity,
+          (presence) => (existed: presence.existed, exists: exists),
+          ifAbsent: () => (existed: existed, exists: exists),
+        );
     }
-    _presences.update(
-      entity,
-      (presence) => (existed: presence.existed, exists: exists),
-      ifAbsent: () => (existed: existed, exists: exists),
-    );
   }
 
   /// Сводка учтённых пакетов. Сущность, которая была и есть, изменена, даже

@@ -18,3 +18,13 @@ final class IntentionCreationForSearch extends IntentionCreationLaunch {
   final String initialTitle;
   final void Function(IntentionId id, String title) onCreated;
 }
+
+final class IntentionCreationForPathStart extends IntentionCreationLaunch {
+  const IntentionCreationForPathStart({
+    required this.initialTitle,
+    required this.onCreated,
+  });
+
+  final String initialTitle;
+  final void Function(IntentionId id) onCreated;
+}

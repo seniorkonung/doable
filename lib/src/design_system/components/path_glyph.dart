@@ -5,8 +5,9 @@ import 'package:flutter/material.dart';
 import 'relation_stroke.dart';
 
 /// Форма глифа пути: ромб — исходное намерение связи, кольцо — связанное,
-/// круг — выбранное действие.
-enum PathGlyphShape { diamond, ring, circle }
+/// круг — выбранное действие, жирное кольцо — конечное намерение сохранённого
+/// пути.
+enum PathGlyphShape { diamond, ring, circle, finalRing }
 
 /// Контур глифа: сплошной — место заполнено, пунктирный — ещё не выбрано.
 enum PathGlyphOutline { solid, dashed }
@@ -49,6 +50,7 @@ final class _PathGlyphPainter extends CustomPainter {
   static const double _grid = 14;
   static const Offset _center = Offset(_grid / 2, _grid / 2);
   static const double _outlineWidth = 1.5;
+  static const double _finalOutlineWidth = 2;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -76,7 +78,9 @@ final class _PathGlyphPainter extends CustomPainter {
         );
       // Пунктирная окружность одна: внешний диаметр и у кольца, и у круга — 12.
       case (
-        PathGlyphShape.ring || PathGlyphShape.circle,
+        PathGlyphShape.ring ||
+            PathGlyphShape.circle ||
+            PathGlyphShape.finalRing,
         PathGlyphOutline.dashed,
       ):
         // Окружность — многоугольник из 72 сторон: Skia измеряет конические
@@ -118,6 +122,15 @@ final class _PathGlyphPainter extends CustomPainter {
           paint
             ..style = PaintingStyle.stroke
             ..strokeWidth = _outlineWidth * scale,
+        );
+      case (PathGlyphShape.finalRing, PathGlyphOutline.solid):
+        // Кольцо 10 с обводкой 2 внутрь границы.
+        canvas.drawCircle(
+          _center * scale,
+          (5 - _finalOutlineWidth / 2) * scale,
+          paint
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = _finalOutlineWidth * scale,
         );
       case (PathGlyphShape.circle, PathGlyphOutline.solid):
         // Круг диаметром 12.

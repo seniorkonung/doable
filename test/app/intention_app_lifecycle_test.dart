@@ -1,11 +1,5 @@
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
-import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
-
-import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/design_system/components/option_tiles.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
@@ -46,6 +40,7 @@ import '../support/intention_type_counts.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/intention_options.dart';
 import '../support/tag_read_contract_test_fallback.dart';
+import '../support/action_read_contract_test_fallback.dart';
 import '../support/statistics_read_contract_test_fallback.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/quick_creation.dart';
@@ -759,7 +754,10 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
 }
 
 final class _DelayedPersonalGraphRepository
-    with StatisticsReadContractTestFallback, TagReadContractTestFallback
+    with
+        ActionReadContractTestFallback,
+        StatisticsReadContractTestFallback,
+        TagReadContractTestFallback
     implements PersonalGraphRepository {
   /// Панель тегов над панелью создания показывает пустой каталог и строку
   /// создания по запросу.
@@ -767,30 +765,6 @@ final class _DelayedPersonalGraphRepository
   Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) async =>
       TagCatalogSuccess(
         TagCatalogSnapshot(items: const [], revision: const _Revision(0)),
-      );
-
-  @override
-  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
-    DailyChoiceDayStatusQuery query,
-  ) => throw UnsupportedError(
-    'Чтение состояний дней не используется в этом тесте.',
-  );
-
-  @override
-  Future<ChoicePathContinuationResult> getChoicePathContinuations(
-    ChoicePathContinuationQuery query,
-  ) => throw UnimplementedError();
-
-  @override
-  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Чтение дневного выбора не используется этим тестом.',
-      );
-
-  @override
-  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Наблюдение дневного выбора не используется этим тестом.',
       );
 
   RelationCounts _countsFor(IntentionId id) => RelationCounts(
@@ -824,15 +798,8 @@ final class _DelayedPersonalGraphRepository
   }
 
   @override
-  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
-    DailyChoiceCatalogQuery query,
-  ) => throw UnsupportedError(
-    'Каталог дневных выборов не используется в этом тесте.',
-  );
-
-  @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) => Future.value(
     GraphResultSuccess(
       RelationGroupFirstPage(

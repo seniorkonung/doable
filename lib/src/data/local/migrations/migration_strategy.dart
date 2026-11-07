@@ -51,7 +51,7 @@ MigrationStrategy localDataMigrationStrategy(
             detectedSchemaVersion: from,
           );
         }
-        // Схема 7 — базовая версия без путей обновления: меньший маркер
+        // Схема 8 — базовая версия без путей обновления: меньший маркер
         // оставили предварительные сборки или повреждение.
         throw const CorruptLocalDataSchemaException();
       },

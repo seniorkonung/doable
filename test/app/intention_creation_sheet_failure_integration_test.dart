@@ -334,8 +334,8 @@ Map<String, List<List<Object?>>> _storedGraph(sqlite.Database raw) => {
     'tags',
     'tag_assignments',
     'long_term_relations',
-    'daily_choices',
-    'daily_choice_path_steps',
+    'actions',
+    'action_path_items',
   ])
     table: [
       for (final row in raw.select('SELECT * FROM $table ORDER BY rowid'))

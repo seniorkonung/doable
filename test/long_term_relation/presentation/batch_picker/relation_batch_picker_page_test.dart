@@ -6,8 +6,6 @@ import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
-import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tag;
 import 'package:doable/src/design_system/components/catalog_header.dart';
 import 'package:doable/src/design_system/components/docked_footer.dart';
@@ -1450,36 +1448,6 @@ void main() {
     );
   }
 
-  testWidgets('со страницы действия над поиском доступны оба направления '
-      'создания дневного выбора', (tester) async {
-    await seedGraph(database, () async {
-      await (database.update(database.intentions)
-            ..where((row) => row.id.equals(_uuid(5))))
-          .write(const IntentionsCompanion(isActionReady: Value(true)));
-    });
-    await open(tester, IntentionRelationGroup.needs);
-    await openRowPage(tester, 'Гулять');
-    await tester.tap(find.text('Выборы').first);
-    await tester.pumpAndSettle();
-    for (final (role, direction) in [
-      ('source', ChoicePathDraftDirection.topDown),
-      ('selected', ChoicePathDraftDirection.bottomUp),
-    ]) {
-      await tester.tap(find.byKey(ValueKey('intention-choices-role-$role')));
-      await tester.pumpAndSettle();
-      final add = find.byKey(const ValueKey('intention-choices-add'));
-      await tester.ensureVisible(add);
-      await tester.tap(add);
-      await tester.pumpAndSettle();
-      expect(
-        tester.widget<ChoicePathPage>(find.byType(ChoicePathPage)).direction,
-        direction,
-      );
-      await router.maybePop();
-      await tester.pumpAndSettle();
-    }
-  });
-
   testWidgets('пункт панели закрывает поиск с отметкой без отправки пачки', (
     tester,
   ) async {
@@ -1895,7 +1863,6 @@ void _expectNoCommands(
   expect(repository.tagCommands, hasLength(tagCommands));
   expect(repository.commands, isEmpty);
   expect(repository.relationCommands, isEmpty);
-  expect(repository.dailyChoiceCommands, isEmpty);
 }
 
 Result<IntentionCatalogFirstPage> _page(

@@ -90,8 +90,8 @@ void main() {
       'intentions',
       'intention_titles_fts',
       'long_term_relations',
-      'daily_choices',
-      'daily_choice_path_steps',
+      'actions',
+      'action_path_items',
       'tags',
       'tag_assignments',
     ])
@@ -135,8 +135,8 @@ void main() {
     ];
     final otherGraph = [
       rows('long_term_relations'),
-      rows('daily_choices'),
-      rows('daily_choice_path_steps'),
+      rows('actions'),
+      rows('action_path_items'),
     ];
 
     await expectCompleteAssignments(_intention(4));
@@ -156,8 +156,8 @@ void main() {
     expect(rows('tags'), tagsBefore);
     expect([
       rows('long_term_relations'),
-      rows('daily_choices'),
-      rows('daily_choice_path_steps'),
+      rows('actions'),
+      rows('action_path_items'),
     ], otherGraph);
 
     expect(
@@ -188,8 +188,8 @@ void main() {
       final intentionsBefore = rows('intentions');
       final tagsBefore = rows('tags');
       final assignmentsBefore = rows('tag_assignments');
-      final dailyChoicesBefore = rows('daily_choices');
-      final pathBefore = rows('daily_choice_path_steps');
+      final actionsBefore = rows('actions');
+      final pathBefore = rows('action_path_items');
 
       await expectCompleteAssignments(_intention(4));
       expect(
@@ -205,8 +205,8 @@ void main() {
       expect(rows('tag_assignments'), assignmentsBefore);
       expect(rows('intentions'), intentionsBefore);
       expect(rows('tags'), tagsBefore);
-      expect(rows('daily_choices'), dailyChoicesBefore);
-      expect(rows('daily_choice_path_steps'), pathBefore);
+      expect(rows('actions'), actionsBefore);
+      expect(rows('action_path_items'), pathBefore);
 
       await expectCompleteAssignments(_intention(2));
       expect(
@@ -222,14 +222,14 @@ void main() {
       expect(rows('tags'), tagsBefore);
       expect(rows('tag_assignments'), assignmentsBefore);
       expect(rows('intentions'), intentionsBefore);
-      expect(rows('daily_choices'), dailyChoicesBefore);
-      expect(rows('daily_choice_path_steps'), pathBefore);
+      expect(rows('actions'), actionsBefore);
+      expect(rows('action_path_items'), pathBefore);
       expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
     },
   );
 
   test(
-    'зависимости намерения и шаг пути блокируют удаление вместе с назначениями',
+    'связи намерения блокируют его удаление вместе с назначениями',
     () async {
       final before = graph();
 
@@ -244,15 +244,6 @@ void main() {
       expect(
         (archived as ResultFailure).failure,
         isA<IntentionHasBlockingRelationsFailure>(),
-      );
-      expect(graph(), before);
-
-      final relation = await repository.execute(
-        DeleteLongTermRelation(_relation(101)),
-      );
-      expect(
-        (relation as GraphCommandFailed).failure,
-        isA<LongTermRelationReferencedByDailyPathFailure>(),
       );
       expect(graph(), before);
     },

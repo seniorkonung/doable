@@ -1,120 +1,63 @@
-import '../../daily_choice/domain/daily_choice.dart';
+import '../../action/domain/action.dart';
 import '../../intention/domain/intention_id.dart';
 import '../../long_term_relation/application/relation_counts.dart';
-import '../../long_term_relation/application/long_term_relation_permissions.dart';
 import '../../long_term_relation/domain/long_term_relation.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
 import 'graph_revision.dart';
 
-enum DailyChoiceChangeValidationFailure {
-  missingChoice,
-  identityMismatch,
-  invalidPathDelta,
-  missingCounts,
-  missingPermissions,
-  unconfirmedPermissions,
+/// Изменение действия одной ревизии графа с состоянием до и после, по
+/// которому потребители находят затронутые даты и намерения пути.
+sealed class ActionChange implements GraphChange {
+  const ActionChange();
+
+  Action? get before;
+  Action? get after;
 }
 
-final class DailyChoiceChangeValidationException implements Exception {
-  const DailyChoiceChangeValidationException(this.failure);
-
-  final DailyChoiceChangeValidationFailure failure;
+final class ActionCreatedChange extends ActionChange {
+  const ActionCreatedChange({required this.revision, required this.action});
+  @override
+  final GraphRevision revision;
+  final Action action;
+  @override
+  Action? get before => null;
+  @override
+  Action get after => action;
 }
 
-/// Изменение выбора и подтверждённые зависимости одной ревизии графа.
-final class DailyChoiceChange implements GraphChange {
-  factory DailyChoiceChange({
-    required GraphRevision revision,
-    required DailyChoice? before,
-    required DailyChoice? after,
-    required Iterable<LongTermRelationId> releasedRelationIds,
-    required Iterable<LongTermRelationId> occupiedRelationIds,
-    required Map<IntentionId, RelationCounts> intentionCounts,
-    required Map<LongTermRelationId, LongTermRelationPermissions>
-    relationPermissions,
-  }) {
-    if (before == null && after == null) {
-      throw const DailyChoiceChangeValidationException(
-        DailyChoiceChangeValidationFailure.missingChoice,
-      );
-    }
-    if (before != null && after != null && before.id != after.id) {
-      throw const DailyChoiceChangeValidationException(
-        DailyChoiceChangeValidationFailure.identityMismatch,
-      );
-    }
-    final released = Set<LongTermRelationId>.unmodifiable(releasedRelationIds);
-    final occupied = Set<LongTermRelationId>.unmodifiable(occupiedRelationIds);
-    if ((before == null && released.isNotEmpty) ||
-        (after == null && occupied.isNotEmpty) ||
-        (before == null && occupied.isEmpty) ||
-        (after == null && released.isEmpty)) {
-      throw const DailyChoiceChangeValidationException(
-        DailyChoiceChangeValidationFailure.invalidPathDelta,
-      );
-    }
-    final counts = Map<IntentionId, RelationCounts>.unmodifiable(
-      intentionCounts,
-    );
-    if (!counts.keys.toSet().containsAll({
-      ..._participants(before),
-      ..._participants(after),
-    })) {
-      throw const DailyChoiceChangeValidationException(
-        DailyChoiceChangeValidationFailure.missingCounts,
-      );
-    }
-    final permissions =
-        Map<LongTermRelationId, LongTermRelationPermissions>.unmodifiable(
-          relationPermissions,
-        );
-    if (!permissions.keys.toSet().containsAll({...released, ...occupied})) {
-      throw const DailyChoiceChangeValidationException(
-        DailyChoiceChangeValidationFailure.missingPermissions,
-      );
-    }
-    if (permissions.values.any((permission) => !permission.isConfirmed)) {
-      throw const DailyChoiceChangeValidationException(
-        DailyChoiceChangeValidationFailure.unconfirmedPermissions,
-      );
-    }
-    return DailyChoiceChange._(
-      revision: revision,
-      before: before,
-      after: after,
-      releasedRelationIds: released,
-      occupiedRelationIds: occupied,
-      intentionCounts: counts,
-      relationPermissions: permissions,
-    );
-  }
-
-  const DailyChoiceChange._({
+/// Действие подтверждённо записано. При операции без изменений состояния
+/// до и после совпадают, а ревизия остаётся прежней.
+final class ActionUpdatedChange extends ActionChange {
+  const ActionUpdatedChange({
     required this.revision,
     required this.before,
     required this.after,
-    required this.releasedRelationIds,
-    required this.occupiedRelationIds,
-    required this.intentionCounts,
-    required this.relationPermissions,
   });
 
   @override
   final GraphRevision revision;
-  final DailyChoice? before;
-  final DailyChoice? after;
-  final Set<LongTermRelationId> releasedRelationIds;
-  final Set<LongTermRelationId> occupiedRelationIds;
-  final Map<IntentionId, RelationCounts> intentionCounts;
-  final Map<LongTermRelationId, LongTermRelationPermissions>
-  relationPermissions;
 
-  static Set<IntentionId> _participants(DailyChoice? choice) =>
-      Set<IntentionId>.unmodifiable(
-        choice == null
-            ? <IntentionId>{}
-            : {choice.sourceIntentionId, choice.selectedIntentionId},
-      );
+  @override
+  final Action before;
+
+  @override
+  final Action after;
+}
+
+final class ActionDeletedChange extends ActionChange {
+  const ActionDeletedChange({required this.revision, required this.action});
+
+  @override
+  final GraphRevision revision;
+
+  /// Состояние действия перед удалением.
+  final Action action;
+
+  @override
+  Action get before => action;
+
+  @override
+  Action? get after => null;
 }
 
 final class IntentionRelationCountsChanged implements GraphChange {
@@ -159,21 +102,17 @@ sealed class LongTermRelationChange implements GraphChange {
   LongTermRelationId get id;
   LongTermRelation? get before;
   LongTermRelation? get after;
-  LongTermRelationPermissions? get permissions;
 }
 
 final class LongTermRelationCreatedChange extends LongTermRelationChange {
   const LongTermRelationCreatedChange({
     required this.revision,
     required this.relation,
-    this.permissions = const LongTermRelationPermissions.unknown(),
   });
 
   @override
   final GraphRevision revision;
   final LongTermRelation relation;
-  @override
-  final LongTermRelationPermissions permissions;
 
   @override
   LongTermRelationId get id => relation.id;
@@ -198,8 +137,6 @@ final class LongTermRelationUpdatedChange extends LongTermRelationChange {
     required GraphRevision revision,
     required LongTermRelation before,
     required LongTermRelation after,
-    LongTermRelationPermissions permissions =
-        const LongTermRelationPermissions.unknown(),
   }) {
     if (before.id != after.id) {
       throw const LongTermRelationChangeValidationException(
@@ -210,7 +147,6 @@ final class LongTermRelationUpdatedChange extends LongTermRelationChange {
       revision: revision,
       before: before,
       after: after,
-      permissions: permissions,
     );
   }
 
@@ -218,7 +154,6 @@ final class LongTermRelationUpdatedChange extends LongTermRelationChange {
     required this.revision,
     required this.before,
     required this.after,
-    required this.permissions,
   });
 
   @override
@@ -229,8 +164,6 @@ final class LongTermRelationUpdatedChange extends LongTermRelationChange {
 
   @override
   final LongTermRelation after;
-  @override
-  final LongTermRelationPermissions permissions;
 
   @override
   LongTermRelationId get id => after.id;
@@ -240,15 +173,12 @@ final class LongTermRelationUnchangedChange extends LongTermRelationChange {
   const LongTermRelationUnchangedChange({
     required this.revision,
     required this.relation,
-    this.permissions = const LongTermRelationPermissions.unknown(),
   });
 
   @override
   final GraphRevision revision;
 
   final LongTermRelation relation;
-  @override
-  final LongTermRelationPermissions permissions;
 
   @override
   LongTermRelationId get id => relation.id;
@@ -278,6 +208,4 @@ final class LongTermRelationDeletedChange extends LongTermRelationChange {
 
   @override
   LongTermRelation? get after => null;
-  @override
-  LongTermRelationPermissions? get permissions => null;
 }

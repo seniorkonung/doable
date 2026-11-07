@@ -1,11 +1,5 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/main.dart';
-import 'package:doable/src/app/quick_creation/quick_creation_daily_choice_start_sheet.dart';
-import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
-import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
-import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
-import 'package:doable/src/design_system/components/filter_button.dart';
-import 'package:doable/src/design_system/components/picker_row.dart';
 import 'package:doable/src/design_system/components/search_field.dart';
 import 'package:doable/src/design_system/components/tag_row.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
@@ -20,24 +14,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../support/action_seed.dart';
 import '../support/app_root_pages.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/intention_catalog_controls.dart';
 import '../support/tag_storage_fixture.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
-import '../support/quick_creation.dart';
 import '../support/tag_positions.dart';
 
 const _health = 301;
 const _sport = 302;
 const _rest = 303;
 
-/// Связь сохранённого дневного пути: её участники защищены от замены.
+/// Связь пути сохранённого действия.
 const _pathRelation = 101;
 const _archivedRelation = 102;
 const _activeRelation = 103;
-const _dailyChoice = 201;
+const _action = 201;
 
 /// Строка результата: название и строка тегов так, как они показаны.
 typedef _Row = (String title, String tags);
@@ -339,52 +333,22 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Удаление снимает условие и в другом открытом поиске', (
-    tester,
-  ) async {
+  testWidgets('Удаление тега в панели фильтра снимает условие', (tester) async {
     final app = await _App.pump(tester, const Locale('ru'));
     final l10n = app.l10n;
-    const actions = DailyChoiceActionPickerPage;
     final healthRest = l10n.intentionSummaryTags('Здоровье, Отдых');
     final health = l10n.intentionSummaryTags('Здоровье');
     await _addCondition(tester, l10n, _sport, present: true);
     await _expectResults(tester, [
       ('Ходить в зал', l10n.intentionSummaryTags('Здоровье, Спорт, Отдых')),
     ]);
-    await openQuickCreation(
-      tester,
-      QuickCreationMode.dailyChoice,
-      openedPage: find.byType(QuickCreationDailyChoiceStartSheet),
-      wait: _until,
-    );
-    await chooseQuickCreationDailyChoiceStart(
-      tester,
-      ChoicePathDraftDirection.bottomUp,
-      openedPage: find.byKey(const ValueKey('daily-choice-action-filter')),
-      wait: _until,
-    );
-    await _addCondition(
-      tester,
-      l10n,
-      _sport,
-      present: false,
-      opener: _filterButton,
-    );
-    expect(tester.widget<FilterButton>(_filterButton).count, 1);
 
-    await _openFilterPanel(tester, opener: _filterButton);
+    await _openFilterPanel(tester);
     await _chooseFromMenu(tester, _panelRow(_sport), l10n.tagsPanelDeleteTag);
     await _tap(tester, find.text(l10n.tagsPanelDeleteConfirm));
     await _waitFor(tester, () => _panelRow(_sport).evaluate().isEmpty);
     await _closeFilterPanel(tester, l10n);
 
-    expect(tester.widget<FilterButton>(_filterButton).count, 0);
-    await _expectResults(tester, [
-      ('Ходить в зал', healthRest),
-      ('Ходить до магазина', health),
-      ('Ходить в парк', healthRest),
-    ], results: _actionResults);
-    await _closeTop(tester, actions);
     expect(shownIntentionCatalogParameters(tester).tagConditions, 0);
     await _expectResults(tester, [
       ('Ходить в парк', healthRest),
@@ -475,7 +439,7 @@ final class _App {
 }
 
 /// Намерения с тегами «Здоровье», «Спорт» и «Отдых», связи первого
-/// намерения и его дневной выбор с путём по одной из активных связей.
+/// намерения и действие с путём по одной из активных связей.
 void _seed(sqlite.Database database) {
   seedRawGraph(database, () {
     for (final (number, name) in [
@@ -525,23 +489,10 @@ void _seed(sqlite.Database database) {
         ],
       );
     }
-    database.execute(
-      'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
-      [
-        tagFixtureId(_dailyChoice),
-        tagFixtureId(1),
-        tagFixtureId(2),
-        '2026-09-25',
-        0,
-      ],
-    );
-    database.execute(
-      'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
-      [
-        tagFixtureId(202),
-        tagFixtureId(_dailyChoice),
-        tagFixtureId(_pathRelation),
-      ],
+    seedAction(
+      database,
+      id: tagFixtureId(_action),
+      path: [tagFixtureId(1), tagFixtureId(2)],
     );
   });
 }
@@ -569,36 +520,10 @@ List<_Row> _catalogResults(WidgetTester tester) => [
   for (final row in shownIntentionCatalogRows(tester)) (row.title, row.tags),
 ];
 
-/// Результаты экрана выбора действия в порядке выдачи.
-///
-/// Строка экрана выбора рисует теги линией без текстовых виджетов: их состав
-/// сравнивается в той же подписи, что у строки каталога.
-List<_Row> _actionResults(WidgetTester tester) {
-  final page = find.byType(DailyChoiceActionPickerPage);
-  final l10n = AppLocalizations.of(tester.element(page));
-  return [
-    for (final row in tester.widgetList<PickerRow>(
-      find.descendant(of: page, matching: find.byType(PickerRow)),
-    ))
-      (
-        row.name,
-        row.tags.isEmpty
-            ? l10n.intentionSummaryNoTags
-            : l10n.intentionSummaryTags(
-                row.tags.map((tag) => tag.name).join(', '),
-              ),
-      ),
-  ];
-}
-
-/// Дожидается результатов [expected]; по умолчанию читает выдачу каталога.
-Future<void> _expectResults(
-  WidgetTester tester,
-  List<_Row> expected, {
-  List<_Row> Function(WidgetTester tester) results = _catalogResults,
-}) async {
+/// Дожидается результатов [expected] в выдаче каталога.
+Future<void> _expectResults(WidgetTester tester, List<_Row> expected) async {
   for (var attempt = 0; attempt < 100; attempt++) {
-    final actual = results(tester);
+    final actual = _catalogResults(tester);
     if (actual.length == expected.length &&
         [
           for (var index = 0; index < actual.length; index++)
@@ -612,7 +537,7 @@ Future<void> _expectResults(
     await tester.pump(const Duration(milliseconds: 20));
   }
   await tester.pumpAndSettle();
-  expect(results(tester), expected);
+  expect(_catalogResults(tester), expected);
 }
 
 /// Добавляет условие в панели фильтра: первое нажатие на тег требует его,
@@ -622,18 +547,16 @@ Future<void> _addCondition(
   AppLocalizations l10n,
   int tag, {
   required bool present,
-  Finder? opener,
 }) async {
-  await _openFilterPanel(tester, opener: opener);
+  await _openFilterPanel(tester);
   await _cycle(tester, tag, TagRowFilterMark.mustBePresent);
   if (!present) await _cycle(tester, tag, TagRowFilterMark.mustBeAbsent);
   await _closeFilterPanel(tester, l10n);
 }
 
-/// Открывает панель фильтра элементом [opener] — по умолчанию элементом
-/// каталога — и ждёт строк тегов.
-Future<void> _openFilterPanel(WidgetTester tester, {Finder? opener}) async {
-  await _tap(tester, opener ?? intentionCatalogTagFilterControl);
+/// Открывает панель фильтра элементом каталога и ждёт строк тегов.
+Future<void> _openFilterPanel(WidgetTester tester) async {
+  await _tap(tester, intentionCatalogTagFilterControl);
   await _until(tester, find.byType(TagRow));
   await tester.pumpAndSettle();
 }
@@ -650,16 +573,6 @@ Future<void> _closeFilterPanel(
 ) async {
   await _tap(tester, find.text(l10n.tagsPanelDone));
   await _waitFor(tester, () => find.byType(TagRow).evaluate().isEmpty);
-  await tester.pumpAndSettle();
-}
-
-/// Закрывает верхнюю страницу системным действием «назад».
-/// Кнопка фильтра экрана выбора.
-final _filterButton = find.byType(FilterButton);
-
-Future<void> _closeTop(WidgetTester tester, Type page) async {
-  await tester.binding.handlePopRoute();
-  await _waitFor(tester, () => find.byType(page).evaluate().isEmpty);
   await tester.pumpAndSettle();
 }
 

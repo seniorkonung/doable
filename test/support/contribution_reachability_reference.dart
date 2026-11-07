@@ -6,18 +6,21 @@ typedef ContributionReferenceRelation = ({
   bool archived,
 });
 
-typedef ContributionReferenceChoice = ({
-  List<ContributionReferenceRelation> path,
+typedef ContributionReferenceAction = ({
+  List<IntentionId> path,
   bool completed,
 });
 
-/// Независимый эталон: каждый самостоятельный выбор начинает обход
-/// со всех намерений полного сохранённого пути, включая архивированные шаги.
-/// Опорные группы, компоненты сильной связности и битовые маски не используются.
+/// Независимый эталон Главной: каждое самостоятельное действие начинает обход
+/// со всех существующих намерений сохранённого пути, включая архивированные,
+/// и идёт по активным связям. Удалённые намерения [deleted] не засчитываются
+/// и обход не начинают. Опорные группы, сокращение опорных намерений,
+/// компоненты сильной связности и битовые маски не используются.
 Map<IntentionId, ({int planned, int contribution})>
-referenceContributionCounts({
+referenceActionContributionCounts({
   required List<ContributionReferenceRelation> relations,
-  required List<ContributionReferenceChoice> choices,
+  required List<ContributionReferenceAction> actions,
+  Set<IntentionId> deleted = const {},
 }) {
   final parents = <IntentionId, List<IntentionId>>{};
   for (final relation in relations) {
@@ -26,10 +29,11 @@ referenceContributionCounts({
     }
   }
   final counts = <IntentionId, ({int planned, int contribution})>{};
-  for (final choice in choices) {
+  for (final action in actions) {
     final visited = <IntentionId>{};
     final pending = [
-      for (final step in choice.path) ...[step.source, step.target],
+      for (final intention in action.path)
+        if (!deleted.contains(intention)) intention,
     ];
     while (pending.isNotEmpty) {
       final intention = pending.removeLast();
@@ -40,65 +44,116 @@ referenceContributionCounts({
       final previous = counts[intention] ?? (planned: 0, contribution: 0);
       counts[intention] = (
         planned: previous.planned + 1,
-        contribution: previous.contribution + (choice.completed ? 1 : 0),
+        contribution: previous.contribution + (action.completed ? 1 : 0),
       );
     }
   }
   return counts;
 }
 
-/// Эталон разбивки одного намерения: обходит полные пути каждого выбора
-/// без опорных групп, а неявное основание ищет отдельно от каждой связи.
-Map<ContributionReferenceRelation, ({int planned, int contribution})>
-referenceIntentionRelationCounts({
+typedef ContributionReferenceCounts = ({int planned, int contribution});
+
+typedef ContributionReferenceIntentionStatistics = ({
+  ContributionReferenceCounts throughRelations,
+  int explicitPathActions,
+  Map<IntentionId, ContributionReferenceCounts> terminalIntentions,
+  Map<ContributionReferenceRelation, ContributionReferenceCounts> relations,
+});
+
+/// Независимый эталон вида «Через связи» раздела одного намерения: каждое
+/// самостоятельное действие проверяется отдельно по полному пути без опорных
+/// групп, сокращения опорных намерений и битовых масок. Удалённые намерения
+/// [deleted] не засчитываются, обход не начинают и элементами не бывают;
+/// их связей в [relations] нет.
+ContributionReferenceIntentionStatistics referenceIntentionActionStatistics({
   required IntentionId intentionId,
   required List<ContributionReferenceRelation> relations,
-  required List<ContributionReferenceChoice> choices,
+  required List<ContributionReferenceAction> actions,
+  Set<IntentionId> deleted = const {},
 }) {
   final children = <IntentionId, List<IntentionId>>{};
   for (final relation in relations) {
-    if (!relation.archived &&
-        relation.source != intentionId &&
-        relation.target != intentionId) {
+    if (!relation.archived) {
       (children[relation.source] ??= []).add(relation.target);
     }
   }
-  final counts =
-      <ContributionReferenceRelation, ({int planned, int contribution})>{};
-  for (final choice in choices) {
-    if (choice.path.last.target == intentionId ||
-        !referenceContributionCounts(
-          relations: relations,
-          choices: [choice],
-        ).containsKey(intentionId)) {
-      continue;
+  // Связанное намерение связи засчитывает действие в обход самого намерения.
+  bool reachesAvoiding(IntentionId start, Set<IntentionId> targets) {
+    final visited = <IntentionId>{};
+    final pending = [start];
+    while (pending.isNotEmpty) {
+      final node = pending.removeLast();
+      if (node == intentionId || !visited.add(node)) continue;
+      if (targets.contains(node)) return true;
+      pending.addAll(children[node] ?? const []);
     }
-    final pathIntentions = {
-      for (final step in choice.path) ...[step.source, step.target],
-    }..remove(intentionId);
+    return false;
+  }
+
+  ContributionReferenceCounts add(
+    ContributionReferenceCounts? previous,
+    bool completed,
+  ) => (
+    planned: (previous?.planned ?? 0) + 1,
+    contribution: (previous?.contribution ?? 0) + (completed ? 1 : 0),
+  );
+
+  ContributionReferenceCounts? through;
+  var explicit = 0;
+  final terminals = <IntentionId, ContributionReferenceCounts>{};
+  final relationCounts =
+      <ContributionReferenceRelation, ContributionReferenceCounts>{};
+  for (final action in actions) {
+    final existing = {
+      for (final intention in action.path)
+        if (!deleted.contains(intention)) intention,
+    };
+    if (existing.isEmpty) continue;
+    final position = action.path.indexOf(intentionId);
+    final counted =
+        position >= 0 || _reachesAny(children, intentionId, existing);
+    if (!counted) continue;
+    through = add(through, action.completed);
+    if (position >= 0) explicit++;
+    final terminal = action.path.last;
+    if (terminal == intentionId) continue;
+    if (!deleted.contains(terminal)) {
+      terminals[terminal] = add(terminals[terminal], action.completed);
+    }
+    final others = existing..remove(intentionId);
     for (final relation in relations) {
       if (relation.source != intentionId) continue;
-      var included = choice.path.contains(relation);
-      if (!included && !relation.archived) {
-        final visited = <IntentionId>{};
-        final pending = [relation.target];
-        while (pending.isNotEmpty) {
-          final node = pending.removeLast();
-          if (node == intentionId || !visited.add(node)) continue;
-          if (pathIntentions.contains(node)) {
-            included = true;
-            break;
-          }
-          pending.addAll(children[node] ?? const []);
-        }
+      final following =
+          position >= 0 && action.path[position + 1] == relation.target;
+      if (following ||
+          (!relation.archived && reachesAvoiding(relation.target, others))) {
+        relationCounts[relation] = add(
+          relationCounts[relation],
+          action.completed,
+        );
       }
-      if (!included) continue;
-      final previous = counts[relation] ?? (planned: 0, contribution: 0);
-      counts[relation] = (
-        planned: previous.planned + 1,
-        contribution: previous.contribution + (choice.completed ? 1 : 0),
-      );
     }
   }
-  return counts;
+  return (
+    throughRelations: through ?? (planned: 0, contribution: 0),
+    explicitPathActions: explicit,
+    terminalIntentions: terminals,
+    relations: relationCounts,
+  );
+}
+
+bool _reachesAny(
+  Map<IntentionId, List<IntentionId>> children,
+  IntentionId start,
+  Set<IntentionId> targets,
+) {
+  final visited = <IntentionId>{};
+  final pending = [start];
+  while (pending.isNotEmpty) {
+    final node = pending.removeLast();
+    if (!visited.add(node)) continue;
+    if (targets.contains(node)) return true;
+    pending.addAll(children[node] ?? const []);
+  }
+  return false;
 }

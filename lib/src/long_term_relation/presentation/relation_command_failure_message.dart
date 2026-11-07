@@ -20,7 +20,6 @@ String longTermRelationCommandFailureMessage(
     LongTermRelationCorruptionFailure() =>
       localizations.relationsAdditionCorruption,
     LongTermRelationNotFoundFailure() ||
-    LongTermRelationReferencedByDailyPathFailure() ||
     LongTermRelationArchivedTypeChangeFailure() ||
     LongTermRelationUnexpectedFailure() =>
       localizations.relationsAdditionUnexpected,
@@ -34,9 +33,8 @@ String longTermRelationCommandFailureMessage(
       localizations.relationEditorUpdateUnavailable,
     LongTermRelationCorruptionFailure() =>
       localizations.relationEditorUpdateCorruption,
-    // Изменение связи не называет пару и участников и не проверяет шаги пути,
-    // поэтому такие отказы для него неожиданны.
-    LongTermRelationReferencedByDailyPathFailure() ||
+    // Изменение связи не называет пару и участников, поэтому такие отказы для
+    // него неожиданны.
     LongTermRelationPairOccupiedFailure() ||
     LongTermRelationParticipantNotFoundFailure() ||
     LongTermRelationParticipantArchivedFailure() ||
@@ -50,7 +48,6 @@ String longTermRelationCommandFailureMessage(
     LongTermRelationCorruptionFailure() =>
       localizations.relationArchiveCorruption,
     LongTermRelationPairOccupiedFailure() ||
-    LongTermRelationReferencedByDailyPathFailure() ||
     LongTermRelationArchivedTypeChangeFailure() ||
     LongTermRelationParticipantNotFoundFailure() ||
     LongTermRelationParticipantArchivedFailure() =>
@@ -76,9 +73,7 @@ String longTermRelationCommandFailureMessage(
       localizations.relationRestoreUnavailable,
     LongTermRelationCorruptionFailure() =>
       localizations.relationRestoreCorruption,
-    LongTermRelationPairOccupiedFailure() =>
-      localizations.relationRestoreConflict,
-    LongTermRelationReferencedByDailyPathFailure() ||
+    LongTermRelationPairOccupiedFailure() ||
     LongTermRelationArchivedTypeChangeFailure() =>
       localizations.relationRestoreConflict,
     LongTermRelationUnexpectedFailure() =>
@@ -86,8 +81,6 @@ String longTermRelationCommandFailureMessage(
   },
   LongTermRelationCommandKind.delete => switch (failure) {
     LongTermRelationNotFoundFailure() => localizations.relationDeleteNotFound,
-    LongTermRelationReferencedByDailyPathFailure() =>
-      localizations.relationDeleteReferencedByDailyPath,
     LongTermRelationUnavailableFailure() =>
       localizations.relationDeleteUnavailable,
     LongTermRelationCorruptionFailure() =>

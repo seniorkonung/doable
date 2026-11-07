@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/contribution_reachability.dart';
@@ -93,10 +92,12 @@ void main() {
         _report({
           'profile': profile.name,
           'archived': archived,
-          'archivedSteps': _scalar(
+          'archivedLinks': _scalar(
             raw,
-            '''SELECT COUNT(*) FROM daily_choice_path_steps s
-            JOIN long_term_relations r ON r.id = s.long_term_relation_id
+            '''SELECT COUNT(*) FROM action_path_items p
+            JOIN long_term_relations r
+              ON r.source_intention_id = p.previous_intention_id
+             AND r.related_intention_id = p.intention_id
             WHERE r.is_archived = 1''',
           ),
           'archivedIntentions': _scalar(
@@ -147,13 +148,15 @@ void main() {
             'archived': archived,
             'period': period is StatisticsMonth ? 'month' : 'year',
             'referenceMs': referenceWatch.elapsedMilliseconds,
-            'archivedPeriodSteps': _scalar(
+            'archivedPeriodLinks': _scalar(
               raw,
               '''SELECT COUNT(*)
-              FROM daily_choice_path_steps s
-              JOIN daily_choices c ON c.id = s.daily_choice_id
-              JOIN long_term_relations r ON r.id = s.long_term_relation_id
-              WHERE r.is_archived = 1 AND c.choice_date BETWEEN
+              FROM action_path_items p
+              JOIN actions a ON a.id = p.action_id
+              JOIN long_term_relations r
+                ON r.source_intention_id = p.previous_intention_id
+               AND r.related_intention_id = p.intention_id
+              WHERE r.is_archived = 1 AND a.date BETWEEN
               '${period.firstDate.toCanonicalString()}' AND '${period.lastDate.toCanonicalString()}' ''',
             ),
             ..._volume(fixture, period),
@@ -171,7 +174,6 @@ void main() {
                 StatisticsQuery(
                   period: period,
                   view: StatisticsView.throughRelations,
-                  localDate: CalendarDate.fromParts(2026, 6, 15),
                   pageSize: 100,
                   cursor: cursor,
                 );
@@ -395,7 +397,7 @@ void _expectPage(
   StatisticsPage page,
   List<FixtureContribution> expected,
   int offset,
-  ({int choices, int steps, int completed, int missed, int upcoming}) volume,
+  ({int actions, int pathItems, int completed}) volume,
 ) {
   expect(page.items.length, lessThanOrEqualTo(100));
   expect(
@@ -415,10 +417,8 @@ void _expectPage(
   if (offset == 0) {
     final first = page as StatisticsFirstPage;
     expect(first.totalItems, expected.length);
-    expect(first.summary.counts.planned, volume.choices);
-    expect(first.summary.counts.contribution, volume.completed);
-    expect(first.summary.uncompleted.missed, volume.missed);
-    expect(first.summary.uncompleted.upcoming, volume.upcoming);
+    expect(first.summary.planned, volume.actions);
+    expect(first.summary.contribution, volume.completed);
   }
 }
 
@@ -432,16 +432,16 @@ void _expectVolume(
 ) {
   final where = period == null
       ? ''
-      : " WHERE c.choice_date BETWEEN '${period.firstDate.toCanonicalString()}' AND '${period.lastDate.toCanonicalString()}'";
+      : " WHERE a.date BETWEEN '${period.firstDate.toCanonicalString()}' AND '${period.lastDate.toCanonicalString()}'";
   final volume = fixture.volume(period);
   expect(
-    _scalar(database, 'SELECT COUNT(*) FROM daily_choices c$where'),
-    volume.choices,
+    _scalar(database, 'SELECT COUNT(*) FROM actions a$where'),
+    volume.actions,
   );
   expect(
-    _scalar(database, '''SELECT COUNT(*) FROM daily_choice_path_steps s
-    JOIN daily_choices c ON c.id = s.daily_choice_id$where'''),
-    volume.steps,
+    _scalar(database, '''SELECT COUNT(*) FROM action_path_items p
+    JOIN actions a ON a.id = p.action_id$where'''),
+    volume.pathItems,
   );
 }
 
@@ -449,8 +449,8 @@ Map<String, Object> _volume(
   ContributionStatisticsFixture fixture,
   StatisticsPeriod? period,
 ) => {
-  'choices': fixture.volume(period).choices,
-  'steps': fixture.volume(period).steps,
+  'actions': fixture.volume(period).actions,
+  'pathItems': fixture.volume(period).pathItems,
   ...fixture.distribution(period),
 };
 

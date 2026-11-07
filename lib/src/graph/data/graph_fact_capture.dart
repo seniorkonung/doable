@@ -27,9 +27,11 @@ final class GraphFactCapture {
     final facts = [
       ...await _tagFacts(),
       ...await _intentionFacts(),
+      ...await _deletedIntentionFacts(),
       ...await _tagAssignmentFacts(),
       ...await _relationFacts(),
-      ...await _dailyChoiceFacts(),
+      ...await _deletedRelationPairFacts(),
+      ...await _actionFacts(),
     ];
     for (final marks in _markTables) {
       await _database.delete(marks).go();
@@ -40,9 +42,11 @@ final class GraphFactCapture {
   List<TableInfo<Table, Object?>> get _markTables => [
     _database.graphLogTagMarks,
     _database.graphLogIntentionMarks,
+    _database.graphLogDeletedIntentionMarks,
     _database.graphLogTagAssignmentMarks,
     _database.graphLogLongTermRelationMarks,
-    _database.graphLogDailyChoiceMarks,
+    _database.graphLogDeletedRelationPairMarks,
+    _database.graphLogActionMarks,
   ];
 
   Future<Iterable<GraphFact>> _tagFacts() async {
@@ -91,6 +95,35 @@ final class GraphFactCapture {
           row,
           record: () => IntentionRecord(decodeStoredIntention(row.data)),
           key: () => IntentionKey(
+            decodeStoredIntentionId(requiredStoredString(row.data, 'mark_id')),
+          ),
+        ),
+    ];
+  }
+
+  /// Надгробия база перечисляет по ключу.
+  Future<Iterable<GraphFact>> _deletedIntentionFacts() async {
+    final rows = await _database
+        .customSelect(
+          '''SELECT mark.intention_id AS mark_id, mark.first_operation,
+                tombstone.intention_id IS NOT NULL AS present,
+                tombstone.intention_id, tombstone.title
+         FROM graph_log_deleted_intention_marks AS mark
+         LEFT JOIN deleted_intentions AS tombstone
+           ON tombstone.intention_id = mark.intention_id
+         ORDER BY tombstone.intention_id IS NULL, mark.intention_id''',
+          readsFrom: {
+            _database.graphLogDeletedIntentionMarks,
+            _database.deletedIntentions,
+          },
+        )
+        .get();
+    return [
+      for (final row in rows)
+        ?_factOf(
+          row,
+          record: () => storedDeletedIntentionRecord(row.data),
+          key: () => DeletedIntentionKey(
             decodeStoredIntentionId(requiredStoredString(row.data, 'mark_id')),
           ),
         ),
@@ -159,41 +192,72 @@ final class GraphFactCapture {
     ];
   }
 
-  Future<Iterable<GraphFact>> _dailyChoiceFacts() async {
+  Future<Iterable<GraphFact>> _deletedRelationPairFacts() async {
     final rows = await _database
         .customSelect(
-          '''SELECT mark.daily_choice_id AS mark_id, mark.first_operation,
-                choice.id IS NOT NULL AS present, choice.creation_sequence,
-                choice.id, choice.source_intention_id,
-                choice.selected_intention_id, choice.choice_date,
-                choice.description, choice.is_completed,
-                choice.scheduled_minute, choice.priority
-         FROM graph_log_daily_choice_marks AS mark
-         LEFT JOIN daily_choices AS choice ON choice.id = mark.daily_choice_id
-         ORDER BY choice.creation_sequence IS NULL, choice.creation_sequence,
-                  mark.daily_choice_id''',
+          '''SELECT mark.source_intention_id AS mark_source_id,
+                mark.related_intention_id AS mark_related_id,
+                mark.first_operation,
+                tombstone.source_intention_id IS NOT NULL AS present,
+                tombstone.source_intention_id, tombstone.related_intention_id,
+                tombstone.type
+         FROM graph_log_deleted_relation_pair_marks AS mark
+         LEFT JOIN deleted_relation_pairs AS tombstone
+           ON tombstone.source_intention_id = mark.source_intention_id AND
+              tombstone.related_intention_id = mark.related_intention_id
+         ORDER BY tombstone.source_intention_id IS NULL,
+                  mark.source_intention_id, mark.related_intention_id''',
           readsFrom: {
-            _database.graphLogDailyChoiceMarks,
-            _database.dailyChoices,
+            _database.graphLogDeletedRelationPairMarks,
+            _database.deletedRelationPairs,
           },
         )
         .get();
+    return [
+      for (final row in rows)
+        ?_factOf(
+          row,
+          record: () => storedDeletedRelationPairRecord(row.data),
+          key: () => DeletedRelationPairKey(
+            sourceIntentionId: decodeStoredIntentionId(
+              requiredStoredString(row.data, 'mark_source_id'),
+            ),
+            relatedIntentionId: decodeStoredIntentionId(
+              requiredStoredString(row.data, 'mark_related_id'),
+            ),
+          ),
+        ),
+    ];
+  }
+
+  Future<Iterable<GraphFact>> _actionFacts() async {
+    final rows = await _database
+        .customSelect(
+          '''SELECT mark.action_id AS mark_id, mark.first_operation,
+                stored.id IS NOT NULL AS present, stored.creation_sequence,
+                stored.id, stored.title, stored.description, stored.date,
+                stored.scheduled_hour, stored.priority, stored.is_completed,
+                stored.created_at, stored.updated_at
+         FROM graph_log_action_marks AS mark
+         LEFT JOIN actions AS stored ON stored.id = mark.action_id
+         ORDER BY stored.creation_sequence IS NULL, stored.creation_sequence,
+                  mark.action_id''',
+          readsFrom: {_database.graphLogActionMarks, _database.actions},
+        )
+        .get();
     if (rows.isEmpty) return const [];
-    final paths = await readStoredChoicePaths(
+    final paths = await readStoredActionPathRows(
       _database,
-      choiceIds: 'SELECT daily_choice_id FROM graph_log_daily_choice_marks',
-      readsFrom: {_database.graphLogDailyChoiceMarks},
+      actionIds: 'SELECT action_id FROM graph_log_action_marks',
+      readsFrom: {_database.graphLogActionMarks},
     );
     return [
       for (final row in rows)
         ?_factOf(
           row,
-          record: () =>
-              storedDailyChoiceRecord(decodeStoredDailyChoice(row.data), paths),
-          key: () => DailyChoiceKey(
-            decodeStoredDailyChoiceId(
-              requiredStoredString(row.data, 'mark_id'),
-            ),
+          record: () => storedActionRecord(row.data, paths),
+          key: () => ActionKey(
+            decodeStoredActionId(requiredStoredString(row.data, 'mark_id')),
           ),
         ),
     ];

@@ -15,12 +15,19 @@ import 'top_bar.dart';
 
 /// Возможность построить любой вариант [Sheet].
 ///
-/// Её даёт построителю только [showDoableSheet]: она несёт маршрут этой
-/// функции, анимацию которого лист ведёт пальцем.
+/// Её даёт построителю только [showDoableSheet], а странице маршрута
+/// [doableSheetPageRoute] — [SheetPresentation.of]: она несёт маршрут листа,
+/// анимацию которого лист ведёт пальцем.
 final class SheetPresentation {
   const SheetPresentation._(this._route);
 
   final _DoableSheetRoute<Object?> _route;
+
+  /// Возможность листа, в маршруте [doableSheetPageRoute] которого стоит
+  /// [context].
+  static SheetPresentation of(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<_SheetPresentationScope>()!
+      .presentation;
 
   /// Закрывает лист выбором [choice], который показ отдаёт только после
   /// окончания анимации закрытия, а не в момент закрытия.
@@ -56,6 +63,51 @@ Future<T?> showDoableSheet<T>({
   bool hostsMessages = false,
 }) {
   final navigator = Navigator.of(context, rootNavigator: true);
+  final route = _sheetRoute<T>(
+    context: context,
+    capturedThemes: InheritedTheme.capture(
+      from: context,
+      to: navigator.context,
+    ),
+    settings: null,
+    hostsMessages: hostsMessages,
+    builder: builder,
+  );
+  return navigator.push(route).then((result) async {
+    if (route._resultAfterClosing) await route.completed;
+    return result;
+  });
+}
+
+/// Маршрут листа для страницы [page] стека навигатора, которому [context]
+/// принадлежит, например страницы маршрутизатора с собственным построителем
+/// маршрута.
+///
+/// Лист движется и закрывается, как показанный [showDoableSheet], а [child]
+/// строит свой [Sheet] с возможностью из [SheetPresentation.of]. Стек
+/// маршрутизатора видит такой лист своей страницей.
+Route<T> doableSheetPageRoute<T>({
+  required BuildContext context,
+  required Page<T> page,
+  required Widget child,
+  bool hostsMessages = false,
+}) => _sheetRoute<T>(
+  context: context,
+  capturedThemes: null,
+  settings: page,
+  hostsMessages: hostsMessages,
+  builder: (_, sheet) =>
+      _SheetPresentationScope(presentation: sheet, child: child),
+);
+
+_DoableSheetRoute<T> _sheetRoute<T>({
+  required BuildContext context,
+  required CapturedThemes? capturedThemes,
+  required RouteSettings? settings,
+  required bool hostsMessages,
+  required Widget Function(BuildContext context, SheetPresentation sheet)
+  builder,
+}) {
   final localizations = MaterialLocalizations.of(context);
   // Без явного нуля маршрут лишь укоротил бы анимацию в 20 раз:
   // https://api.flutter.dev/flutter/animation/AnimationBehavior.html
@@ -64,10 +116,8 @@ Future<T?> showDoableSheet<T>({
       : _sheetDuration;
   late final _DoableSheetRoute<T> route;
   route = _DoableSheetRoute<T>(
-    capturedThemes: InheritedTheme.capture(
-      from: context,
-      to: navigator.context,
-    ),
+    capturedThemes: capturedThemes,
+    settings: settings,
     barrierLabel: localizations.scrimLabel,
     barrierOnTapHint: localizations.scrimOnTapHint(
       localizations.bottomSheetLabel,
@@ -89,10 +139,20 @@ Future<T?> showDoableSheet<T>({
       ),
     ),
   );
-  return navigator.push(route).then((result) async {
-    if (route._resultAfterClosing) await route.completed;
-    return result;
+  return route;
+}
+
+/// Возможность листа для страницы маршрута [doableSheetPageRoute].
+final class _SheetPresentationScope extends InheritedWidget {
+  const _SheetPresentationScope({
+    required this.presentation,
+    required super.child,
   });
+
+  final SheetPresentation presentation;
+
+  @override
+  bool updateShouldNotify(_SheetPresentationScope oldWidget) => false;
 }
 
 /// Длительность движения листа, которое не ведёт палец.
@@ -137,6 +197,7 @@ final class _DoableSheetRoute<T> extends ModalBottomSheetRoute<T> {
   _DoableSheetRoute({
     required super.builder,
     required super.capturedThemes,
+    required super.settings,
     required super.barrierLabel,
     required super.barrierOnTapHint,
     required Color barrierColor,
@@ -357,6 +418,14 @@ final class _SheetMotionState extends State<_SheetMotion> {
     // https://api.flutter.dev/flutter/gestures/DragGestureRecognizer/didStopTrackingLastPointer.html
     final target = _isPointerCanceled ? _startState : _targetOf(velocity);
     switch (target) {
+      // Лист, закрытие которого сначала спрашивает его содержимое, как
+      // «назад» и затемнение, возвращается, а решение получает содержимое:
+      // https://api.flutter.dev/flutter/widgets/PopScope-class.html
+      case _SheetState.closed
+          when _route.popDisposition == RoutePopDisposition.doNotPop:
+        _route._animation.forward();
+        widget.expansion?.resize(full: _drag.isFull);
+        _route.onPopInvokedWithResult(false, null);
       case _SheetState.closed:
         Navigator.pop(context);
       case _SheetState.compact || _SheetState.full:

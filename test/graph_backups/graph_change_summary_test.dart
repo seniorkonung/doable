@@ -1,9 +1,12 @@
 import 'dart:io';
 
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/action/domain/action.dart';
+import 'package:doable/src/action/domain/action_id.dart';
+import 'package:doable/src/action/domain/action_path.dart';
+import 'package:doable/src/action/domain/action_priority.dart';
+import 'package:doable/src/action/domain/action_schedule.dart';
+import 'package:doable/src/action/domain/action_text.dart';
+import 'package:doable/src/data/local/app_database.dart' show AppDatabase;
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
@@ -17,6 +20,7 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -25,6 +29,8 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/action_seed.dart';
+import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/local_database_harness.dart';
 import '../support/tag_positions.dart';
@@ -60,7 +66,7 @@ void main() {
               GraphEntityCreated(_tag(1, 'Дом')),
               GraphEntityCreated(_tag(2, 'Дача')),
               GraphEntityChanged(_relation(1, from: 1, to: 2)),
-              GraphEntityChanged(_dailyChoice(1, from: 1, to: 2, through: 1)),
+              GraphEntityChanged(_action(1, path: [1, 2])),
             ],
           ),
         )
@@ -71,12 +77,61 @@ void main() {
               GraphEntityChanged(_tag(1, 'Дом и сад')),
               GraphEntityDeleted(TagKey(_tagId(2))),
               GraphEntityDeleted(LongTermRelationKey(_relationId(1))),
-              GraphEntityChanged(_dailyChoice(1, from: 1, to: 2, through: 1)),
+              GraphEntityChanged(_action(1, path: [1, 2])),
             ],
           ),
         );
 
       expect(_shown(tally.summary), (added: 1, changed: 1, deleted: 1));
+    });
+
+    test('действие считается добавленным, изменённым или удалённым по своим '
+        'фактам, как остальные сущности', () {
+      final tally = GraphChangeTally(after: 0)
+        ..add(
+          GraphHistoryChange(
+            position: 1,
+            facts: [
+              GraphEntityCreated(_action(1, path: [1])),
+              GraphEntityChanged(_action(2, path: [1])),
+              GraphEntityDeleted(ActionKey(_actionId(3))),
+            ],
+          ),
+        );
+
+      expect(_shown(tally.summary), (added: 1, changed: 1, deleted: 1));
+    });
+
+    test('факты надгробий намерения и пары не считаются ни изменениями '
+        'действий, ни отдельными сущностями', () {
+      final tally = GraphChangeTally(after: 0)
+        ..add(
+          GraphHistoryChange(
+            position: 1,
+            facts: [
+              GraphEntityDeleted(IntentionKey(_intentionId(1))),
+              GraphEntityCreated(_deletedIntention(1)),
+              GraphEntityDeleted(LongTermRelationKey(_relationId(1))),
+              GraphEntityCreated(_deletedPair(from: 2, to: 3)),
+            ],
+          ),
+        )
+        ..add(
+          GraphHistoryChange(
+            position: 2,
+            facts: [
+              GraphEntityCreated(_relation(2, from: 2, to: 3)),
+              GraphEntityDeleted(
+                DeletedRelationPairKey(
+                  sourceIntentionId: _intentionId(2),
+                  relatedIntentionId: _intentionId(3),
+                ),
+              ),
+            ],
+          ),
+        );
+
+      expect(_shown(tally.summary), (added: 1, changed: 0, deleted: 2));
     });
 
     test('снятие и повторное назначение тега и назначение другого тега '
@@ -215,6 +270,7 @@ void main() {
 
   group('сводка изменений по пакетам чтения истории', () {
     late LocalDatabaseHarness harness;
+    late AppDatabase database;
     late DriftPersonalGraphRepository repository;
     late GraphSnapshotStore store;
     late Directory snapshots;
@@ -223,8 +279,9 @@ void main() {
       harness = await LocalDatabaseHarness.fileBacked();
       var now = DateTime.utc(2026, 10, 18, 9);
       DateTime clock() => now = now.add(const Duration(seconds: 1));
+      database = await harness.openReadyDatabase();
       repository = DriftPersonalGraphRepository(
-        await harness.openReadyDatabase(),
+        database,
         UuidV7IntentionIdGenerator(),
         clock,
         InMemoryDiagnosticsSink(),
@@ -325,6 +382,44 @@ void main() {
         added: 0,
         changed: 1,
         deleted: 0,
+      ));
+    });
+
+    test('удаление намерения без связей и тегов, составлявшего путь трёх '
+        'действий, даёт «1 удалено»', () async {
+      await seedGraph(database, () async {
+        await database.customStatement(
+          'INSERT INTO intentions (id, title, created_at, updated_at) '
+          'VALUES (?, ?, 1, 1)',
+          [seedUuid(1), 'Бегать'],
+        );
+        for (var number = 11; number <= 13; number++) {
+          await database.customStatement(
+            '''INSERT INTO actions
+               (id, title, date, priority, is_completed, created_at,
+                updated_at)
+               VALUES (?, 'Пробежка', '2026-10-08', 4, 0, 1, 1)''',
+            [seedUuid(number)],
+          );
+          await database.customStatement(insertActionPathItem, [
+            seedUuid(number),
+            0,
+            seedUuid(1),
+            null,
+            actionPathRole(0, 1),
+          ]);
+        }
+      });
+      final previous = await repository.readCurrentPosition();
+
+      final intention =
+          (IntentionId.decode(seedUuid(1)) as IntentionIdDecodingSuccess).id;
+      await confirm<IntentionDeleted>(DeleteIntention(intention));
+
+      expect(_shown(await summaryAfter(previous)), (
+        added: 0,
+        changed: 0,
+        deleted: 1,
       ));
     });
 
@@ -432,32 +527,30 @@ LongTermRelationRecord _relation(
   updatedAt: RelationTimestamp(DateTime.utc(2026, 10, 17, 9)),
 );
 
-DailyChoiceRecord _dailyChoice(
-  int number, {
-  required int from,
-  required int to,
-  required int through,
-}) {
-  final id = _dailyChoiceId(number);
-  return DailyChoiceRecord(
-    choice: DailyChoice(
-      id: id,
+DeletedIntentionRecord _deletedIntention(int number) => DeletedIntentionRecord(
+  id: _intentionId(number),
+  title: 'Удалённое $number',
+);
+
+DeletedRelationPairRecord _deletedPair({required int from, required int to}) =>
+    DeletedRelationPairRecord(
       sourceIntentionId: _intentionId(from),
-      selectedIntentionId: _intentionId(to),
-      date: CalendarDate.fromParts(2026, 10, 2),
-      description: null,
-      isCompleted: false,
-    ),
-    path: StoredChoicePath([
-      ChoicePathStep(
-        id: _stepId(number),
-        dailyChoiceId: id,
-        relationId: _relationId(through),
-        previousStepId: null,
-      ),
-    ]),
-  );
-}
+      relatedIntentionId: _intentionId(to),
+      type: LongTermRelationType.need,
+    );
+
+ActionRecord _action(int number, {required List<int> path}) => ActionRecord(
+  id: _actionId(number),
+  title: ActionTitle('Пробежка'),
+  description: null,
+  path: ActionPath([for (final intention in path) _intentionId(intention)]),
+  date: CalendarDate.fromParts(2026, 10, 2),
+  schedule: const ActionAllDay(),
+  priority: ActionPriority.p4,
+  isCompleted: false,
+  createdAt: ActionTimestamp(_createdAt),
+  updatedAt: ActionTimestamp(_createdAt),
+);
 
 TagId _tagId(int number) =>
     (TagId.decode(_uuid('7b0e2f4c', number)) as TagIdDecodingSuccess).id;
@@ -470,13 +563,8 @@ LongTermRelationId _relationId(int number) => (LongTermRelationId.decode(
   _uuid('2a3b4c5d', number),
 ) as LongTermRelationIdDecodingSuccess).id;
 
-DailyChoiceId _dailyChoiceId(int number) => (DailyChoiceId.decode(
-  _uuid('3c4d5e6f', number),
-) as DailyChoiceIdDecodingSuccess).id;
-
-ChoicePathStepId _stepId(int number) => (ChoicePathStepId.decode(
-  _uuid('4d5e6f7a', number),
-) as ChoicePathStepIdDecodingSuccess).id;
+ActionId _actionId(int number) =>
+    (ActionId.decode(_uuid('5e6f7a8b', number)) as ActionIdDecodingSuccess).id;
 
 String _uuid(String prefix, int number) =>
     '$prefix-1d3a-4c5e-8f60-0a1b2c3d4e${number.toString().padLeft(2, '0')}';

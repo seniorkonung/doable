@@ -1,13 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
+import 'package:doable/src/action/domain/action.dart';
+import 'package:doable/src/action/domain/action_id.dart';
+import 'package:doable/src/action/domain/action_path.dart';
+import 'package:doable/src/action/domain/action_priority.dart';
+import 'package:doable/src/action/domain/action_schedule.dart';
+import 'package:doable/src/action/domain/action_text.dart';
 import 'package:doable/src/graph_format/graph_format_codec.dart';
 import 'package:doable/src/graph_format/graph_format_records.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -15,6 +14,7 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_assignment.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
@@ -111,19 +111,23 @@ void main() {
           '$created,"kind":"longTermRelation","id":"${_relationIds[0]}",'
           '"sourceIntentionId":"${_intentionIds[0]}",'
           '"relatedIntentionId":"${_intentionIds[1]}"';
-      final choice =
-          '$created,"kind":"dailyChoice","id":"${_dailyChoiceIds[0]}",'
+      final action = '$created,"kind":"action","id":"${_actionIds[0]}"';
+      final actionPath = '"path":["${_intentionIds[0]}","${_intentionIds[1]}"]';
+      String validAction({
+        String title = '"title":"Сходить в бассейн"',
+        String description = '"description":null',
+        String date = '"date":"2026-10-17"',
+        String hour = '"hour":null',
+        String priority = '"priority":"P2"',
+        String? path,
+      }) =>
+          '{$action,$title,$description,$date,$hour,$priority,'
+          '"completed":false,${path ?? actionPath},$createdAt,$updatedAt}';
+      final deletedIntention =
+          '$created,"kind":"deletedIntention","id":"${_intentionIds[3]}"';
+      final deletedPair =
+          '$created,"kind":"deletedRelationPair",'
           '"sourceIntentionId":"${_intentionIds[0]}"';
-      final selected = '"selectedIntentionId":"${_intentionIds[1]}"';
-      const choiceDate = '"date":"2026-10-17"';
-      const choiceRest = '"priority":"P2","completed":false,"description":null';
-      final path =
-          '"path":[{"id":"${_stepIds[0]}","relationId":"${_relationIds[0]}"}]';
-      String validChoice({
-        String date = choiceDate,
-        String time = '"time":null',
-        required String path,
-      }) => '{$choice,$selected,$date,$time,$choiceRest,$path}';
 
       // Каждая недопустимая строка отличается от одной из этих лишь причиной.
       final validLines = [
@@ -131,8 +135,21 @@ void main() {
         '{$tag,"name":"Дом","color":null,"position":"Zz0V"}',
         '{$intention,$createdAt,$updatedAt}',
         '{$relation,$relationRest,$createdAt,$updatedAt}',
-        validChoice(path: path),
+        validAction(),
+        validAction(hour: '"hour":0'),
+        validAction(hour: '"hour":23'),
+        validAction(path: '"path":["${_intentionIds[0]}"]'),
+        validAction(description: '"description":"  утром\\n"'),
+        '{$deletedIntention,"title":"Заниматься йогой"}',
+        '{$deletedPair,"relatedIntentionId":"${_intentionIds[1]}",'
+            '"type":"need"}',
         '{"fact":"deleted","entity":"tag","id":"${_tagIds[0]}"}',
+        '{"fact":"deleted","entity":"action","id":"${_actionIds[0]}"}',
+        '{"fact":"deleted","entity":"deletedIntention",'
+            '"id":"${_intentionIds[3]}"}',
+        '{"fact":"deleted","entity":"deletedRelationPair",'
+            '"sourceIntentionId":"${_intentionIds[0]}",'
+            '"relatedIntentionId":"${_intentionIds[1]}"}',
       ];
       for (final line in validLines) {
         expect(
@@ -207,24 +224,48 @@ void main() {
         'связь без времени создания': '{$relation,$relationRest,$updatedAt}',
         'связь без времени последнего изменения':
             '{$relation,$relationRest,$createdAt}',
-        'несуществующая дата дневного выбора': validChoice(
+        'название действия с окружающими пробелами': validAction(
+          title: '"title":" Сходить в бассейн"',
+        ),
+        'пробельное название действия': validAction(title: '"title":" "'),
+        'пробельное описание действия': validAction(
+          description: '"description":" \\n"',
+        ),
+        'несуществующая дата действия': validAction(
           date: '"date":"2026-02-30"',
-          path: path,
         ),
-        'время дня вне суток': validChoice(time: '"time":"24:00"', path: path),
-        'время дня без ведущего нуля': validChoice(
-          time: '"time":"9:05"',
-          path: path,
+        'час действия вне суток': validAction(hour: '"hour":24'),
+        'отрицательный час действия': validAction(hour: '"hour":-1'),
+        'час действия не целое число': validAction(hour: '"hour":9.5'),
+        'час действия строкой': validAction(hour: '"hour":"9"'),
+        'время дня вместо часа действия':
+            '{$action,"title":"Сходить в бассейн","description":null,'
+            '"date":"2026-10-17","time":null,"priority":"P2",'
+            '"completed":false,$actionPath,$createdAt,$updatedAt}',
+        'неизвестный приоритет действия': validAction(
+          priority: '"priority":"P5"',
         ),
-        'пустой путь выбора': validChoice(path: '"path":[]'),
-        'повторный шаг пути': validChoice(
-          path:
-              '"path":[{"id":"${_stepIds[0]}","relationId":"${_relationIds[0]}"},'
-              '{"id":"${_stepIds[0]}","relationId":"${_relationIds[1]}"}]',
+        'пустой путь действия': validAction(path: '"path":[]'),
+        'повтор намерения в пути действия': validAction(
+          path: '"path":["${_intentionIds[0]}","${_intentionIds[0]}"]',
         ),
-        'дневной выбор с совпадающими участниками':
-            '{$choice,"selectedIntentionId":"${_intentionIds[0]}",'
-            '$choiceDate,"time":null,$choiceRest,$path}',
+        'путь действия не список': validAction(
+          path: '"path":"${_intentionIds[0]}"',
+        ),
+        'элемент пути действия не строка': validAction(path: '"path":[1]'),
+        'идентификатор в пути действия не в канонической записи': validAction(
+          path: '"path":["${_intentionIds[0].toUpperCase()}"]',
+        ),
+        'надгробие намерения с окружающими пробелами':
+            '{$deletedIntention,"title":" Заниматься йогой"}',
+        'надгробие намерения с пробельным названием':
+            '{$deletedIntention,"title":" "}',
+        'надгробие пары неизвестного типа':
+            '{$deletedPair,"relatedIntentionId":"${_intentionIds[1]}",'
+            '"type":"must"}',
+        'надгробие пары с совпадающими намерениями':
+            '{$deletedPair,"relatedIntentionId":"${_intentionIds[0]}",'
+            '"type":"need"}',
       };
 
       for (final MapEntry(key: reason, value: line) in invalidLines.entries) {
@@ -285,25 +326,17 @@ const _relationIds = [
   '2a3b4c5d-6e7f-4a80-b91c-0d1e2f3a4b02',
   '2a3b4c5d-6e7f-4a80-b91c-0d1e2f3a4b03',
 ];
-const _dailyChoiceIds = [
-  '3c4d5e6f-7a8b-4c9d-a0e1-1f2a3b4c5d01',
-  '3c4d5e6f-7a8b-4c9d-a0e1-1f2a3b4c5d02',
-  '3c4d5e6f-7a8b-4c9d-a0e1-1f2a3b4c5d03',
+const _actionIds = [
+  '5e6f7a8b-9c0d-4eaf-b012-3a4b5c6d7e01',
+  '5e6f7a8b-9c0d-4eaf-b012-3a4b5c6d7e02',
+  '5e6f7a8b-9c0d-4eaf-b012-3a4b5c6d7e03',
 ];
-const _stepIds = [
-  '4d5e6f7a-8b9c-4dae-bf01-2a3b4c5d6e01',
-  '4d5e6f7a-8b9c-4dae-bf01-2a3b4c5d6e02',
-  '4d5e6f7a-8b9c-4dae-bf01-2a3b4c5d6e03',
-];
-
 List<GraphFact> _expectedGoldenFacts() {
   final health = _intentionId(_intentionIds[0]);
   final running = _intentionId(_intentionIds[1]);
   final jogging = _intentionId(_intentionIds[2]);
   final needRunning = _relationId(_relationIds[0]);
   final canJog = _relationId(_relationIds[1]);
-  final allDayChoice = _dailyChoiceId(_dailyChoiceIds[0]);
-  final midnightChoice = _dailyChoiceId(_dailyChoiceIds[1]);
   final home = _tagId(_tagIds[0]);
   final work = _tagId(_tagIds[2]);
 
@@ -410,52 +443,46 @@ List<GraphFact> _expectedGoldenFacts() {
       ),
     ),
     GraphEntityCreated(
-      DailyChoiceRecord(
-        choice: DailyChoice(
-          id: allDayChoice,
-          sourceIntentionId: health,
-          selectedIntentionId: jogging,
-          date: CalendarDate.fromParts(2026, 10, 17),
-          description: null,
-          isCompleted: false,
-          priority: DailyChoicePriority.p2,
-        ),
-        path: StoredChoicePath([
-          ChoicePathStep(
-            id: _stepId(_stepIds[0]),
-            dailyChoiceId: allDayChoice,
-            relationId: needRunning,
-            previousStepId: null,
-          ),
-          ChoicePathStep(
-            id: _stepId(_stepIds[1]),
-            dailyChoiceId: allDayChoice,
-            relationId: canJog,
-            previousStepId: _stepId(_stepIds[0]),
-          ),
-        ]),
+      DeletedIntentionRecord(
+        id: _intentionId(_intentionIds[3]),
+        title: 'Плавать в бассейне',
+      ),
+    ),
+    GraphEntityCreated(
+      DeletedRelationPairRecord(
+        sourceIntentionId: health,
+        relatedIntentionId: _intentionId(_intentionIds[3]),
+        type: LongTermRelationType.can,
+      ),
+    ),
+    GraphEntityCreated(
+      ActionRecord(
+        id: _actionId(_actionIds[0]),
+        title: ActionTitle('Сходить в бассейн'),
+        description: null,
+        path: ActionPath([health, running, _intentionId(_intentionIds[3])]),
+        date: CalendarDate.fromParts(2026, 10, 17),
+        schedule: const ActionAllDay(),
+        priority: ActionPriority.p2,
+        isCompleted: false,
+        createdAt: ActionTimestamp(DateTime.utc(2026, 10, 17, 9)),
+        updatedAt: ActionTimestamp(DateTime.utc(2026, 10, 17, 9)),
       ),
     ),
     GraphEntityChanged(
-      DailyChoiceRecord(
-        choice: DailyChoice(
-          id: midnightChoice,
-          sourceIntentionId: health,
-          selectedIntentionId: running,
-          date: CalendarDate.fromParts(2026, 2, 28),
-          description: DailyChoiceDescription.fromStored('  утром\n'),
-          isCompleted: true,
-          schedule: DailyChoiceTime(hour: 0, minute: 0),
-          priority: DailyChoicePriority.p4,
+      ActionRecord(
+        id: _actionId(_actionIds[1]),
+        title: ActionTitle('Позаниматься 🧘'),
+        description: ActionDescription.fromInput('  утром\n'),
+        path: ActionPath([jogging]),
+        date: CalendarDate.fromParts(2026, 2, 28),
+        schedule: ActionAtHour(23),
+        priority: ActionPriority.p4,
+        isCompleted: true,
+        createdAt: ActionTimestamp(DateTime.utc(2026, 10, 1, 7, 1, 0, 0, 1)),
+        updatedAt: ActionTimestamp(
+          DateTime.utc(2026, 10, 17, 21, 4, 5, 123, 456),
         ),
-        path: StoredChoicePath([
-          ChoicePathStep(
-            id: _stepId(_stepIds[2]),
-            dailyChoiceId: midnightChoice,
-            relationId: needRunning,
-            previousStepId: null,
-          ),
-        ]),
       ),
     ),
     GraphEntityDeleted(TagKey(_tagId(_tagIds[1]))),
@@ -464,7 +491,14 @@ List<GraphFact> _expectedGoldenFacts() {
       TagAssignmentKey(TagAssignment(tagId: home, intentionId: running)),
     ),
     GraphEntityDeleted(LongTermRelationKey(_relationId(_relationIds[2]))),
-    GraphEntityDeleted(DailyChoiceKey(_dailyChoiceId(_dailyChoiceIds[2]))),
+    GraphEntityDeleted(DeletedIntentionKey(_intentionId(_intentionIds[3]))),
+    GraphEntityDeleted(
+      DeletedRelationPairKey(
+        sourceIntentionId: health,
+        relatedIntentionId: running,
+      ),
+    ),
+    GraphEntityDeleted(ActionKey(_actionId(_actionIds[2]))),
   ];
 }
 
@@ -476,8 +510,5 @@ IntentionId _intentionId(String value) =>
 LongTermRelationId _relationId(String value) =>
     (LongTermRelationId.decode(value) as LongTermRelationIdDecodingSuccess).id;
 
-DailyChoiceId _dailyChoiceId(String value) =>
-    (DailyChoiceId.decode(value) as DailyChoiceIdDecodingSuccess).id;
-
-ChoicePathStepId _stepId(String value) =>
-    (ChoicePathStepId.decode(value) as ChoicePathStepIdDecodingSuccess).id;
+ActionId _actionId(String value) =>
+    (ActionId.decode(value) as ActionIdDecodingSuccess).id;

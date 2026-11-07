@@ -5,7 +5,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
-import '../../daily_choice/presentation/daily_choice_command_failure_message.dart';
+import '../../action/presentation/action_command_failure_message.dart';
 import '../../data_transfer/presentation/graph_import_failure_message.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
@@ -313,8 +313,8 @@ GraphOperationMessage _messageFor(
   LongTermRelationPresentableCompletion() => GraphOperationMessage(
     _relationMessage(localizations, completion),
   ),
-  DailyChoicePresentableCompletion() => GraphOperationMessage(
-    _dailyChoiceMessage(localizations, completion),
+  ActionPresentableCompletion() => GraphOperationMessage(
+    _actionMessage(localizations, completion),
   ),
   TagCommandFailedCompletion() => GraphOperationMessage(
     _tagFailureMessage(localizations, completion),
@@ -400,25 +400,25 @@ String _tagFailureMessage(
   },
 );
 
-String _dailyChoiceMessage(
+String _actionMessage(
   AppLocalizations localizations,
-  DailyChoicePresentableCompletion completion,
+  ActionPresentableCompletion completion,
 ) => localizations.graphOperationMessage(
   switch (completion.kind) {
-    DailyChoiceCommandKind.create => localizations.graphOperationCreate,
-    DailyChoiceCommandKind.update => localizations.graphOperationUpdate,
-    DailyChoiceCommandKind.delete => localizations.graphOperationDelete,
+    ActionCommandKind.create => localizations.graphOperationCreate,
+    ActionCommandKind.update => localizations.graphOperationUpdate,
+    ActionCommandKind.delete => localizations.graphOperationDelete,
   },
-  localizations.graphOperationDailyChoice,
+  localizations.graphOperationAction,
   switch (completion.result) {
     GraphResultSuccess() => switch (completion.kind) {
-      DailyChoiceCommandKind.create => localizations.dailyChoiceCreated,
-      DailyChoiceCommandKind.update => throw StateError(
-        'Успех изменения дневного выбора не образует права предъявления.',
+      ActionCommandKind.update => throw StateError(
+        'Успех изменения действия не образует права предъявления.',
       ),
-      DailyChoiceCommandKind.delete => localizations.dailyChoiceDeleted,
+      ActionCommandKind.create => localizations.actionCreated,
+      ActionCommandKind.delete => localizations.actionDeleted,
     },
-    GraphResultFailure(:final failure) => dailyChoiceCommandFailureMessage(
+    GraphResultFailure(:final failure) => actionCommandFailureMessage(
       localizations,
       failure,
     ),
@@ -543,6 +543,8 @@ String _successFor(
   (IntentionCommandKind.create, IntentionSaved()) => switch (target) {
     CreatingIntentionForSearchOperationTarget() =>
       localizations.editorCreatedAndChosen,
+    CreatingIntentionForPathStartOperationTarget() =>
+      localizations.editorCreatedAndChosenPathStart,
     CreatingIntentionOperationTarget() ||
     ExistingIntentionOperationTarget() => localizations.editorCreated,
   },

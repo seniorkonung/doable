@@ -2,9 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/action/application/action_command.dart';
+import 'package:doable/src/action/domain/action_id.dart';
 import 'package:doable/src/data/local/app_database.dart' show AppDatabase;
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -30,6 +29,8 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uuid/uuid.dart';
 
+import '../support/action_seed.dart'
+    show actionPathRole, insertAction, insertActionPathItem, seedUuid;
 import '../support/encoded_diagnostics_log.dart';
 import '../support/failing_snapshot_temporary_files.dart';
 import '../support/forwarding_graph_fact_log.dart';
@@ -127,9 +128,10 @@ void main() {
     ),
   )).intention;
 
-  /// Связь [source] → [related] и дневной выбор [related] по ней: записи
-  /// последних секций формата.
-  Future<void> relateAndChoose(Intention source, Intention related) async {
+  /// Связь [source] → [related] и действие с путём по ней: записи последних
+  /// секций формата. Команды создания действия нет, поэтому оно заполняется
+  /// в обход лога и попадает только в снимки, собранные из базы.
+  Future<void> relateAndAct(Intention source, Intention related) async {
     final relation = (await confirm<LongTermRelationsAdded>(
       AddLongTermRelations(
         pageIntentionId: source.id,
@@ -149,21 +151,12 @@ void main() {
         ),
       ),
     );
-    await confirm(
-      CreateDailyChoice(
-        sourceIntentionId: source.id,
-        selectedIntentionId: related.id,
-        path: ConfirmedChoicePath([
-          ConfirmedChoicePathStep(
-            relationId: relation.id,
-            sourceIntentionId: source.id,
-            type: relation.type,
-            relatedIntentionId: related.id,
-          ),
-        ]),
-        date: CalendarDate.fromParts(2026, 10, 17),
-        description: null,
-        isCompleted: false,
+    await seedGraph(
+      database,
+      () => insertAction(
+        database,
+        id: seedUuid(100),
+        path: [source.id.toCanonicalString(), related.id.toCanonicalString()],
       ),
     );
   }
@@ -207,7 +200,7 @@ void main() {
         'состояние из него и последующих пакетов совпадает с базой', () async {
       final home = await createTag('Дом');
       final health = await createIntention('Здоровье', tagIds: {home.id});
-      await relateAndChoose(health, await createIntention('Бегать'));
+      await relateAndAct(health, await createIntention('Бегать'));
       final damaged = await storeOver(repository)
           .writeSnapshot(await repository.readCurrentPosition());
       await corrupt(snapshotFile(damaged));
@@ -228,6 +221,72 @@ void main() {
     });
   }
 
+  test('пересобранный из базы снимок и последующие пакеты воспроизводят '
+      'действия с путями и надгробия', () async {
+    final health = await createIntention('Здоровье');
+    final running = await createIntention('Бегать');
+    final morning = await createIntention('Пробежка утром');
+    Future<LongTermRelation> relate(
+      Intention source,
+      Intention related,
+    ) async => (await confirm<LongTermRelationsAdded>(
+      AddLongTermRelations(
+        pageIntentionId: source.id,
+        candidateIds: [related.id],
+        group: IntentionRelationGroup.needs,
+      ),
+    )).relations.single;
+    final healthRunning = await relate(health, running);
+    final runningMorning = await relate(running, morning);
+    // Действия пока появляются только в обход лога: команды их создания нет.
+    await seedGraph(database, () async {
+      for (final (number, path) in [
+        (1, [health, running, morning]),
+        (2, [health, running]),
+      ]) {
+        await database.customStatement(
+          'INSERT INTO actions (id, title, date, priority, is_completed, '
+          "created_at, updated_at) VALUES (?, 'Пробежка', '2026-10-17', 4, 0, "
+          '1, 1)',
+          [seedUuid(number)],
+        );
+        for (final (position, intention) in path.indexed) {
+          await database.customStatement(insertActionPathItem, [
+            seedUuid(number),
+            position,
+            intention.id.toCanonicalString(),
+            position == 0 ? null : path[position - 1].id.toCanonicalString(),
+            actionPathRole(position, path.length),
+          ]);
+        }
+      }
+    });
+    await confirm(DeleteLongTermRelation(healthRunning.id));
+    final damaged = await storeOver(repository)
+        .writeSnapshot(await repository.readCurrentPosition());
+    await snapshotFile(damaged).delete();
+    final compaction = compactionOver(repository)..start();
+    await confirmCommands(_threshold + 1);
+    await compaction.shutdown();
+    expect(attempts, hasLength(1));
+
+    await confirm(
+      UpdateActionFields(
+        actionId: _actionId(1),
+        patch: const ActionFieldsPatch(isCompleted: ActionFieldSet(true)),
+      ),
+    );
+    await confirm(DeleteLongTermRelation(runningMorning.id));
+    await confirm(DeleteIntention(running.id));
+    await confirm(DeleteAction(_actionId(2)));
+
+    final records = await referenceGraphRecords(database);
+    expect(records.whereType<ActionRecord>(), hasLength(1));
+    expect(records.whereType<DeletedIntentionRecord>(), hasLength(1));
+    expect(records.whereType<DeletedRelationPairRecord>(), hasLength(2));
+    await expectStateMatchesDatabase();
+  });
+
   test('команды между порциями задержанной пересборки подтверждаются до её '
       'окончания и отражены в пересобранном снимке', () async {
     // Первая порция заканчивается посреди назначений тега «Дом»: 2 тега,
@@ -238,7 +297,7 @@ void main() {
       for (var index = 0; index < 60; index++)
         await createIntention('Намерение $index', tagIds: {home.id}),
     ];
-    await relateAndChoose(intentions[0], intentions[1]);
+    await relateAndAct(intentions[0], intentions[1]);
     final damaged = await storeOver(repository)
         .writeSnapshot(await repository.readCurrentPosition());
     await snapshotFile(damaged).delete();
@@ -536,6 +595,9 @@ final class _FirstPortionPausingLog extends ForwardingGraphFactLog {
     return portion;
   }
 }
+
+ActionId _actionId(int number) =>
+    (ActionId.decode(seedUuid(number)) as ActionIdDecodingSuccess).id;
 
 Future<Set<String>> _fileNamesIn(Directory directory) async => {
   if (await directory.exists())

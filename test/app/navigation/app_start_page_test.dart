@@ -4,7 +4,7 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/action/presentation/day/action_day_root_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
@@ -46,7 +46,7 @@ void main() {
   });
 
   group('начальная страница не зависит от намерений', () {
-    testWidgets('намерения без дневных выборов оставляют статистику пустой', (
+    testWidgets('намерения без действий оставляют статистику пустой', (
       tester,
     ) async {
       final harness = await _harness(tester, const Locale('ru'));
@@ -184,7 +184,7 @@ void _expectStartPage(WidgetTester tester) {
   for (final page in [
     IntentionDetailsPage,
     IntentionCatalogPage,
-    DailyChoiceCatalogPage,
+    ActionDayRootPage,
   ]) {
     expect(
       find.byType(page, skipOffstage: false),
@@ -201,16 +201,9 @@ AppDestination _selected(WidgetTester tester) =>
 Future<void> _expectEmptyHome(WidgetTester tester) async {
   final home = find.byType(HomePage);
   final l10n = AppLocalizations.of(tester.element(home));
-  await _until(tester, find.text(l10n.statisticsPlannedContribution(0)));
-  await tester.scrollUntilVisible(
-    find.text(l10n.statisticsEmpty),
-    200,
-    scrollable: find.descendant(of: home, matching: find.byType(Scrollable)),
-  );
-  expect(find.text(l10n.statisticsEmpty), findsOneWidget);
-  expect(find.text(l10n.statisticsPlannedContribution(0)), findsOneWidget);
-  expect(find.text(l10n.statisticsContribution(0)), findsOneWidget);
-  expect(find.text(l10n.statisticsTotalItems(0)), findsOneWidget);
+  await _until(tester, find.text(l10n.statisticsPeriodEmpty));
+  expect(find.text(l10n.statisticsPeriodSummary), findsNothing);
+  expect(find.text(l10n.statisticsTotalItems(0)), findsNothing);
 }
 
 void _storeIntention(

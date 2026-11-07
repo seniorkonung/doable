@@ -1,7 +1,6 @@
 import 'dart:isolate';
 
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/action/application/action_command.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -15,13 +14,16 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
-import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/action_seed.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
 void main() {
   late LocalDatabaseHarness harness;
+  late sqlite.Database raw;
   late AppDatabase database;
   late DriftPersonalGraphRepository repository;
   late InMemoryDiagnosticsSink diagnostics;
@@ -30,13 +32,11 @@ void main() {
   StatisticsQuery query({
     StatisticsCursor? cursor,
     StatisticsPeriod? period,
-    CalendarDate? localDate,
     int pageSize = 2,
     StatisticsView view = StatisticsView.throughRelations,
   }) => StatisticsQuery(
     period: period ?? StatisticsMonth(2026, 9),
     view: view,
-    localDate: localDate ?? CalendarDate.fromParts(2026, 9, 23),
     pageSize: pageSize,
     cursor: cursor,
   );
@@ -49,22 +49,47 @@ void main() {
     UuidV7IntentionIdGenerator(),
     () => DateTime.utc(2026, 9, 23),
     diagnostics,
-    dailyChoiceIdGenerator: FixedChoiceIds(durabilityChoice(201)),
-    choicePathStepIdGenerator: SequentialStepIds(301),
     statisticsReachabilityRunner: runner,
   );
 
   setUp(() async {
     harness = LocalDatabaseHarness.inMemory();
     probe = _ReadProbe();
-    database = await harness.openReadyDatabase(observer: probe);
-    await seedDurabilityGraph(database);
+    database = await harness.openReadyDatabase(
+      setup: (db) => raw = db,
+      observer: probe,
+    );
+    // Путь 1 → 2 → 3 идёт по активным связям, а связи 1 → 4 и 1 → 5 к нему
+    // не ведут.
+    seedRawGraph(raw, () {
+      for (var number = 1; number <= 5; number++) {
+        seedIntention(raw, seedUuid(number), 'Намерение $number');
+      }
+      for (final (number, source, related) in [
+        (101, 1, 2),
+        (102, 2, 3),
+        (103, 1, 4),
+        (104, 1, 5),
+      ]) {
+        seedRelation(
+          raw,
+          seedUuid(number),
+          seedUuid(source),
+          seedUuid(related),
+        );
+      }
+      seedAction(
+        raw,
+        id: seedUuid(201),
+        path: [
+          for (final number in [1, 2, 3]) seedUuid(number),
+        ],
+        date: '2026-09-23',
+        isCompleted: true,
+      );
+    });
     diagnostics = InMemoryDiagnosticsSink();
     repository = createRepository();
-    expect(
-      await repository.execute(durabilityCreate()),
-      isA<GraphCommandSucceeded>(),
-    );
   });
   tearDown(() => harness.dispose());
 
@@ -72,21 +97,19 @@ void main() {
     'первая и поздняя порции дают точные числа и архивные отметки',
     () async {
       expect(
-        await repository.execute(ArchiveIntention(durabilityIntention(2))),
+        await repository.execute(ArchiveIntention(seedIntentionId(2))),
         isA<GraphCommandSucceeded>(),
       );
       final PersonalGraphRepository publicRepository = repository;
       final first = _page(
         await publicRepository.getStatisticsPage(query()),
       ) as StatisticsFirstPage;
-      expect(first.summary.counts.planned, 1);
-      expect(first.summary.counts.contribution, 1);
-      expect(first.summary.uncompleted.missed, 0);
-      expect(first.summary.uncompleted.upcoming, 0);
+      expect(first.summary.planned, 1);
+      expect(first.summary.contribution, 1);
       expect(first.totalItems, 3);
       expect(first.items.map((item) => item.id), [
-        durabilityIntention(3),
-        durabilityIntention(2),
+        seedIntentionId(3),
+        seedIntentionId(2),
       ]);
       expect(first.items.last.archiveState, IntentionArchiveState.archived);
       expect(first.items.last.title, 'Намерение 2');
@@ -94,7 +117,7 @@ void main() {
         await repository.getStatisticsPage(query(cursor: first.nextCursor)),
       );
       expect(last, isA<StatisticsContinuationPage>());
-      expect(last.items.single.id, durabilityIntention(1));
+      expect(last.items.single.id, seedIntentionId(1));
       expect(last.nextCursor, isNull);
       for (final item in [...first.items, ...last.items]) {
         expect(item.counts.planned, 1);
@@ -113,8 +136,8 @@ void main() {
         query(period: StatisticsMonth(2026, 10)),
       ),
     ) as StatisticsFirstPage;
-    expect(page.summary.counts.planned, 0);
-    expect(page.summary.counts.contribution, 0);
+    expect(page.summary.planned, 0);
+    expect(page.summary.contribution, 0);
     expect(page.totalItems, 0);
     expect(page.items, isEmpty);
     expect(page.nextCursor, isNull);
@@ -146,11 +169,9 @@ void main() {
       expect(eventRan, isTrue);
       expect(completed, isFalse);
       final command = await repository.execute(
-        UpdateDailyChoiceFields(
-          choiceId: durabilityChoice(201),
-          patch: const DailyChoiceFieldsPatch(
-            isCompleted: DailyChoiceFieldSet(false),
-          ),
+        UpdateActionFields(
+          actionId: seedActionId(201),
+          patch: const ActionFieldsPatch(isCompleted: ActionFieldSet(false)),
         ),
       );
       expect(command, isA<GraphCommandSucceeded>());
@@ -176,7 +197,7 @@ void main() {
       final fresh = _page(
         await repository.getStatisticsPage(query()),
       ) as StatisticsFirstPage;
-      expect(fresh.summary.counts.contribution, 0);
+      expect(fresh.summary.contribution, 0);
       expect(
         fresh.items.every((item) => item.counts.contribution == 0),
         isTrue,
@@ -198,7 +219,7 @@ void main() {
       final last = _page(
         await repository.getStatisticsPage(query(cursor: first.nextCursor)),
       );
-      expect(last.items.single.id, durabilityIntention(1));
+      expect(last.items.single.id, seedIntentionId(1));
       expect(probe.sourceReads, 1);
       expect(probe.snapshotReads, 1);
       expect(_computations(diagnostics), 1);
@@ -224,7 +245,7 @@ void main() {
         query(period: StatisticsYear(2026), cursor: year.nextCursor),
       ),
     );
-    expect(continued.items.single.id, durabilityIntention(1));
+    expect(continued.items.single.id, seedIntentionId(1));
     expect(probe.sourceReads, 3);
     expect(_computations(diagnostics), 3);
     await repository.getStatisticsPage(query());
@@ -232,42 +253,13 @@ void main() {
     expect(_computations(diagnostics), 4);
   });
 
-  test('смена местной даты пересчитывает сводку без изменения графа', () async {
-    expect(
-      await repository.execute(
-        UpdateDailyChoiceFields(
-          choiceId: durabilityChoice(201),
-          patch: const DailyChoiceFieldsPatch(
-            isCompleted: DailyChoiceFieldSet(false),
-          ),
-        ),
-      ),
-      isA<GraphCommandSucceeded>(),
-    );
-    final today = _page(
-      await repository.getStatisticsPage(query()),
-    ) as StatisticsFirstPage;
-    final tomorrow = _page(
-      await repository.getStatisticsPage(
-        query(localDate: CalendarDate.fromParts(2026, 9, 24)),
-      ),
-    ) as StatisticsFirstPage;
-    expect(today.summary.uncompleted.upcoming, 1);
-    expect(today.summary.uncompleted.missed, 0);
-    expect(tomorrow.summary.uncompleted.upcoming, 0);
-    expect(tomorrow.summary.uncompleted.missed, 1);
-    expect(probe.sourceReads, 2);
-    expect(_computations(diagnostics), 2);
-  });
-
   test('курсор отклоняется при смене условий, вида чтения и эпохи', () async {
     final first = _page(await repository.getStatisticsPage(query()));
     final cursor = first.nextCursor;
     for (final changed in [
       query(cursor: cursor, period: StatisticsYear(2026)),
-      query(cursor: cursor, localDate: CalendarDate.fromParts(2026, 9, 24)),
       query(cursor: cursor, pageSize: 1),
-      query(cursor: cursor, view: StatisticsView.selectedActions),
+      query(cursor: cursor, view: StatisticsView.terminalIntentions),
     ]) {
       _expectExpired(await repository.getStatisticsPage(changed));
     }
@@ -283,7 +275,7 @@ void main() {
     () async {
       final first = _page(await repository.getStatisticsPage(query()));
       expect(
-        await repository.execute(ArchiveIntention(durabilityIntention(2))),
+        await repository.execute(ArchiveIntention(seedIntentionId(2))),
         isA<GraphCommandSucceeded>(),
       );
       _expectExpired(

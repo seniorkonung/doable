@@ -2,8 +2,6 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
-import '../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
 import '../../design_system/components/notice.dart';
 import '../../design_system/components/sheet.dart';
 import '../../design_system/doable_colors.dart';
@@ -13,6 +11,8 @@ import '../../graph/application/graph_command_coordinator.dart';
 import '../../graph_backups/graph_backup_registry.dart';
 import '../../graph_backups/graph_backups_provider.dart';
 import '../../graph_backups/graph_change_summary.dart';
+import '../../shared/presentation/local_day/local_date_provider.dart';
+import '../../shared/presentation/local_day/local_day_observer.dart';
 import '../application/graph_restore_provider.dart';
 import 'backup_descriptions.dart';
 import 'restore_backup_confirmation.dart';
@@ -47,13 +47,13 @@ final class _BackupsSheet extends ConsumerStatefulWidget {
 final class _BackupsSheetState extends ConsumerState<_BackupsSheet> {
   /// Перестраивает панель с началом другой местной даты, чтобы дни копий
   /// назывались относительно нового сегодня.
-  late final DailyChoiceLocalDayObserver _localDay;
+  late final LocalDayObserver _localDay;
 
   @override
   void initState() {
     super.initState();
-    _localDay = DailyChoiceLocalDayObserver(
-      readLocalDay: ref.read(dailyChoiceLocalDateSourceProvider),
+    _localDay = LocalDayObserver(
+      readLocalDay: ref.read(localDateSourceProvider),
       onTodayChanged: () => setState(() {}),
     );
   }

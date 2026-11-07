@@ -1,5 +1,5 @@
-import '../../daily_choice/domain/calendar_date.dart';
 import '../../graph/application/graph_revision.dart';
+import '../../shared/domain/calendar_date.dart';
 import '../application/contribution_counts.dart';
 import '../application/statistics_period.dart';
 import '../application/statistics_read_contract.dart';
@@ -14,7 +14,7 @@ final class HomeStatisticsSelection {
     required this.year,
     required this.browsedYear,
     this.tab = HomeStatisticsTab.month,
-    this.view = StatisticsView.sourceIntentions,
+    this.view = StatisticsView.rootIntentions,
     this.isPeriodSelectorExpanded = false,
   });
 
@@ -141,7 +141,7 @@ sealed class HomeStatisticsLoaded extends HomeStatisticsReadState {
     this.refreshStatus = const HomeStatisticsRefreshIdle(),
   }) : items = List.unmodifiable(items);
 
-  final StatisticsPeriodSummary summary;
+  final ContributionCounts summary;
   final int totalItems;
   final List<StatisticsItem> items;
   final GraphRevision revision;
@@ -152,7 +152,11 @@ sealed class HomeStatisticsLoaded extends HomeStatisticsReadState {
   HomeStatisticsLoaded withRefreshStatus(
     HomeStatisticsRefreshStatus refreshStatus,
   ) => switch (this) {
-    HomeStatisticsEmpty() => HomeStatisticsEmpty(
+    HomeStatisticsPeriodEmpty() => HomeStatisticsPeriodEmpty(
+      revision: revision,
+      refreshStatus: refreshStatus,
+    ),
+    HomeStatisticsViewEmpty() => HomeStatisticsViewEmpty(
       summary: summary,
       revision: revision,
       refreshStatus: refreshStatus,
@@ -191,8 +195,20 @@ final class HomeStatisticsData extends HomeStatisticsLoaded {
       );
 }
 
-final class HomeStatisticsEmpty extends HomeStatisticsLoaded {
-  HomeStatisticsEmpty({
+/// В периоде нет действий: сводки, выбора вида и каталога нет.
+final class HomeStatisticsPeriodEmpty extends HomeStatisticsLoaded {
+  HomeStatisticsPeriodEmpty({required super.revision, super.refreshStatus})
+    : super(
+        summary: ContributionCounts(planned: 0, contribution: 0),
+        totalItems: 0,
+        items: const [],
+        nextCursor: null,
+      );
+}
+
+/// В периоде есть действия, но в выбранном виде нет элементов.
+final class HomeStatisticsViewEmpty extends HomeStatisticsLoaded {
+  HomeStatisticsViewEmpty({
     required super.summary,
     required super.revision,
     super.refreshStatus,

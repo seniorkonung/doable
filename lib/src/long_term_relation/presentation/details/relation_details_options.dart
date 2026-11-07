@@ -7,7 +7,6 @@ import '../../../design_system/components/options_menu.dart';
 import '../../../design_system/components/sheet.dart';
 import '../../../design_system/doable_icon.dart';
 import '../../../intention/domain/intention.dart';
-import '../../application/long_term_relation_permissions.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../domain/long_term_relation.dart';
 import 'relation_details_state.dart';
@@ -19,8 +18,7 @@ enum RelationOption { archive, restore, delete }
 /// Пункты листа параметров по последнему принятому снимку панели.
 ///
 /// Пока для связи выполняется изменяющая операция, пункты недоступны и просят
-/// дождаться её окончания. Исключение — удаление связи из пути дневного выбора:
-/// окончание операции его не откроет, поэтому оно сохраняет свою причину.
+/// дождаться её окончания.
 List<OptionsMenuItem<RelationOption>> relationOptions(
   AppLocalizations localizations,
   RelationDetailsLoaded loaded,
@@ -60,23 +58,17 @@ List<OptionsMenuItem<RelationOption>> relationOptions(
     },
   };
 
-  final deleteBlocker = switch (loaded.permissions.restriction) {
-    LongTermRelationPermissionRestriction.referencedByDailyPath =>
-      localizations.relationDetailsPathProtection,
-    null when busy => wait,
-    null => null,
-  };
-  final delete = deleteBlocker == null
-      ? OptionsMenuItem(
+  final delete = busy
+      ? OptionsMenuItem<RelationOption>.unavailable(
+          icon: DoableIconData.delete,
+          name: localizations.relationSheetOptionDelete,
+          reason: wait,
+        )
+      : OptionsMenuItem(
           value: RelationOption.delete,
           icon: DoableIconData.delete,
           name: localizations.relationSheetOptionDelete,
           tone: OptionRowTone.danger,
-        )
-      : OptionsMenuItem<RelationOption>.unavailable(
-          icon: DoableIconData.delete,
-          name: localizations.relationSheetOptionDelete,
-          reason: deleteBlocker,
         );
 
   return [stateChange, delete];

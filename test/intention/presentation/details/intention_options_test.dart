@@ -76,14 +76,6 @@ void main() {
         'Его связи останутся в архиве, пока вы их не восстановите',
       );
     }
-    // Дневные выборы не остаются в архиве, поэтому пояснение их не касается.
-    expect(
-      intentionOptions(
-        ru,
-        _loaded(archived: true, counts: testRelationCounts(dailySource: 1)),
-      )[1].hint,
-      'Новые пути снова смогут его использовать',
-    );
   });
 
   test('доступное удаление поясняет, что теги сохранятся', () {
@@ -93,18 +85,10 @@ void main() {
   });
 
   test('удаление выключено, пока его блокируют связи любого архивного '
-      'состояния, дневные выборы или и то, и другое, и называет причину', () {
-    for (final (counts, reason) in [
-      (testRelationCounts(activeNeedIncoming: 1), 'Сначала удалите его связи'),
-      (testRelationCounts(archivedCanIncoming: 1), 'Сначала удалите его связи'),
-      (
-        testRelationCounts(dailySelected: 1),
-        'Сначала удалите его дневные выборы',
-      ),
-      (
-        testRelationCounts(archivedNeedOutgoing: 1, dailySource: 2),
-        'Сначала удалите его связи и дневные выборы',
-      ),
+      'состояния, и называет причину только о связях', () {
+    for (final counts in [
+      testRelationCounts(activeNeedIncoming: 1),
+      testRelationCounts(archivedCanIncoming: 1),
     ]) {
       for (final archived in [false, true]) {
         final delete = intentionOptions(
@@ -112,7 +96,7 @@ void main() {
           _loaded(archived: archived, counts: counts),
         )[2];
         expect(delete.value, isNull);
-        expect(delete.hint, reason);
+        expect(delete.hint, 'Сначала удалите его связи');
       }
     }
   });
@@ -133,13 +117,13 @@ void main() {
 
     final blocked = intentionOptions(
       ru,
-      _loaded(running: true, counts: testRelationCounts(dailySource: 1)),
+      _loaded(running: true, counts: testRelationCounts(activeNeedIncoming: 1)),
     );
     expect(blocked.map((item) => item.value), everyElement(isNull));
     expect(blocked.map((item) => item.hint), [
       'Дождитесь окончания текущего изменения',
       'Дождитесь окончания текущего изменения',
-      'Сначала удалите его дневные выборы',
+      'Сначала удалите его связи',
     ]);
   });
 
@@ -171,25 +155,14 @@ void main() {
     expect(
       intentionOptions(
         en,
-        _loaded(archived: true, counts: testRelationCounts(dailySource: 1)),
-      ).map((item) => (item.name, item.hint)),
-      [
-        ('Edit', null),
-        ('Restore from archive', 'New paths can use it again'),
-        ('Delete', 'Delete its daily choices first'),
-      ],
-    );
-    expect(
-      intentionOptions(
-        en,
         _loaded(
           archived: true,
-          counts: testRelationCounts(archivedNeedIncoming: 1, dailySource: 1),
+          counts: testRelationCounts(archivedNeedIncoming: 1),
         ),
       ).map((item) => item.hint).skip(1),
       [
         'Its relations stay archived until you restore them',
-        'Delete its relations and daily choices first',
+        'Delete its relations first',
       ],
     );
     expect(

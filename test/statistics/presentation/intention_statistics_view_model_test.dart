@@ -1,4 +1,4 @@
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
 import 'package:doable/src/statistics/application/intention_statistics_target.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
@@ -17,15 +17,38 @@ void main() {
       final page = harness.open();
       expect(page.state.selection.period, StatisticsMonth(2026, 10));
       expect(page.state.selection.year, StatisticsYear(2026));
-      expect(page.state.selection.view, StatisticsView.throughRelations);
+      expect(page.state.selection.view, isNull);
       expect(page.state.read, isA<IntentionStatisticsInitialLoad>());
       await pumpEventQueue();
       final query = harness.reader.queries.single;
       expect(query.intentionId, statisticsId(1));
       expect(query.period, StatisticsMonth(2026, 10));
-      expect(query.view, StatisticsView.throughRelations);
-      expect(query.localDate, statisticsToday);
+      expect(query.view, isNull);
       expect(query.pageSize, 100);
+    },
+  );
+
+  test(
+    'без цели выбранный чтением вид запоминается и уходит в следующее чтение',
+    () async {
+      final harness = IntentionStatisticsHarness();
+      addTearDown(harness.dispose);
+      final page = harness.open();
+      await pumpEventQueue();
+      expect(harness.reader.queries.single.view, isNull);
+
+      harness.reader.section(0, defaultView: StatisticsView.terminalIntentions);
+      await pumpEventQueue();
+      expect(page.state.selection.view, page.loaded.section.view);
+      expect(page.state.selection.view, StatisticsView.terminalIntentions);
+
+      page.model.selectPeriod(StatisticsYear(2025));
+      await pumpEventQueue();
+      expect(harness.reader.queries, hasLength(2));
+      expect(
+        harness.reader.queries.last.view,
+        StatisticsView.terminalIntentions,
+      );
     },
   );
 
@@ -73,20 +96,20 @@ void main() {
       page.model.selectPeriod(StatisticsMonth(2025, 3));
       page.model.selectMode(IntentionStatisticsMode.year);
       page.model.selectPeriod(StatisticsYear(2024));
-      page.model.selectView(StatisticsView.sourceIntentions);
+      page.model.selectView(StatisticsView.rootIntentions);
       page.model.selectMode(IntentionStatisticsMode.month);
       expect(page.state.selection.period, StatisticsMonth(2025, 3));
       page.model.selectMode(IntentionStatisticsMode.year);
       expect(page.state.selection.period, StatisticsYear(2024));
       page.model.selectMonth(7);
       expect(page.state.selection.period, StatisticsMonth(2024, 7));
-      expect(page.state.selection.view, StatisticsView.sourceIntentions);
+      expect(page.state.selection.view, StatisticsView.rootIntentions);
       page.model.selectMode(IntentionStatisticsMode.year);
       expect(page.state.selection.period, StatisticsYear(2024));
       final count = harness.reader.queries.length;
       page.model.selectMode(IntentionStatisticsMode.year);
       page.model.selectPeriod(StatisticsYear(2024));
-      page.model.selectView(StatisticsView.sourceIntentions);
+      page.model.selectView(StatisticsView.rootIntentions);
       expect(harness.reader.queries, hasLength(count));
     },
   );
@@ -140,13 +163,13 @@ void main() {
     harness.reader.section(3, marker: 33);
     await pumpEventQueue();
     expect(
-      first.loaded.breakdowns.sourceIntentions!.items.single.id,
+      first.loaded.breakdowns.rootIntentions!.items.single.id,
       statisticsId(33),
     );
     expect(second.state.selection.period, StatisticsMonth(2026, 10));
     expect(second.state.selection.view, StatisticsView.throughRelations);
     expect(
-      second.loaded.breakdowns.selectedActions!.items.single.id,
+      second.loaded.breakdowns.terminalIntentions!.items.single.id,
       statisticsId(22),
     );
     first.close();
@@ -155,7 +178,7 @@ void main() {
     final reopened = harness.open();
     await pumpEventQueue();
     expect(reopened.state.selection.period, StatisticsMonth(2026, 10));
-    expect(reopened.state.selection.view, StatisticsView.throughRelations);
+    expect(reopened.state.selection.view, isNull);
   });
 
   test('смена условий отбрасывает поздние успех и отказ раздела', () async {
@@ -171,7 +194,7 @@ void main() {
     harness.reader.fail(1, const StatisticsReadUnavailableFailure());
     await pumpEventQueue();
     expect(
-      page.loaded.breakdowns.sourceIntentions!.items.single.id,
+      page.loaded.breakdowns.rootIntentions!.items.single.id,
       statisticsId(3),
     );
     expect(page.loaded.section.query.period, StatisticsYear(2025));
@@ -198,7 +221,7 @@ void main() {
       expect(page.state.read, isA<IntentionStatisticsEmpty>());
       expect(page.loaded.section.selectedCounts.planned, 0);
       expect(page.loaded.section.periodCounts.contribution, 20);
-      expect(page.loaded.section.cards.sourceIntentions.planned, 1);
+      expect(page.loaded.section.cards.rootIntentions.planned, 1);
     },
   );
 
@@ -208,7 +231,7 @@ void main() {
     final page = harness.open();
     await pumpEventQueue();
     final relationCursor = StatisticsTestCursor<StatisticsRelationItem>();
-    final actionCursor = StatisticsTestCursor<StatisticsItem>();
+    final terminalIntentionCursor = StatisticsTestCursor<StatisticsItem>();
     harness.reader.section(
       0,
       marker: 106,
@@ -216,7 +239,7 @@ void main() {
       total: 205,
       relationsTotal: 101,
       relationsCursor: relationCursor,
-      actionsCursor: actionCursor,
+      terminalIntentionsCursor: terminalIntentionCursor,
     );
     await pumpEventQueue();
     await page.model.loadMoreIfNeeded(StatisticsBreakdown.relations, 68);
@@ -225,8 +248,8 @@ void main() {
       StatisticsBreakdown.relations,
       69,
     );
-    final actionsLoad = page.model.loadMoreIfNeeded(
-      StatisticsBreakdown.selectedActions,
+    final terminalIntentionsLoad = page.model.loadMoreIfNeeded(
+      StatisticsBreakdown.terminalIntentions,
       69,
     );
     await page.model.loadMoreIfNeeded(StatisticsBreakdown.relations, 99);
@@ -238,28 +261,34 @@ void main() {
       List.generate(100, (i) => statisticsItem(105 - i)),
       cursor: lastCursor,
     );
-    await actionsLoad;
+    await terminalIntentionsLoad;
     harness.reader.more<StatisticsRelationItem>(0, [
       statisticsRelation(105, planned: 3),
     ]);
     await relationsLoad;
     expect(page.loaded.breakdowns.relations!.items, hasLength(101));
-    expect(page.loaded.breakdowns.selectedActions!.items, hasLength(200));
-    expect(page.loaded.breakdowns.selectedActions!.totalItems, 205);
-    await page.model.loadMoreIfNeeded(StatisticsBreakdown.selectedActions, 168);
+    expect(page.loaded.breakdowns.terminalIntentions!.items, hasLength(200));
+    expect(page.loaded.breakdowns.terminalIntentions!.totalItems, 205);
+    await page.model.loadMoreIfNeeded(
+      StatisticsBreakdown.terminalIntentions,
+      168,
+    );
     expect(harness.reader.continuations, hasLength(2));
     final lastLoad = page.model.loadMoreIfNeeded(
-      StatisticsBreakdown.selectedActions,
+      StatisticsBreakdown.terminalIntentions,
       169,
     );
     harness.reader.more(2, List.generate(5, (i) => statisticsItem(5 - i)));
     await lastLoad;
     expect(
-      page.loaded.breakdowns.selectedActions!.items.map((item) => item.id),
+      page.loaded.breakdowns.terminalIntentions!.items.map((item) => item.id),
       List.generate(205, (i) => statisticsId(205 - i)),
     );
-    await page.model.loadMoreIfNeeded(StatisticsBreakdown.selectedActions, 204);
-    await page.model.loadMoreIfNeeded(StatisticsBreakdown.sourceIntentions, 0);
+    await page.model.loadMoreIfNeeded(
+      StatisticsBreakdown.terminalIntentions,
+      204,
+    );
+    await page.model.loadMoreIfNeeded(StatisticsBreakdown.rootIntentions, 0);
     expect(harness.reader.continuations, hasLength(3));
   });
 
@@ -273,32 +302,34 @@ void main() {
       harness.reader.section(
         0,
         total: 2,
-        actionsCursor: StatisticsTestCursor<StatisticsItem>(),
+        terminalIntentionsCursor: StatisticsTestCursor<StatisticsItem>(),
       );
       await pumpEventQueue();
-      final oldLoad = page.model.loadMore(StatisticsBreakdown.selectedActions);
-      page.model.selectView(StatisticsView.selectedActions);
+      final oldLoad = page.model.loadMore(
+        StatisticsBreakdown.terminalIntentions,
+      );
+      page.model.selectView(StatisticsView.terminalIntentions);
       expect(page.state.read, isA<IntentionStatisticsInitialLoad>());
       harness.reader.section(1, marker: 9);
       await pumpEventQueue();
       harness.reader.more(0, [statisticsItem(2)]);
       await oldLoad;
       expect(
-        page.loaded.breakdowns.sourceIntentions!.items.single.id,
+        page.loaded.breakdowns.rootIntentions!.items.single.id,
         statisticsId(9),
       );
-      expect(page.loaded.breakdowns.selectedActions, isNull);
+      expect(page.loaded.breakdowns.terminalIntentions, isNull);
     },
   );
 
   test(
-    'разбивка по исходным намерениям продолжает выбранные действия',
+    'разбивка по корневым намерениям продолжает выбранные действия',
     () async {
       final harness = IntentionStatisticsHarness();
       addTearDown(harness.dispose);
       final page = harness.open(
         target: IntentionStatisticsTarget(
-          view: StatisticsView.selectedActions,
+          view: StatisticsView.terminalIntentions,
           period: StatisticsMonth(2026, 10),
         ),
       );
@@ -307,17 +338,17 @@ void main() {
         0,
         marker: 2,
         total: 2,
-        sourcesCursor: StatisticsTestCursor<StatisticsItem>(),
+        rootIntentionsCursor: StatisticsTestCursor<StatisticsItem>(),
       );
       await pumpEventQueue();
-      final load = page.model.loadMore(StatisticsBreakdown.sourceIntentions);
+      final load = page.model.loadMore(StatisticsBreakdown.rootIntentions);
       harness.reader.more(0, [statisticsItem(1)]);
       await load;
       expect(
-        page.loaded.breakdowns.sourceIntentions!.items.map((item) => item.id),
+        page.loaded.breakdowns.rootIntentions!.items.map((item) => item.id),
         [statisticsId(2), statisticsId(1)],
       );
-      expect(page.loaded.breakdowns.selectedActions, isNull);
+      expect(page.loaded.breakdowns.terminalIntentions, isNull);
     },
   );
 
@@ -357,10 +388,7 @@ void main() {
         await page.model.retry();
         expect(harness.reader.queries, hasLength(2));
         expect(harness.reader.queries.last.period, StatisticsMonth(2026, 10));
-        expect(
-          harness.reader.queries.last.view,
-          StatisticsView.throughRelations,
-        );
+        expect(harness.reader.queries.last.view, isNull);
         harness.reader.section(1);
       }
       await retry;
@@ -377,18 +405,20 @@ void main() {
         harness.reader.section(
           0,
           total: 2,
-          actionsCursor: StatisticsTestCursor<StatisticsItem>(),
+          terminalIntentionsCursor: StatisticsTestCursor<StatisticsItem>(),
         );
         await pumpEventQueue();
-        final load = page.model.loadMore(StatisticsBreakdown.selectedActions);
+        final load = page.model.loadMore(
+          StatisticsBreakdown.terminalIntentions,
+        );
         harness.reader.failMore<StatisticsItem>(0, failure);
         await load;
         expect(
-          page.loaded.breakdowns.selectedActions!.items.single.id,
+          page.loaded.breakdowns.terminalIntentions!.items.single.id,
           statisticsId(1),
         );
         final status =
-            page.loaded.breakdowns.selectedActions!.pageStatus
+            page.loaded.breakdowns.terminalIntentions!.pageStatus
                 as IntentionStatisticsPageFailure;
         expect(status.failure, failure);
         expect(status.canRetry, canRetry);
@@ -397,21 +427,23 @@ void main() {
           isA<IntentionStatisticsPageIdle>(),
         );
         await page.model.loadMoreIfNeeded(
-          StatisticsBreakdown.selectedActions,
+          StatisticsBreakdown.terminalIntentions,
           0,
         );
         expect(harness.reader.continuations, hasLength(1));
         final retry = page.model.retryLoadMore(
-          StatisticsBreakdown.selectedActions,
+          StatisticsBreakdown.terminalIntentions,
         );
         if (canRetry) {
-          await page.model.retryLoadMore(StatisticsBreakdown.selectedActions);
+          await page.model.retryLoadMore(
+            StatisticsBreakdown.terminalIntentions,
+          );
           expect(harness.reader.continuations, hasLength(2));
           harness.reader.more(1, [statisticsItem(2)]);
         }
         await retry;
         expect(
-          page.loaded.breakdowns.selectedActions!.items,
+          page.loaded.breakdowns.terminalIntentions!.items,
           hasLength(canRetry ? 2 : 1),
         );
       },

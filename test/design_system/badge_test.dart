@@ -112,6 +112,85 @@ void main() {
     });
   }
 
+  for (final (themeName, brightness, colors) in [
+    ('светлой', Brightness.light, DoableColors.light),
+    ('тёмной', Brightness.dark, DoableColors.dark),
+  ]) {
+    testWidgets('в $themeName теме метка удаления — слово caption цвета muted '
+        'на fill с углами radius-xs за значком корзины 13, а строчная метка '
+        'не выше своего слова', (tester) async {
+      await tester.pumpWidget(
+        _app(
+          brightness: brightness,
+          child: const Badge.deleted(word: 'Удалено'),
+        ),
+      );
+
+      final badge = tester.getRect(find.bySubtype<Badge>());
+      final ground = tester.widget<DecoratedBox>(
+        find.descendant(
+          of: find.bySubtype<Badge>(),
+          matching: find.byType(DecoratedBox),
+        ),
+      );
+      expect(
+        ground.decoration,
+        BoxDecoration(
+          color: colors.fill,
+          borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
+        ),
+      );
+      final icon = tester.widget<DoableIcon>(find.byType(DoableIcon));
+      expect(icon.icon, DoableIconData.delete);
+      expect(icon.size, 13);
+      expect(icon.color, colors.muted);
+      final word = tester.getRect(find.text('Удалено'));
+      final iconRect = tester.getRect(find.byType(DoableIcon));
+      expect(badge.height, 20);
+      expect(word.top - badge.top, 1);
+      expect(iconRect.left - badge.left, 5);
+      expect(word.left - iconRect.right, DoableMetrics.space1);
+      expect(badge.right - word.right, 7);
+      final style = tester
+          .renderObject<RenderParagraph>(
+            find.descendant(
+              of: find.text('Удалено'),
+              matching: find.byType(RichText),
+            ),
+          )
+          .text
+          .style!;
+      expect(style.color, colors.muted);
+      expect(style.fontSize, DoableType.caption.fontSize);
+
+      await tester.pumpWidget(
+        _app(
+          brightness: brightness,
+          child: const Badge.deletedInline(word: 'Удалено'),
+        ),
+      );
+
+      expect(
+        tester.getRect(find.bySubtype<Badge>()).height,
+        tester.getRect(find.text('Удалено')).height,
+      );
+    });
+  }
+
+  testWidgets('диктор читает слово метки удаления, и метка не кнопка', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+
+    await tester.pumpWidget(_app(child: const Badge.deleted(word: 'Удалено')));
+
+    expect(
+      tester.getSemantics(find.text('Удалено')),
+      matchesSemantics(label: 'Удалено'),
+    );
+    semantics.dispose();
+  });
+
   testWidgets('диктор читает слово метки архива, и метка не кнопка', (
     tester,
   ) async {

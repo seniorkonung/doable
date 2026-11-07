@@ -1,12 +1,10 @@
 import 'dart:convert';
 
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
+import 'package:doable/src/action/application/action_command.dart';
+import 'package:doable/src/action/domain/action_id.dart';
+import 'package:doable/src/action/domain/action_priority.dart';
+import 'package:doable/src/action/domain/action_schedule.dart';
+import 'package:doable/src/action/domain/action_text.dart';
 import 'package:doable/src/data/local/app_database.dart' show AppDatabase;
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -21,6 +19,7 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag.dart';
@@ -29,7 +28,9 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:drift/drift.dart' show ComparableExpr, OrderingTerm;
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/action_seed.dart';
 import '../../support/graph_log_completeness_reference.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -42,7 +43,12 @@ void main() {
   late DriftPersonalGraphRepository repository;
   late DateTime now;
 
+  /// Состояние, заполненное в обход лога; без него лог сверяется от
+  /// позиции 0.
+  _GraphCheckpoint? seeded;
+
   setUp(() async {
+    seeded = null;
     harness = LocalDatabaseHarness.inMemory();
     database = await harness.openReadyDatabase();
     now = DateTime.utc(2026, 10, 17, 9);
@@ -63,19 +69,17 @@ void main() {
     records: await referenceGraphRecords(database),
   );
 
-  /// Сверяет выгрузку базы с состоянием, собранным из лога от позиции 0 и
-  /// от промежуточного состояния [base].
+  /// Сверяет выгрузку базы с состоянием, собранным из лога от позиции 0, а
+  /// после заполнения в обход лога — от заполненного состояния, и от
+  /// промежуточного состояния [base].
   Future<void> expectLogMatchesDatabase(_GraphCheckpoint base) async {
     final expected = await referenceGraphRecords(database);
     for (final (description, assemblyBase) in [
-      ('от позиции 0', const GraphStateBase.empty()),
-      (
-        'от позиции ${base.position}',
-        GraphStateBase(
-          position: base.position,
-          readRecords: () => Stream.fromIterable(base.records),
-        ),
-      ),
+      switch (seeded) {
+        null => ('от позиции 0', const GraphStateBase.empty()),
+        final origin => ('от заполненного состояния', _baseOf(origin)),
+      },
+      ('от позиции ${base.position}', _baseOf(base)),
     ]) {
       final state = await GraphStateAssembly.assemble(
         assemblyBase,
@@ -292,68 +296,127 @@ void main() {
     await confirm(DeleteLongTermRelation(relation.id));
   });
 
-  test('команды дневных выборов: создание, изменение полей и удаление '
-      'вместе с шагами', () async {
+  test('команды действий и удаления в путях: изменение и удаление действий, '
+      'появление и снятие надгробий намерения и пар', () async {
     final health = await createIntention('Здоровье');
-    final running = await createIntention(
-      'Бегать',
-      readiness: IntentionReadiness.ready,
-    );
-    final morning = await createIntention(
-      'Пробежка утром',
-      readiness: IntentionReadiness.ready,
-    );
-    final needRunning = await relate(health, running);
-    final needMorning = await relate(running, morning);
-    final choice = (await confirm<DailyChoiceCreated>(
-      CreateDailyChoice(
-        sourceIntentionId: health.id,
-        selectedIntentionId: morning.id,
-        path: _path([needRunning, needMorning]),
-        date: CalendarDate.fromParts(2026, 10, 17),
-        description: DailyChoiceDescription.fromInput('До работы'),
-        isCompleted: false,
-        schedule: DailyChoiceTime(hour: 7, minute: 30),
-        priority: DailyChoicePriority.p2,
-      ),
-    )).choice;
-    await confirm(
-      CreateDailyChoice(
-        sourceIntentionId: health.id,
-        selectedIntentionId: running.id,
-        path: _path([needRunning]),
-        date: CalendarDate.fromParts(2026, 10, 18),
-        description: null,
-        isCompleted: false,
-      ),
-    );
+    final running = await createIntention('Бегать');
+    final morning = await createIntention('Пробежка утром');
+    final healthRunning = await relate(health, running);
+    final runningMorning = await relate(running, morning);
+    final full = _actionId(1);
+    final short = _actionId(2);
+    await seedGraph(database, () async {
+      await _insertAction(database, full, 'Пробежка в парке', [
+        health,
+        running,
+        morning,
+      ]);
+      await _insertAction(database, short, 'Размяться', [health, running]);
+      await _insertAction(database, _actionId(3), 'Выйти пораньше', [morning]);
+    });
+    seeded = await checkpoint();
 
     await confirm(
-      UpdateDailyChoiceFields(
-        choiceId: choice.id,
-        patch: DailyChoiceFieldsPatch(
-          date: DailyChoiceFieldSet(CalendarDate.fromParts(2026, 10, 19)),
-          description: const DailyChoiceDescriptionCleared(),
-          isCompleted: const DailyChoiceFieldSet(true),
-          schedule: const DailyChoiceFieldSet(DailyChoiceAllDay()),
-          priority: const DailyChoiceFieldSet(DailyChoicePriority.p1),
+      UpdateActionFields(
+        actionId: full,
+        patch: ActionFieldsPatch(
+          title: ActionFieldSet(ActionTitle('Пробежка у реки')),
+          description: ActionFieldSet(ActionDescription.fromInput('Не спеша')),
+          date: ActionFieldSet(CalendarDate.fromParts(2026, 10, 19)),
+          schedule: ActionFieldSet(ActionAtHour(7)),
+          priority: const ActionFieldSet(ActionPriority.p1),
+          isCompleted: const ActionFieldSet(true),
         ),
       ),
     );
-    await confirm(DeleteDailyChoice(choice.id));
+    await confirm(DeleteLongTermRelation(healthRunning.id));
+    final restored = await relate(health, running);
+    // Удаление намерения со связями запрещено, поэтому связи удаляются
+    // раньше.
+    await confirm(DeleteLongTermRelation(restored.id));
+    await confirm(DeleteLongTermRelation(runningMorning.id));
+    await confirm(DeleteIntention(running.id));
+    final deletion = _factKinds(await _lastPackageFacts(database));
+    expect(
+      deletion.where((kind) => kind == 'created DeletedIntentionRecord'),
+      hasLength(1),
+      reason: 'удаление намерения из двух путей даёт одно его надгробие',
+    );
+    expect(
+      deletion,
+      everyElement(isNot(contains('Action'))),
+      reason: 'удаление намерения из путей не меняет действия',
+    );
+    await confirm(DeleteAction(short));
+    await confirm(DeleteAction(full));
+    expect(
+      await referenceGraphRecords(database),
+      everyElement(
+        isNot(
+          anyOf(
+            isA<DeletedIntentionRecord>(),
+            isA<DeletedRelationPairRecord>(),
+          ),
+        ),
+      ),
+      reason: 'удаление последнего пути снимает надгробия',
+    );
   });
 }
 
-ConfirmedChoicePath _path(List<LongTermRelation> relations) =>
-    ConfirmedChoicePath([
-      for (final relation in relations)
-        ConfirmedChoicePathStep(
-          relationId: relation.id,
-          sourceIntentionId: relation.sourceIntentionId,
-          type: relation.type,
-          relatedIntentionId: relation.relatedIntentionId,
-        ),
+GraphStateBase _baseOf(_GraphCheckpoint checkpoint) => GraphStateBase(
+  position: checkpoint.position,
+  readRecords: () => Stream.fromIterable(checkpoint.records),
+);
+
+ActionId _actionId(int number) => (ActionId.decode(
+  '018f0b5d-6b2e-7c80-8000-${number.toRadixString(16).padLeft(12, '0')}',
+) as ActionIdDecodingSuccess).id;
+
+/// Вставляет действие с путём [path]; вызывать внутри `seedGraph`.
+Future<void> _insertAction(
+  AppDatabase database,
+  ActionId id,
+  String title,
+  List<Intention> path,
+) async {
+  await database.customStatement(
+    'INSERT INTO actions (id, title, date, priority, is_completed, '
+    "created_at, updated_at) VALUES (?, ?, '2026-10-17', 4, 0, 1, 1)",
+    [id.toCanonicalString(), title],
+  );
+  for (final (position, intention) in path.indexed) {
+    await database.customStatement(insertActionPathItem, [
+      id.toCanonicalString(),
+      position,
+      intention.id.toCanonicalString(),
+      position == 0 ? null : path[position - 1].id.toCanonicalString(),
+      actionPathRole(position, path.length),
     ]);
+  }
+}
+
+Future<List<GraphFact>> _lastPackageFacts(AppDatabase database) async {
+  final package =
+      await (database.select(database.graphLogPackages)
+            ..orderBy([(package) => OrderingTerm.desc(package.position)])
+            ..limit(1))
+          .getSingle();
+  return GraphFormatCodec.decodePackage(
+    package.facts!,
+    GraphFormatVersion.ofCarrier(package.formatVersion!),
+  );
+}
+
+/// Вид факта и тип сущности, например `created DeletedIntentionRecord`.
+List<String> _factKinds(List<GraphFact> facts) => [
+  for (final fact in facts)
+    switch (fact) {
+      GraphEntityCreated(:final record) => 'created ${record.runtimeType}',
+      GraphEntityChanged(:final record) => 'changed ${record.runtimeType}',
+      GraphEntityDeleted(:final entity) => 'deleted ${entity.runtimeType}',
+    },
+];
 
 Future<int> _lastPosition(AppDatabase database) async =>
     (await database
@@ -393,23 +456,29 @@ List<String> _lines(List<GraphEntityRecord> records) => [
 typedef _Counts = ({
   int tags,
   int intentions,
+  int deletedIntentions,
   int tagAssignments,
   int longTermRelations,
-  int dailyChoices,
+  int deletedRelationPairs,
+  int actions,
 });
 
 _Counts _counts(GraphRecordCounts counts) => (
   tags: counts.tags,
   intentions: counts.intentions,
+  deletedIntentions: counts.deletedIntentions,
   tagAssignments: counts.tagAssignments,
   longTermRelations: counts.longTermRelations,
-  dailyChoices: counts.dailyChoices,
+  deletedRelationPairs: counts.deletedRelationPairs,
+  actions: counts.actions,
 );
 
 _Counts _countsOf(List<GraphEntityRecord> records) => (
   tags: records.whereType<TagRecord>().length,
   intentions: records.whereType<IntentionRecord>().length,
+  deletedIntentions: records.whereType<DeletedIntentionRecord>().length,
   tagAssignments: records.whereType<TagAssignmentRecord>().length,
   longTermRelations: records.whereType<LongTermRelationRecord>().length,
-  dailyChoices: records.whereType<DailyChoiceRecord>().length,
+  deletedRelationPairs: records.whereType<DeletedRelationPairRecord>().length,
+  actions: records.whereType<ActionRecord>().length,
 );

@@ -166,7 +166,7 @@ void main() {
           brightness: brightness,
           child: AddRow.addOnly(
             addText: 'Добавить',
-            addLabel: 'Создать дневной выбор',
+            addLabel: 'Создать действие',
             onAdd: () {},
             addKey: _addKey,
           ),
@@ -250,7 +250,7 @@ void main() {
     expect(
       tester.getSemantics(find.byKey(_addKey)),
       matchesSemantics(
-        label: 'Создать дневной выбор',
+        label: 'Создать действие',
         isButton: true,
         hasEnabledState: true,
         isEnabled: true,
@@ -269,7 +269,7 @@ void main() {
   testWidgets('при тексте масштаба 2 длинная подсказка переносится, строка '
       'растёт без переполнения, а «Добавить» остаётся у края', (tester) async {
     const hint =
-        'Дневные выборы, которые начинаются с этого намерения, и ещё немного';
+        'Действия, которые начинаются с этого намерения, и ещё немного';
     await tester.pumpWidget(
       _app(
         textScale: 2,
@@ -289,7 +289,7 @@ void main() {
   testWidgets('при тексте масштаба 2 длинная подсказка без «Добавить» '
       'переносится без переполнения', (tester) async {
     const hint =
-        'Дневные выборы, которые начинаются с этого намерения, и ещё немного';
+        'Действия, которые начинаются с этого намерения, и ещё немного';
     await tester.pumpWidget(
       _app(textScale: 2, child: AddRow.hintOnly(hint: hint)),
     );
@@ -311,13 +311,13 @@ AddRow _row({required VoidCallback? onAdd, String title = 'Теги'}) => AddRow
   addKey: _addKey,
 );
 
-const _hint = 'Дневные выборы, которые начинаются с этого намерения.';
+const _hint = 'Действия, которые начинаются с этого намерения.';
 
 AddRow _hintRow({required VoidCallback onAdd, String hint = _hint}) =>
     AddRow.hint(
       hint: hint,
       addText: 'Добавить',
-      addLabel: 'Создать дневной выбор',
+      addLabel: 'Создать действие',
       onAdd: onAdd,
       addKey: _addKey,
     );

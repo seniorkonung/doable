@@ -55,14 +55,14 @@ void main() {
       tester,
     ) async {
       final h = await _open(tester);
-      expect(_loading('Загружаем действия…'), findsOneWidget);
+      expect(_loading('Загружаем намерения…'), findsOneWidget);
 
       h.repository.complete(0, _firstPage(_actions(3)));
       await _settle(tester);
       h.notifier.changeTitleFilter('бег');
       await _settle(tester);
 
-      expect(_loading('Загружаем действия…'), findsOneWidget);
+      expect(_loading('Загружаем намерения…'), findsOneWidget);
       expect(find.byType(CatalogHeader), findsNothing);
     });
 
@@ -77,14 +77,14 @@ void main() {
       );
       await _settle(tester);
       expect(
-        find.text('Не удалось загрузить действия. Повторите попытку.'),
+        find.text('Не удалось загрузить намерения. Повторите попытку.'),
         findsOneWidget,
       );
       await tester.tap(find.text('Повторить'));
       await _settle(tester);
 
       expect(h.repository.queries, hasLength(2));
-      expect(_loading('Загружаем действия…'), findsOneWidget);
+      expect(_loading('Загружаем намерения…'), findsOneWidget);
     });
 
     testWidgets('повреждение первой порции показано отказом без повтора', (
@@ -100,7 +100,7 @@ void main() {
 
       expect(
         find.text(
-          'Сохранённые данные действий повреждены и не могут быть показаны.',
+          'Сохранённые данные намерений повреждены и не могут быть показаны.',
         ),
         findsOneWidget,
       );
@@ -133,7 +133,7 @@ void main() {
       h.notifier.changeTitleFilter('бег');
       await tester.pump();
 
-      expect(_loading('Загружаем действия…'), findsOneWidget);
+      expect(_loading('Загружаем намерения…'), findsOneWidget);
       expect(h.position.pixels, 0);
       expect(tester.getTopLeft(_listState).dy, tester.getTopLeft(_list).dy);
     });
@@ -150,7 +150,7 @@ void main() {
       );
       await tester.pump();
 
-      expect(_loading('Загружаем действия…'), findsOneWidget);
+      expect(_loading('Загружаем намерения…'), findsOneWidget);
       expect(h.position.pixels, 0);
       expect(tester.getTopLeft(_listState).dy, tester.getTopLeft(_list).dy);
 
@@ -163,7 +163,7 @@ void main() {
       await tester.pump();
 
       expect(
-        find.text('Не удалось загрузить действия. Повторите попытку.'),
+        find.text('Не удалось загрузить намерения. Повторите попытку.'),
         findsOneWidget,
       );
       expect(h.position.pixels, 0);
@@ -813,7 +813,7 @@ final _sport = Tag(
 final _more = find.byWidgetPredicate(
   (widget) =>
       widget is Semantics &&
-      widget.properties.label == 'Загружаем ещё действия',
+      widget.properties.label == 'Загружаем ещё намерения',
 );
 
 /// Виды состояния списка — закрытые наследники [ListState].
@@ -933,7 +933,7 @@ Future<_Harness> _open(
     tester,
     container,
     repository,
-    purpose ?? SelectDailyChoiceAction(session: IntentionSearchSession()),
+    purpose ?? const BrowseIntentionCatalog(),
   );
   if (loadedBeforeMount != null) {
     // Модель удерживает другой слушатель: выдача монтируется на готовую

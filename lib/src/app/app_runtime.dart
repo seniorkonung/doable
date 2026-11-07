@@ -9,7 +9,6 @@ import '../data/local/app_database.dart'
     show AppDatabase, openAndroidProductionDatabaseConnection;
 import '../data/local/bootstrap/local_data_bootstrap.dart';
 import '../data/local/bootstrap/local_data_bootstrap_result.dart';
-import '../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import '../data_transfer/application/document_access.dart';
 import '../data_transfer/application/graph_composition.dart';
 import '../data_transfer/application/graph_composition_provider.dart';
@@ -35,6 +34,7 @@ import '../intention/application/intention_id_generator.dart';
 import '../long_term_relation/application/long_term_relation_id_generator.dart';
 import '../shared/diagnostics/developer_diagnostics_sink.dart';
 import '../shared/diagnostics/diagnostics_sink.dart';
+import '../shared/presentation/local_day/local_date_provider.dart';
 import 'quick_creation/file_quick_creation_mode_store.dart';
 import 'quick_creation/quick_creation_mode.dart';
 import 'quick_creation/quick_creation_mode_controller.dart';
@@ -104,9 +104,9 @@ final class AppRuntimeIncompatibleSchema extends AppRuntimeBootstrapResult {
 }
 
 final class AppRuntime {
-  /// [dailyChoiceLocalDateSource] заменяет часы устройства как источник
-  /// локального сегодня каталога дневных выборов во всём контейнере приложения;
-  /// без него используется [readDeviceLocalDay].
+  /// [localDateSource] заменяет часы устройства как источник локального
+  /// сегодня во всём контейнере приложения; без него используется
+  /// [readDeviceLocalDay].
   /// [quickCreationModeStore] принадлежит этому runtime и обслуживает единый
   /// контроллер независимо от подготовки и команд личного графа.
   /// [graphFilesFactory] подключает файлы графа вне базы. После подготовки
@@ -134,7 +134,7 @@ final class AppRuntime {
     required QuickCreationModeStore quickCreationModeStore,
     AppPersonalGraphRepositoryFactory? repositoryFactory,
     AppGraphFilesFactory? graphFilesFactory,
-    DailyChoiceLocalDateSource? dailyChoiceLocalDateSource,
+    LocalDateSource? localDateSource,
     DateTime Function()? clock,
   }) {
     assert(
@@ -174,7 +174,7 @@ final class AppRuntime {
       ),
       graphFactory,
       graphFilesFactory,
-      dailyChoiceLocalDateSource ?? readDeviceLocalDay,
+      localDateSource ?? readDeviceLocalDay,
       quickCreationModeStore,
       diagnosticsSink,
       readClock,
@@ -215,7 +215,7 @@ final class AppRuntime {
     this._localDataBootstrap,
     this._graphFactory,
     this._graphFilesFactory,
-    this._dailyChoiceLocalDateSource,
+    this._localDateSource,
     this._quickCreationModeStore,
     this._diagnosticsSink,
     this._clock,
@@ -224,7 +224,7 @@ final class AppRuntime {
   final LocalDataBootstrap _localDataBootstrap;
   final _AppGraphFactory _graphFactory;
   final AppGraphFilesFactory? _graphFilesFactory;
-  final DailyChoiceLocalDateSource _dailyChoiceLocalDateSource;
+  final LocalDateSource _localDateSource;
   final QuickCreationModeStore _quickCreationModeStore;
   final DiagnosticsSink _diagnosticsSink;
   final DateTime Function() _clock;
@@ -388,9 +388,7 @@ final class AppRuntime {
           personalGraphRepositoryProvider.overrideWithValue(repository),
           if (composition != null)
             graphCompositionSourceProvider.overrideWithValue(composition),
-          dailyChoiceLocalDateSourceProvider.overrideWithValue(
-            _dailyChoiceLocalDateSource,
-          ),
+          localDateSourceProvider.overrideWithValue(_localDateSource),
           if (export != null)
             graphExportControllerProvider.overrideWith(
               () => GraphExportController(export),

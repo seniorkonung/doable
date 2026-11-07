@@ -1,60 +1,9 @@
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
-import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test(
-    'закрытые группы различают восемь долговременных и две дневные роли',
-    () {
-      final counts = RelationCounts(
-        activeNeedIncoming: 1,
-        activeNeedOutgoing: 2,
-        activeCanIncoming: 3,
-        activeCanOutgoing: 4,
-        archivedNeedIncoming: 5,
-        archivedNeedOutgoing: 6,
-        archivedCanIncoming: 7,
-        archivedCanOutgoing: 8,
-        dailySource: 9,
-        dailySelected: 10,
-      );
-      final longTerm = LongTermRelationGroup(
-        type: LongTermRelationType.need,
-        direction: RelationDirection.incoming,
-        scope: RelationScope.archived,
-      );
-      const daily = DailyChoiceRelationGroup(
-        role: DailyChoiceRelationRole.source,
-      );
-
-      expect(counts.forSelection(longTerm), 5);
-      expect(counts.forSelection(daily), 9);
-      expect(
-        counts.forSelection(
-          const DailyChoiceRelationGroup(
-            role: DailyChoiceRelationRole.selected,
-          ),
-        ),
-        10,
-      );
-    },
-  );
-
-  test('дневная группа сохраняет границы порции 1–100', () {
-    for (final pageSize in [0, 101]) {
-      expect(
-        () => DailyChoiceGroupQuery(
-          intentionId: _intentionId,
-          role: DailyChoiceRelationRole.source,
-          pageSize: pageSize,
-        ),
-        throwsA(isA<RelationGroupQueryValidationException>()),
-      );
-    }
-  });
-
   group('RelationGroupQuery', () {
     test('принимает граничные размеры ограниченной порции', () {
       for (final pageSize in [1, 100]) {

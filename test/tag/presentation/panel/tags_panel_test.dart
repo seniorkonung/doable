@@ -1078,8 +1078,8 @@ void main() {
         title: 'Удалить тег?',
         text:
             'Будут необратимо удалены тег Дом и все его назначения активным '
-            'и архивированным намерениям. Сами намерения, связи, дневные '
-            'выборы и их пути сохранятся.',
+            'и архивированным намерениям. Сами намерения, связи, действия '
+            'и их пути сохранятся.',
         menuDelete: 'Удалить тег',
         cancel: 'Отмена',
         delete: 'Удалить',
@@ -1092,7 +1092,7 @@ void main() {
         text:
             'This permanently deletes the tag Дом and all its assignments to '
             'active and archived intentions. The intentions, relations, '
-            'daily choices and their paths remain.',
+            'actions and their paths remain.',
         menuDelete: 'Delete tag',
         cancel: 'Cancel',
         delete: 'Delete',

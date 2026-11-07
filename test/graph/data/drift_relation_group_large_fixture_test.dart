@@ -343,8 +343,6 @@ List<RelationGroupEntry> _longTermItems(RelationGroupPage page) =>
     switch (page) {
       RelationGroupFirstPage(:final items) ||
       RelationGroupContinuationPage(:final items) => items,
-      DailyChoiceGroupFirstPage() || DailyChoiceGroupContinuationPage() =>
-        throw StateError('Ожидалась группа долговременных связей.'),
     };
 
 Future<void> _expectCommandSuccess(

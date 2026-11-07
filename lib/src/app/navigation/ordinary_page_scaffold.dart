@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../shared/domain/calendar_date.dart';
 import 'app_navigation.dart';
 
 /// Каркас обычной страницы над оболочкой основной навигации.
@@ -14,9 +15,11 @@ final class OrdinaryPageScaffold extends StatelessWidget {
     this.body,
     this.floatingActionButton,
     this.floatingActionButtonLocation,
+    this.actionDate,
     super.key,
   });
 
+  final CalendarDate Function()? actionDate;
   final PreferredSizeWidget? appBar;
   final Widget? body;
   final Widget? floatingActionButton;
@@ -29,6 +32,6 @@ final class OrdinaryPageScaffold extends StatelessWidget {
     floatingActionButton: floatingActionButton,
     floatingActionButtonLocation: floatingActionButtonLocation,
     // https://api.flutter.dev/flutter/material/Scaffold/bottomNavigationBar.html
-    bottomNavigationBar: const AppNavigation(),
+    bottomNavigationBar: AppNavigation(actionDate: actionDate),
   );
 }

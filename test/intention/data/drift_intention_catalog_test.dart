@@ -54,6 +54,35 @@ void main() {
 
   tearDown(() => database.close());
 
+  test('исключённый корень не входит в число и порции поиска', () async {
+    seedRawGraph(raw, () {
+      for (final number in [1, 2, 3]) {
+        raw.execute(
+          'INSERT INTO intentions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
+          [_uuid(number), 'Намерение $number', number, number],
+        );
+      }
+    });
+    IntentionCatalogQuery query(IntentionCatalogCursor? cursor) =>
+        IntentionCatalogQuery(
+          scope: IntentionScope.active,
+          titleFilter: null,
+          excludedIntentionId: _id(_uuid(2)),
+          order: IntentionCatalogOrder.createdAtDescending,
+          pageSize: 1,
+          cursor: cursor,
+          counting: IntentionCatalogCounting.byType,
+        );
+    final first = _firstPage(await repository.getCatalogPage(query(null)));
+    final next = _continuationPage(
+      await repository.getCatalogPage(query(first.nextCursor)),
+    );
+    expect(first.totalCount, 2);
+    expect(first.items.single.id, _id(_uuid(3)));
+    expect(next.items.single.id, _id(_uuid(1)));
+    expect(next.nextCursor, isNull);
+  });
+
   test('первая порция поиска считает все активные точные названия', () async {
     seedRawGraph(raw, () {
       raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [

@@ -1,10 +1,7 @@
 part of 'quick_creation_launcher_test.dart';
 
-const _foreignFilter = 'Намерение 3';
-
 enum _Origin {
   home('Главной', 0, HomePage),
-  daily('каталогом дневных выборов', 1, DailyChoiceCatalogPage),
   deep('глубокой страницей', 1, IntentionDetailsPage);
 
   const _Origin(this.label, this.tabIndex, this.page);
@@ -13,85 +10,10 @@ enum _Origin {
   final Type page;
 }
 
-String _label(QuickCreationMode mode, ChoicePathDraftDirection? direction) =>
-    switch (mode) {
-      QuickCreationMode.intention => 'Намерение',
-      QuickCreationMode.dailyChoice =>
-        'Дневной выбор: ${_directionLabel(direction!)}',
-    };
-
-String _directionLabel(ChoicePathDraftDirection direction) =>
-    switch (direction) {
-      ChoicePathDraftDirection.topDown => 'от намерения',
-      ChoicePathDraftDirection.bottomUp => 'от действия',
-    };
-
-String _firstRoute(
-  QuickCreationMode mode,
-  ChoicePathDraftDirection? direction,
-) => switch (mode) {
-  QuickCreationMode.intention => IntentionEditorRoute.name,
-  QuickCreationMode.dailyChoice => switch (direction!) {
-    ChoicePathDraftDirection.topDown => DailyChoiceSourcePickerRoute.name,
-    ChoicePathDraftDirection.bottomUp => DailyChoiceActionPickerRoute.name,
-  },
-};
-
-String _prefix(ChoicePathDraftDirection direction) => switch (direction) {
-  ChoicePathDraftDirection.topDown => 'source',
-  ChoicePathDraftDirection.bottomUp => 'action',
-};
-
-int _candidate(ChoicePathDraftDirection direction) => switch (direction) {
-  ChoicePathDraftDirection.topDown => 1,
-  ChoicePathDraftDirection.bottomUp => 3,
-};
-
-Future<void> _selectStart(
-  WidgetTester tester,
-  ChoicePathDraftDirection direction,
-) => chooseQuickCreationDailyChoiceStart(
-  tester,
-  direction,
-  openedPage: _key('daily-choice-${_prefix(direction)}-filter'),
-);
-
 Finder _key(String key) => find.byKey(ValueKey(key));
 List<LocalKey> _history(RootStackRouter router) => [
   for (final data in router.stackData) data.matchId,
 ];
-
-Future<void> _choose(
-  WidgetTester tester,
-  ChoicePathDraftDirection direction,
-) async {
-  await tester.tap(
-    _key(
-      'daily-choice-${_prefix(direction)}-${durabilityUuid(_candidate(direction))}',
-    ),
-  );
-  await tester.pumpAndSettle();
-}
-
-/// Закрывает начальный поиск крестиком, который отменяет создание.
-Future<void> _cancelPicker(
-  WidgetTester tester,
-  ChoicePathDraftDirection direction,
-) async {
-  await tester.tap(_key('daily-choice-${_prefix(direction)}-cancel'));
-  await tester.pumpAndSettle();
-}
-
-String _filterText(WidgetTester tester, ChoicePathDraftDirection direction) =>
-    tester
-        .widget<EditableText>(
-          find.descendant(
-            of: _key('daily-choice-${_prefix(direction)}-filter'),
-            matching: find.byType(EditableText),
-          ),
-        )
-        .controller
-        .text;
 
 Future<BuildContext> _source(
   WidgetTester tester,
@@ -104,13 +26,6 @@ Future<BuildContext> _source(
   await tester.pumpAndSettle();
   if (origin == _Origin.deep) {
     unawaited(
-      router.push(
-        DailyChoiceActionPickerRoute(launch: TestDailyChoicePickerLaunch()),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.enterText(_key('daily-choice-action-filter'), _foreignFilter);
-    unawaited(
       router.push(IntentionDetailsRoute(intentionId: durabilityIntention(2))),
     );
     await tester.pumpAndSettle();
@@ -120,7 +35,7 @@ Future<BuildContext> _source(
 
 Future<RootStackRouter> _openApp(
   WidgetTester tester, {
-  RootStackRouter? router,
+  CalendarDate? today,
 }) async {
   tester.view.physicalSize = const Size(1200, 2400);
   tester.view.devicePixelRatio = 1;
@@ -130,12 +45,13 @@ Future<RootStackRouter> _openApp(
   final container = ProviderContainer(
     overrides: [
       inMemoryQuickCreationModeOverride,
+      if (today != null) ControlledLocalDate(today).override,
       personalGraphRepositoryProvider.overrideWithValue(
         durabilityRepository(database),
       ),
     ],
   );
-  final appRouter = router ?? AppRouter();
+  final appRouter = AppRouter();
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());
     container.dispose();
@@ -156,29 +72,4 @@ Future<RootStackRouter> _openApp(
   );
   await tester.pumpAndSettle();
   return appRouter;
-}
-
-/// Поиск, открытый после [holdNextPicker], закрывается сразу, а его ID
-/// доставляется после сброса.
-final class _DelayedPickerRouter extends RootStackRouter {
-  final _gate = Completer<void>();
-  bool _hold = false;
-  void holdNextPicker() => _hold = true;
-  void release() => _gate.complete();
-  @override
-  List<AutoRoute> get routes => AppRouter().routes;
-  @override
-  Future<T?> push<T extends Object?>(
-    PageRouteInfo route, {
-    OnNavigationFailure? onFailure,
-  }) async {
-    final hold =
-        _hold &&
-        (route.routeName == DailyChoiceSourcePickerRoute.name ||
-            route.routeName == DailyChoiceActionPickerRoute.name);
-    if (hold) _hold = false;
-    final result = await super.push<T>(route, onFailure: onFailure);
-    if (hold) await _gate.future;
-    return result;
-  }
 }

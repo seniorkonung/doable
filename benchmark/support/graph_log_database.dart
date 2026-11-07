@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_description.dart';
+import 'package:doable/src/action/application/action_command.dart';
+import 'package:doable/src/action/domain/action_text.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show LocalDatabaseConnectionObserver;
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -71,7 +71,9 @@ final class GraphLogDatabase {
         'intentions': fixture.intentions,
         'tagAssignments': fixture.tagAssignments,
         'longTermRelations': fixture.longTermRelations,
-        'dailyChoices': fixture.dailyChoices,
+        'deletedIntentions': fixture.deletedIntentions,
+        'deletedRelationPairs': fixture.deletedRelationPairs,
+        'actions': fixture.actions,
         'hubRelations': hubRelations,
         'preparationMs': preparation.elapsedMilliseconds,
         'databaseBytes': harness.databaseFile.lengthSync(),
@@ -99,7 +101,7 @@ final class GraphLogDatabase {
   var _edits = 0;
 
   /// Подтверждает [count] команд, каждая из которых пишет один пакет:
-  /// правки названий намерений и описаний дневных выборов поочерёдно, а с
+  /// правки названий намерений и описаний действий поочерёдно, а с
   /// [longDescriptions] — описания намерений на пределе графем.
   Future<void> confirmEdits(int count, {bool longDescriptions = false}) async {
     final before = await repository.readCurrentPosition();
@@ -140,11 +142,11 @@ final class GraphLogDatabase {
         description: fixture.intentionDescription(intention),
       );
     }
-    return UpdateDailyChoiceFields(
-      choiceId: fixture.dailyChoiceId(entity % fixture.dailyChoices),
-      patch: DailyChoiceFieldsPatch(
-        description: DailyChoiceDescriptionSet(
-          DailyChoiceDescription.fromInput('Правка $edit')!,
+    return UpdateActionFields(
+      actionId: fixture.actionId(entity % fixture.connectedActions),
+      patch: ActionFieldsPatch(
+        description: ActionFieldSet(
+          ActionDescription.fromInput('Правка $edit'),
         ),
       ),
     );

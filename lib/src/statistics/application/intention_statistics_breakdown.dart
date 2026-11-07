@@ -4,31 +4,32 @@ import '../../long_term_relation/domain/long_term_relation_id.dart';
 import 'contribution_counts.dart';
 import 'statistics_read_contract.dart';
 
-enum StatisticsBreakdown { sourceIntentions, selectedActions, relations }
+/// Разбивки действий выбранного вида по другим намерениям их путей.
+enum StatisticsBreakdown { rootIntentions, terminalIntentions, relations }
 
 extension StatisticsViewBreakdowns on StatisticsView {
   /// Только допустимые разбивки, в порядке показа в разделе намерения.
   List<StatisticsBreakdown> get breakdowns => switch (this) {
-    StatisticsView.sourceIntentions => const [
-      StatisticsBreakdown.selectedActions,
+    StatisticsView.rootIntentions => const [
+      StatisticsBreakdown.terminalIntentions,
     ],
     StatisticsView.intermediateIntentions => const [
-      StatisticsBreakdown.sourceIntentions,
-      StatisticsBreakdown.selectedActions,
+      StatisticsBreakdown.rootIntentions,
+      StatisticsBreakdown.terminalIntentions,
     ],
-    StatisticsView.selectedActions => const [
-      StatisticsBreakdown.sourceIntentions,
+    StatisticsView.terminalIntentions => const [
+      StatisticsBreakdown.rootIntentions,
     ],
     StatisticsView.throughRelations => const [
       StatisticsBreakdown.relations,
-      StatisticsBreakdown.selectedActions,
+      StatisticsBreakdown.terminalIntentions,
     ],
   };
 }
 
 /// Связь обозначается связанным намерением, но сохраняет собственные
 /// идентификатор и архивное состояние. Количества [relatedIntention] относятся
-/// к выборам, засчитанным этой связи, а не ко всей статистике её намерения.
+/// к действиям, отнесённым к этой связи, а не ко всей статистике её намерения.
 final class StatisticsRelationItem {
   const StatisticsRelationItem({
     required this.id,
@@ -42,7 +43,7 @@ final class StatisticsRelationItem {
 }
 
 /// Непрозрачное продолжение разбивки. Адаптер связывает его с намерением,
-/// периодом, видом, разбивкой, местной датой, размером порции, ревизией
+/// периодом, видом, разбивкой, размером порции, ревизией
 /// (включая эпоху) и позицией. Продолжение принимает только этот курсор,
 /// поэтому новые условия требуют нового чтения раздела.
 ///
@@ -51,13 +52,14 @@ final class StatisticsRelationItem {
 /// Тип строки сохраняется от первой порции до всех её продолжений.
 abstract interface class StatisticsBreakdownCursor<T> {}
 
-/// Строки идут по убыванию вклада, запланированного вклада и идентификатора:
+/// Строки идут по убыванию запланированного вклада, вклада и идентификатора:
 /// намерения для [StatisticsItem], связи для [StatisticsRelationItem].
 /// Адаптер возвращает не больше запрошенного размера порции (до 100),
 /// без повторов и пропусков между порциями одного снимка.
 ///
-/// Доля строки — её вклад / вклад намерения раздела в выбранном виде;
-/// при нулевом знаменателе доли нет. Доли связей не нормализуются к 100%.
+/// Доля строки — её запланированный вклад, делённый на число действий
+/// выбранного вида. Одно действие может относиться к нескольким строкам,
+/// поэтому доли не нормализуются к 100%.
 sealed class StatisticsBreakdownPage<T> {
   StatisticsBreakdownPage({required List<T> items, required this.nextCursor})
     : items = List.unmodifiable(items) {

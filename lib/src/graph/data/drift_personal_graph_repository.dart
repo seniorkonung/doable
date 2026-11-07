@@ -4,24 +4,21 @@ import 'dart:isolate';
 import 'dart:math' show min;
 import 'dart:typed_data';
 
+import '../../action/application/action_command.dart';
+import '../../action/application/action_day.dart';
+import '../../action/application/action_day_statuses.dart';
+import '../../action/application/action_details.dart';
+import '../../action/application/action_list_item.dart';
+import '../../action/application/action_result.dart';
+import '../../action/application/intention_actions.dart';
+import '../../action/application/path_candidates.dart';
+import '../../action/domain/action.dart';
+import '../../action/domain/action_id.dart';
+import '../../action/domain/action_path.dart';
+import '../../action/domain/action_schedule.dart';
 import '../../data/local/app_database.dart' as local;
 import '../../data/local/fts_query.dart';
 import '../../data/local/sqlite_failure_classifier.dart';
-import '../../daily_choice/application/daily_choice_details.dart';
-import '../../daily_choice/application/daily_choice_catalog.dart';
-import '../../daily_choice/application/choice_path_continuations.dart';
-import '../../daily_choice/application/choice_path_draft.dart';
-import '../../daily_choice/application/confirmed_choice_path.dart';
-import '../../daily_choice/application/daily_choice_command.dart';
-import '../../daily_choice/application/daily_choice_day_statuses.dart';
-import '../../daily_choice/application/daily_choice_id_generator.dart';
-import '../../daily_choice/application/daily_choice_result.dart';
-import '../../daily_choice/domain/calendar_date.dart';
-import '../../daily_choice/domain/choice_path_step_id.dart';
-import '../../daily_choice/domain/daily_choice.dart';
-import '../../daily_choice/domain/daily_choice_id.dart';
-import '../../daily_choice/domain/daily_choice_priority.dart';
-import '../../daily_choice/domain/daily_choice_schedule.dart';
 import '../../data_transfer/application/graph_composition.dart';
 import '../../data_transfer/application/graph_replacement.dart';
 import '../../graph_backups/graph_backup_registry.dart';
@@ -30,7 +27,9 @@ import '../../graph_format/graph_format_codec.dart'
     show GraphFormatCodec, GraphFormatVersion;
 import '../../graph_format/graph_format_records.dart'
     show
-        DailyChoiceRecord,
+        ActionRecord,
+        DeletedIntentionRecord,
+        DeletedRelationPairRecord,
         GraphEntityRecord,
         GraphRecordCounts,
         IntentionRecord,
@@ -55,7 +54,6 @@ import '../../intention/domain/intention_text.dart';
 import '../../long_term_relation/application/long_term_relation_command.dart';
 import '../../long_term_relation/application/long_term_relation_id_generator.dart';
 import '../../long_term_relation/application/long_term_relation_projection.dart';
-import '../../long_term_relation/application/long_term_relation_permissions.dart';
 import '../../long_term_relation/application/relation_counts.dart';
 import '../../long_term_relation/application/relation_group_page.dart';
 import '../../long_term_relation/application/relation_pair_probe.dart';
@@ -64,6 +62,7 @@ import '../../long_term_relation/domain/long_term_relation.dart'
 import '../../long_term_relation/domain/long_term_relation_description.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../shared/diagnostics/diagnostics_sink.dart';
+import '../../shared/domain/calendar_date.dart';
 import '../../shared/domain/text_preview.dart';
 import '../../statistics/application/contribution_counts.dart';
 import '../../statistics/application/intention_statistics_breakdown.dart';
@@ -90,21 +89,21 @@ import 'drift_relation_count_aggregates.dart';
 import 'contribution_reachability.dart';
 import 'graph_fact_capture.dart';
 import 'graph_record_rows.dart';
-import 'stored_choice_path_verification.dart';
 import 'stored_graph_rows.dart';
 
 import 'package:drift/drift.dart';
 import 'package:sqlite3/sqlite3.dart';
+import 'package:uuid/uuid.dart';
 
-part 'drift_daily_choice_path_validation.dart';
-part 'drift_personal_graph_repository_daily_choice_reads.dart';
-part 'drift_personal_graph_repository_daily_choice_catalog.dart';
-part 'drift_personal_graph_repository_daily_choice_day_statuses.dart';
-part 'drift_personal_graph_repository_daily_choice_commands.dart';
+part 'drift_personal_graph_repository_action_commands.dart';
+part 'drift_personal_graph_repository_action_day.dart';
+part 'drift_personal_graph_repository_action_day_statuses.dart';
+part 'drift_personal_graph_repository_action_reads.dart';
+part 'drift_personal_graph_repository_intention_actions.dart';
+part 'drift_personal_graph_repository_path_candidates.dart';
 part 'drift_personal_graph_repository_relation_commands.dart';
 part 'drift_personal_graph_repository_relation_details.dart';
 part 'drift_personal_graph_repository_relation_groups.dart';
-part 'drift_personal_graph_repository_choice_path_reads.dart';
 part 'drift_personal_graph_repository_tag_reads.dart';
 part 'drift_personal_graph_repository_tag_commands.dart';
 part 'drift_personal_graph_repository_fact_log.dart';
@@ -131,17 +130,11 @@ final class DriftPersonalGraphRepository
     this._now,
     this._diagnosticsSink, {
     LongTermRelationIdGenerator? relationIdGenerator,
-    DailyChoiceIdGenerator? dailyChoiceIdGenerator,
-    ChoicePathStepIdGenerator? choicePathStepIdGenerator,
     TagIdGenerator? tagIdGenerator,
     this._statisticsReachabilityRunner = runContributionReachabilityInIsolate,
     this._intentionStatisticsRunner = runIntentionContributionInIsolate,
   }) : _relationIdGenerator =
            relationIdGenerator ?? UuidV7LongTermRelationIdGenerator(),
-       _dailyChoiceIdGenerator =
-           dailyChoiceIdGenerator ?? UuidV7DailyChoiceIdGenerator(),
-       _choicePathStepIdGenerator =
-           choicePathStepIdGenerator ?? UuidV7ChoicePathStepIdGenerator(),
        _tagIdGenerator = tagIdGenerator ?? UuidV7TagIdGenerator();
 
   final local.AppDatabase _database;
@@ -149,8 +142,6 @@ final class DriftPersonalGraphRepository
   final DateTime Function() _now;
   final DiagnosticsSink _diagnosticsSink;
   final LongTermRelationIdGenerator _relationIdGenerator;
-  final DailyChoiceIdGenerator _dailyChoiceIdGenerator;
-  final ChoicePathStepIdGenerator _choicePathStepIdGenerator;
   final TagIdGenerator _tagIdGenerator;
   var _epoch = _GraphEpoch();
   final _AsyncSequencer _sequencer = _AsyncSequencer();
@@ -160,8 +151,7 @@ final class DriftPersonalGraphRepository
   /// Сигнал подтверждённой записи реестра копий.
   final StreamController<void> _backupsChanged = StreamController.broadcast();
   final Map<IntentionId, Set<StreamController<void>>> _intentionWatchers = {};
-  final Map<DailyChoiceId, Set<_DailyChoiceWatchRegistration>>
-  _dailyChoiceWatchers = {};
+  final Map<ActionId, Set<_ActionWatchRegistration>> _actionWatchers = {};
   final Map<LongTermRelationId, Set<_RelationWatchRegistration>>
   _relationWatchers = {};
   var _mutationSequence = 0;
@@ -178,17 +168,17 @@ final class DriftPersonalGraphRepository
   @override
   Future<StatisticsPageResult> getStatisticsPage(StatisticsQuery query) =>
       switch (query.view) {
-        StatisticsView.sourceIntentions => _readStatisticsPage(
+        StatisticsView.rootIntentions => _readStatisticsPage(
           query,
-          _SavedPathStatisticsView.source,
+          _PathRoleStatisticsView.root,
         ),
         StatisticsView.intermediateIntentions => _readStatisticsPage(
           query,
-          _SavedPathStatisticsView.intermediate,
+          _PathRoleStatisticsView.intermediate,
         ),
-        StatisticsView.selectedActions => _readStatisticsPage(
+        StatisticsView.terminalIntentions => _readStatisticsPage(
           query,
-          _SavedPathStatisticsView.selected,
+          _PathRoleStatisticsView.terminal,
         ),
         StatisticsView.throughRelations => _readThroughRelationsStatisticsPage(
           query,
@@ -302,27 +292,25 @@ final class DriftPersonalGraphRepository
       DriftRelationCountAggregates(_database);
 
   @override
-  Future<ChoicePathContinuationResult> getChoicePathContinuations(
-    ChoicePathContinuationQuery query,
-  ) => _readChoicePathContinuations(query);
+  Future<ActionDayPageResult> getActionDayPage(ActionDayQuery query) =>
+      _readActionDayPage(query);
 
   @override
-  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
-      _readDailyChoice(id);
+  Future<ActionDayStatusesReadResult> getActionDayStatuses(
+    ActionDayStatusQuery query,
+  ) => _readActionDayStatuses(query);
 
   @override
-  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
-      _watchDailyChoice(id);
+  Stream<ActionReadResult> watchAction(ActionId id) => _watchAction(id);
 
   @override
-  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
-    DailyChoiceCatalogQuery query,
-  ) => _readDailyChoiceCatalogPage(query);
+  Future<IntentionActionsPageResult> getIntentionActionsPage(
+    IntentionActionsQuery query,
+  ) => _readIntentionActionsPage(query);
 
   @override
-  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
-    DailyChoiceDayStatusQuery query,
-  ) => _readDailyChoiceDayStatuses(query);
+  Future<PathCandidatesResult> getPathCandidates(PathCandidatesQuery query) =>
+      _readPathCandidates(query);
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -385,7 +373,7 @@ final class DriftPersonalGraphRepository
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) => _readRelationGroupPage(query);
 
   @override
@@ -512,12 +500,6 @@ final class DriftPersonalGraphRepository
     return Map.unmodifiable(counts);
   }
 
-  Future<LongTermRelationPermissions> _readRelationPermissions(
-    LongTermRelationId id,
-  ) async =>
-      (await _relationCountAggregates.readPermissions([id]))[id] ??
-      (throw const StoredGraphCorruption());
-
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
     TSuccess extends GraphCommandOutcome,
@@ -529,9 +511,7 @@ final class DriftPersonalGraphRepository
       ),
       final LongTermRelationCommand relationCommand =>
         await _executeLongTermRelation(relationCommand),
-      final DailyChoiceCommand dailyChoiceCommand => await _executeDailyChoice(
-        dailyChoiceCommand,
-      ),
+      final ActionCommand actionCommand => await _executeAction(actionCommand),
       final CreateTag createTag => await _executeTag(createTag),
       final UpdateTag updateTag => await _executeTag(updateTag),
       final MoveTag moveTag => await _executeTag(moveTag),
@@ -704,8 +684,6 @@ final class DriftPersonalGraphRepository
           final afterId = after?.summary.id;
           if (beforeId != null) affected.add(beforeId);
           if (afterId != null) affected.add(afterId);
-        case DailyChoiceChange(:final intentionCounts):
-          affected.addAll(intentionCounts.keys);
         case GraphChange():
           break;
       }
@@ -719,7 +697,7 @@ final class DriftPersonalGraphRepository
     final stableChanges = List<GraphChange>.unmodifiable(changes);
     _invalidateStatisticsRelationSnapshot(stableChanges);
     _notifyIntentionWatchersFor(stableChanges);
-    _notifyDailyChoiceWatchersFor(stableChanges);
+    _notifyActionWatchersFor(stableChanges);
     _notifyRelationWatchersFor(stableChanges);
   }
 
@@ -1008,9 +986,7 @@ final class DriftPersonalGraphRepository
           '''SELECT relation.creation_sequence, relation.id,
                 relation.source_intention_id, relation.related_intention_id,
                 relation.type, relation.priority, relation.is_archived,
-                relation.created_at, relation.updated_at,
-                EXISTS(SELECT 1 FROM daily_choice_path_steps AS step
-                       WHERE step.long_term_relation_id = relation.id) AS is_referenced
+                relation.created_at, relation.updated_at
          FROM long_term_relations AS relation
          WHERE relation.is_archived = 0 AND
                (relation.source_intention_id = ? OR relation.related_intention_id = ?)''',
@@ -1018,10 +994,7 @@ final class DriftPersonalGraphRepository
             Variable<String>(serializedId),
             Variable<String>(serializedId),
           ],
-          readsFrom: {
-            _database.longTermRelations,
-            _database.dailyChoicePathSteps,
-          },
+          readsFrom: {_database.longTermRelations},
         )
         .get();
     final archivedAt = relation_domain.RelationTimestamp(clock.read());
@@ -1030,11 +1003,6 @@ final class DriftPersonalGraphRepository
         _CascadedRelationArchive(
           StoredLongTermRelation.decode(row.data).toDomain(),
           archivedAt,
-          switch (requiredStoredInteger(row.data, 'is_referenced')) {
-            0 => const LongTermRelationPermissions.unrestricted(),
-            1 => const LongTermRelationPermissions.referencedByDailyPath(),
-            _ => throw const StoredGraphCorruption(),
-          },
         ),
     ];
     await _database.customUpdate(
@@ -1079,20 +1047,13 @@ final class DriftPersonalGraphRepository
               FROM long_term_relations
               WHERE source_intention_id = ? OR related_intention_id = ?
               LIMIT 1
-            ) OR EXISTS (
-              SELECT 1
-              FROM daily_choices
-              WHERE source_intention_id = ? OR selected_intention_id = ?
-              LIMIT 1
             ) AS has_blocking_relations
           ''',
           variables: [
             Variable<String>(serializedId),
             Variable<String>(serializedId),
-            Variable<String>(serializedId),
-            Variable<String>(serializedId),
           ],
-          readsFrom: {_database.longTermRelations, _database.dailyChoices},
+          readsFrom: {_database.longTermRelations},
         )
         .getSingle();
     return row.read<int>('has_blocking_relations') == 1;
@@ -1133,7 +1094,8 @@ final class DriftPersonalGraphRepository
     final (totalCount, counts) = await _countCatalog(query);
     final titleFilter = query.titleFilter;
     int? exactTitleCount;
-    if (query.pairProbe != null && titleFilter != null) {
+    if ((query.pairProbe != null || query.countExactActiveTitle) &&
+        titleFilter != null) {
       final count = countAll();
       final countQuery = _database.selectOnly(intentions)
         ..addColumns([count])
@@ -1334,6 +1296,12 @@ final class DriftPersonalGraphRepository
           intentions.id
               .equals(pairProbe.counterpartId.toCanonicalString())
               .not();
+    }
+    final excludedId = query.excludedIntentionId;
+    if (excludedId != null) {
+      condition =
+          condition &
+          intentions.id.equals(excludedId.toCanonicalString()).not();
     }
     final requiredTagIds = query.tagFilter.requiredTagIds;
     if (requiredTagIds.isNotEmpty) {
@@ -1670,6 +1638,7 @@ final class _DriftIntentionCatalogEntrySnapshot
     if (!matchesScope ||
         !matchesReadiness ||
         summary.id == query.pairProbe?.counterpartId ||
+        summary.id == query.excludedIntentionId ||
         !query.tagFilter.matches(summary.tags.map((tag) => tag.id).toSet())) {
       return false;
     }

@@ -371,7 +371,7 @@ List<int> _countsOf(GraphRecordCounts counts) => [
   counts.intentions,
   counts.tagAssignments,
   counts.longTermRelations,
-  counts.dailyChoices,
+  counts.actions,
 ];
 
 List<String> _lines(List<GraphEntityRecord> records) => [

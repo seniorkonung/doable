@@ -10,8 +10,7 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/action/presentation/day/action_day_root_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
@@ -20,14 +19,16 @@ import 'package:doable/src/intention/presentation/editor/intention_editor_page.d
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../intention/presentation/picker/intention_picker_test_support.dart';
+import '../../support/action_seed.dart';
 import '../../support/app_root_pages.dart';
-import '../../support/daily_choice_local_date.dart';
+import '../../support/controlled_local_date.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/intention_catalog_controls.dart';
@@ -36,19 +37,19 @@ import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/quick_creation.dart';
 
 /// Намерения «Намерение 01» … «Намерение 40»: выдача каталога намерений
-/// длиннее экрана. Первое — исходное намерение дневных выборов.
+/// длиннее экрана. Первое — исходное намерение действий.
 const _intentionCount = 40;
 
 /// Намерение «Прочее», которое фильтр названия «Намерение» исключает.
 const _other = 41;
 
-/// Связь «Намерение 01» → «Намерение 02» — путь обоих дневных выборов.
+/// Связь «Намерение 01» → «Намерение 02» — путь обоих действий.
 const _relation = 101;
-const _earlierChoice = 201;
-const _laterChoice = 202;
+const _earlierAction = 201;
+const _laterAction = 202;
 final _earlierDate = CalendarDate.fromParts(2026, 9, 25);
 
-/// День более позднего дневного выбора — локальное сегодня приложения:
+/// День более позднего действия — локальное сегодня приложения:
 /// каталог открывается на нём, а более ранний день выбирается отдельно.
 final _laterDate = CalendarDate.fromParts(2026, 9, 26);
 
@@ -98,7 +99,7 @@ void main() {
 
     expect(app.platform.exits, 1);
     _expectRootPage(tester, app.router, AppDestination.home);
-    expect(_built(DailyChoiceCatalogPage), findsNothing);
+    expect(_built(ActionDayRootPage), findsNothing);
     expect(_built(IntentionCatalogPage), findsNothing);
     expect(app.platform.frameworkHandlesBack, isFalse);
     expect(tester.takeException(), isNull);
@@ -258,7 +259,7 @@ void main() {
 
     for (final destination in [
       AppDestination.home,
-      AppDestination.dailyChoices,
+      AppDestination.actions,
       AppDestination.intentionGraph,
       AppDestination.home,
     ]) {
@@ -284,17 +285,17 @@ void main() {
 }
 
 /// Каталоги — корневые страницы, с которых «назад» ведёт на Главную.
-const _catalogs = [AppDestination.dailyChoices, AppDestination.intentionGraph];
+const _catalogs = [AppDestination.actions, AppDestination.intentionGraph];
 
 const _names = {
-  AppDestination.dailyChoices: 'Дневные выборы',
+  AppDestination.actions: 'Действия',
   AppDestination.intentionGraph: 'Граф намерений',
 };
 
 /// Корневая страница каждого пункта.
 const _rootPages = {
   AppDestination.home: HomePage,
-  AppDestination.dailyChoices: DailyChoiceCatalogPage,
+  AppDestination.actions: ActionDayRootPage,
   AppDestination.intentionGraph: IntentionCatalogPage,
 };
 
@@ -352,7 +353,7 @@ Future<_App> _start(WidgetTester tester) async {
     connectionFactory: () =>
         openInMemoryLocalDatabase(setup: (database) => raw = database),
     diagnosticsSink: InMemoryDiagnosticsSink(),
-    dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(_laterDate).read,
+    localDateSource: ControlledLocalDate(_laterDate).read,
   );
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());
@@ -370,7 +371,7 @@ Future<_App> _start(WidgetTester tester) async {
   return _App(ready.container.read(appRouterProvider), platform);
 }
 
-/// Намерения, связь и два дневных выбора по ней на
+/// Намерения, связь и два действия по ней на
 /// разные даты: каждая корневая страница получает содержимое и параметры.
 void _seed(sqlite.Database database) {
   seedRawGraph(database, () {
@@ -390,30 +391,15 @@ void _seed(sqlite.Database database) {
       'VALUES (?, ?, ?, ?, ?, ?, 0, 0)',
       [tagFixtureId(_relation), tagFixtureId(1), tagFixtureId(2), 'need', 2, 0],
     );
-    for (final (choice, date) in [
-      (_earlierChoice, _earlierDate),
-      (_laterChoice, _laterDate),
+    for (final (action, date) in [
+      (_earlierAction, _earlierDate),
+      (_laterAction, _laterDate),
     ]) {
-      database.execute(
-        'INSERT INTO daily_choices (id, source_intention_id, '
-        'selected_intention_id, choice_date, is_completed) '
-        'VALUES (?, ?, ?, ?, ?)',
-        [
-          tagFixtureId(choice),
-          tagFixtureId(1),
-          tagFixtureId(2),
-          date.toCanonicalString(),
-          0,
-        ],
-      );
-      database.execute(
-        'INSERT INTO daily_choice_path_steps (id, daily_choice_id, '
-        'long_term_relation_id) VALUES (?, ?, ?)',
-        [
-          tagFixtureId(choice + 10),
-          tagFixtureId(choice),
-          tagFixtureId(_relation),
-        ],
+      seedAction(
+        database,
+        id: tagFixtureId(action),
+        path: [tagFixtureId(1), tagFixtureId(2)],
+        date: date.toCanonicalString(),
       );
     }
   });

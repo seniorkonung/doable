@@ -7,17 +7,19 @@ import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
+import 'package:doable/src/action/presentation/day/action_day_date_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
+import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:doable/src/statistics/presentation/home_statistics_state.dart';
 import 'package:doable/src/statistics/presentation/home_statistics_view_model.dart';
+import 'package:doable/src/statistics/presentation/intention_statistics_calendar.dart';
 import 'package:doable/src/statistics/presentation/intention_statistics_section.dart';
 import 'package:doable/src/statistics/presentation/intention_statistics_state.dart';
 import 'package:doable/src/statistics/presentation/intention_statistics_view_model.dart';
@@ -25,8 +27,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/action_seed.dart';
 import '../support/app_root_pages.dart';
-import '../support/daily_choice_durability_fixture.dart';
+import '../support/graph_durability_fixture.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
@@ -38,14 +41,21 @@ void main() {
     final app = await _start(tester);
     app.homeModel.selectPeriod(StatisticsYear(2025));
     for (final (view, id) in [
-      (StatisticsView.sourceIntentions, 1120),
+      (StatisticsView.rootIntentions, 1120),
       (StatisticsView.intermediateIntentions, 2),
-      (StatisticsView.selectedActions, 2120),
+      (StatisticsView.terminalIntentions, 2120),
       (StatisticsView.throughRelations, 2120),
     ]) {
       _scroll(tester, find.byType(HomePage)).position.jumpTo(0);
       await tester.pumpAndSettle();
-      await _tap(tester, find.text(_viewLabel(app.texts, view)));
+      await _tap(
+        tester,
+        find.text(_viewLabel(app.texts, app.home.selection.view)),
+      );
+      await _tap(
+        tester,
+        find.widgetWithText(OptionRow, _viewLabel(app.texts, view)),
+      );
       await _wait(tester, () => app.home.read is HomeStatisticsData);
       final row = find.text('Намерение $id');
       await _scrollTo(tester, row, find.byType(HomePage));
@@ -90,7 +100,7 @@ void main() {
         tester,
         app,
         1010,
-        StatisticsView.sourceIntentions,
+        StatisticsView.rootIntentions,
         StatisticsMonth(2025, 9),
       );
       app.router.pop();
@@ -104,7 +114,7 @@ void main() {
         tester,
         app,
         1010,
-        StatisticsView.sourceIntentions,
+        StatisticsView.rootIntentions,
         StatisticsMonth(2025, 9),
       );
       await openHome(tester, waitFor: _untilFound);
@@ -134,14 +144,14 @@ void main() {
       final originalProvider = app.sectionProvider(tester);
       for (final (breakdown, rowId, view) in [
         (
-          StatisticsBreakdown.sourceIntentions,
+          StatisticsBreakdown.rootIntentions,
           1010,
-          StatisticsView.sourceIntentions,
+          StatisticsView.rootIntentions,
         ),
         (
-          StatisticsBreakdown.selectedActions,
+          StatisticsBreakdown.terminalIntentions,
           2010,
-          StatisticsView.selectedActions,
+          StatisticsView.terminalIntentions,
         ),
         (StatisticsBreakdown.relations, 2010, StatisticsView.throughRelations),
       ]) {
@@ -149,7 +159,10 @@ void main() {
           await tester.ensureVisible(
             find.text('Статистика', skipOffstage: false).last,
           );
-          await _tap(tester, find.text(app.texts.statisticsThroughRelations));
+          await _tap(
+            tester,
+            find.text(app.texts.statisticsTileThroughRelations),
+          );
           await _wait(
             tester,
             () =>
@@ -166,10 +179,10 @@ void main() {
         final before = app.container.read(originalProvider);
         final data = before.read as IntentionStatisticsLoaded;
         expect(switch (breakdown) {
-          StatisticsBreakdown.sourceIntentions =>
-            data.breakdowns.sourceIntentions!.items.length,
-          StatisticsBreakdown.selectedActions =>
-            data.breakdowns.selectedActions!.items.length,
+          StatisticsBreakdown.rootIntentions =>
+            data.breakdowns.rootIntentions!.items.length,
+          StatisticsBreakdown.terminalIntentions =>
+            data.breakdowns.terminalIntentions!.items.length,
           StatisticsBreakdown.relations =>
             data.breakdowns.relations!.items.length,
         }, 120);
@@ -180,10 +193,10 @@ void main() {
         expect(retained.selection.view, before.selection.view);
         final parts = (retained.read as IntentionStatisticsLoaded).breakdowns;
         expect(switch (breakdown) {
-          StatisticsBreakdown.sourceIntentions =>
-            parts.sourceIntentions!.items.length,
-          StatisticsBreakdown.selectedActions =>
-            parts.selectedActions!.items.length,
+          StatisticsBreakdown.rootIntentions =>
+            parts.rootIntentions!.items.length,
+          StatisticsBreakdown.terminalIntentions =>
+            parts.terminalIntentions!.items.length,
           StatisticsBreakdown.relations => parts.relations!.items.length,
         }, 120);
         await _scrollTo(tester, row, find.byType(IntentionDetailsPage));
@@ -199,11 +212,11 @@ void main() {
         final after = app.container.read(originalProvider);
         expect(after.selection, same(before.selection));
         final restored = (after.read as IntentionStatisticsLoaded).breakdowns;
+        expect(restored.rootIntentions, same(data.breakdowns.rootIntentions));
         expect(
-          restored.sourceIntentions,
-          same(data.breakdowns.sourceIntentions),
+          restored.terminalIntentions,
+          same(data.breakdowns.terminalIntentions),
         );
-        expect(restored.selectedActions, same(data.breakdowns.selectedActions));
         expect(restored.relations, same(data.breakdowns.relations));
         expect(
           _scroll(tester, find.byType(IntentionDetailsPage)).position.pixels,
@@ -215,7 +228,7 @@ void main() {
   );
 
   testWidgets(
-    'повторное намерение получает свою цель, день открывает каталог, язык и возврат сохраняют состояние',
+    'повторное намерение получает свою цель, день открывает экран дня, язык и возврат сохраняют состояние',
     (tester) async {
       final app = await _start(tester);
       app.homeModel.selectPeriod(StatisticsMonth(2025, 9));
@@ -231,7 +244,7 @@ void main() {
       );
       final first = app.sectionProvider(tester);
       final action = find.descendant(
-        of: find.byKey(const ValueKey(StatisticsBreakdown.selectedActions)),
+        of: find.byKey(const ValueKey(StatisticsBreakdown.terminalIntentions)),
         matching: find.text('Намерение 2120'),
       );
       await _scrollTo(tester, action, find.byType(IntentionDetailsPage));
@@ -245,10 +258,10 @@ void main() {
         tester,
         app,
         2120,
-        StatisticsView.selectedActions,
+        StatisticsView.terminalIntentions,
         StatisticsMonth(2025, 9),
       );
-      await _tap(tester, find.text(app.texts.statisticsThroughRelations));
+      await _tap(tester, find.text(app.texts.statisticsTileThroughRelations));
       final relation = find.descendant(
         of: find.byKey(const ValueKey(StatisticsBreakdown.relations)),
         matching: find.text('Намерение 2'),
@@ -265,14 +278,34 @@ void main() {
       );
       final second = app.sectionProvider(tester);
       expect(second, isNot(first));
-      await _tap(tester, find.text(app.texts.statisticsSourceIntentions));
+      await _tap(tester, find.text(app.texts.statisticsTileIntermediate));
       await _tap(tester, find.byTooltip(app.texts.statisticsPreviousMonth));
       await _wait(
         tester,
-        () => app.container.read(second).read is IntentionStatisticsLoaded,
+        () => _isLoadedFor(app, second, StatisticsMonth(2025, 8)),
+      );
+      // В августе у «Намерения 2» нет действий: плитки сохранены, а вместо
+      // календаря стоит сообщение.
+      expect(
+        find.text(
+          app.texts.statisticsIntentionEmptyIntermediateTitle(
+            app.texts.statisticsMonthPeriod(DateTime.utc(2025, 8)),
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text(app.texts.statisticsTileThroughRelations),
+        findsOneWidget,
+      );
+      expect(find.byType(IntentionStatisticsCalendarView), findsNothing);
+      await _tap(tester, find.byTooltip(app.texts.statisticsNextMonth));
+      await _wait(
+        tester,
+        () => _isLoadedFor(app, second, StatisticsMonth(2025, 9)),
       );
       final topState = app.container.read(second);
-      expect(topState.selection.period, StatisticsMonth(2025, 8));
+      expect(topState.selection.view, StatisticsView.intermediateIntentions);
       tester.binding.platformDispatcher.localesTestValue = const [Locale('en')];
       await tester.pumpAndSettle();
       expect(find.text('Statistics').first, findsOneWidget);
@@ -282,8 +315,8 @@ void main() {
       final english = lookupAppLocalizations(const Locale('en'));
       final day = find.bySemanticsLabel(
         english.statisticsCalendarDaySemantics(
-          DateTime.utc(2025, 8, 1),
-          english.statisticsCalendarDayNoChoices,
+          DateTime.utc(2025, 9, 12),
+          english.statisticsCalendarDayAllCompleted,
         ),
       );
       await tester.ensureVisible(day);
@@ -293,15 +326,11 @@ void main() {
         find.byType(IntentionDetailsPage),
       ).position.pixels;
       await _tap(tester, day);
-      await _untilFound(tester, find.byType(DailyChoiceDateCatalogPage));
+      await _untilFound(tester, find.byType(ActionDayDatePage));
       expect(app.router.stack, hasLength(depth + 1));
       expect(
-        tester
-            .widget<DailyChoiceDateCatalogPage>(
-              find.byType(DailyChoiceDateCatalogPage),
-            )
-            .date,
-        CalendarDate.fromParts(2025, 8, 1),
+        tester.widget<ActionDayDatePage>(find.byType(ActionDayDatePage)).date,
+        CalendarDate.fromParts(2025, 9, 12),
       );
       expect(
         tester
@@ -343,10 +372,10 @@ void main() {
 
 String _viewLabel(AppLocalizations texts, StatisticsView view) =>
     switch (view) {
-      StatisticsView.sourceIntentions => texts.statisticsSourceIntentions,
+      StatisticsView.rootIntentions => texts.statisticsRootIntentions,
       StatisticsView.intermediateIntentions =>
         texts.statisticsIntermediateIntentions,
-      StatisticsView.selectedActions => texts.statisticsSelectedActions,
+      StatisticsView.terminalIntentions => texts.statisticsTerminalIntentions,
       StatisticsView.throughRelations => texts.statisticsThroughRelations,
     };
 
@@ -380,7 +409,7 @@ Future<_App> _start(WidgetTester tester) async {
     connectionFactory: openInMemoryLocalDatabase,
     diagnosticsSink: InMemoryDiagnosticsSink(),
     quickCreationModeStore: InMemoryQuickCreationModeStore(),
-    dailyChoiceLocalDateSource: () => DailyChoiceLocalDay(
+    localDateSource: () => LocalDay(
       date: CalendarDate.fromParts(2026, 10, 12),
       untilNextDate: const Duration(hours: 12),
     ),
@@ -457,6 +486,15 @@ Future<void> _scrollTo(WidgetTester tester, Finder row, Finder page) async {
   fail('Строка не появилась: $row');
 }
 
+bool _isLoadedFor(
+  _App app,
+  IntentionStatisticsViewModelProvider provider,
+  StatisticsPeriod period,
+) => switch (app.container.read(provider).read) {
+  IntentionStatisticsLoaded(:final section) => section.query.period == period,
+  _ => false,
+};
+
 Future<void> _untilFound(WidgetTester tester, Finder finder) =>
     _wait(tester, () => finder.evaluate().isNotEmpty);
 
@@ -507,24 +545,20 @@ Future<void> _seed(AppDatabase database) => seedGraph(database, () async {
         ],
       );
     }
+    // Главная считает действия.
     await database.customStatement(
-      "INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, '2025-09-12', 1)",
-      [
-        durabilityUuid(4000 + i),
-        durabilityUuid(1000 + i),
-        durabilityUuid(2000 + i),
-      ],
+      "INSERT INTO actions (id, title, date, priority, is_completed, created_at, updated_at) VALUES (?, 'Действие', '2025-09-12', 4, 1, 1, 1)",
+      [durabilityUuid(7000 + i)],
     );
-    for (var step = 0; step < 2; step++) {
-      await database.customStatement(
-        'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id, previous_step_id) VALUES (?, ?, ?, ?)',
-        [
-          durabilityUuid(5000 + i * 2 + step),
-          durabilityUuid(4000 + i),
-          durabilityUuid(firstRelation + step),
-          step == 0 ? null : durabilityUuid(5000 + i * 2),
-        ],
-      );
+    final path = [1000 + i, 2, 2000 + i];
+    for (final (position, intention) in path.indexed) {
+      await database.customStatement(insertActionPathItem, [
+        durabilityUuid(7000 + i),
+        position,
+        durabilityUuid(intention),
+        position == 0 ? null : durabilityUuid(path[position - 1]),
+        actionPathRole(position, path.length),
+      ]);
     }
   }
   await database.customStatement(

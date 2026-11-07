@@ -871,9 +871,7 @@ void main() {
         'и удалении', () async {
       final repository = ControlledCatalogRepository();
       final container = reconciliationCatalogContainer(repository);
-      final provider = intentionCatalogViewModelProvider(
-        SelectDailyChoiceSource(session: IntentionSearchSession()),
-      );
+      final provider = intentionCatalogViewModelProvider(_participantPurpose());
       final subscription = container.listen(
         provider,
         (_, _) {},
@@ -986,7 +984,7 @@ void main() {
         final repository = ControlledCatalogRepository();
         final container = reconciliationCatalogContainer(repository);
         final provider = intentionCatalogViewModelProvider(
-          SelectDailyChoiceSource(session: IntentionSearchSession()),
+          _participantPurpose(),
         );
         final subscription = container.listen(
           provider,
@@ -1069,15 +1067,32 @@ void main() {
             ),
           ),
         );
+        // Вошедшую строку при исключённом участнике сообщает только порция:
+        // занятость её пары неизвестна, выдача читается заново.
+        await waitForCatalogQueries(repository, 3);
+        repository.complete(
+          2,
+          ResultSuccess(
+            IntentionCatalogFirstPage(
+              items: [actionAsIntention],
+              totalCount: 1,
+              counts: IntentionCountsByType(
+                IntentionTypeCounts(all: 2, actions: 1),
+              ),
+              nextCursor: null,
+              revision: const TestCatalogRevision(3),
+            ),
+          ),
+        );
         expect(
-          container.read(provider).requireValue,
+          await container.read(provider.future),
           isA<IntentionCatalogLoaded>()
               .having((state) => state.items, 'строки', [actionAsIntention])
               .having((state) => state.totalCount, 'количество', 1)
               .having((state) => state.typeCounts?.all, 'все', 2)
               .having((state) => state.typeCounts?.actions, 'действия', 1),
         );
-        expect(repository.queries, hasLength(2));
+        expect(repository.queries, hasLength(3));
       },
     );
   });
@@ -2225,4 +2240,12 @@ Tag _tag(int number) => Tag(
   name: TagName.fromInput('Тег $number'),
   color: null,
   position: tagPositionAt(number),
+);
+
+SelectRelationParticipant _participantPurpose() => SelectRelationParticipant(
+  session: IntentionSearchSession(),
+  pairProbe: RelationPairProbe(
+    counterpartId: testSummary(index: 999).id,
+    candidateRole: RelationParticipantRole.related,
+  ),
 );

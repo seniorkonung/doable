@@ -4,8 +4,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
-import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
+import 'package:doable/src/action/presentation/day/action_day_root_page.dart';
 import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
@@ -26,8 +25,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../daily_choice/presentation/daily_choice_picker_launch_test_support.dart'
-    show TestDailyChoicePickerLaunch;
 import '../../intention/presentation/catalog/catalog_test_support.dart';
 import '../../long_term_relation/presentation/details/relation_details_test_support.dart';
 import '../../long_term_relation/presentation/relation_graph_test_support.dart'
@@ -81,29 +78,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(IntentionCatalogPage), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('catalog-open-daily-choices')),
-        findsNothing,
-      );
-
-      await openDailyChoices(tester);
+      await openActions(tester);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      expect(find.byType(DailyChoiceCatalogPage), findsOneWidget);
-
-      unawaited(
-        router.push<IntentionId>(
-          DailyChoiceSourcePickerRoute(launch: TestDailyChoicePickerLaunch()),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      expect(find.byType(DailyChoiceSourcePickerPage), findsOneWidget);
-      expect(repository.queryAt(1).scope, IntentionScope.active);
-      expect(
-        repository.queryAt(1).readinessFilter,
-        IntentionReadinessFilter.all,
-      );
+      expect(find.byType(ActionDayRootPage), findsOneWidget);
     },
   );
 

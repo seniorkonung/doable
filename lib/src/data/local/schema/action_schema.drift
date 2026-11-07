@@ -1,0 +1,322 @@
+import 'long_term_relation_schema.drift';
+
+-- Название и описание подчиняются контракту текста намерения.
+CREATE TABLE actions (
+  creation_sequence INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT
+    CHECK (creation_sequence > 0),
+  id TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL CHECK (
+    typeof(title) = 'text' AND
+    title <> '' AND
+    instr(CAST(title AS BLOB), x'00') = 0
+  ),
+  description TEXT CHECK (
+    description IS NULL OR
+    (
+      typeof(description) = 'text' AND
+      instr(CAST(description AS BLOB), x'00') = 0 AND
+      length(trim(description, char(9) || char(10) || char(11) || char(12) || char(13) || char(32))) > 0
+    )
+  ),
+  date TEXT NOT NULL CHECK (
+    typeof(date) = 'text' AND
+    length(date) = 10 AND
+    date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+  ),
+  -- NULL — «Весь день».
+  scheduled_hour INTEGER CHECK (
+    scheduled_hour IS NULL OR
+    (typeof(scheduled_hour) = 'integer' AND scheduled_hour BETWEEN 0 AND 23)
+  ),
+  priority INTEGER NOT NULL CHECK (
+    typeof(priority) = 'integer' AND priority BETWEEN 1 AND 4
+  ),
+  is_completed BOOLEAN NOT NULL CHECK (
+    typeof(is_completed) = 'integer' AND
+    is_completed IN (0, 1)
+  ),
+  created_at INTEGER NOT NULL CHECK (typeof(created_at) = 'integer'),
+  updated_at INTEGER NOT NULL CHECK (typeof(updated_at) = 'integer')
+);
+
+-- Порядок выдачи дня: секция выполнения, «Весь день» перед часами,
+-- приоритет и порядок создания. Префикс (date, is_completed) служит
+-- отметкам календаря.
+CREATE INDEX actions_date_completion_schedule_order
+  ON actions (
+    date, is_completed, COALESCE(scheduled_hour, -1),
+    priority, creation_sequence
+  );
+
+CREATE TRIGGER actions_immutable_identity
+AFTER UPDATE OF creation_sequence, id ON actions
+WHEN
+  new.creation_sequence <> old.creation_sequence OR
+  new.id <> old.id
+BEGIN
+  SELECT RAISE(ABORT, 'action identity is immutable');
+END;
+
+-- Путь — последовательность намерений от корневого (позиция 0) до
+-- конечного. Внешних ключей на намерения и связи нет: путь переживает их
+-- удаление, а данные удалённого хранят надгробия. previous_intention_id
+-- повторяет намерение предыдущей позиции, чтобы пара звена читалась из
+-- одной строки.
+--
+-- Роль и копия ключа порядка действия (order_*) — производные данные
+-- хранилища для списков ролей намерения; формат данных и факты журнала их
+-- не содержат. Намерение пути из одного намерения — «единственное»: оно и
+-- корневое, и конечное.
+CREATE TABLE action_path_items (
+  action_id TEXT NOT NULL
+    REFERENCES actions(id) ON UPDATE RESTRICT ON DELETE CASCADE,
+  position INTEGER NOT NULL CHECK (
+    typeof(position) = 'integer' AND position >= 0
+  ),
+  intention_id TEXT NOT NULL CHECK (typeof(intention_id) = 'text'),
+  previous_intention_id TEXT,
+  role TEXT NOT NULL CHECK (
+    typeof(role) = 'text' AND
+    role IN ('root', 'intermediate', 'terminal', 'single')
+  ),
+  order_date TEXT NOT NULL,
+  -- -1 — «Весь день».
+  order_hour INTEGER NOT NULL,
+  order_sequence INTEGER NOT NULL,
+  PRIMARY KEY (action_id, position),
+  UNIQUE (action_id, intention_id)
+);
+
+CREATE INDEX action_path_items_intention_action
+  ON action_path_items (intention_id, action_id);
+
+-- Строки роли намерения в порядке списка вкладки «Действия»: продолжение
+-- находится сравнением ключа порядка без сортировки и без прохода по
+-- строкам других ролей.
+CREATE INDEX action_path_items_intention_role_order
+  ON action_path_items (
+    intention_id, role, order_date DESC, order_hour DESC,
+    order_sequence DESC
+  );
+
+CREATE INDEX action_path_items_link
+  ON action_path_items (previous_intention_id, intention_id);
+
+-- Путь перезаписывается целиком, поэтому строки вставляются по порядку
+-- позиций: строка продолжает предыдущую позицию того же действия, а
+-- позиция 0 предыдущего намерения не имеет.
+CREATE TRIGGER action_path_items_continue_previous_position
+AFTER INSERT ON action_path_items
+WHEN new.previous_intention_id IS NOT (
+  SELECT intention_id
+  FROM action_path_items
+  WHERE action_id = new.action_id AND position = new.position - 1
+)
+BEGIN
+  SELECT RAISE(ABORT, 'action path item must continue the previous position');
+END;
+
+-- Путь из одного намерения задаёт роль «единственное», более длинный —
+-- корневое, промежуточные и конечное. Строки вставляются по порядку
+-- позиций, поэтому роль сверяется с позицией и ролью предыдущей строки.
+CREATE TRIGGER action_path_items_role_follows_position
+AFTER INSERT ON action_path_items
+WHEN CASE
+  WHEN new.position = 0 THEN new.role NOT IN ('root', 'single')
+  ELSE
+    new.role NOT IN ('intermediate', 'terminal') OR
+    NOT EXISTS (
+      SELECT 1
+      FROM action_path_items
+      WHERE
+        action_id = new.action_id AND
+        position = new.position - 1 AND
+        role IN ('root', 'intermediate')
+    )
+END
+BEGIN
+  SELECT RAISE(ABORT, 'action path item role must follow its position');
+END;
+
+CREATE TRIGGER action_path_items_order_key_matches_action
+AFTER INSERT ON action_path_items
+WHEN NOT EXISTS (
+  SELECT 1
+  FROM actions
+  WHERE
+    id = new.action_id AND
+    date = new.order_date AND
+    COALESCE(scheduled_hour, -1) = new.order_hour AND
+    creation_sequence = new.order_sequence
+)
+BEGIN
+  SELECT RAISE(ABORT, 'action path item order key must match its action');
+END;
+
+-- Последовательность создания действия неизменна, поэтому вслед за
+-- действием меняются только дата и час.
+CREATE TRIGGER actions_copy_order_key_to_path
+AFTER UPDATE OF date, scheduled_hour ON actions
+WHEN
+  new.date IS NOT old.date OR
+  new.scheduled_hour IS NOT old.scheduled_hour
+BEGIN
+  UPDATE action_path_items
+  SET order_date = new.date, order_hour = COALESCE(new.scheduled_hour, -1)
+  WHERE action_id = new.id;
+END;
+
+CREATE TRIGGER action_path_items_known_intention
+AFTER INSERT ON action_path_items
+WHEN
+  NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.intention_id) AND
+  NOT EXISTS (
+    SELECT 1 FROM deleted_intentions WHERE intention_id = new.intention_id
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'action path item requires a known intention');
+END;
+
+-- Изменение строки обошло бы поддержку надгробий, порядок позиций и
+-- проверку роли; меняется только копия даты и часа вслед за действием.
+CREATE TRIGGER action_path_items_immutable
+BEFORE UPDATE ON action_path_items
+WHEN
+  new.action_id IS NOT old.action_id OR
+  new.position IS NOT old.position OR
+  new.intention_id IS NOT old.intention_id OR
+  new.previous_intention_id IS NOT old.previous_intention_id OR
+  new.role IS NOT old.role OR
+  new.order_sequence IS NOT old.order_sequence
+BEGIN
+  SELECT RAISE(ABORT, 'action path items are immutable');
+END;
+
+-- Надгробия хранят данные удалённого, пока на него ссылается хоть один
+-- путь. У намерения либо есть строка, либо надгробие; у пары намерений —
+-- либо связь, либо надгробие.
+CREATE TABLE deleted_intentions (
+  intention_id TEXT NOT NULL PRIMARY KEY CHECK (typeof(intention_id) = 'text'),
+  title TEXT NOT NULL CHECK (
+    typeof(title) = 'text' AND
+    title <> '' AND
+    instr(CAST(title AS BLOB), x'00') = 0
+  )
+);
+
+CREATE TABLE deleted_relation_pairs (
+  source_intention_id TEXT NOT NULL CHECK (
+    typeof(source_intention_id) = 'text'
+  ),
+  related_intention_id TEXT NOT NULL CHECK (
+    typeof(related_intention_id) = 'text'
+  ),
+  type TEXT NOT NULL CHECK (
+    typeof(type) = 'text' AND
+    type IN ('need', 'can')
+  ),
+  PRIMARY KEY (source_intention_id, related_intention_id),
+  CHECK (source_intention_id <> related_intention_id)
+);
+
+CREATE TRIGGER deleted_intentions_reject_existing
+BEFORE INSERT ON deleted_intentions
+WHEN EXISTS (SELECT 1 FROM intentions WHERE id = new.intention_id)
+BEGIN
+  SELECT RAISE(ABORT, 'tombstone of an existing intention');
+END;
+
+CREATE TRIGGER intentions_reject_tombstoned
+AFTER INSERT ON intentions
+WHEN EXISTS (
+  SELECT 1 FROM deleted_intentions WHERE intention_id = new.id
+)
+BEGIN
+  SELECT RAISE(ABORT, 'tombstone of an existing intention');
+END;
+
+CREATE TRIGGER deleted_relation_pairs_reject_existing
+BEFORE INSERT ON deleted_relation_pairs
+WHEN EXISTS (
+  SELECT 1
+  FROM long_term_relations
+  WHERE
+    source_intention_id = new.source_intention_id AND
+    related_intention_id = new.related_intention_id
+)
+BEGIN
+  SELECT RAISE(ABORT, 'tombstone of an existing relation pair');
+END;
+
+CREATE TRIGGER deleted_intentions_immutable
+BEFORE UPDATE ON deleted_intentions
+BEGIN
+  SELECT RAISE(ABORT, 'tombstones are immutable');
+END;
+
+CREATE TRIGGER deleted_relation_pairs_immutable
+BEFORE UPDATE ON deleted_relation_pairs
+BEGIN
+  SELECT RAISE(ABORT, 'tombstones are immutable');
+END;
+
+CREATE TRIGGER intentions_tombstone_after_delete
+AFTER DELETE ON intentions
+WHEN EXISTS (
+  SELECT 1 FROM action_path_items WHERE intention_id = old.id
+)
+BEGIN
+  INSERT INTO deleted_intentions (intention_id, title)
+  VALUES (old.id, old.title);
+END;
+
+-- Связь пары уже удалена, а прежнее надгробие пары при живой связи
+-- существовать не могло, поэтому вставка не конфликтует.
+CREATE TRIGGER long_term_relations_tombstone_after_delete
+AFTER DELETE ON long_term_relations
+WHEN EXISTS (
+  SELECT 1
+  FROM action_path_items
+  WHERE
+    previous_intention_id = old.source_intention_id AND
+    intention_id = old.related_intention_id
+)
+BEGIN
+  INSERT INTO deleted_relation_pairs (
+    source_intention_id, related_intention_id, type
+  ) VALUES (old.source_intention_id, old.related_intention_id, old.type);
+END;
+
+-- Заново созданная связь пары снимает разрыв звена.
+CREATE TRIGGER long_term_relations_untombstone_after_insert
+AFTER INSERT ON long_term_relations
+BEGIN
+  DELETE FROM deleted_relation_pairs
+  WHERE
+    source_intention_id = new.source_intention_id AND
+    related_intention_id = new.related_intention_id;
+END;
+
+-- Предыдущее намерение строки — намерение другой строки того же пути,
+-- поэтому ссылку на надгробие намерения держит столбец intention_id.
+CREATE TRIGGER action_path_items_release_tombstones_after_delete
+AFTER DELETE ON action_path_items
+BEGIN
+  DELETE FROM deleted_intentions
+  WHERE
+    intention_id = old.intention_id AND
+    NOT EXISTS (
+      SELECT 1 FROM action_path_items WHERE intention_id = old.intention_id
+    );
+  DELETE FROM deleted_relation_pairs
+  WHERE
+    source_intention_id = old.previous_intention_id AND
+    related_intention_id = old.intention_id AND
+    NOT EXISTS (
+      SELECT 1
+      FROM action_path_items
+      WHERE
+        previous_intention_id = old.previous_intention_id AND
+        intention_id = old.intention_id
+    );
+END;

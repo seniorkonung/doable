@@ -835,9 +835,11 @@ bool _notCancelled() => false;
 int _total(GraphRecordCounts counts) =>
     counts.tags +
     counts.intentions +
+    counts.deletedIntentions +
     counts.tagAssignments +
     counts.longTermRelations +
-    counts.dailyChoices;
+    counts.deletedRelationPairs +
+    counts.actions;
 
 /// Пишет [bytes] в [file] без сброса на диск: файлы порций пересборки и
 /// состояния — не снимки, и после сбоя процесса они не нужны.

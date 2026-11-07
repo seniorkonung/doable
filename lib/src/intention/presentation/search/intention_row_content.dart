@@ -23,13 +23,11 @@ final class IntentionRowContent {
 
   /// [requiredTagIds] — обязательные теги применённого запроса, который
   /// отобрал строку, а не текущих условий: пока новая порция загружается, они
-  /// уже могут быть другими. [namesKind] — называет ли доступное название
-  /// тип найденного, см. `IntentionSearchKind.namesKind`.
+  /// уже могут быть другими.
   factory IntentionRowContent.of(
     AppLocalizations l10n, {
     required IntentionSummary summary,
     required Set<TagId> requiredTagIds,
-    required bool namesKind,
   }) {
     final isAction = switch (summary.readiness) {
       IntentionReadiness.ready => true,
@@ -70,10 +68,9 @@ final class IntentionRowContent {
       label: [
         summary.title,
         if (archived) l10n.intentionPickerArchived,
-        if (namesKind)
-          isAction
-              ? l10n.intentionPickerKindAction
-              : l10n.intentionPickerKindIntention,
+        isAction
+            ? l10n.intentionPickerKindAction
+            : l10n.intentionPickerKindIntention,
         ?description,
         orderedTags.isEmpty
             ? l10n.intentionSummaryNoTags

@@ -228,12 +228,7 @@ void defineIntentionPickerSessionTests({
       await router.maybePop();
       await tester.pumpAndSettle();
       expect(firstModel.selection.order, IntentionCatalogOrder.titleDescending);
-      switch (firstModel.selection.type) {
-        case IntentionTypeOpen(:final selected):
-          expect(selected, IntentionTypeChoice.actions);
-        case IntentionTypePinnedToActions():
-          expect(first, isA<SelectDailyChoiceAction>());
-      }
+      expect(firstModel.selection.type, IntentionTypeChoice.actions);
 
       await router.maybePop();
       await tester.pumpAndSettle();

@@ -1,18 +1,5 @@
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
-import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
-
-import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_priority.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_schedule.dart';
-import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -29,47 +16,24 @@ import 'package:doable/src/long_term_relation/application/relation_group_page.da
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 
-import '../../support/daily_choice_reconciliation_fixture.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
+import '../../support/action_read_contract_test_fallback.dart';
 import '../../support/statistics_read_contract_test_fallback.dart';
 import '../../support/intention_description_preview.dart';
 import '../../support/intention_title_order_key.dart';
 
 /// Управляемый граф: каждое чтение группы завершается тестом вручную.
 final class ControlledRelationGraphRepository
-    with StatisticsReadContractTestFallback, TagReadContractTestFallback
+    with
+        ActionReadContractTestFallback,
+        StatisticsReadContractTestFallback,
+        TagReadContractTestFallback
     implements PersonalGraphRepository {
-  @override
-  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
-    DailyChoiceDayStatusQuery query,
-  ) => throw UnsupportedError(
-    'Чтение состояний дней не используется в этом тесте.',
-  );
-
-  @override
-  Future<ChoicePathContinuationResult> getChoicePathContinuations(
-    ChoicePathContinuationQuery query,
-  ) => throw UnimplementedError();
-
-  @override
-  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Чтение дневного выбора не используется этим тестом.',
-      );
-
-  @override
-  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Наблюдение дневного выбора не используется этим тестом.',
-      );
-
-  final queries = <RelationGroupQuery>[];
-  final pageQueries = <RelationGroupPageQuery>[];
+  final pageQueries = <RelationGroupQuery>[];
   final _requests = <Completer<RelationGroupPageResult>>[];
   final intentionIds = <IntentionId>[];
   final intentionCommands = <IntentionCommand>[];
   final relationCommands = <LongTermRelationCommand>[];
-  final dailyChoiceCommands = <DailyChoiceCommand>[];
 
   /// Строки порций вместе с владельцем группы, которого сама строка не несёт.
   final _relationRows =
@@ -82,14 +46,10 @@ final class ControlledRelationGraphRepository
   final _commandRequests =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
-  final _dailyChoiceRequests = <Completer<DailyChoiceCommandResult>>[];
 
   int get requestCount => _requests.length;
 
-  RelationGroupQuery queryAt(int index) =>
-      pageQueries[index] as RelationGroupQuery;
-
-  RelationGroupPageQuery pageQueryAt(int index) => pageQueries[index];
+  RelationGroupQuery queryAt(int index) => pageQueries[index];
 
   void complete(int index, RelationGroupPageResult result) {
     _requests[index].complete(result);
@@ -99,14 +59,12 @@ final class ControlledRelationGraphRepository
     final rows = switch (page) {
       RelationGroupFirstPage(:final items) ||
       RelationGroupContinuationPage(:final items) => items,
-      DailyChoiceGroupFirstPage() ||
-      DailyChoiceGroupContinuationPage() => <RelationGroupEntry>[],
     };
     final ownerId = pageQueries[index].intentionId;
     for (final row in rows) {
       _relationRows[row.relation.id] = (ownerId, row);
     }
-    if (page is RelationGroupFirstPage || page is DailyChoiceGroupFirstPage) {
+    if (page is RelationGroupFirstPage) {
       _latestRevision = page.revision;
     }
     complete(index, GraphResultSuccess(page));
@@ -167,23 +125,11 @@ final class ControlledRelationGraphRepository
     _relationCommandRequests[index].complete(result);
   }
 
-  void completeDailyChoiceCommand(int index, DailyChoiceCommandResult result) {
-    _dailyChoiceRequests[index].complete(result);
-  }
-
-  @override
-  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
-    DailyChoiceCatalogQuery query,
-  ) => throw UnsupportedError(
-    'Каталог дневных выборов не используется в этом тесте.',
-  );
-
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) {
     pageQueries.add(query);
-    if (query is RelationGroupQuery) queries.add(query);
     final request = Completer<RelationGroupPageResult>();
     _requests.add(request);
     return request.future;
@@ -227,9 +173,6 @@ final class ControlledRelationGraphRepository
       ),
       final LongTermRelationCommand relationCommand =>
         await _executeLongTermRelation(relationCommand),
-      final DailyChoiceCommand choiceCommand => await _executeDailyChoice(
-        choiceCommand,
-      ),
       _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
     };
     return result as GraphCommandResult<TSuccess, TFailure>;
@@ -250,15 +193,6 @@ final class ControlledRelationGraphRepository
     relationCommands.add(command);
     final request = Completer<LongTermRelationCommandResult>();
     _relationCommandRequests.add(request);
-    return request.future;
-  }
-
-  Future<DailyChoiceCommandResult> _executeDailyChoice(
-    DailyChoiceCommand command,
-  ) {
-    dailyChoiceCommands.add(command);
-    final request = Completer<DailyChoiceCommandResult>();
-    _dailyChoiceRequests.add(request);
     return request.future;
   }
 
@@ -473,8 +407,6 @@ RelationCounts testRelationCounts({
   int archivedNeedOutgoing = 0,
   int archivedCanIncoming = 0,
   int archivedCanOutgoing = 0,
-  int dailySource = 0,
-  int dailySelected = 0,
 }) => RelationCounts(
   activeNeedIncoming: activeNeedIncoming,
   activeNeedOutgoing: activeNeedOutgoing,
@@ -484,8 +416,6 @@ RelationCounts testRelationCounts({
   archivedNeedOutgoing: archivedNeedOutgoing,
   archivedCanIncoming: archivedCanIncoming,
   archivedCanOutgoing: archivedCanOutgoing,
-  dailySource: dailySource,
-  dailySelected: dailySelected,
 );
 
 /// Сводка, в которой заполнена только выбранная группа.
@@ -507,83 +437,5 @@ RelationCounts testCountsForGroup({
     archivedNeedOutgoing: !isActive && isNeed && !isIncoming ? count : 0,
     archivedCanIncoming: !isActive && !isNeed && isIncoming ? count : 0,
     archivedCanOutgoing: !isActive && !isNeed && !isIncoming ? count : 0,
-  );
-}
-
-/// Строка дневной роли с участниками, заданными проверкой.
-DailyChoiceCatalogItem testDailyCatalogItem({
-  required IntentionId source,
-  required IntentionId selected,
-  DailyChoiceId? id,
-  CalendarDate? date,
-  String selectedTitle = 'Действие',
-  bool isCompleted = false,
-}) {
-  final choice = reconciliationChoice(source: source, selected: selected);
-  return DailyChoiceCatalogItem(
-    id: id ?? choice.id,
-    source: DailyChoiceCatalogParticipant(
-      id: source,
-      title: 'Источник',
-      archiveState: IntentionArchiveState.active,
-      readiness: IntentionReadiness.notReady,
-    ),
-    selected: DailyChoiceCatalogParticipant(
-      id: selected,
-      title: selectedTitle,
-      archiveState: IntentionArchiveState.active,
-      readiness: IntentionReadiness.ready,
-    ),
-    date: date ?? choice.date,
-    isCompleted: isCompleted,
-    schedule: const DailyChoiceAllDay(),
-    priority: DailyChoicePriority.p4,
-    description: null,
-    pathIntentionCount: 2,
-  );
-}
-
-/// Подтверждённое изменение полей дневного выбора на ревизии 2.
-DailyChoiceCommandResult testDailyFieldsUpdatedResult({
-  required DailyChoice before,
-  required DailyChoice after,
-  required Map<IntentionId, RelationCounts> counts,
-}) {
-  final created = reconciliationChoiceCreated(
-    choice: before,
-    pathRelationId: testRelationId(3),
-    revision: const TestGraphRevision(1),
-    counts: counts,
-  );
-  final path = switch (created) {
-    GraphResultSuccess(
-      value: ConfirmedGraphResult(value: DailyChoiceCreated(:final path)),
-    ) =>
-      path,
-    _ => throw StateError('Ожидался подтверждённый путь.'),
-  };
-  return GraphCommandSucceeded<
-    DailyChoiceCommandSuccess,
-    DailyChoiceCommandFailure
-  >(
-    ConfirmedGraphResult(
-      revision: const TestGraphRevision(2),
-      value: DailyChoiceFieldsUpdated(
-        before: before,
-        choice: after,
-        path: path,
-        changes: [
-          DailyChoiceChange(
-            revision: const TestGraphRevision(2),
-            before: before,
-            after: after,
-            releasedRelationIds: const [],
-            occupiedRelationIds: const [],
-            intentionCounts: counts,
-            relationPermissions: const {},
-          ),
-        ],
-      ),
-    ),
   );
 }

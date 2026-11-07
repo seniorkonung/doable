@@ -834,7 +834,7 @@ Future<void> _select(WidgetTester tester, AppDestination destination) async {
     find.byType(switch (destination) {
       AppDestination.home => HomePage,
       AppDestination.intentionGraph => IntentionCatalogPage,
-      AppDestination.dailyChoices => fail('Пункт не используется проверкой'),
+      AppDestination.actions => fail('Пункт не используется проверкой'),
     }),
   );
   await tester.pumpAndSettle();

@@ -70,6 +70,23 @@ void main() {
     expect(app.storedState(), before);
   });
 
+  testWidgets('сценарий «Файл неопубликованного варианта формата»: файл '
+      'прежней сборки отклоняется без подтверждения, граф и копии остаются '
+      'прежними, а под строкой «Импорт данных» показан отказ повреждённого '
+      'файла', (tester) async {
+    final app = await _startApp(tester);
+    await app.openSettings();
+    final before = app.storedState();
+    app.chooseForImport(temporaryImportDocument(_previousVariantFile()));
+
+    await app.startImport();
+    await app_flow.until(tester, find.text(_invalidFile));
+
+    expect(find.text('Импортировать эту копию?'), findsNothing);
+    expect(find.text(_importRunning), findsNothing);
+    expect(app.storedState(), before);
+  });
+
   testWidgets('сценарий «Повреждение обнаружено после подтверждения»: после '
       'подтверждения файла, обрезанного посередине, замена отменяется, граф и '
       'копии остаются прежними, а под строкой «Импорт данных» показан отказ '
@@ -130,7 +147,7 @@ Future<ImportAppHarness> _startApp(WidgetTester tester) async {
   final app = await ImportAppHarness.start(
     tester,
     at: _now,
-    seed: (graph) async {
+    seed: (graph, _) async {
       expect(
         await graph.execute(
           CreateTag(
@@ -149,6 +166,21 @@ Future<ImportAppHarness> _startApp(WidgetTester tester) async {
 
 /// Исправный эталонный файл экспорта.
 List<int> _referenceFile() => graphExportFileOf(referenceGraphFileLines());
+
+/// Эталонный файл в составе сборок до действий: без разделов надгробий и
+/// действий и без их счётчиков в заголовке.
+List<int> _previousVariantFile() {
+  final lines = referenceGraphFileLines();
+  return graphExportFileOf([
+    ...withEditedLine(lines, 0, (header) {
+      (header['counts']! as Map<String, Object?>)
+        ..remove('deletedIntentions')
+        ..remove('deletedRelationPairs')
+        ..remove('actions');
+    }).take(7),
+    ...lines.sublist(8, 14),
+  ]);
+}
 
 /// Эталонный файл экспорта, описания намерений которого занимают страницы
 /// переполнения, которых в сжатом файле хранилища нет.

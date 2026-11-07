@@ -1,20 +1,12 @@
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_id_generator.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_instance.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_state.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_view_model.dart';
-import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_state.dart';
-import 'package:doable/src/daily_choice/presentation/details/daily_choice_details_view_model.dart';
-import 'package:doable/src/daily_choice/presentation/intention_choices/intention_choices_state.dart';
-import 'package:doable/src/daily_choice/presentation/intention_choices/intention_choices_view_model.dart';
-
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/action/application/action_command.dart';
+import 'package:doable/src/action/application/action_details.dart';
+import 'package:doable/src/action/presentation/day/action_day_instance.dart';
+import 'package:doable/src/action/presentation/day/action_day_state.dart';
+import 'package:doable/src/action/presentation/day/action_day_view_model.dart';
+import 'package:doable/src/action/presentation/panel/action_panel_state.dart';
+import 'package:doable/src/action/presentation/panel/action_panel_view_model.dart';
 import 'package:doable/src/data/local/app_database.dart'
     hide Intention, LongTermRelation, TagAssignment;
 import 'package:doable/src/graph/application/graph_change.dart';
@@ -52,6 +44,7 @@ import 'package:doable/src/long_term_relation/presentation/intention_relations/i
 import 'package:doable/src/long_term_relation/presentation/intention_relations/intention_relations_view_model.dart';
 import 'package:doable/src/long_term_relation/presentation/relation_group_paging_policy.dart';
 import 'package:doable/src/long_term_relation/presentation/relation_list_reconciliation.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
@@ -65,13 +58,15 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../intention/presentation/catalog/catalog_test_support.dart'
     as catalog_support;
-import '../../support/daily_choice_durability_fixture.dart';
-import '../../support/daily_choice_local_date.dart';
+import '../../support/action_panel_fixture.dart';
+import '../../support/action_seed.dart';
+import '../../support/graph_durability_fixture.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/intention_type_counts.dart';
 import '../../long_term_relation/presentation/relation_graph_test_support.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
+import '../../support/action_read_contract_test_fallback.dart';
 import '../../support/statistics_read_contract_test_fallback.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/tag_positions.dart';
@@ -282,212 +277,168 @@ void main() {
     });
   });
 
-  test(
-    'повтор и удаление согласуют открытые представления одной ревизией',
-    () async {
-      final database = AppDatabase(openInMemoryLocalDatabase());
-      await database.open();
-      addTearDown(database.close);
-      await seedDurabilityGraph(database);
-      final repository = DriftPersonalGraphRepository(
-        database,
-        UuidV7IntentionIdGenerator(),
-        () => DateTime.utc(2026, 9, 23),
-        InMemoryDiagnosticsSink(),
-        dailyChoiceIdGenerator: _CheckpointChoiceIds(),
-      );
-      expect(
-        await repository.execute(durabilityCreate()),
-        isA<GraphCommandSucceeded>(),
-      );
-      final firstId = durabilityChoice(201);
-      final repeatId = durabilityChoice(202);
-      final container = ProviderContainer(
-        overrides: [
-          personalGraphRepositoryProvider.overrideWithValue(repository),
-          ControlledDailyChoiceLocalDate(durabilityChoiceDate).override,
-        ],
-        retry: (retryCount, error) => null,
-      );
-      addTearDown(container.dispose);
-      final coordinator = container.read(
-        graphCommandCoordinatorProvider.notifier,
-      );
-      final catalogProvider = dailyChoiceCatalogViewModelProvider(
-        DailyChoiceCatalogInstance(initialDate: durabilityChoiceDate),
-      );
-      final pages = {
-        for (final number in [1, 3])
-          number: IntentionPageInstance(target: const ChoicesTarget()),
-      };
-      IntentionChoicesViewModelProvider choicesProvider(int number) =>
-          intentionChoicesViewModelProvider(
-            durabilityIntention(number),
-            pages[number]!,
-          );
-      final subscriptions = [
-        container.listen(catalogProvider, (_, _) {}, fireImmediately: true),
-        for (final number in [1, 2, 3, 4, 5])
-          container.listen(
-            intentionDetailsViewModelProvider(durabilityIntention(number)),
-            (_, _) {},
-            fireImmediately: true,
-          ),
-        for (final number in [1, 3])
-          container.listen(
-            choicesProvider(number),
-            (_, _) {},
-            fireImmediately: true,
-          ),
-        for (final number in [101, 102])
-          container.listen(
-            relationDetailsViewModelProvider(durabilityRelation(number)),
-            (_, _) {},
-            fireImmediately: true,
-          ),
-      ];
-      addTearDown(() {
-        for (final subscription in subscriptions) {
-          subscription.close();
-        }
-      });
-      // Каталог показывает день повторяемого выбора независимо от
-      // первоначального охвата.
-      container.read(catalogProvider.notifier).selectDate(durabilityChoiceDate);
-      final details = DailyChoiceDetailsViewModel(
-        repository,
-        container.read(graphCommandCoordinatorProvider.notifier),
-        firstId,
-      );
-      addTearDown(details.dispose);
-
-      container
-          .read(choicesProvider(3).notifier)
-          .selectRole(DailyChoiceRelationRole.selected);
-      DailyChoiceCatalogLoaded catalog() =>
-          container.read(catalogProvider) as DailyChoiceCatalogLoaded;
-      IntentionChoicesLoaded choices(int number) =>
-          container.read(choicesProvider(number)) as IntentionChoicesLoaded;
-      IntentionDetailsLoaded intention(int number) => container.read(
-        intentionDetailsViewModelProvider(durabilityIntention(number)),
-      ) as IntentionDetailsLoaded;
-      RelationDetailsLoaded relation(int number) => container.read(
-        relationDetailsViewModelProvider(durabilityRelation(number)),
-      ) as RelationDetailsLoaded;
-      await _settleUntil(
-        () =>
-            container.read(catalogProvider) is DailyChoiceCatalogLoaded &&
-            details.state is DailyChoiceDetailsLoaded &&
-            [1, 3].every(
-              (number) =>
-                  container.read(choicesProvider(number))
-                      is IntentionChoicesLoaded,
-            ) &&
-            [1, 2, 3, 4, 5].every(
-              (number) => container.read(
-                intentionDetailsViewModelProvider(durabilityIntention(number)),
-              ) is IntentionDetailsLoaded,
-            ) &&
-            [101, 102].every(
-              (number) => container.read(
-                relationDetailsViewModelProvider(durabilityRelation(number)),
-              ) is RelationDetailsLoaded,
-            ),
-        diagnostics: () => [
-          container.read(catalogProvider).runtimeType,
-          details.state.runtimeType,
-          for (final number in [1, 3])
-            container.read(choicesProvider(number)).runtimeType,
-          for (final number in [1, 2, 3, 4, 5])
-            container
-                .read(
-                  intentionDetailsViewModelProvider(
-                    durabilityIntention(number),
-                  ),
-                )
-                .runtimeType,
-        ].join(', '),
-      );
-      final initialIntentions = {
-        for (final number in [1, 2, 3, 4, 5])
-          number: intention(number).intention,
-      };
-      expect(catalog().selection.date, durabilityChoiceDate);
-      expect(catalog().items.map((item) => item.id), [firstId]);
-      expect(choices(1).items.map((item) => item.id), [firstId]);
-      expect(choices(3).items.map((item) => item.id), [firstId]);
-      expect(relation(101).permissions.canDelete, isFalse);
-      expect(relation(102).permissions.canDelete, isFalse);
-
-      final repeat = coordinator.acceptDailyChoiceCreation(
-        DailyChoiceCreationFormKey(),
-        durabilityCreate(),
-      );
-      expect(repeat, isA<DailyChoiceCommandAccepted>());
-      final repeated = await (repeat as DailyChoiceCommandAccepted).future;
-      expect(repeated.isFailure, isFalse);
-      final repeatRevision = repeated.revision!;
-      await _settleUntil(
-        () =>
-            catalog().freshness == DailyChoiceCatalogFreshness.current &&
-            catalog().revision.compareTo(repeatRevision) ==
-                GraphRevisionOrder.same &&
-            catalog().totalCount == 2 &&
-            choices(1).items.length == 2 &&
-            choices(3).items.length == 2,
-      );
-      expect(catalog().items.map((item) => item.id).toSet(), {
-        firstId,
-        repeatId,
-      });
-      expect(choices(1).counts.dailySource, 2);
-      expect(choices(3).counts.dailySelected, 2);
-      expect(relation(101).permissions.canDelete, isFalse);
-      expect(intention(2).details.relationCounts.dailySource, 0);
-      expect(intention(2).details.relationCounts.dailySelected, 0);
-
-      for (final number in [1, 2, 3, 4, 5]) {
-        final before = initialIntentions[number]!;
-        final after = intention(number).intention;
-        expect(after.title, before.title);
-        expect(after.readiness, before.readiness);
-        expect(after.archiveState, before.archiveState);
-        expect(after.updatedAt, before.updatedAt);
+  test('изменение и удаление действия согласуют открытые представления одной '
+      'ревизией', () async {
+    late sqlite.Database raw;
+    final database = AppDatabase(
+      openInMemoryLocalDatabase(setup: (db) => raw = db),
+    );
+    await database.open();
+    addTearDown(database.close);
+    await seedDurabilityGraph(database);
+    // Два полностью одинаковых действия дня остаются самостоятельными
+    // строками: порядок создания различает их.
+    final firstId = actionIdOf(201);
+    final siblingId = actionIdOf(202);
+    seedRawGraph(raw, () {
+      for (final number in [201, 202]) {
+        seedAction(
+          raw,
+          id: seedUuid(number),
+          path: [
+            for (final step in [1, 2, 3]) seedUuid(step),
+          ],
+          date: _actionDate.toCanonicalString(),
+        );
       }
-
-      final deletion = coordinator.acceptDailyChoiceDelete(
-        DeleteDailyChoice(repeatId),
-      );
-      expect(deletion, isA<DailyChoiceCommandAccepted>());
-      final deleted = await (deletion as DailyChoiceCommandAccepted).future;
-      expect(deleted.isFailure, isFalse);
-      final deletionRevision = deleted.revision!;
-      await _settleUntil(
-        () =>
-            catalog().freshness == DailyChoiceCatalogFreshness.current &&
-            catalog().revision.compareTo(deletionRevision) ==
-                GraphRevisionOrder.same &&
-            catalog().totalCount == 1 &&
-            choices(1).items.length == 1 &&
-            choices(3).items.length == 1 &&
-            relation(101).revision.compareTo(deletionRevision) ==
-                GraphRevisionOrder.same,
-      );
-      expect(catalog().items.single.id, firstId);
-      expect(choices(1).items.map((item) => item.id), [firstId]);
-      expect(choices(3).items.map((item) => item.id), [firstId]);
-      expect(choices(1).counts.dailySource, 1);
-      expect(choices(3).counts.dailySelected, 1);
-      expect(relation(101).permissions.canDelete, isFalse);
-      expect(relation(102).permissions.canDelete, isFalse);
-      expect(
-        (details.state as DailyChoiceDetailsLoaded).details.path.map(
-          (step) => step.relation.id,
+    });
+    final repository = DriftPersonalGraphRepository(
+      database,
+      UuidV7IntentionIdGenerator(),
+      () => DateTime.utc(2026, 9, 23),
+      InMemoryDiagnosticsSink(),
+    );
+    final container = ProviderContainer(
+      overrides: [
+        personalGraphRepositoryProvider.overrideWithValue(repository),
+      ],
+      retry: (retryCount, error) => null,
+    );
+    addTearDown(container.dispose);
+    final coordinator = container.read(
+      graphCommandCoordinatorProvider.notifier,
+    );
+    final dayProvider = actionDayViewModelProvider(
+      ActionDayInstance(initialDate: _actionDate),
+    );
+    final subscriptions = [
+      container.listen(dayProvider, (_, _) {}, fireImmediately: true),
+      for (final number in [1, 2, 3, 4, 5])
+        container.listen(
+          intentionDetailsViewModelProvider(durabilityIntention(number)),
+          (_, _) {},
+          fireImmediately: true,
         ),
-        [durabilityRelation(101), durabilityRelation(102)],
-      );
-    },
-  );
+    ];
+    addTearDown(() {
+      for (final subscription in subscriptions) {
+        subscription.close();
+      }
+    });
+    final panel = ActionPanelViewModel(repository, coordinator, firstId);
+    addTearDown(panel.dispose);
+
+    ActionDayLoaded day() => container.read(dayProvider) as ActionDayLoaded;
+    IntentionDetailsLoaded intention(int number) => container.read(
+      intentionDetailsViewModelProvider(durabilityIntention(number)),
+    ) as IntentionDetailsLoaded;
+    bool panelAt(GraphRevision revision) => switch (panel.state) {
+      ActionPanelLoaded(revision: final shown) =>
+        shown.compareTo(revision) == GraphRevisionOrder.same,
+      _ => false,
+    };
+    await _settleUntil(
+      () =>
+          container.read(dayProvider) is ActionDayLoaded &&
+          panel.state is ActionPanelLoaded &&
+          [1, 2, 3, 4, 5].every(
+            (number) => container.read(
+              intentionDetailsViewModelProvider(durabilityIntention(number)),
+            ) is IntentionDetailsLoaded,
+          ),
+      diagnostics: () => [
+        container.read(dayProvider).runtimeType,
+        panel.state.runtimeType,
+        for (final number in [1, 2, 3, 4, 5])
+          container
+              .read(
+                intentionDetailsViewModelProvider(durabilityIntention(number)),
+              )
+              .runtimeType,
+      ].join(', '),
+    );
+    final initialIntentions = {
+      for (final number in [1, 2, 3, 4, 5])
+        number: (
+          intention(number).intention,
+          intention(number).details.relationCounts,
+        ),
+    };
+    expect(day().selection.date, _actionDate);
+    expect(day().incomplete.items.map((item) => item.id), [firstId, siblingId]);
+    expect(day().completed.items, isEmpty);
+
+    final update = coordinator.acceptActionUpdate(
+      UpdateActionFields(
+        actionId: firstId,
+        patch: const ActionFieldsPatch(isCompleted: ActionFieldSet(true)),
+      ),
+    );
+    expect(update, isA<ActionCommandAccepted>());
+    final updated = await (update as ActionCommandAccepted).future;
+    expect(updated.isFailure, isFalse);
+    final updateRevision = updated.revision!;
+    await _settleUntil(
+      () =>
+          day().freshness == ActionDayFreshness.current &&
+          day().revision.compareTo(updateRevision) == GraphRevisionOrder.same &&
+          day().completed.items.length == 1 &&
+          panelAt(updateRevision),
+    );
+    expect(day().incomplete.items.map((item) => item.id), [siblingId]);
+    expect(day().completed.items.map((item) => item.id), [firstId]);
+    expect(day().totalCount, 2);
+    expect(
+      (panel.state as ActionPanelLoaded).details.action.isCompleted,
+      isTrue,
+    );
+
+    final deletion = coordinator.acceptActionDelete(DeleteAction(siblingId));
+    expect(deletion, isA<ActionCommandAccepted>());
+    final deleted = await (deletion as ActionCommandAccepted).future;
+    expect(deleted.isFailure, isFalse);
+    final deletionRevision = deleted.revision!;
+    await _settleUntil(
+      () =>
+          day().freshness == ActionDayFreshness.current &&
+          day().revision.compareTo(deletionRevision) ==
+              GraphRevisionOrder.same &&
+          day().totalCount == 1,
+    );
+    expect(day().incomplete.items, isEmpty);
+    expect(day().completed.items.map((item) => item.id), [firstId]);
+    expect(panel.state, isA<ActionPanelLoaded>());
+    expect(
+      [
+        for (final step
+            in (panel.state as ActionPanelLoaded).details.path.steps)
+          if (step.link case ExistingActionPathLink(:final relation))
+            relation.id,
+      ],
+      [durabilityRelation(101), durabilityRelation(102)],
+    );
+
+    // Команды действий не меняют намерения и их счётчики связей.
+    for (final number in [1, 2, 3, 4, 5]) {
+      final (intentionBefore, countsBefore) = initialIntentions[number]!;
+      final after = intention(number).intention;
+      expect(after.title, intentionBefore.title);
+      expect(after.readiness, intentionBefore.readiness);
+      expect(after.archiveState, intentionBefore.archiveState);
+      expect(after.updatedAt, intentionBefore.updatedAt);
+      expect(intention(number).details.relationCounts, countsBefore);
+    }
+  });
 
   test(
     'одиночные удаления связей Drift согласуют все открытые представления',
@@ -1454,6 +1405,9 @@ void main() {
 /// Получатели общего тега: активные из них занимают две порции каталога.
 const _taggedRecipients = 24;
 
+/// День действий сквозного сценария с настоящим хранилищем.
+final _actionDate = CalendarDate.fromParts(2026, 9, 23);
+
 Future<void> _settleUntil(
   bool Function() condition, {
   String Function()? diagnostics,
@@ -1462,13 +1416,6 @@ Future<void> _settleUntil(
     await pumpEventQueue();
   }
   expect(condition(), isTrue, reason: diagnostics?.call());
-}
-
-final class _CheckpointChoiceIds implements DailyChoiceIdGenerator {
-  var _next = 201;
-
-  @override
-  DailyChoiceId generate() => durabilityChoice(_next++);
 }
 
 /// Единая среда каталога, подробного просмотра и вкладки «Связи» одного
@@ -1712,32 +1659,11 @@ final class _CheckpointHarness {
 
 /// Управляемый граф, обслуживающий все чтения и команды контрольной точки.
 final class _CheckpointGraphRepository
-    with StatisticsReadContractTestFallback, TagReadContractTestFallback
+    with
+        ActionReadContractTestFallback,
+        StatisticsReadContractTestFallback,
+        TagReadContractTestFallback
     implements PersonalGraphRepository {
-  @override
-  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
-    DailyChoiceDayStatusQuery query,
-  ) => throw UnsupportedError(
-    'Чтение состояний дней не используется в этом тесте.',
-  );
-
-  @override
-  Future<ChoicePathContinuationResult> getChoicePathContinuations(
-    ChoicePathContinuationQuery query,
-  ) => throw UnimplementedError();
-
-  @override
-  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Чтение дневного выбора не используется этим тестом.',
-      );
-
-  @override
-  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Наблюдение дневного выбора не используется этим тестом.',
-      );
-
   final catalogQueries = <IntentionCatalogQuery>[];
   final _catalogRequests = <Completer<Result<IntentionCatalogPage>>>[];
   final groupQueries = <RelationGroupQuery>[];
@@ -1821,17 +1747,10 @@ final class _CheckpointGraphRepository
   }
 
   @override
-  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
-    DailyChoiceCatalogQuery query,
-  ) => throw UnsupportedError(
-    'Каталог дневных выборов не используется в этом тесте.',
-  );
-
-  @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) {
-    groupQueries.add(query as RelationGroupQuery);
+    groupQueries.add(query);
     final request = Completer<RelationGroupPageResult>();
     _groupRequests.add(request);
     return request.future;

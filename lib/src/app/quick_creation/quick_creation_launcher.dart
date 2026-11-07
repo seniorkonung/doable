@@ -4,32 +4,40 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
-import '../../daily_choice/presentation/daily_choice_creation_launcher.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../action/presentation/editor/action_editor_state.dart';
+import '../../shared/domain/calendar_date.dart';
 import '../../shared/presentation/exclusive_operation.dart';
+import '../../shared/presentation/local_day/local_date_provider.dart';
 import '../routing/app_router.gr.dart';
-import 'quick_creation_daily_choice_start_sheet.dart';
 import 'quick_creation_mode.dart';
 
 /// Общий вход в готовые потоки создания без изменения исходной истории.
 ///
 /// Каждый экземпляр панели владеет своим launcher. Контекст должен принадлежать
 /// текущей обычной странице, для оболочки — выбранной корневой вкладке.
-/// Повторный запуск отклоняется до открытия первой страницы; у дневного выбора
-/// блокировка охватывает лист выбора начала, поиск и открытие пути. Возврат Future
+/// Повторный запуск отклоняется до открытия первой страницы. Возврат Future
 /// означает окончание запуска, а не завершение создания или возврат из формы.
 final class QuickCreationLauncher {
   final _operation = ExclusiveOperation<void>();
-  final _dailyChoice = DailyChoiceCreationLauncher();
 
   Future<void> launch({
     required BuildContext sourceContext,
     required QuickCreationMode mode,
-  }) => switch (_operation.start(() => _launch(sourceContext, mode))) {
+    CalendarDate? actionDate,
+  }) => switch (_operation.start(
+    () => _launch(sourceContext, mode, actionDate),
+  )) {
     ExclusiveOperationAccepted(:final future) => future,
     ExclusiveOperationAlreadyRunning() => Future<void>.value(),
   };
 
-  Future<void> _launch(BuildContext context, QuickCreationMode mode) async {
+  Future<void> _launch(
+    BuildContext context,
+    QuickCreationMode mode,
+    CalendarDate? actionDate,
+  ) async {
     if (!context.mounted) return;
     final router = context.router.root;
     final source = context.routeData;
@@ -40,12 +48,17 @@ final class QuickCreationLauncher {
     switch (mode) {
       case QuickCreationMode.intention:
         await _openFirst(router, IntentionEditorRoute());
-      case QuickCreationMode.dailyChoice:
-        final direction = await showQuickCreationDailyChoiceStartSheet(context);
-        if (direction == null || !context.mounted) return;
-        // Результат листа приходит после pop; верхний маршрут уже обновлён:
-        // https://api.flutter.dev/flutter/widgets/NavigatorObserver/didChangeTop.html
-        await _dailyChoice.launch(sourceContext: context, direction: direction);
+      case QuickCreationMode.action:
+        final date =
+            actionDate ??
+            ProviderScope.containerOf(
+              context,
+              listen: false,
+            ).read(localDateSourceProvider)().date;
+        await _openFirst(
+          router,
+          ActionEditorRoute(launch: ActionEditorLaunch(date: date)),
+        );
     }
   }
 

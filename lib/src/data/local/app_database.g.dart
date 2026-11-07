@@ -1258,17 +1258,17 @@ class GraphLogLongTermRelationMarksCompanion
   }
 }
 
-class GraphLogDailyChoiceMarks extends Table
-    with TableInfo<GraphLogDailyChoiceMarks, GraphLogDailyChoiceMark> {
+class GraphLogActionMarks extends Table
+    with TableInfo<GraphLogActionMarks, GraphLogActionMark> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  GraphLogDailyChoiceMarks(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _dailyChoiceIdMeta = const VerificationMeta(
-    'dailyChoiceId',
+  GraphLogActionMarks(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _actionIdMeta = const VerificationMeta(
+    'actionId',
   );
-  late final GeneratedColumn<String> dailyChoiceId = GeneratedColumn<String>(
-    'daily_choice_id',
+  late final GeneratedColumn<String> actionId = GeneratedColumn<String>(
+    'action_id',
     aliasedName,
     false,
     type: DriftSqlType.string,
@@ -1287,29 +1287,26 @@ class GraphLogDailyChoiceMarks extends Table
     $customConstraints: 'NOT NULL CHECK (first_operation IN (\'insert\', \'update\', \'delete\'))',
   );
   @override
-  List<GeneratedColumn> get $columns => [dailyChoiceId, firstOperation];
+  List<GeneratedColumn> get $columns => [actionId, firstOperation];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
   String get actualTableName => $name;
-  static const String $name = 'graph_log_daily_choice_marks';
+  static const String $name = 'graph_log_action_marks';
   @override
   VerificationContext validateIntegrity(
-    Insertable<GraphLogDailyChoiceMark> instance, {
+    Insertable<GraphLogActionMark> instance, {
     bool isInserting = false,
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
-    if (data.containsKey('daily_choice_id')) {
+    if (data.containsKey('action_id')) {
       context.handle(
-        _dailyChoiceIdMeta,
-        dailyChoiceId.isAcceptableOrUnknown(
-          data['daily_choice_id']!,
-          _dailyChoiceIdMeta,
-        ),
+        _actionIdMeta,
+        actionId.isAcceptableOrUnknown(data['action_id']!, _actionIdMeta),
       );
     } else if (isInserting) {
-      context.missing(_dailyChoiceIdMeta);
+      context.missing(_actionIdMeta);
     }
     if (data.containsKey('first_operation')) {
       context.handle(
@@ -1326,17 +1323,14 @@ class GraphLogDailyChoiceMarks extends Table
   }
 
   @override
-  Set<GeneratedColumn> get $primaryKey => {dailyChoiceId};
+  Set<GeneratedColumn> get $primaryKey => {actionId};
   @override
-  GraphLogDailyChoiceMark map(
-    Map<String, dynamic> data, {
-    String? tablePrefix,
-  }) {
+  GraphLogActionMark map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return GraphLogDailyChoiceMark(
-      dailyChoiceId: attachedDatabase.typeMapping.read(
+    return GraphLogActionMark(
+      actionId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}daily_choice_id'],
+        data['${effectivePrefix}action_id'],
       )!,
       firstOperation: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -1346,44 +1340,44 @@ class GraphLogDailyChoiceMarks extends Table
   }
 
   @override
-  GraphLogDailyChoiceMarks createAlias(String alias) {
-    return GraphLogDailyChoiceMarks(attachedDatabase, alias);
+  GraphLogActionMarks createAlias(String alias) {
+    return GraphLogActionMarks(attachedDatabase, alias);
   }
 
   @override
   bool get dontWriteConstraints => true;
 }
 
-class GraphLogDailyChoiceMark extends DataClass
-    implements Insertable<GraphLogDailyChoiceMark> {
-  final String dailyChoiceId;
+class GraphLogActionMark extends DataClass
+    implements Insertable<GraphLogActionMark> {
+  final String actionId;
   final String firstOperation;
-  const GraphLogDailyChoiceMark({
-    required this.dailyChoiceId,
+  const GraphLogActionMark({
+    required this.actionId,
     required this.firstOperation,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['daily_choice_id'] = Variable<String>(dailyChoiceId);
+    map['action_id'] = Variable<String>(actionId);
     map['first_operation'] = Variable<String>(firstOperation);
     return map;
   }
 
-  GraphLogDailyChoiceMarksCompanion toCompanion(bool nullToAbsent) {
-    return GraphLogDailyChoiceMarksCompanion(
-      dailyChoiceId: Value(dailyChoiceId),
+  GraphLogActionMarksCompanion toCompanion(bool nullToAbsent) {
+    return GraphLogActionMarksCompanion(
+      actionId: Value(actionId),
       firstOperation: Value(firstOperation),
     );
   }
 
-  factory GraphLogDailyChoiceMark.fromJson(
+  factory GraphLogActionMark.fromJson(
     Map<String, dynamic> json, {
     ValueSerializer? serializer,
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return GraphLogDailyChoiceMark(
-      dailyChoiceId: serializer.fromJson<String>(json['daily_choice_id']),
+    return GraphLogActionMark(
+      actionId: serializer.fromJson<String>(json['action_id']),
       firstOperation: serializer.fromJson<String>(json['first_operation']),
     );
   }
@@ -1391,25 +1385,19 @@ class GraphLogDailyChoiceMark extends DataClass
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'daily_choice_id': serializer.toJson<String>(dailyChoiceId),
+      'action_id': serializer.toJson<String>(actionId),
       'first_operation': serializer.toJson<String>(firstOperation),
     };
   }
 
-  GraphLogDailyChoiceMark copyWith({
-    String? dailyChoiceId,
-    String? firstOperation,
-  }) => GraphLogDailyChoiceMark(
-    dailyChoiceId: dailyChoiceId ?? this.dailyChoiceId,
-    firstOperation: firstOperation ?? this.firstOperation,
-  );
-  GraphLogDailyChoiceMark copyWithCompanion(
-    GraphLogDailyChoiceMarksCompanion data,
-  ) {
-    return GraphLogDailyChoiceMark(
-      dailyChoiceId: data.dailyChoiceId.present
-          ? data.dailyChoiceId.value
-          : this.dailyChoiceId,
+  GraphLogActionMark copyWith({String? actionId, String? firstOperation}) =>
+      GraphLogActionMark(
+        actionId: actionId ?? this.actionId,
+        firstOperation: firstOperation ?? this.firstOperation,
+      );
+  GraphLogActionMark copyWithCompanion(GraphLogActionMarksCompanion data) {
+    return GraphLogActionMark(
+      actionId: data.actionId.present ? data.actionId.value : this.actionId,
       firstOperation: data.firstOperation.present
           ? data.firstOperation.value
           : this.firstOperation,
@@ -1418,58 +1406,57 @@ class GraphLogDailyChoiceMark extends DataClass
 
   @override
   String toString() {
-    return (StringBuffer('GraphLogDailyChoiceMark(')
-          ..write('dailyChoiceId: $dailyChoiceId, ')
+    return (StringBuffer('GraphLogActionMark(')
+          ..write('actionId: $actionId, ')
           ..write('firstOperation: $firstOperation')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(dailyChoiceId, firstOperation);
+  int get hashCode => Object.hash(actionId, firstOperation);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is GraphLogDailyChoiceMark &&
-          other.dailyChoiceId == this.dailyChoiceId &&
+      (other is GraphLogActionMark &&
+          other.actionId == this.actionId &&
           other.firstOperation == this.firstOperation);
 }
 
-class GraphLogDailyChoiceMarksCompanion
-    extends UpdateCompanion<GraphLogDailyChoiceMark> {
-  final Value<String> dailyChoiceId;
+class GraphLogActionMarksCompanion extends UpdateCompanion<GraphLogActionMark> {
+  final Value<String> actionId;
   final Value<String> firstOperation;
   final Value<int> rowid;
-  const GraphLogDailyChoiceMarksCompanion({
-    this.dailyChoiceId = const Value.absent(),
+  const GraphLogActionMarksCompanion({
+    this.actionId = const Value.absent(),
     this.firstOperation = const Value.absent(),
     this.rowid = const Value.absent(),
   });
-  GraphLogDailyChoiceMarksCompanion.insert({
-    required String dailyChoiceId,
+  GraphLogActionMarksCompanion.insert({
+    required String actionId,
     required String firstOperation,
     this.rowid = const Value.absent(),
-  }) : dailyChoiceId = Value(dailyChoiceId),
+  }) : actionId = Value(actionId),
        firstOperation = Value(firstOperation);
-  static Insertable<GraphLogDailyChoiceMark> custom({
-    Expression<String>? dailyChoiceId,
+  static Insertable<GraphLogActionMark> custom({
+    Expression<String>? actionId,
     Expression<String>? firstOperation,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
-      if (dailyChoiceId != null) 'daily_choice_id': dailyChoiceId,
+      if (actionId != null) 'action_id': actionId,
       if (firstOperation != null) 'first_operation': firstOperation,
       if (rowid != null) 'rowid': rowid,
     });
   }
 
-  GraphLogDailyChoiceMarksCompanion copyWith({
-    Value<String>? dailyChoiceId,
+  GraphLogActionMarksCompanion copyWith({
+    Value<String>? actionId,
     Value<String>? firstOperation,
     Value<int>? rowid,
   }) {
-    return GraphLogDailyChoiceMarksCompanion(
-      dailyChoiceId: dailyChoiceId ?? this.dailyChoiceId,
+    return GraphLogActionMarksCompanion(
+      actionId: actionId ?? this.actionId,
       firstOperation: firstOperation ?? this.firstOperation,
       rowid: rowid ?? this.rowid,
     );
@@ -1478,8 +1465,8 @@ class GraphLogDailyChoiceMarksCompanion
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    if (dailyChoiceId.present) {
-      map['daily_choice_id'] = Variable<String>(dailyChoiceId.value);
+    if (actionId.present) {
+      map['action_id'] = Variable<String>(actionId.value);
     }
     if (firstOperation.present) {
       map['first_operation'] = Variable<String>(firstOperation.value);
@@ -1492,8 +1479,570 @@ class GraphLogDailyChoiceMarksCompanion
 
   @override
   String toString() {
-    return (StringBuffer('GraphLogDailyChoiceMarksCompanion(')
-          ..write('dailyChoiceId: $dailyChoiceId, ')
+    return (StringBuffer('GraphLogActionMarksCompanion(')
+          ..write('actionId: $actionId, ')
+          ..write('firstOperation: $firstOperation, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class GraphLogDeletedIntentionMarks extends Table
+    with
+        TableInfo<GraphLogDeletedIntentionMarks, GraphLogDeletedIntentionMark> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  GraphLogDeletedIntentionMarks(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _intentionIdMeta = const VerificationMeta(
+    'intentionId',
+  );
+  late final GeneratedColumn<String> intentionId = GeneratedColumn<String>(
+    'intention_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL PRIMARY KEY',
+  );
+  static const VerificationMeta _firstOperationMeta = const VerificationMeta(
+    'firstOperation',
+  );
+  late final GeneratedColumn<String> firstOperation = GeneratedColumn<String>(
+    'first_operation',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints:
+        'NOT NULL CHECK (first_operation IN (\'insert\', \'delete\'))',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [intentionId, firstOperation];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'graph_log_deleted_intention_marks';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<GraphLogDeletedIntentionMark> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('intention_id')) {
+      context.handle(
+        _intentionIdMeta,
+        intentionId.isAcceptableOrUnknown(
+          data['intention_id']!,
+          _intentionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_intentionIdMeta);
+    }
+    if (data.containsKey('first_operation')) {
+      context.handle(
+        _firstOperationMeta,
+        firstOperation.isAcceptableOrUnknown(
+          data['first_operation']!,
+          _firstOperationMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_firstOperationMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {intentionId};
+  @override
+  GraphLogDeletedIntentionMark map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GraphLogDeletedIntentionMark(
+      intentionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}intention_id'],
+      )!,
+      firstOperation: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}first_operation'],
+      )!,
+    );
+  }
+
+  @override
+  GraphLogDeletedIntentionMarks createAlias(String alias) {
+    return GraphLogDeletedIntentionMarks(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class GraphLogDeletedIntentionMark extends DataClass
+    implements Insertable<GraphLogDeletedIntentionMark> {
+  final String intentionId;
+  final String firstOperation;
+  const GraphLogDeletedIntentionMark({
+    required this.intentionId,
+    required this.firstOperation,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['intention_id'] = Variable<String>(intentionId);
+    map['first_operation'] = Variable<String>(firstOperation);
+    return map;
+  }
+
+  GraphLogDeletedIntentionMarksCompanion toCompanion(bool nullToAbsent) {
+    return GraphLogDeletedIntentionMarksCompanion(
+      intentionId: Value(intentionId),
+      firstOperation: Value(firstOperation),
+    );
+  }
+
+  factory GraphLogDeletedIntentionMark.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GraphLogDeletedIntentionMark(
+      intentionId: serializer.fromJson<String>(json['intention_id']),
+      firstOperation: serializer.fromJson<String>(json['first_operation']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'intention_id': serializer.toJson<String>(intentionId),
+      'first_operation': serializer.toJson<String>(firstOperation),
+    };
+  }
+
+  GraphLogDeletedIntentionMark copyWith({
+    String? intentionId,
+    String? firstOperation,
+  }) => GraphLogDeletedIntentionMark(
+    intentionId: intentionId ?? this.intentionId,
+    firstOperation: firstOperation ?? this.firstOperation,
+  );
+  GraphLogDeletedIntentionMark copyWithCompanion(
+    GraphLogDeletedIntentionMarksCompanion data,
+  ) {
+    return GraphLogDeletedIntentionMark(
+      intentionId: data.intentionId.present
+          ? data.intentionId.value
+          : this.intentionId,
+      firstOperation: data.firstOperation.present
+          ? data.firstOperation.value
+          : this.firstOperation,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GraphLogDeletedIntentionMark(')
+          ..write('intentionId: $intentionId, ')
+          ..write('firstOperation: $firstOperation')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(intentionId, firstOperation);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GraphLogDeletedIntentionMark &&
+          other.intentionId == this.intentionId &&
+          other.firstOperation == this.firstOperation);
+}
+
+class GraphLogDeletedIntentionMarksCompanion
+    extends UpdateCompanion<GraphLogDeletedIntentionMark> {
+  final Value<String> intentionId;
+  final Value<String> firstOperation;
+  final Value<int> rowid;
+  const GraphLogDeletedIntentionMarksCompanion({
+    this.intentionId = const Value.absent(),
+    this.firstOperation = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  GraphLogDeletedIntentionMarksCompanion.insert({
+    required String intentionId,
+    required String firstOperation,
+    this.rowid = const Value.absent(),
+  }) : intentionId = Value(intentionId),
+       firstOperation = Value(firstOperation);
+  static Insertable<GraphLogDeletedIntentionMark> custom({
+    Expression<String>? intentionId,
+    Expression<String>? firstOperation,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (intentionId != null) 'intention_id': intentionId,
+      if (firstOperation != null) 'first_operation': firstOperation,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  GraphLogDeletedIntentionMarksCompanion copyWith({
+    Value<String>? intentionId,
+    Value<String>? firstOperation,
+    Value<int>? rowid,
+  }) {
+    return GraphLogDeletedIntentionMarksCompanion(
+      intentionId: intentionId ?? this.intentionId,
+      firstOperation: firstOperation ?? this.firstOperation,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (intentionId.present) {
+      map['intention_id'] = Variable<String>(intentionId.value);
+    }
+    if (firstOperation.present) {
+      map['first_operation'] = Variable<String>(firstOperation.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GraphLogDeletedIntentionMarksCompanion(')
+          ..write('intentionId: $intentionId, ')
+          ..write('firstOperation: $firstOperation, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class GraphLogDeletedRelationPairMarks extends Table
+    with
+        TableInfo<
+          GraphLogDeletedRelationPairMarks,
+          GraphLogDeletedRelationPairMark
+        > {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  GraphLogDeletedRelationPairMarks(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _sourceIntentionIdMeta = const VerificationMeta(
+    'sourceIntentionId',
+  );
+  late final GeneratedColumn<String> sourceIntentionId =
+      GeneratedColumn<String>(
+        'source_intention_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+        $customConstraints: 'NOT NULL',
+      );
+  static const VerificationMeta _relatedIntentionIdMeta =
+      const VerificationMeta('relatedIntentionId');
+  late final GeneratedColumn<String> relatedIntentionId =
+      GeneratedColumn<String>(
+        'related_intention_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+        $customConstraints: 'NOT NULL',
+      );
+  static const VerificationMeta _firstOperationMeta = const VerificationMeta(
+    'firstOperation',
+  );
+  late final GeneratedColumn<String> firstOperation = GeneratedColumn<String>(
+    'first_operation',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints:
+        'NOT NULL CHECK (first_operation IN (\'insert\', \'delete\'))',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    sourceIntentionId,
+    relatedIntentionId,
+    firstOperation,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'graph_log_deleted_relation_pair_marks';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<GraphLogDeletedRelationPairMark> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('source_intention_id')) {
+      context.handle(
+        _sourceIntentionIdMeta,
+        sourceIntentionId.isAcceptableOrUnknown(
+          data['source_intention_id']!,
+          _sourceIntentionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceIntentionIdMeta);
+    }
+    if (data.containsKey('related_intention_id')) {
+      context.handle(
+        _relatedIntentionIdMeta,
+        relatedIntentionId.isAcceptableOrUnknown(
+          data['related_intention_id']!,
+          _relatedIntentionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_relatedIntentionIdMeta);
+    }
+    if (data.containsKey('first_operation')) {
+      context.handle(
+        _firstOperationMeta,
+        firstOperation.isAcceptableOrUnknown(
+          data['first_operation']!,
+          _firstOperationMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_firstOperationMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {
+    sourceIntentionId,
+    relatedIntentionId,
+  };
+  @override
+  GraphLogDeletedRelationPairMark map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GraphLogDeletedRelationPairMark(
+      sourceIntentionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_intention_id'],
+      )!,
+      relatedIntentionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}related_intention_id'],
+      )!,
+      firstOperation: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}first_operation'],
+      )!,
+    );
+  }
+
+  @override
+  GraphLogDeletedRelationPairMarks createAlias(String alias) {
+    return GraphLogDeletedRelationPairMarks(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const [
+    'PRIMARY KEY(source_intention_id, related_intention_id)',
+  ];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class GraphLogDeletedRelationPairMark extends DataClass
+    implements Insertable<GraphLogDeletedRelationPairMark> {
+  final String sourceIntentionId;
+  final String relatedIntentionId;
+  final String firstOperation;
+  const GraphLogDeletedRelationPairMark({
+    required this.sourceIntentionId,
+    required this.relatedIntentionId,
+    required this.firstOperation,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['source_intention_id'] = Variable<String>(sourceIntentionId);
+    map['related_intention_id'] = Variable<String>(relatedIntentionId);
+    map['first_operation'] = Variable<String>(firstOperation);
+    return map;
+  }
+
+  GraphLogDeletedRelationPairMarksCompanion toCompanion(bool nullToAbsent) {
+    return GraphLogDeletedRelationPairMarksCompanion(
+      sourceIntentionId: Value(sourceIntentionId),
+      relatedIntentionId: Value(relatedIntentionId),
+      firstOperation: Value(firstOperation),
+    );
+  }
+
+  factory GraphLogDeletedRelationPairMark.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GraphLogDeletedRelationPairMark(
+      sourceIntentionId: serializer.fromJson<String>(
+        json['source_intention_id'],
+      ),
+      relatedIntentionId: serializer.fromJson<String>(
+        json['related_intention_id'],
+      ),
+      firstOperation: serializer.fromJson<String>(json['first_operation']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'source_intention_id': serializer.toJson<String>(sourceIntentionId),
+      'related_intention_id': serializer.toJson<String>(relatedIntentionId),
+      'first_operation': serializer.toJson<String>(firstOperation),
+    };
+  }
+
+  GraphLogDeletedRelationPairMark copyWith({
+    String? sourceIntentionId,
+    String? relatedIntentionId,
+    String? firstOperation,
+  }) => GraphLogDeletedRelationPairMark(
+    sourceIntentionId: sourceIntentionId ?? this.sourceIntentionId,
+    relatedIntentionId: relatedIntentionId ?? this.relatedIntentionId,
+    firstOperation: firstOperation ?? this.firstOperation,
+  );
+  GraphLogDeletedRelationPairMark copyWithCompanion(
+    GraphLogDeletedRelationPairMarksCompanion data,
+  ) {
+    return GraphLogDeletedRelationPairMark(
+      sourceIntentionId: data.sourceIntentionId.present
+          ? data.sourceIntentionId.value
+          : this.sourceIntentionId,
+      relatedIntentionId: data.relatedIntentionId.present
+          ? data.relatedIntentionId.value
+          : this.relatedIntentionId,
+      firstOperation: data.firstOperation.present
+          ? data.firstOperation.value
+          : this.firstOperation,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GraphLogDeletedRelationPairMark(')
+          ..write('sourceIntentionId: $sourceIntentionId, ')
+          ..write('relatedIntentionId: $relatedIntentionId, ')
+          ..write('firstOperation: $firstOperation')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(sourceIntentionId, relatedIntentionId, firstOperation);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GraphLogDeletedRelationPairMark &&
+          other.sourceIntentionId == this.sourceIntentionId &&
+          other.relatedIntentionId == this.relatedIntentionId &&
+          other.firstOperation == this.firstOperation);
+}
+
+class GraphLogDeletedRelationPairMarksCompanion
+    extends UpdateCompanion<GraphLogDeletedRelationPairMark> {
+  final Value<String> sourceIntentionId;
+  final Value<String> relatedIntentionId;
+  final Value<String> firstOperation;
+  final Value<int> rowid;
+  const GraphLogDeletedRelationPairMarksCompanion({
+    this.sourceIntentionId = const Value.absent(),
+    this.relatedIntentionId = const Value.absent(),
+    this.firstOperation = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  GraphLogDeletedRelationPairMarksCompanion.insert({
+    required String sourceIntentionId,
+    required String relatedIntentionId,
+    required String firstOperation,
+    this.rowid = const Value.absent(),
+  }) : sourceIntentionId = Value(sourceIntentionId),
+       relatedIntentionId = Value(relatedIntentionId),
+       firstOperation = Value(firstOperation);
+  static Insertable<GraphLogDeletedRelationPairMark> custom({
+    Expression<String>? sourceIntentionId,
+    Expression<String>? relatedIntentionId,
+    Expression<String>? firstOperation,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (sourceIntentionId != null) 'source_intention_id': sourceIntentionId,
+      if (relatedIntentionId != null)
+        'related_intention_id': relatedIntentionId,
+      if (firstOperation != null) 'first_operation': firstOperation,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  GraphLogDeletedRelationPairMarksCompanion copyWith({
+    Value<String>? sourceIntentionId,
+    Value<String>? relatedIntentionId,
+    Value<String>? firstOperation,
+    Value<int>? rowid,
+  }) {
+    return GraphLogDeletedRelationPairMarksCompanion(
+      sourceIntentionId: sourceIntentionId ?? this.sourceIntentionId,
+      relatedIntentionId: relatedIntentionId ?? this.relatedIntentionId,
+      firstOperation: firstOperation ?? this.firstOperation,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (sourceIntentionId.present) {
+      map['source_intention_id'] = Variable<String>(sourceIntentionId.value);
+    }
+    if (relatedIntentionId.present) {
+      map['related_intention_id'] = Variable<String>(relatedIntentionId.value);
+    }
+    if (firstOperation.present) {
+      map['first_operation'] = Variable<String>(firstOperation.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GraphLogDeletedRelationPairMarksCompanion(')
+          ..write('sourceIntentionId: $sourceIntentionId, ')
+          ..write('relatedIntentionId: $relatedIntentionId, ')
           ..write('firstOperation: $firstOperation, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -4601,11 +5150,11 @@ class LongTermRelationsCompanion extends UpdateCompanion<LongTermRelation> {
   }
 }
 
-class DailyChoices extends Table with TableInfo<DailyChoices, DailyChoice> {
+class Actions extends Table with TableInfo<Actions, Action> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  DailyChoices(this.attachedDatabase, [this._alias]);
+  Actions(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _creationSequenceMeta = const VerificationMeta(
     'creationSequence',
   );
@@ -4628,39 +5177,14 @@ class DailyChoices extends Table with TableInfo<DailyChoices, DailyChoice> {
     requiredDuringInsert: true,
     $customConstraints: 'NOT NULL UNIQUE',
   );
-  static const VerificationMeta _sourceIntentionIdMeta = const VerificationMeta(
-    'sourceIntentionId',
-  );
-  late final GeneratedColumn<String> sourceIntentionId =
-      GeneratedColumn<String>(
-        'source_intention_id',
-        aliasedName,
-        false,
-        type: DriftSqlType.string,
-        requiredDuringInsert: true,
-        $customConstraints: 'NOT NULL REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE RESTRICT',
-      );
-  static const VerificationMeta _selectedIntentionIdMeta =
-      const VerificationMeta('selectedIntentionId');
-  late final GeneratedColumn<String> selectedIntentionId =
-      GeneratedColumn<String>(
-        'selected_intention_id',
-        aliasedName,
-        false,
-        type: DriftSqlType.string,
-        requiredDuringInsert: true,
-        $customConstraints: 'NOT NULL REFERENCES intentions(id)ON UPDATE RESTRICT ON DELETE RESTRICT',
-      );
-  static const VerificationMeta _choiceDateMeta = const VerificationMeta(
-    'choiceDate',
-  );
-  late final GeneratedColumn<String> choiceDate = GeneratedColumn<String>(
-    'choice_date',
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
     aliasedName,
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL CHECK (typeof(choice_date) = \'text\' AND length(choice_date) = 10 AND choice_date GLOB \'[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]\')',
+    $customConstraints: 'NOT NULL CHECK (typeof(title) = \'text\' AND title <> \'\' AND instr(CAST(title AS BLOB), X\'00\') = 0)',
   );
   static const VerificationMeta _descriptionMeta = const VerificationMeta(
     'description',
@@ -4671,7 +5195,38 @@ class DailyChoices extends Table with TableInfo<DailyChoices, DailyChoice> {
     true,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    $customConstraints: 'CHECK (description IS NULL OR(typeof(description) = \'text\' AND instr(CAST(description AS BLOB), X\'00\') = 0))',
+    $customConstraints: 'CHECK (description IS NULL OR(typeof(description) = \'text\' AND instr(CAST(description AS BLOB), X\'00\') = 0 AND length(trim(description, char(9) || char(10) || char(11) || char(12) || char(13) || char(32))) > 0))',
+  );
+  static const VerificationMeta _dateMeta = const VerificationMeta('date');
+  late final GeneratedColumn<String> date = GeneratedColumn<String>(
+    'date',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(date) = \'text\' AND length(date) = 10 AND date GLOB \'[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]\')',
+  );
+  static const VerificationMeta _scheduledHourMeta = const VerificationMeta(
+    'scheduledHour',
+  );
+  late final GeneratedColumn<int> scheduledHour = GeneratedColumn<int>(
+    'scheduled_hour',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'CHECK (scheduled_hour IS NULL OR(typeof(scheduled_hour) = \'integer\' AND scheduled_hour BETWEEN 0 AND 23))',
+  );
+  static const VerificationMeta _priorityMeta = const VerificationMeta(
+    'priority',
+  );
+  late final GeneratedColumn<int> priority = GeneratedColumn<int>(
+    'priority',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(priority) = \'integer\' AND priority BETWEEN 1 AND 4)',
   );
   static const VerificationMeta _isCompletedMeta = const VerificationMeta(
     'isCompleted',
@@ -4684,49 +5239,49 @@ class DailyChoices extends Table with TableInfo<DailyChoices, DailyChoice> {
     requiredDuringInsert: true,
     $customConstraints: 'NOT NULL CHECK (typeof(is_completed) = \'integer\' AND is_completed IN (0, 1))',
   );
-  static const VerificationMeta _scheduledMinuteMeta = const VerificationMeta(
-    'scheduledMinute',
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
   );
-  late final GeneratedColumn<int> scheduledMinute = GeneratedColumn<int>(
-    'scheduled_minute',
-    aliasedName,
-    true,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    $customConstraints: 'CHECK (scheduled_minute IS NULL OR(typeof(scheduled_minute) = \'integer\' AND scheduled_minute BETWEEN 0 AND 1439))',
-  );
-  static const VerificationMeta _priorityMeta = const VerificationMeta(
-    'priority',
-  );
-  late final GeneratedColumn<int> priority = GeneratedColumn<int>(
-    'priority',
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
     aliasedName,
     false,
     type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    $customConstraints: 'NOT NULL DEFAULT 4 CHECK (typeof(priority) = \'integer\' AND priority BETWEEN 1 AND 4)',
-    defaultValue: const CustomExpression('4'),
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(created_at) = \'integer\')',
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(updated_at) = \'integer\')',
   );
   @override
   List<GeneratedColumn> get $columns => [
     creationSequence,
     id,
-    sourceIntentionId,
-    selectedIntentionId,
-    choiceDate,
+    title,
     description,
-    isCompleted,
-    scheduledMinute,
+    date,
+    scheduledHour,
     priority,
+    isCompleted,
+    createdAt,
+    updatedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
   String get actualTableName => $name;
-  static const String $name = 'daily_choices';
+  static const String $name = 'actions';
   @override
   VerificationContext validateIntegrity(
-    Insertable<DailyChoice> instance, {
+    Insertable<Action> instance, {
     bool isInserting = false,
   }) {
     final context = VerificationContext();
@@ -4745,35 +5300,13 @@ class DailyChoices extends Table with TableInfo<DailyChoices, DailyChoice> {
     } else if (isInserting) {
       context.missing(_idMeta);
     }
-    if (data.containsKey('source_intention_id')) {
+    if (data.containsKey('title')) {
       context.handle(
-        _sourceIntentionIdMeta,
-        sourceIntentionId.isAcceptableOrUnknown(
-          data['source_intention_id']!,
-          _sourceIntentionIdMeta,
-        ),
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
       );
     } else if (isInserting) {
-      context.missing(_sourceIntentionIdMeta);
-    }
-    if (data.containsKey('selected_intention_id')) {
-      context.handle(
-        _selectedIntentionIdMeta,
-        selectedIntentionId.isAcceptableOrUnknown(
-          data['selected_intention_id']!,
-          _selectedIntentionIdMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_selectedIntentionIdMeta);
-    }
-    if (data.containsKey('choice_date')) {
-      context.handle(
-        _choiceDateMeta,
-        choiceDate.isAcceptableOrUnknown(data['choice_date']!, _choiceDateMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_choiceDateMeta);
+      context.missing(_titleMeta);
     }
     if (data.containsKey('description')) {
       context.handle(
@@ -4783,6 +5316,31 @@ class DailyChoices extends Table with TableInfo<DailyChoices, DailyChoice> {
           _descriptionMeta,
         ),
       );
+    }
+    if (data.containsKey('date')) {
+      context.handle(
+        _dateMeta,
+        date.isAcceptableOrUnknown(data['date']!, _dateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dateMeta);
+    }
+    if (data.containsKey('scheduled_hour')) {
+      context.handle(
+        _scheduledHourMeta,
+        scheduledHour.isAcceptableOrUnknown(
+          data['scheduled_hour']!,
+          _scheduledHourMeta,
+        ),
+      );
+    }
+    if (data.containsKey('priority')) {
+      context.handle(
+        _priorityMeta,
+        priority.isAcceptableOrUnknown(data['priority']!, _priorityMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_priorityMeta);
     }
     if (data.containsKey('is_completed')) {
       context.handle(
@@ -4795,20 +5353,21 @@ class DailyChoices extends Table with TableInfo<DailyChoices, DailyChoice> {
     } else if (isInserting) {
       context.missing(_isCompletedMeta);
     }
-    if (data.containsKey('scheduled_minute')) {
+    if (data.containsKey('created_at')) {
       context.handle(
-        _scheduledMinuteMeta,
-        scheduledMinute.isAcceptableOrUnknown(
-          data['scheduled_minute']!,
-          _scheduledMinuteMeta,
-        ),
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
       );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
     }
-    if (data.containsKey('priority')) {
+    if (data.containsKey('updated_at')) {
       context.handle(
-        _priorityMeta,
-        priority.isAcceptableOrUnknown(data['priority']!, _priorityMeta),
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
       );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
     }
     return context;
   }
@@ -4816,9 +5375,9 @@ class DailyChoices extends Table with TableInfo<DailyChoices, DailyChoice> {
   @override
   Set<GeneratedColumn> get $primaryKey => {creationSequence};
   @override
-  DailyChoice map(Map<String, dynamic> data, {String? tablePrefix}) {
+  Action map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return DailyChoice(
+    return Action(
       creationSequence: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}creation_sequence'],
@@ -4827,127 +5386,130 @@ class DailyChoices extends Table with TableInfo<DailyChoices, DailyChoice> {
         DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
-      sourceIntentionId: attachedDatabase.typeMapping.read(
+      title: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}source_intention_id'],
-      )!,
-      selectedIntentionId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}selected_intention_id'],
-      )!,
-      choiceDate: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}choice_date'],
+        data['${effectivePrefix}title'],
       )!,
       description: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}description'],
       ),
-      isCompleted: attachedDatabase.typeMapping.read(
-        DriftSqlType.bool,
-        data['${effectivePrefix}is_completed'],
+      date: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}date'],
       )!,
-      scheduledMinute: attachedDatabase.typeMapping.read(
+      scheduledHour: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
-        data['${effectivePrefix}scheduled_minute'],
+        data['${effectivePrefix}scheduled_hour'],
       ),
       priority: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}priority'],
       )!,
+      isCompleted: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_completed'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
     );
   }
 
   @override
-  DailyChoices createAlias(String alias) {
-    return DailyChoices(attachedDatabase, alias);
+  Actions createAlias(String alias) {
+    return Actions(attachedDatabase, alias);
   }
 
-  @override
-  List<String> get customConstraints => const [
-    'CHECK(source_intention_id <> selected_intention_id)',
-  ];
   @override
   bool get dontWriteConstraints => true;
 }
 
-class DailyChoice extends DataClass implements Insertable<DailyChoice> {
+class Action extends DataClass implements Insertable<Action> {
   final int creationSequence;
   final String id;
-  final String sourceIntentionId;
-  final String selectedIntentionId;
-  final String choiceDate;
+  final String title;
   final String? description;
-  final bool isCompleted;
-  final int? scheduledMinute;
+  final String date;
+
+  /// NULL — «Весь день».
+  final int? scheduledHour;
   final int priority;
-  const DailyChoice({
+  final bool isCompleted;
+  final int createdAt;
+  final int updatedAt;
+  const Action({
     required this.creationSequence,
     required this.id,
-    required this.sourceIntentionId,
-    required this.selectedIntentionId,
-    required this.choiceDate,
+    required this.title,
     this.description,
-    required this.isCompleted,
-    this.scheduledMinute,
+    required this.date,
+    this.scheduledHour,
     required this.priority,
+    required this.isCompleted,
+    required this.createdAt,
+    required this.updatedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['creation_sequence'] = Variable<int>(creationSequence);
     map['id'] = Variable<String>(id);
-    map['source_intention_id'] = Variable<String>(sourceIntentionId);
-    map['selected_intention_id'] = Variable<String>(selectedIntentionId);
-    map['choice_date'] = Variable<String>(choiceDate);
+    map['title'] = Variable<String>(title);
     if (!nullToAbsent || description != null) {
       map['description'] = Variable<String>(description);
     }
-    map['is_completed'] = Variable<bool>(isCompleted);
-    if (!nullToAbsent || scheduledMinute != null) {
-      map['scheduled_minute'] = Variable<int>(scheduledMinute);
+    map['date'] = Variable<String>(date);
+    if (!nullToAbsent || scheduledHour != null) {
+      map['scheduled_hour'] = Variable<int>(scheduledHour);
     }
     map['priority'] = Variable<int>(priority);
+    map['is_completed'] = Variable<bool>(isCompleted);
+    map['created_at'] = Variable<int>(createdAt);
+    map['updated_at'] = Variable<int>(updatedAt);
     return map;
   }
 
-  DailyChoicesCompanion toCompanion(bool nullToAbsent) {
-    return DailyChoicesCompanion(
+  ActionsCompanion toCompanion(bool nullToAbsent) {
+    return ActionsCompanion(
       creationSequence: Value(creationSequence),
       id: Value(id),
-      sourceIntentionId: Value(sourceIntentionId),
-      selectedIntentionId: Value(selectedIntentionId),
-      choiceDate: Value(choiceDate),
+      title: Value(title),
       description: description == null && nullToAbsent
           ? const Value.absent()
           : Value(description),
-      isCompleted: Value(isCompleted),
-      scheduledMinute: scheduledMinute == null && nullToAbsent
+      date: Value(date),
+      scheduledHour: scheduledHour == null && nullToAbsent
           ? const Value.absent()
-          : Value(scheduledMinute),
+          : Value(scheduledHour),
       priority: Value(priority),
+      isCompleted: Value(isCompleted),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
     );
   }
 
-  factory DailyChoice.fromJson(
+  factory Action.fromJson(
     Map<String, dynamic> json, {
     ValueSerializer? serializer,
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return DailyChoice(
+    return Action(
       creationSequence: serializer.fromJson<int>(json['creation_sequence']),
       id: serializer.fromJson<String>(json['id']),
-      sourceIntentionId: serializer.fromJson<String>(
-        json['source_intention_id'],
-      ),
-      selectedIntentionId: serializer.fromJson<String>(
-        json['selected_intention_id'],
-      ),
-      choiceDate: serializer.fromJson<String>(json['choice_date']),
+      title: serializer.fromJson<String>(json['title']),
       description: serializer.fromJson<String?>(json['description']),
-      isCompleted: serializer.fromJson<bool>(json['is_completed']),
-      scheduledMinute: serializer.fromJson<int?>(json['scheduled_minute']),
+      date: serializer.fromJson<String>(json['date']),
+      scheduledHour: serializer.fromJson<int?>(json['scheduled_hour']),
       priority: serializer.fromJson<int>(json['priority']),
+      isCompleted: serializer.fromJson<bool>(json['is_completed']),
+      createdAt: serializer.fromJson<int>(json['created_at']),
+      updatedAt: serializer.fromJson<int>(json['updated_at']),
     );
   }
   @override
@@ -4956,79 +5518,78 @@ class DailyChoice extends DataClass implements Insertable<DailyChoice> {
     return <String, dynamic>{
       'creation_sequence': serializer.toJson<int>(creationSequence),
       'id': serializer.toJson<String>(id),
-      'source_intention_id': serializer.toJson<String>(sourceIntentionId),
-      'selected_intention_id': serializer.toJson<String>(selectedIntentionId),
-      'choice_date': serializer.toJson<String>(choiceDate),
+      'title': serializer.toJson<String>(title),
       'description': serializer.toJson<String?>(description),
-      'is_completed': serializer.toJson<bool>(isCompleted),
-      'scheduled_minute': serializer.toJson<int?>(scheduledMinute),
+      'date': serializer.toJson<String>(date),
+      'scheduled_hour': serializer.toJson<int?>(scheduledHour),
       'priority': serializer.toJson<int>(priority),
+      'is_completed': serializer.toJson<bool>(isCompleted),
+      'created_at': serializer.toJson<int>(createdAt),
+      'updated_at': serializer.toJson<int>(updatedAt),
     };
   }
 
-  DailyChoice copyWith({
+  Action copyWith({
     int? creationSequence,
     String? id,
-    String? sourceIntentionId,
-    String? selectedIntentionId,
-    String? choiceDate,
+    String? title,
     Value<String?> description = const Value.absent(),
-    bool? isCompleted,
-    Value<int?> scheduledMinute = const Value.absent(),
+    String? date,
+    Value<int?> scheduledHour = const Value.absent(),
     int? priority,
-  }) => DailyChoice(
+    bool? isCompleted,
+    int? createdAt,
+    int? updatedAt,
+  }) => Action(
     creationSequence: creationSequence ?? this.creationSequence,
     id: id ?? this.id,
-    sourceIntentionId: sourceIntentionId ?? this.sourceIntentionId,
-    selectedIntentionId: selectedIntentionId ?? this.selectedIntentionId,
-    choiceDate: choiceDate ?? this.choiceDate,
+    title: title ?? this.title,
     description: description.present ? description.value : this.description,
-    isCompleted: isCompleted ?? this.isCompleted,
-    scheduledMinute: scheduledMinute.present
-        ? scheduledMinute.value
-        : this.scheduledMinute,
+    date: date ?? this.date,
+    scheduledHour: scheduledHour.present
+        ? scheduledHour.value
+        : this.scheduledHour,
     priority: priority ?? this.priority,
+    isCompleted: isCompleted ?? this.isCompleted,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
   );
-  DailyChoice copyWithCompanion(DailyChoicesCompanion data) {
-    return DailyChoice(
+  Action copyWithCompanion(ActionsCompanion data) {
+    return Action(
       creationSequence: data.creationSequence.present
           ? data.creationSequence.value
           : this.creationSequence,
       id: data.id.present ? data.id.value : this.id,
-      sourceIntentionId: data.sourceIntentionId.present
-          ? data.sourceIntentionId.value
-          : this.sourceIntentionId,
-      selectedIntentionId: data.selectedIntentionId.present
-          ? data.selectedIntentionId.value
-          : this.selectedIntentionId,
-      choiceDate: data.choiceDate.present
-          ? data.choiceDate.value
-          : this.choiceDate,
+      title: data.title.present ? data.title.value : this.title,
       description: data.description.present
           ? data.description.value
           : this.description,
+      date: data.date.present ? data.date.value : this.date,
+      scheduledHour: data.scheduledHour.present
+          ? data.scheduledHour.value
+          : this.scheduledHour,
+      priority: data.priority.present ? data.priority.value : this.priority,
       isCompleted: data.isCompleted.present
           ? data.isCompleted.value
           : this.isCompleted,
-      scheduledMinute: data.scheduledMinute.present
-          ? data.scheduledMinute.value
-          : this.scheduledMinute,
-      priority: data.priority.present ? data.priority.value : this.priority,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
 
   @override
   String toString() {
-    return (StringBuffer('DailyChoice(')
+    return (StringBuffer('Action(')
           ..write('creationSequence: $creationSequence, ')
           ..write('id: $id, ')
-          ..write('sourceIntentionId: $sourceIntentionId, ')
-          ..write('selectedIntentionId: $selectedIntentionId, ')
-          ..write('choiceDate: $choiceDate, ')
+          ..write('title: $title, ')
           ..write('description: $description, ')
+          ..write('date: $date, ')
+          ..write('scheduledHour: $scheduledHour, ')
+          ..write('priority: $priority, ')
           ..write('isCompleted: $isCompleted, ')
-          ..write('scheduledMinute: $scheduledMinute, ')
-          ..write('priority: $priority')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
@@ -5037,111 +5598,121 @@ class DailyChoice extends DataClass implements Insertable<DailyChoice> {
   int get hashCode => Object.hash(
     creationSequence,
     id,
-    sourceIntentionId,
-    selectedIntentionId,
-    choiceDate,
+    title,
     description,
-    isCompleted,
-    scheduledMinute,
+    date,
+    scheduledHour,
     priority,
+    isCompleted,
+    createdAt,
+    updatedAt,
   );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is DailyChoice &&
+      (other is Action &&
           other.creationSequence == this.creationSequence &&
           other.id == this.id &&
-          other.sourceIntentionId == this.sourceIntentionId &&
-          other.selectedIntentionId == this.selectedIntentionId &&
-          other.choiceDate == this.choiceDate &&
+          other.title == this.title &&
           other.description == this.description &&
+          other.date == this.date &&
+          other.scheduledHour == this.scheduledHour &&
+          other.priority == this.priority &&
           other.isCompleted == this.isCompleted &&
-          other.scheduledMinute == this.scheduledMinute &&
-          other.priority == this.priority);
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
 }
 
-class DailyChoicesCompanion extends UpdateCompanion<DailyChoice> {
+class ActionsCompanion extends UpdateCompanion<Action> {
   final Value<int> creationSequence;
   final Value<String> id;
-  final Value<String> sourceIntentionId;
-  final Value<String> selectedIntentionId;
-  final Value<String> choiceDate;
+  final Value<String> title;
   final Value<String?> description;
-  final Value<bool> isCompleted;
-  final Value<int?> scheduledMinute;
+  final Value<String> date;
+  final Value<int?> scheduledHour;
   final Value<int> priority;
-  const DailyChoicesCompanion({
+  final Value<bool> isCompleted;
+  final Value<int> createdAt;
+  final Value<int> updatedAt;
+  const ActionsCompanion({
     this.creationSequence = const Value.absent(),
     this.id = const Value.absent(),
-    this.sourceIntentionId = const Value.absent(),
-    this.selectedIntentionId = const Value.absent(),
-    this.choiceDate = const Value.absent(),
+    this.title = const Value.absent(),
     this.description = const Value.absent(),
-    this.isCompleted = const Value.absent(),
-    this.scheduledMinute = const Value.absent(),
+    this.date = const Value.absent(),
+    this.scheduledHour = const Value.absent(),
     this.priority = const Value.absent(),
+    this.isCompleted = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
   });
-  DailyChoicesCompanion.insert({
+  ActionsCompanion.insert({
     this.creationSequence = const Value.absent(),
     required String id,
-    required String sourceIntentionId,
-    required String selectedIntentionId,
-    required String choiceDate,
+    required String title,
     this.description = const Value.absent(),
+    required String date,
+    this.scheduledHour = const Value.absent(),
+    required int priority,
     required bool isCompleted,
-    this.scheduledMinute = const Value.absent(),
-    this.priority = const Value.absent(),
+    required int createdAt,
+    required int updatedAt,
   }) : id = Value(id),
-       sourceIntentionId = Value(sourceIntentionId),
-       selectedIntentionId = Value(selectedIntentionId),
-       choiceDate = Value(choiceDate),
-       isCompleted = Value(isCompleted);
-  static Insertable<DailyChoice> custom({
+       title = Value(title),
+       date = Value(date),
+       priority = Value(priority),
+       isCompleted = Value(isCompleted),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<Action> custom({
     Expression<int>? creationSequence,
     Expression<String>? id,
-    Expression<String>? sourceIntentionId,
-    Expression<String>? selectedIntentionId,
-    Expression<String>? choiceDate,
+    Expression<String>? title,
     Expression<String>? description,
-    Expression<bool>? isCompleted,
-    Expression<int>? scheduledMinute,
+    Expression<String>? date,
+    Expression<int>? scheduledHour,
     Expression<int>? priority,
+    Expression<bool>? isCompleted,
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
   }) {
     return RawValuesInsertable({
       if (creationSequence != null) 'creation_sequence': creationSequence,
       if (id != null) 'id': id,
-      if (sourceIntentionId != null) 'source_intention_id': sourceIntentionId,
-      if (selectedIntentionId != null)
-        'selected_intention_id': selectedIntentionId,
-      if (choiceDate != null) 'choice_date': choiceDate,
+      if (title != null) 'title': title,
       if (description != null) 'description': description,
-      if (isCompleted != null) 'is_completed': isCompleted,
-      if (scheduledMinute != null) 'scheduled_minute': scheduledMinute,
+      if (date != null) 'date': date,
+      if (scheduledHour != null) 'scheduled_hour': scheduledHour,
       if (priority != null) 'priority': priority,
+      if (isCompleted != null) 'is_completed': isCompleted,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
     });
   }
 
-  DailyChoicesCompanion copyWith({
+  ActionsCompanion copyWith({
     Value<int>? creationSequence,
     Value<String>? id,
-    Value<String>? sourceIntentionId,
-    Value<String>? selectedIntentionId,
-    Value<String>? choiceDate,
+    Value<String>? title,
     Value<String?>? description,
-    Value<bool>? isCompleted,
-    Value<int?>? scheduledMinute,
+    Value<String>? date,
+    Value<int?>? scheduledHour,
     Value<int>? priority,
+    Value<bool>? isCompleted,
+    Value<int>? createdAt,
+    Value<int>? updatedAt,
   }) {
-    return DailyChoicesCompanion(
+    return ActionsCompanion(
       creationSequence: creationSequence ?? this.creationSequence,
       id: id ?? this.id,
-      sourceIntentionId: sourceIntentionId ?? this.sourceIntentionId,
-      selectedIntentionId: selectedIntentionId ?? this.selectedIntentionId,
-      choiceDate: choiceDate ?? this.choiceDate,
+      title: title ?? this.title,
       description: description ?? this.description,
-      isCompleted: isCompleted ?? this.isCompleted,
-      scheduledMinute: scheduledMinute ?? this.scheduledMinute,
+      date: date ?? this.date,
+      scheduledHour: scheduledHour ?? this.scheduledHour,
       priority: priority ?? this.priority,
+      isCompleted: isCompleted ?? this.isCompleted,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -5154,363 +5725,549 @@ class DailyChoicesCompanion extends UpdateCompanion<DailyChoice> {
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
-    if (sourceIntentionId.present) {
-      map['source_intention_id'] = Variable<String>(sourceIntentionId.value);
-    }
-    if (selectedIntentionId.present) {
-      map['selected_intention_id'] = Variable<String>(
-        selectedIntentionId.value,
-      );
-    }
-    if (choiceDate.present) {
-      map['choice_date'] = Variable<String>(choiceDate.value);
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
     }
     if (description.present) {
       map['description'] = Variable<String>(description.value);
     }
-    if (isCompleted.present) {
-      map['is_completed'] = Variable<bool>(isCompleted.value);
+    if (date.present) {
+      map['date'] = Variable<String>(date.value);
     }
-    if (scheduledMinute.present) {
-      map['scheduled_minute'] = Variable<int>(scheduledMinute.value);
+    if (scheduledHour.present) {
+      map['scheduled_hour'] = Variable<int>(scheduledHour.value);
     }
     if (priority.present) {
       map['priority'] = Variable<int>(priority.value);
+    }
+    if (isCompleted.present) {
+      map['is_completed'] = Variable<bool>(isCompleted.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
     }
     return map;
   }
 
   @override
   String toString() {
-    return (StringBuffer('DailyChoicesCompanion(')
+    return (StringBuffer('ActionsCompanion(')
           ..write('creationSequence: $creationSequence, ')
           ..write('id: $id, ')
-          ..write('sourceIntentionId: $sourceIntentionId, ')
-          ..write('selectedIntentionId: $selectedIntentionId, ')
-          ..write('choiceDate: $choiceDate, ')
+          ..write('title: $title, ')
           ..write('description: $description, ')
+          ..write('date: $date, ')
+          ..write('scheduledHour: $scheduledHour, ')
+          ..write('priority: $priority, ')
           ..write('isCompleted: $isCompleted, ')
-          ..write('scheduledMinute: $scheduledMinute, ')
-          ..write('priority: $priority')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 }
 
-class DailyChoicePathSteps extends Table
-    with TableInfo<DailyChoicePathSteps, DailyChoicePathStep> {
+class ActionPathItems extends Table
+    with TableInfo<ActionPathItems, ActionPathItem> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  DailyChoicePathSteps(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
+  ActionPathItems(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _actionIdMeta = const VerificationMeta(
+    'actionId',
+  );
+  late final GeneratedColumn<String> actionId = GeneratedColumn<String>(
+    'action_id',
     aliasedName,
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL PRIMARY KEY',
+    $customConstraints:
+        'NOT NULL REFERENCES actions(id)ON UPDATE RESTRICT ON DELETE CASCADE',
   );
-  static const VerificationMeta _dailyChoiceIdMeta = const VerificationMeta(
-    'dailyChoiceId',
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
   );
-  late final GeneratedColumn<String> dailyChoiceId = GeneratedColumn<String>(
-    'daily_choice_id',
+  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+    'position',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints:
+        'NOT NULL CHECK (typeof(position) = \'integer\' AND position >= 0)',
+  );
+  static const VerificationMeta _intentionIdMeta = const VerificationMeta(
+    'intentionId',
+  );
+  late final GeneratedColumn<String> intentionId = GeneratedColumn<String>(
+    'intention_id',
     aliasedName,
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL REFERENCES daily_choices(id)ON UPDATE RESTRICT ON DELETE CASCADE',
+    $customConstraints: 'NOT NULL CHECK (typeof(intention_id) = \'text\')',
   );
-  static const VerificationMeta _longTermRelationIdMeta =
-      const VerificationMeta('longTermRelationId');
-  late final GeneratedColumn<String> longTermRelationId =
+  static const VerificationMeta _previousIntentionIdMeta =
+      const VerificationMeta('previousIntentionId');
+  late final GeneratedColumn<String> previousIntentionId =
       GeneratedColumn<String>(
-        'long_term_relation_id',
+        'previous_intention_id',
         aliasedName,
-        false,
+        true,
         type: DriftSqlType.string,
-        requiredDuringInsert: true,
-        $customConstraints: 'NOT NULL REFERENCES long_term_relations(id)ON UPDATE RESTRICT ON DELETE RESTRICT',
+        requiredDuringInsert: false,
+        $customConstraints: '',
       );
-  static const VerificationMeta _previousStepIdMeta = const VerificationMeta(
-    'previousStepId',
-  );
-  late final GeneratedColumn<String> previousStepId = GeneratedColumn<String>(
-    'previous_step_id',
+  static const VerificationMeta _roleMeta = const VerificationMeta('role');
+  late final GeneratedColumn<String> role = GeneratedColumn<String>(
+    'role',
     aliasedName,
-    true,
+    false,
     type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: '',
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(role) = \'text\' AND role IN (\'root\', \'intermediate\', \'terminal\', \'single\'))',
+  );
+  static const VerificationMeta _orderDateMeta = const VerificationMeta(
+    'orderDate',
+  );
+  late final GeneratedColumn<String> orderDate = GeneratedColumn<String>(
+    'order_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _orderHourMeta = const VerificationMeta(
+    'orderHour',
+  );
+  late final GeneratedColumn<int> orderHour = GeneratedColumn<int>(
+    'order_hour',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _orderSequenceMeta = const VerificationMeta(
+    'orderSequence',
+  );
+  late final GeneratedColumn<int> orderSequence = GeneratedColumn<int>(
+    'order_sequence',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
   );
   @override
   List<GeneratedColumn> get $columns => [
-    id,
-    dailyChoiceId,
-    longTermRelationId,
-    previousStepId,
+    actionId,
+    position,
+    intentionId,
+    previousIntentionId,
+    role,
+    orderDate,
+    orderHour,
+    orderSequence,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
   String get actualTableName => $name;
-  static const String $name = 'daily_choice_path_steps';
+  static const String $name = 'action_path_items';
   @override
   VerificationContext validateIntegrity(
-    Insertable<DailyChoicePathStep> instance, {
+    Insertable<ActionPathItem> instance, {
     bool isInserting = false,
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    } else if (isInserting) {
-      context.missing(_idMeta);
-    }
-    if (data.containsKey('daily_choice_id')) {
+    if (data.containsKey('action_id')) {
       context.handle(
-        _dailyChoiceIdMeta,
-        dailyChoiceId.isAcceptableOrUnknown(
-          data['daily_choice_id']!,
-          _dailyChoiceIdMeta,
+        _actionIdMeta,
+        actionId.isAcceptableOrUnknown(data['action_id']!, _actionIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_actionIdMeta);
+    }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_positionMeta);
+    }
+    if (data.containsKey('intention_id')) {
+      context.handle(
+        _intentionIdMeta,
+        intentionId.isAcceptableOrUnknown(
+          data['intention_id']!,
+          _intentionIdMeta,
         ),
       );
     } else if (isInserting) {
-      context.missing(_dailyChoiceIdMeta);
+      context.missing(_intentionIdMeta);
     }
-    if (data.containsKey('long_term_relation_id')) {
+    if (data.containsKey('previous_intention_id')) {
       context.handle(
-        _longTermRelationIdMeta,
-        longTermRelationId.isAcceptableOrUnknown(
-          data['long_term_relation_id']!,
-          _longTermRelationIdMeta,
+        _previousIntentionIdMeta,
+        previousIntentionId.isAcceptableOrUnknown(
+          data['previous_intention_id']!,
+          _previousIntentionIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('role')) {
+      context.handle(
+        _roleMeta,
+        role.isAcceptableOrUnknown(data['role']!, _roleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_roleMeta);
+    }
+    if (data.containsKey('order_date')) {
+      context.handle(
+        _orderDateMeta,
+        orderDate.isAcceptableOrUnknown(data['order_date']!, _orderDateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_orderDateMeta);
+    }
+    if (data.containsKey('order_hour')) {
+      context.handle(
+        _orderHourMeta,
+        orderHour.isAcceptableOrUnknown(data['order_hour']!, _orderHourMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_orderHourMeta);
+    }
+    if (data.containsKey('order_sequence')) {
+      context.handle(
+        _orderSequenceMeta,
+        orderSequence.isAcceptableOrUnknown(
+          data['order_sequence']!,
+          _orderSequenceMeta,
         ),
       );
     } else if (isInserting) {
-      context.missing(_longTermRelationIdMeta);
-    }
-    if (data.containsKey('previous_step_id')) {
-      context.handle(
-        _previousStepIdMeta,
-        previousStepId.isAcceptableOrUnknown(
-          data['previous_step_id']!,
-          _previousStepIdMeta,
-        ),
-      );
+      context.missing(_orderSequenceMeta);
     }
     return context;
   }
 
   @override
-  Set<GeneratedColumn> get $primaryKey => {id};
+  Set<GeneratedColumn> get $primaryKey => {actionId, position};
   @override
   List<Set<GeneratedColumn>> get uniqueKeys => [
-    {dailyChoiceId, id},
+    {actionId, intentionId},
   ];
   @override
-  DailyChoicePathStep map(Map<String, dynamic> data, {String? tablePrefix}) {
+  ActionPathItem map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return DailyChoicePathStep(
-      id: attachedDatabase.typeMapping.read(
+    return ActionPathItem(
+      actionId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}id'],
+        data['${effectivePrefix}action_id'],
       )!,
-      dailyChoiceId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}daily_choice_id'],
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position'],
       )!,
-      longTermRelationId: attachedDatabase.typeMapping.read(
+      intentionId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}long_term_relation_id'],
+        data['${effectivePrefix}intention_id'],
       )!,
-      previousStepId: attachedDatabase.typeMapping.read(
+      previousIntentionId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}previous_step_id'],
+        data['${effectivePrefix}previous_intention_id'],
       ),
+      role: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}role'],
+      )!,
+      orderDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}order_date'],
+      )!,
+      orderHour: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}order_hour'],
+      )!,
+      orderSequence: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}order_sequence'],
+      )!,
     );
   }
 
   @override
-  DailyChoicePathSteps createAlias(String alias) {
-    return DailyChoicePathSteps(attachedDatabase, alias);
+  ActionPathItems createAlias(String alias) {
+    return ActionPathItems(attachedDatabase, alias);
   }
 
   @override
   List<String> get customConstraints => const [
-    'UNIQUE(daily_choice_id, id)',
-    'FOREIGN KEY(daily_choice_id, previous_step_id)REFERENCES daily_choice_path_steps(daily_choice_id, id)ON UPDATE NO ACTION ON DELETE NO ACTION DEFERRABLE INITIALLY DEFERRED',
-    'CHECK(previous_step_id IS NULL OR previous_step_id <> id)',
+    'PRIMARY KEY(action_id, position)',
+    'UNIQUE(action_id, intention_id)',
   ];
   @override
   bool get dontWriteConstraints => true;
 }
 
-class DailyChoicePathStep extends DataClass
-    implements Insertable<DailyChoicePathStep> {
-  final String id;
-  final String dailyChoiceId;
-  final String longTermRelationId;
-  final String? previousStepId;
-  const DailyChoicePathStep({
-    required this.id,
-    required this.dailyChoiceId,
-    required this.longTermRelationId,
-    this.previousStepId,
+class ActionPathItem extends DataClass implements Insertable<ActionPathItem> {
+  final String actionId;
+  final int position;
+  final String intentionId;
+  final String? previousIntentionId;
+  final String role;
+  final String orderDate;
+
+  /// -1 — «Весь день».
+  final int orderHour;
+  final int orderSequence;
+  const ActionPathItem({
+    required this.actionId,
+    required this.position,
+    required this.intentionId,
+    this.previousIntentionId,
+    required this.role,
+    required this.orderDate,
+    required this.orderHour,
+    required this.orderSequence,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['id'] = Variable<String>(id);
-    map['daily_choice_id'] = Variable<String>(dailyChoiceId);
-    map['long_term_relation_id'] = Variable<String>(longTermRelationId);
-    if (!nullToAbsent || previousStepId != null) {
-      map['previous_step_id'] = Variable<String>(previousStepId);
+    map['action_id'] = Variable<String>(actionId);
+    map['position'] = Variable<int>(position);
+    map['intention_id'] = Variable<String>(intentionId);
+    if (!nullToAbsent || previousIntentionId != null) {
+      map['previous_intention_id'] = Variable<String>(previousIntentionId);
     }
+    map['role'] = Variable<String>(role);
+    map['order_date'] = Variable<String>(orderDate);
+    map['order_hour'] = Variable<int>(orderHour);
+    map['order_sequence'] = Variable<int>(orderSequence);
     return map;
   }
 
-  DailyChoicePathStepsCompanion toCompanion(bool nullToAbsent) {
-    return DailyChoicePathStepsCompanion(
-      id: Value(id),
-      dailyChoiceId: Value(dailyChoiceId),
-      longTermRelationId: Value(longTermRelationId),
-      previousStepId: previousStepId == null && nullToAbsent
+  ActionPathItemsCompanion toCompanion(bool nullToAbsent) {
+    return ActionPathItemsCompanion(
+      actionId: Value(actionId),
+      position: Value(position),
+      intentionId: Value(intentionId),
+      previousIntentionId: previousIntentionId == null && nullToAbsent
           ? const Value.absent()
-          : Value(previousStepId),
+          : Value(previousIntentionId),
+      role: Value(role),
+      orderDate: Value(orderDate),
+      orderHour: Value(orderHour),
+      orderSequence: Value(orderSequence),
     );
   }
 
-  factory DailyChoicePathStep.fromJson(
+  factory ActionPathItem.fromJson(
     Map<String, dynamic> json, {
     ValueSerializer? serializer,
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return DailyChoicePathStep(
-      id: serializer.fromJson<String>(json['id']),
-      dailyChoiceId: serializer.fromJson<String>(json['daily_choice_id']),
-      longTermRelationId: serializer.fromJson<String>(
-        json['long_term_relation_id'],
+    return ActionPathItem(
+      actionId: serializer.fromJson<String>(json['action_id']),
+      position: serializer.fromJson<int>(json['position']),
+      intentionId: serializer.fromJson<String>(json['intention_id']),
+      previousIntentionId: serializer.fromJson<String?>(
+        json['previous_intention_id'],
       ),
-      previousStepId: serializer.fromJson<String?>(json['previous_step_id']),
+      role: serializer.fromJson<String>(json['role']),
+      orderDate: serializer.fromJson<String>(json['order_date']),
+      orderHour: serializer.fromJson<int>(json['order_hour']),
+      orderSequence: serializer.fromJson<int>(json['order_sequence']),
     );
   }
   @override
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'id': serializer.toJson<String>(id),
-      'daily_choice_id': serializer.toJson<String>(dailyChoiceId),
-      'long_term_relation_id': serializer.toJson<String>(longTermRelationId),
-      'previous_step_id': serializer.toJson<String?>(previousStepId),
+      'action_id': serializer.toJson<String>(actionId),
+      'position': serializer.toJson<int>(position),
+      'intention_id': serializer.toJson<String>(intentionId),
+      'previous_intention_id': serializer.toJson<String?>(previousIntentionId),
+      'role': serializer.toJson<String>(role),
+      'order_date': serializer.toJson<String>(orderDate),
+      'order_hour': serializer.toJson<int>(orderHour),
+      'order_sequence': serializer.toJson<int>(orderSequence),
     };
   }
 
-  DailyChoicePathStep copyWith({
-    String? id,
-    String? dailyChoiceId,
-    String? longTermRelationId,
-    Value<String?> previousStepId = const Value.absent(),
-  }) => DailyChoicePathStep(
-    id: id ?? this.id,
-    dailyChoiceId: dailyChoiceId ?? this.dailyChoiceId,
-    longTermRelationId: longTermRelationId ?? this.longTermRelationId,
-    previousStepId: previousStepId.present
-        ? previousStepId.value
-        : this.previousStepId,
+  ActionPathItem copyWith({
+    String? actionId,
+    int? position,
+    String? intentionId,
+    Value<String?> previousIntentionId = const Value.absent(),
+    String? role,
+    String? orderDate,
+    int? orderHour,
+    int? orderSequence,
+  }) => ActionPathItem(
+    actionId: actionId ?? this.actionId,
+    position: position ?? this.position,
+    intentionId: intentionId ?? this.intentionId,
+    previousIntentionId: previousIntentionId.present
+        ? previousIntentionId.value
+        : this.previousIntentionId,
+    role: role ?? this.role,
+    orderDate: orderDate ?? this.orderDate,
+    orderHour: orderHour ?? this.orderHour,
+    orderSequence: orderSequence ?? this.orderSequence,
   );
-  DailyChoicePathStep copyWithCompanion(DailyChoicePathStepsCompanion data) {
-    return DailyChoicePathStep(
-      id: data.id.present ? data.id.value : this.id,
-      dailyChoiceId: data.dailyChoiceId.present
-          ? data.dailyChoiceId.value
-          : this.dailyChoiceId,
-      longTermRelationId: data.longTermRelationId.present
-          ? data.longTermRelationId.value
-          : this.longTermRelationId,
-      previousStepId: data.previousStepId.present
-          ? data.previousStepId.value
-          : this.previousStepId,
+  ActionPathItem copyWithCompanion(ActionPathItemsCompanion data) {
+    return ActionPathItem(
+      actionId: data.actionId.present ? data.actionId.value : this.actionId,
+      position: data.position.present ? data.position.value : this.position,
+      intentionId: data.intentionId.present
+          ? data.intentionId.value
+          : this.intentionId,
+      previousIntentionId: data.previousIntentionId.present
+          ? data.previousIntentionId.value
+          : this.previousIntentionId,
+      role: data.role.present ? data.role.value : this.role,
+      orderDate: data.orderDate.present ? data.orderDate.value : this.orderDate,
+      orderHour: data.orderHour.present ? data.orderHour.value : this.orderHour,
+      orderSequence: data.orderSequence.present
+          ? data.orderSequence.value
+          : this.orderSequence,
     );
   }
 
   @override
   String toString() {
-    return (StringBuffer('DailyChoicePathStep(')
-          ..write('id: $id, ')
-          ..write('dailyChoiceId: $dailyChoiceId, ')
-          ..write('longTermRelationId: $longTermRelationId, ')
-          ..write('previousStepId: $previousStepId')
+    return (StringBuffer('ActionPathItem(')
+          ..write('actionId: $actionId, ')
+          ..write('position: $position, ')
+          ..write('intentionId: $intentionId, ')
+          ..write('previousIntentionId: $previousIntentionId, ')
+          ..write('role: $role, ')
+          ..write('orderDate: $orderDate, ')
+          ..write('orderHour: $orderHour, ')
+          ..write('orderSequence: $orderSequence')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, dailyChoiceId, longTermRelationId, previousStepId);
+  int get hashCode => Object.hash(
+    actionId,
+    position,
+    intentionId,
+    previousIntentionId,
+    role,
+    orderDate,
+    orderHour,
+    orderSequence,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is DailyChoicePathStep &&
-          other.id == this.id &&
-          other.dailyChoiceId == this.dailyChoiceId &&
-          other.longTermRelationId == this.longTermRelationId &&
-          other.previousStepId == this.previousStepId);
+      (other is ActionPathItem &&
+          other.actionId == this.actionId &&
+          other.position == this.position &&
+          other.intentionId == this.intentionId &&
+          other.previousIntentionId == this.previousIntentionId &&
+          other.role == this.role &&
+          other.orderDate == this.orderDate &&
+          other.orderHour == this.orderHour &&
+          other.orderSequence == this.orderSequence);
 }
 
-class DailyChoicePathStepsCompanion
-    extends UpdateCompanion<DailyChoicePathStep> {
-  final Value<String> id;
-  final Value<String> dailyChoiceId;
-  final Value<String> longTermRelationId;
-  final Value<String?> previousStepId;
+class ActionPathItemsCompanion extends UpdateCompanion<ActionPathItem> {
+  final Value<String> actionId;
+  final Value<int> position;
+  final Value<String> intentionId;
+  final Value<String?> previousIntentionId;
+  final Value<String> role;
+  final Value<String> orderDate;
+  final Value<int> orderHour;
+  final Value<int> orderSequence;
   final Value<int> rowid;
-  const DailyChoicePathStepsCompanion({
-    this.id = const Value.absent(),
-    this.dailyChoiceId = const Value.absent(),
-    this.longTermRelationId = const Value.absent(),
-    this.previousStepId = const Value.absent(),
+  const ActionPathItemsCompanion({
+    this.actionId = const Value.absent(),
+    this.position = const Value.absent(),
+    this.intentionId = const Value.absent(),
+    this.previousIntentionId = const Value.absent(),
+    this.role = const Value.absent(),
+    this.orderDate = const Value.absent(),
+    this.orderHour = const Value.absent(),
+    this.orderSequence = const Value.absent(),
     this.rowid = const Value.absent(),
   });
-  DailyChoicePathStepsCompanion.insert({
-    required String id,
-    required String dailyChoiceId,
-    required String longTermRelationId,
-    this.previousStepId = const Value.absent(),
+  ActionPathItemsCompanion.insert({
+    required String actionId,
+    required int position,
+    required String intentionId,
+    this.previousIntentionId = const Value.absent(),
+    required String role,
+    required String orderDate,
+    required int orderHour,
+    required int orderSequence,
     this.rowid = const Value.absent(),
-  }) : id = Value(id),
-       dailyChoiceId = Value(dailyChoiceId),
-       longTermRelationId = Value(longTermRelationId);
-  static Insertable<DailyChoicePathStep> custom({
-    Expression<String>? id,
-    Expression<String>? dailyChoiceId,
-    Expression<String>? longTermRelationId,
-    Expression<String>? previousStepId,
+  }) : actionId = Value(actionId),
+       position = Value(position),
+       intentionId = Value(intentionId),
+       role = Value(role),
+       orderDate = Value(orderDate),
+       orderHour = Value(orderHour),
+       orderSequence = Value(orderSequence);
+  static Insertable<ActionPathItem> custom({
+    Expression<String>? actionId,
+    Expression<int>? position,
+    Expression<String>? intentionId,
+    Expression<String>? previousIntentionId,
+    Expression<String>? role,
+    Expression<String>? orderDate,
+    Expression<int>? orderHour,
+    Expression<int>? orderSequence,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (dailyChoiceId != null) 'daily_choice_id': dailyChoiceId,
-      if (longTermRelationId != null)
-        'long_term_relation_id': longTermRelationId,
-      if (previousStepId != null) 'previous_step_id': previousStepId,
+      if (actionId != null) 'action_id': actionId,
+      if (position != null) 'position': position,
+      if (intentionId != null) 'intention_id': intentionId,
+      if (previousIntentionId != null)
+        'previous_intention_id': previousIntentionId,
+      if (role != null) 'role': role,
+      if (orderDate != null) 'order_date': orderDate,
+      if (orderHour != null) 'order_hour': orderHour,
+      if (orderSequence != null) 'order_sequence': orderSequence,
       if (rowid != null) 'rowid': rowid,
     });
   }
 
-  DailyChoicePathStepsCompanion copyWith({
-    Value<String>? id,
-    Value<String>? dailyChoiceId,
-    Value<String>? longTermRelationId,
-    Value<String?>? previousStepId,
+  ActionPathItemsCompanion copyWith({
+    Value<String>? actionId,
+    Value<int>? position,
+    Value<String>? intentionId,
+    Value<String?>? previousIntentionId,
+    Value<String>? role,
+    Value<String>? orderDate,
+    Value<int>? orderHour,
+    Value<int>? orderSequence,
     Value<int>? rowid,
   }) {
-    return DailyChoicePathStepsCompanion(
-      id: id ?? this.id,
-      dailyChoiceId: dailyChoiceId ?? this.dailyChoiceId,
-      longTermRelationId: longTermRelationId ?? this.longTermRelationId,
-      previousStepId: previousStepId ?? this.previousStepId,
+    return ActionPathItemsCompanion(
+      actionId: actionId ?? this.actionId,
+      position: position ?? this.position,
+      intentionId: intentionId ?? this.intentionId,
+      previousIntentionId: previousIntentionId ?? this.previousIntentionId,
+      role: role ?? this.role,
+      orderDate: orderDate ?? this.orderDate,
+      orderHour: orderHour ?? this.orderHour,
+      orderSequence: orderSequence ?? this.orderSequence,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -5518,17 +6275,31 @@ class DailyChoicePathStepsCompanion
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<String>(id.value);
+    if (actionId.present) {
+      map['action_id'] = Variable<String>(actionId.value);
     }
-    if (dailyChoiceId.present) {
-      map['daily_choice_id'] = Variable<String>(dailyChoiceId.value);
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
     }
-    if (longTermRelationId.present) {
-      map['long_term_relation_id'] = Variable<String>(longTermRelationId.value);
+    if (intentionId.present) {
+      map['intention_id'] = Variable<String>(intentionId.value);
     }
-    if (previousStepId.present) {
-      map['previous_step_id'] = Variable<String>(previousStepId.value);
+    if (previousIntentionId.present) {
+      map['previous_intention_id'] = Variable<String>(
+        previousIntentionId.value,
+      );
+    }
+    if (role.present) {
+      map['role'] = Variable<String>(role.value);
+    }
+    if (orderDate.present) {
+      map['order_date'] = Variable<String>(orderDate.value);
+    }
+    if (orderHour.present) {
+      map['order_hour'] = Variable<int>(orderHour.value);
+    }
+    if (orderSequence.present) {
+      map['order_sequence'] = Variable<int>(orderSequence.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -5538,11 +6309,543 @@ class DailyChoicePathStepsCompanion
 
   @override
   String toString() {
-    return (StringBuffer('DailyChoicePathStepsCompanion(')
-          ..write('id: $id, ')
-          ..write('dailyChoiceId: $dailyChoiceId, ')
-          ..write('longTermRelationId: $longTermRelationId, ')
-          ..write('previousStepId: $previousStepId, ')
+    return (StringBuffer('ActionPathItemsCompanion(')
+          ..write('actionId: $actionId, ')
+          ..write('position: $position, ')
+          ..write('intentionId: $intentionId, ')
+          ..write('previousIntentionId: $previousIntentionId, ')
+          ..write('role: $role, ')
+          ..write('orderDate: $orderDate, ')
+          ..write('orderHour: $orderHour, ')
+          ..write('orderSequence: $orderSequence, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class DeletedIntentions extends Table
+    with TableInfo<DeletedIntentions, DeletedIntention> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  DeletedIntentions(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _intentionIdMeta = const VerificationMeta(
+    'intentionId',
+  );
+  late final GeneratedColumn<String> intentionId = GeneratedColumn<String>(
+    'intention_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints:
+        'NOT NULL PRIMARY KEY CHECK (typeof(intention_id) = \'text\')',
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(title) = \'text\' AND title <> \'\' AND instr(CAST(title AS BLOB), X\'00\') = 0)',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [intentionId, title];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'deleted_intentions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DeletedIntention> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('intention_id')) {
+      context.handle(
+        _intentionIdMeta,
+        intentionId.isAcceptableOrUnknown(
+          data['intention_id']!,
+          _intentionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_intentionIdMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {intentionId};
+  @override
+  DeletedIntention map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DeletedIntention(
+      intentionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}intention_id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+    );
+  }
+
+  @override
+  DeletedIntentions createAlias(String alias) {
+    return DeletedIntentions(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class DeletedIntention extends DataClass
+    implements Insertable<DeletedIntention> {
+  final String intentionId;
+  final String title;
+  const DeletedIntention({required this.intentionId, required this.title});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['intention_id'] = Variable<String>(intentionId);
+    map['title'] = Variable<String>(title);
+    return map;
+  }
+
+  DeletedIntentionsCompanion toCompanion(bool nullToAbsent) {
+    return DeletedIntentionsCompanion(
+      intentionId: Value(intentionId),
+      title: Value(title),
+    );
+  }
+
+  factory DeletedIntention.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DeletedIntention(
+      intentionId: serializer.fromJson<String>(json['intention_id']),
+      title: serializer.fromJson<String>(json['title']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'intention_id': serializer.toJson<String>(intentionId),
+      'title': serializer.toJson<String>(title),
+    };
+  }
+
+  DeletedIntention copyWith({String? intentionId, String? title}) =>
+      DeletedIntention(
+        intentionId: intentionId ?? this.intentionId,
+        title: title ?? this.title,
+      );
+  DeletedIntention copyWithCompanion(DeletedIntentionsCompanion data) {
+    return DeletedIntention(
+      intentionId: data.intentionId.present
+          ? data.intentionId.value
+          : this.intentionId,
+      title: data.title.present ? data.title.value : this.title,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DeletedIntention(')
+          ..write('intentionId: $intentionId, ')
+          ..write('title: $title')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(intentionId, title);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DeletedIntention &&
+          other.intentionId == this.intentionId &&
+          other.title == this.title);
+}
+
+class DeletedIntentionsCompanion extends UpdateCompanion<DeletedIntention> {
+  final Value<String> intentionId;
+  final Value<String> title;
+  final Value<int> rowid;
+  const DeletedIntentionsCompanion({
+    this.intentionId = const Value.absent(),
+    this.title = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DeletedIntentionsCompanion.insert({
+    required String intentionId,
+    required String title,
+    this.rowid = const Value.absent(),
+  }) : intentionId = Value(intentionId),
+       title = Value(title);
+  static Insertable<DeletedIntention> custom({
+    Expression<String>? intentionId,
+    Expression<String>? title,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (intentionId != null) 'intention_id': intentionId,
+      if (title != null) 'title': title,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DeletedIntentionsCompanion copyWith({
+    Value<String>? intentionId,
+    Value<String>? title,
+    Value<int>? rowid,
+  }) {
+    return DeletedIntentionsCompanion(
+      intentionId: intentionId ?? this.intentionId,
+      title: title ?? this.title,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (intentionId.present) {
+      map['intention_id'] = Variable<String>(intentionId.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DeletedIntentionsCompanion(')
+          ..write('intentionId: $intentionId, ')
+          ..write('title: $title, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class DeletedRelationPairs extends Table
+    with TableInfo<DeletedRelationPairs, DeletedRelationPair> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  DeletedRelationPairs(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _sourceIntentionIdMeta = const VerificationMeta(
+    'sourceIntentionId',
+  );
+  late final GeneratedColumn<String> sourceIntentionId =
+      GeneratedColumn<String>(
+        'source_intention_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+        $customConstraints:
+            'NOT NULL CHECK (typeof(source_intention_id) = \'text\')',
+      );
+  static const VerificationMeta _relatedIntentionIdMeta =
+      const VerificationMeta('relatedIntentionId');
+  late final GeneratedColumn<String> relatedIntentionId =
+      GeneratedColumn<String>(
+        'related_intention_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+        $customConstraints:
+            'NOT NULL CHECK (typeof(related_intention_id) = \'text\')',
+      );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (typeof(type) = \'text\' AND type IN (\'need\', \'can\'))',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    sourceIntentionId,
+    relatedIntentionId,
+    type,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'deleted_relation_pairs';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DeletedRelationPair> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('source_intention_id')) {
+      context.handle(
+        _sourceIntentionIdMeta,
+        sourceIntentionId.isAcceptableOrUnknown(
+          data['source_intention_id']!,
+          _sourceIntentionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceIntentionIdMeta);
+    }
+    if (data.containsKey('related_intention_id')) {
+      context.handle(
+        _relatedIntentionIdMeta,
+        relatedIntentionId.isAcceptableOrUnknown(
+          data['related_intention_id']!,
+          _relatedIntentionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_relatedIntentionIdMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {
+    sourceIntentionId,
+    relatedIntentionId,
+  };
+  @override
+  DeletedRelationPair map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DeletedRelationPair(
+      sourceIntentionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_intention_id'],
+      )!,
+      relatedIntentionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}related_intention_id'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+    );
+  }
+
+  @override
+  DeletedRelationPairs createAlias(String alias) {
+    return DeletedRelationPairs(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const [
+    'PRIMARY KEY(source_intention_id, related_intention_id)',
+    'CHECK(source_intention_id <> related_intention_id)',
+  ];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class DeletedRelationPair extends DataClass
+    implements Insertable<DeletedRelationPair> {
+  final String sourceIntentionId;
+  final String relatedIntentionId;
+  final String type;
+  const DeletedRelationPair({
+    required this.sourceIntentionId,
+    required this.relatedIntentionId,
+    required this.type,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['source_intention_id'] = Variable<String>(sourceIntentionId);
+    map['related_intention_id'] = Variable<String>(relatedIntentionId);
+    map['type'] = Variable<String>(type);
+    return map;
+  }
+
+  DeletedRelationPairsCompanion toCompanion(bool nullToAbsent) {
+    return DeletedRelationPairsCompanion(
+      sourceIntentionId: Value(sourceIntentionId),
+      relatedIntentionId: Value(relatedIntentionId),
+      type: Value(type),
+    );
+  }
+
+  factory DeletedRelationPair.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DeletedRelationPair(
+      sourceIntentionId: serializer.fromJson<String>(
+        json['source_intention_id'],
+      ),
+      relatedIntentionId: serializer.fromJson<String>(
+        json['related_intention_id'],
+      ),
+      type: serializer.fromJson<String>(json['type']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'source_intention_id': serializer.toJson<String>(sourceIntentionId),
+      'related_intention_id': serializer.toJson<String>(relatedIntentionId),
+      'type': serializer.toJson<String>(type),
+    };
+  }
+
+  DeletedRelationPair copyWith({
+    String? sourceIntentionId,
+    String? relatedIntentionId,
+    String? type,
+  }) => DeletedRelationPair(
+    sourceIntentionId: sourceIntentionId ?? this.sourceIntentionId,
+    relatedIntentionId: relatedIntentionId ?? this.relatedIntentionId,
+    type: type ?? this.type,
+  );
+  DeletedRelationPair copyWithCompanion(DeletedRelationPairsCompanion data) {
+    return DeletedRelationPair(
+      sourceIntentionId: data.sourceIntentionId.present
+          ? data.sourceIntentionId.value
+          : this.sourceIntentionId,
+      relatedIntentionId: data.relatedIntentionId.present
+          ? data.relatedIntentionId.value
+          : this.relatedIntentionId,
+      type: data.type.present ? data.type.value : this.type,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DeletedRelationPair(')
+          ..write('sourceIntentionId: $sourceIntentionId, ')
+          ..write('relatedIntentionId: $relatedIntentionId, ')
+          ..write('type: $type')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(sourceIntentionId, relatedIntentionId, type);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DeletedRelationPair &&
+          other.sourceIntentionId == this.sourceIntentionId &&
+          other.relatedIntentionId == this.relatedIntentionId &&
+          other.type == this.type);
+}
+
+class DeletedRelationPairsCompanion
+    extends UpdateCompanion<DeletedRelationPair> {
+  final Value<String> sourceIntentionId;
+  final Value<String> relatedIntentionId;
+  final Value<String> type;
+  final Value<int> rowid;
+  const DeletedRelationPairsCompanion({
+    this.sourceIntentionId = const Value.absent(),
+    this.relatedIntentionId = const Value.absent(),
+    this.type = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DeletedRelationPairsCompanion.insert({
+    required String sourceIntentionId,
+    required String relatedIntentionId,
+    required String type,
+    this.rowid = const Value.absent(),
+  }) : sourceIntentionId = Value(sourceIntentionId),
+       relatedIntentionId = Value(relatedIntentionId),
+       type = Value(type);
+  static Insertable<DeletedRelationPair> custom({
+    Expression<String>? sourceIntentionId,
+    Expression<String>? relatedIntentionId,
+    Expression<String>? type,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (sourceIntentionId != null) 'source_intention_id': sourceIntentionId,
+      if (relatedIntentionId != null)
+        'related_intention_id': relatedIntentionId,
+      if (type != null) 'type': type,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DeletedRelationPairsCompanion copyWith({
+    Value<String>? sourceIntentionId,
+    Value<String>? relatedIntentionId,
+    Value<String>? type,
+    Value<int>? rowid,
+  }) {
+    return DeletedRelationPairsCompanion(
+      sourceIntentionId: sourceIntentionId ?? this.sourceIntentionId,
+      relatedIntentionId: relatedIntentionId ?? this.relatedIntentionId,
+      type: type ?? this.type,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (sourceIntentionId.present) {
+      map['source_intention_id'] = Variable<String>(sourceIntentionId.value);
+    }
+    if (relatedIntentionId.present) {
+      map['related_intention_id'] = Variable<String>(relatedIntentionId.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DeletedRelationPairsCompanion(')
+          ..write('sourceIntentionId: $sourceIntentionId, ')
+          ..write('relatedIntentionId: $relatedIntentionId, ')
+          ..write('type: $type, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5744,8 +7047,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       GraphLogTagAssignmentMarks(this);
   late final GraphLogLongTermRelationMarks graphLogLongTermRelationMarks =
       GraphLogLongTermRelationMarks(this);
-  late final GraphLogDailyChoiceMarks graphLogDailyChoiceMarks =
-      GraphLogDailyChoiceMarks(this);
+  late final GraphLogActionMarks graphLogActionMarks = GraphLogActionMarks(
+    this,
+  );
+  late final GraphLogDeletedIntentionMarks graphLogDeletedIntentionMarks =
+      GraphLogDeletedIntentionMarks(this);
+  late final GraphLogDeletedRelationPairMarks graphLogDeletedRelationPairMarks =
+      GraphLogDeletedRelationPairMarks(this);
   late final GraphSnapshots graphSnapshots = GraphSnapshots(this);
   late final GraphLogPackages graphLogPackages = GraphLogPackages(this);
   late final GraphBackups graphBackups = GraphBackups(this);
@@ -5801,77 +7109,127 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'CREATE TRIGGER graph_log_mark_long_term_relation_delete AFTER DELETE ON long_term_relations WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_long_term_relation_marks (long_term_relation_id, first_operation) VALUES (old.id, \'delete\');END',
     'graph_log_mark_long_term_relation_delete',
   );
-  late final DailyChoices dailyChoices = DailyChoices(this);
-  late final Trigger graphLogMarkDailyChoiceInsert = Trigger(
-    'CREATE TRIGGER graph_log_mark_daily_choice_insert AFTER INSERT ON daily_choices WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (new.id, \'insert\');END',
-    'graph_log_mark_daily_choice_insert',
+  late final Actions actions = Actions(this);
+  late final Trigger graphLogMarkActionInsert = Trigger(
+    'CREATE TRIGGER graph_log_mark_action_insert AFTER INSERT ON actions WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_action_marks (action_id, first_operation) VALUES (new.id, \'insert\');END',
+    'graph_log_mark_action_insert',
   );
-  late final Trigger graphLogMarkDailyChoiceUpdate = Trigger(
-    'CREATE TRIGGER graph_log_mark_daily_choice_update AFTER UPDATE ON daily_choices WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (new.id, \'update\');END',
-    'graph_log_mark_daily_choice_update',
+  late final Trigger graphLogMarkActionUpdate = Trigger(
+    'CREATE TRIGGER graph_log_mark_action_update AFTER UPDATE ON actions WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_action_marks (action_id, first_operation) VALUES (new.id, \'update\');END',
+    'graph_log_mark_action_update',
   );
-  late final Trigger graphLogMarkDailyChoiceDelete = Trigger(
-    'CREATE TRIGGER graph_log_mark_daily_choice_delete AFTER DELETE ON daily_choices WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (old.id, \'delete\');END',
-    'graph_log_mark_daily_choice_delete',
+  late final Trigger graphLogMarkActionDelete = Trigger(
+    'CREATE TRIGGER graph_log_mark_action_delete AFTER DELETE ON actions WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_action_marks (action_id, first_operation) VALUES (old.id, \'delete\');END',
+    'graph_log_mark_action_delete',
   );
-  late final DailyChoicePathSteps dailyChoicePathSteps = DailyChoicePathSteps(
+  late final ActionPathItems actionPathItems = ActionPathItems(this);
+  late final Trigger graphLogMarkActionPathItemInsert = Trigger(
+    'CREATE TRIGGER graph_log_mark_action_path_item_insert AFTER INSERT ON action_path_items WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_action_marks (action_id, first_operation) VALUES (new.action_id, \'update\');END',
+    'graph_log_mark_action_path_item_insert',
+  );
+  late final Trigger graphLogMarkActionPathItemDelete = Trigger(
+    'CREATE TRIGGER graph_log_mark_action_path_item_delete AFTER DELETE ON action_path_items WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_action_marks (action_id, first_operation) VALUES (old.action_id, \'update\');END',
+    'graph_log_mark_action_path_item_delete',
+  );
+  late final DeletedIntentions deletedIntentions = DeletedIntentions(this);
+  late final Trigger graphLogMarkDeletedIntentionInsert = Trigger(
+    'CREATE TRIGGER graph_log_mark_deleted_intention_insert AFTER INSERT ON deleted_intentions WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_deleted_intention_marks (intention_id, first_operation) VALUES (new.intention_id, \'insert\');END',
+    'graph_log_mark_deleted_intention_insert',
+  );
+  late final Trigger graphLogMarkDeletedIntentionDelete = Trigger(
+    'CREATE TRIGGER graph_log_mark_deleted_intention_delete AFTER DELETE ON deleted_intentions WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_deleted_intention_marks (intention_id, first_operation) VALUES (old.intention_id, \'delete\');END',
+    'graph_log_mark_deleted_intention_delete',
+  );
+  late final DeletedRelationPairs deletedRelationPairs = DeletedRelationPairs(
     this,
   );
-  late final Trigger graphLogMarkDailyChoicePathStepInsert = Trigger(
-    'CREATE TRIGGER graph_log_mark_daily_choice_path_step_insert AFTER INSERT ON daily_choice_path_steps WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (new.daily_choice_id, \'update\');END',
-    'graph_log_mark_daily_choice_path_step_insert',
+  late final Trigger graphLogMarkDeletedRelationPairInsert = Trigger(
+    'CREATE TRIGGER graph_log_mark_deleted_relation_pair_insert AFTER INSERT ON deleted_relation_pairs WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_deleted_relation_pair_marks (source_intention_id, related_intention_id, first_operation) VALUES (new.source_intention_id, new.related_intention_id, \'insert\');END',
+    'graph_log_mark_deleted_relation_pair_insert',
   );
-  late final Trigger graphLogMarkDailyChoicePathStepUpdate = Trigger(
-    'CREATE TRIGGER graph_log_mark_daily_choice_path_step_update AFTER UPDATE ON daily_choice_path_steps WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (old.daily_choice_id, \'update\'), (new.daily_choice_id, \'update\');END',
-    'graph_log_mark_daily_choice_path_step_update',
+  late final Trigger graphLogMarkDeletedRelationPairDelete = Trigger(
+    'CREATE TRIGGER graph_log_mark_deleted_relation_pair_delete AFTER DELETE ON deleted_relation_pairs WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_deleted_relation_pair_marks (source_intention_id, related_intention_id, first_operation) VALUES (old.source_intention_id, old.related_intention_id, \'delete\');END',
+    'graph_log_mark_deleted_relation_pair_delete',
   );
-  late final Trigger graphLogMarkDailyChoicePathStepDelete = Trigger(
-    'CREATE TRIGGER graph_log_mark_daily_choice_path_step_delete AFTER DELETE ON daily_choice_path_steps WHEN (SELECT capture FROM graph_log_control) = 1 BEGIN SELECT RAISE (ABORT, \'graph write outside the graph write path\') FROM graph_log_control WHERE writing = 0;INSERT OR IGNORE INTO graph_log_daily_choice_marks (daily_choice_id, first_operation) VALUES (old.daily_choice_id, \'update\');END',
-    'graph_log_mark_daily_choice_path_step_delete',
+  late final Index actionsDateCompletionScheduleOrder = Index(
+    'actions_date_completion_schedule_order',
+    'CREATE INDEX actions_date_completion_schedule_order ON actions (date, is_completed, COALESCE(scheduled_hour, -1), priority, creation_sequence)',
   );
-  late final Trigger tagsImmutableIdentity = Trigger(
-    'CREATE TRIGGER tags_immutable_identity AFTER UPDATE OF creation_sequence, id ON tags WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, \'tag identity is immutable\');END',
-    'tags_immutable_identity',
+  late final Trigger actionsImmutableIdentity = Trigger(
+    'CREATE TRIGGER actions_immutable_identity AFTER UPDATE OF creation_sequence, id ON actions WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, \'action identity is immutable\');END',
+    'actions_immutable_identity',
   );
-  late final Index tagAssignmentsIntention = Index(
-    'tag_assignments_intention',
-    'CREATE INDEX tag_assignments_intention ON tag_assignments (intention_id, tag_id)',
+  late final Index actionPathItemsIntentionAction = Index(
+    'action_path_items_intention_action',
+    'CREATE INDEX action_path_items_intention_action ON action_path_items (intention_id, action_id)',
   );
-  late final Trigger tagAssignmentsImmutableIdentity = Trigger(
-    'CREATE TRIGGER tag_assignments_immutable_identity AFTER UPDATE OF creation_sequence, tag_id, intention_id ON tag_assignments WHEN new.creation_sequence <> old.creation_sequence OR new.tag_id <> old.tag_id OR new.intention_id <> old.intention_id BEGIN SELECT RAISE (ABORT, \'tag assignment identity is immutable\');END',
-    'tag_assignments_immutable_identity',
+  late final Index actionPathItemsIntentionRoleOrder = Index(
+    'action_path_items_intention_role_order',
+    'CREATE INDEX action_path_items_intention_role_order ON action_path_items (intention_id, role, order_date DESC, order_hour DESC, order_sequence DESC)',
   );
-  late final Index dailyChoicesDateCompletionScheduleOrder = Index(
-    'daily_choices_date_completion_schedule_order',
-    'CREATE INDEX daily_choices_date_completion_schedule_order ON daily_choices (choice_date, is_completed, COALESCE(scheduled_minute, -1), priority, creation_sequence)',
+  late final Index actionPathItemsLink = Index(
+    'action_path_items_link',
+    'CREATE INDEX action_path_items_link ON action_path_items (previous_intention_id, intention_id)',
   );
-  late final Index dailyChoicesDateCreationOrder = Index(
-    'daily_choices_date_creation_order',
-    'CREATE INDEX daily_choices_date_creation_order ON daily_choices (choice_date, creation_sequence)',
+  late final Trigger actionPathItemsContinuePreviousPosition = Trigger(
+    'CREATE TRIGGER action_path_items_continue_previous_position AFTER INSERT ON action_path_items WHEN new.previous_intention_id IS NOT (SELECT intention_id FROM action_path_items WHERE action_id = new.action_id AND position = new.position - 1) BEGIN SELECT RAISE (ABORT, \'action path item must continue the previous position\');END',
+    'action_path_items_continue_previous_position',
   );
-  late final Index dailyChoicesSourceDateCreationOrder = Index(
-    'daily_choices_source_date_creation_order',
-    'CREATE INDEX daily_choices_source_date_creation_order ON daily_choices (source_intention_id, choice_date, creation_sequence)',
+  late final Trigger actionPathItemsRoleFollowsPosition = Trigger(
+    'CREATE TRIGGER action_path_items_role_follows_position AFTER INSERT ON action_path_items WHEN CASE WHEN new.position = 0 THEN new.role NOT IN (\'root\', \'single\') ELSE new.role NOT IN (\'intermediate\', \'terminal\') OR NOT EXISTS (SELECT 1 FROM action_path_items WHERE action_id = new.action_id AND position = new.position - 1 AND role IN (\'root\', \'intermediate\')) END BEGIN SELECT RAISE (ABORT, \'action path item role must follow its position\');END',
+    'action_path_items_role_follows_position',
   );
-  late final Index dailyChoicesSelectedDateCreationOrder = Index(
-    'daily_choices_selected_date_creation_order',
-    'CREATE INDEX daily_choices_selected_date_creation_order ON daily_choices (selected_intention_id, choice_date, creation_sequence)',
+  late final Trigger actionPathItemsOrderKeyMatchesAction = Trigger(
+    'CREATE TRIGGER action_path_items_order_key_matches_action AFTER INSERT ON action_path_items WHEN NOT EXISTS (SELECT 1 FROM actions WHERE id = new.action_id AND date = new.order_date AND COALESCE(scheduled_hour, -1) = new.order_hour AND creation_sequence = new.order_sequence) BEGIN SELECT RAISE (ABORT, \'action path item order key must match its action\');END',
+    'action_path_items_order_key_matches_action',
   );
-  late final Trigger dailyChoicesImmutableIdentity = Trigger(
-    'CREATE TRIGGER daily_choices_immutable_identity AFTER UPDATE OF creation_sequence, id ON daily_choices WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, \'daily choice identity is immutable\');END',
-    'daily_choices_immutable_identity',
+  late final Trigger actionsCopyOrderKeyToPath = Trigger(
+    'CREATE TRIGGER actions_copy_order_key_to_path AFTER UPDATE OF date, scheduled_hour ON actions WHEN new.date IS NOT old.date OR new.scheduled_hour IS NOT old.scheduled_hour BEGIN UPDATE action_path_items SET order_date = new.date, order_hour = COALESCE(new.scheduled_hour, -1) WHERE action_id = new.id;END',
+    'actions_copy_order_key_to_path',
   );
-  late final Index dailyChoicePathStepsOneRoot = Index(
-    'daily_choice_path_steps_one_root',
-    'CREATE UNIQUE INDEX daily_choice_path_steps_one_root ON daily_choice_path_steps (daily_choice_id) WHERE previous_step_id IS NULL',
+  late final Trigger actionPathItemsKnownIntention = Trigger(
+    'CREATE TRIGGER action_path_items_known_intention AFTER INSERT ON action_path_items WHEN NOT EXISTS (SELECT 1 FROM intentions WHERE id = new.intention_id) AND NOT EXISTS (SELECT 1 FROM deleted_intentions WHERE intention_id = new.intention_id) BEGIN SELECT RAISE (ABORT, \'action path item requires a known intention\');END',
+    'action_path_items_known_intention',
   );
-  late final Index dailyChoicePathStepsOneSuccessor = Index(
-    'daily_choice_path_steps_one_successor',
-    'CREATE UNIQUE INDEX daily_choice_path_steps_one_successor ON daily_choice_path_steps (daily_choice_id, previous_step_id) WHERE previous_step_id IS NOT NULL',
+  late final Trigger actionPathItemsImmutable = Trigger(
+    'CREATE TRIGGER action_path_items_immutable BEFORE UPDATE ON action_path_items WHEN new.action_id IS NOT old.action_id OR new.position IS NOT old.position OR new.intention_id IS NOT old.intention_id OR new.previous_intention_id IS NOT old.previous_intention_id OR new.role IS NOT old.role OR new.order_sequence IS NOT old.order_sequence BEGIN SELECT RAISE (ABORT, \'action path items are immutable\');END',
+    'action_path_items_immutable',
   );
-  late final Index dailyChoicePathStepsRelation = Index(
-    'daily_choice_path_steps_relation',
-    'CREATE INDEX daily_choice_path_steps_relation ON daily_choice_path_steps (long_term_relation_id)',
+  late final Trigger deletedIntentionsRejectExisting = Trigger(
+    'CREATE TRIGGER deleted_intentions_reject_existing BEFORE INSERT ON deleted_intentions WHEN EXISTS (SELECT 1 FROM intentions WHERE id = new.intention_id) BEGIN SELECT RAISE (ABORT, \'tombstone of an existing intention\');END',
+    'deleted_intentions_reject_existing',
+  );
+  late final Trigger intentionsRejectTombstoned = Trigger(
+    'CREATE TRIGGER intentions_reject_tombstoned AFTER INSERT ON intentions WHEN EXISTS (SELECT 1 FROM deleted_intentions WHERE intention_id = new.id) BEGIN SELECT RAISE (ABORT, \'tombstone of an existing intention\');END',
+    'intentions_reject_tombstoned',
+  );
+  late final Trigger deletedRelationPairsRejectExisting = Trigger(
+    'CREATE TRIGGER deleted_relation_pairs_reject_existing BEFORE INSERT ON deleted_relation_pairs WHEN EXISTS (SELECT 1 FROM long_term_relations WHERE source_intention_id = new.source_intention_id AND related_intention_id = new.related_intention_id) BEGIN SELECT RAISE (ABORT, \'tombstone of an existing relation pair\');END',
+    'deleted_relation_pairs_reject_existing',
+  );
+  late final Trigger deletedIntentionsImmutable = Trigger(
+    'CREATE TRIGGER deleted_intentions_immutable BEFORE UPDATE ON deleted_intentions BEGIN SELECT RAISE (ABORT, \'tombstones are immutable\');END',
+    'deleted_intentions_immutable',
+  );
+  late final Trigger deletedRelationPairsImmutable = Trigger(
+    'CREATE TRIGGER deleted_relation_pairs_immutable BEFORE UPDATE ON deleted_relation_pairs BEGIN SELECT RAISE (ABORT, \'tombstones are immutable\');END',
+    'deleted_relation_pairs_immutable',
+  );
+  late final Trigger intentionsTombstoneAfterDelete = Trigger(
+    'CREATE TRIGGER intentions_tombstone_after_delete AFTER DELETE ON intentions WHEN EXISTS (SELECT 1 FROM action_path_items WHERE intention_id = old.id) BEGIN INSERT INTO deleted_intentions (intention_id, title) VALUES (old.id, old.title);END',
+    'intentions_tombstone_after_delete',
+  );
+  late final Trigger longTermRelationsTombstoneAfterDelete = Trigger(
+    'CREATE TRIGGER long_term_relations_tombstone_after_delete AFTER DELETE ON long_term_relations WHEN EXISTS (SELECT 1 FROM action_path_items WHERE previous_intention_id = old.source_intention_id AND intention_id = old.related_intention_id) BEGIN INSERT INTO deleted_relation_pairs (source_intention_id, related_intention_id, type) VALUES (old.source_intention_id, old.related_intention_id, old.type);END',
+    'long_term_relations_tombstone_after_delete',
+  );
+  late final Trigger longTermRelationsUntombstoneAfterInsert = Trigger(
+    'CREATE TRIGGER long_term_relations_untombstone_after_insert AFTER INSERT ON long_term_relations BEGIN DELETE FROM deleted_relation_pairs WHERE source_intention_id = new.source_intention_id AND related_intention_id = new.related_intention_id;END',
+    'long_term_relations_untombstone_after_insert',
+  );
+  late final Trigger actionPathItemsReleaseTombstonesAfterDelete = Trigger(
+    'CREATE TRIGGER action_path_items_release_tombstones_after_delete AFTER DELETE ON action_path_items BEGIN DELETE FROM deleted_intentions WHERE intention_id = old.intention_id AND NOT EXISTS (SELECT 1 FROM action_path_items WHERE intention_id = old.intention_id);DELETE FROM deleted_relation_pairs WHERE source_intention_id = old.previous_intention_id AND related_intention_id = old.intention_id AND NOT EXISTS (SELECT 1 FROM action_path_items WHERE previous_intention_id = old.previous_intention_id AND intention_id = old.intention_id);END',
+    'action_path_items_release_tombstones_after_delete',
   );
   late final Index longTermRelationsSourceGroupOrder = Index(
     'long_term_relations_source_group_order',
@@ -5982,6 +7340,18 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'intentions_all_title_search_key_desc_id_asc',
     'CREATE INDEX intentions_all_title_search_key_desc_id_asc ON intentions (title_search_key DESC, id ASC)',
   );
+  late final Trigger tagsImmutableIdentity = Trigger(
+    'CREATE TRIGGER tags_immutable_identity AFTER UPDATE OF creation_sequence, id ON tags WHEN new.creation_sequence <> old.creation_sequence OR new.id <> old.id BEGIN SELECT RAISE (ABORT, \'tag identity is immutable\');END',
+    'tags_immutable_identity',
+  );
+  late final Index tagAssignmentsIntention = Index(
+    'tag_assignments_intention',
+    'CREATE INDEX tag_assignments_intention ON tag_assignments (intention_id, tag_id)',
+  );
+  late final Trigger tagAssignmentsImmutableIdentity = Trigger(
+    'CREATE TRIGGER tag_assignments_immutable_identity AFTER UPDATE OF creation_sequence, tag_id, intention_id ON tag_assignments WHEN new.creation_sequence <> old.creation_sequence OR new.tag_id <> old.tag_id OR new.intention_id <> old.intention_id BEGIN SELECT RAISE (ABORT, \'tag assignment identity is immutable\');END',
+    'tag_assignments_immutable_identity',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5995,7 +7365,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     graphLogIntentionMarks,
     graphLogTagAssignmentMarks,
     graphLogLongTermRelationMarks,
-    graphLogDailyChoiceMarks,
+    graphLogActionMarks,
+    graphLogDeletedIntentionMarks,
+    graphLogDeletedRelationPairMarks,
     graphSnapshots,
     graphLogPackages,
     graphBackups,
@@ -6015,25 +7387,39 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     graphLogMarkLongTermRelationInsert,
     graphLogMarkLongTermRelationUpdate,
     graphLogMarkLongTermRelationDelete,
-    dailyChoices,
-    graphLogMarkDailyChoiceInsert,
-    graphLogMarkDailyChoiceUpdate,
-    graphLogMarkDailyChoiceDelete,
-    dailyChoicePathSteps,
-    graphLogMarkDailyChoicePathStepInsert,
-    graphLogMarkDailyChoicePathStepUpdate,
-    graphLogMarkDailyChoicePathStepDelete,
-    tagsImmutableIdentity,
-    tagAssignmentsIntention,
-    tagAssignmentsImmutableIdentity,
-    dailyChoicesDateCompletionScheduleOrder,
-    dailyChoicesDateCreationOrder,
-    dailyChoicesSourceDateCreationOrder,
-    dailyChoicesSelectedDateCreationOrder,
-    dailyChoicesImmutableIdentity,
-    dailyChoicePathStepsOneRoot,
-    dailyChoicePathStepsOneSuccessor,
-    dailyChoicePathStepsRelation,
+    actions,
+    graphLogMarkActionInsert,
+    graphLogMarkActionUpdate,
+    graphLogMarkActionDelete,
+    actionPathItems,
+    graphLogMarkActionPathItemInsert,
+    graphLogMarkActionPathItemDelete,
+    deletedIntentions,
+    graphLogMarkDeletedIntentionInsert,
+    graphLogMarkDeletedIntentionDelete,
+    deletedRelationPairs,
+    graphLogMarkDeletedRelationPairInsert,
+    graphLogMarkDeletedRelationPairDelete,
+    actionsDateCompletionScheduleOrder,
+    actionsImmutableIdentity,
+    actionPathItemsIntentionAction,
+    actionPathItemsIntentionRoleOrder,
+    actionPathItemsLink,
+    actionPathItemsContinuePreviousPosition,
+    actionPathItemsRoleFollowsPosition,
+    actionPathItemsOrderKeyMatchesAction,
+    actionsCopyOrderKeyToPath,
+    actionPathItemsKnownIntention,
+    actionPathItemsImmutable,
+    deletedIntentionsRejectExisting,
+    intentionsRejectTombstoned,
+    deletedRelationPairsRejectExisting,
+    deletedIntentionsImmutable,
+    deletedRelationPairsImmutable,
+    intentionsTombstoneAfterDelete,
+    longTermRelationsTombstoneAfterDelete,
+    longTermRelationsUntombstoneAfterInsert,
+    actionPathItemsReleaseTombstonesAfterDelete,
     longTermRelationsSourceGroupOrder,
     longTermRelationsRelatedGroupOrder,
     longTermRelationsImmutableIdentity,
@@ -6062,6 +7448,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     intentionsArchivedTitleSearchKeyDescIdAsc,
     intentionsAllTitleSearchKeyAscIdAsc,
     intentionsAllTitleSearchKeyDescIdAsc,
+    tagsImmutableIdentity,
+    tagAssignmentsIntention,
+    tagAssignmentsImmutableIdentity,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -6192,64 +7581,257 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
-        'daily_choices',
+        'actions',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [TableUpdate('graph_log_action_marks', kind: UpdateKind.insert)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'actions',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [TableUpdate('graph_log_action_marks', kind: UpdateKind.insert)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'actions',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('graph_log_action_marks', kind: UpdateKind.insert)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'actions',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('action_path_items', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'action_path_items',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [TableUpdate('graph_log_action_marks', kind: UpdateKind.insert)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'action_path_items',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('graph_log_action_marks', kind: UpdateKind.insert)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'deleted_intentions',
         limitUpdateKind: UpdateKind.insert,
       ),
       result: [
-        TableUpdate('graph_log_daily_choice_marks', kind: UpdateKind.insert),
+        TableUpdate(
+          'graph_log_deleted_intention_marks',
+          kind: UpdateKind.insert,
+        ),
       ],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
-        'daily_choices',
-        limitUpdateKind: UpdateKind.update,
-      ),
-      result: [
-        TableUpdate('graph_log_daily_choice_marks', kind: UpdateKind.insert),
-      ],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'daily_choices',
+        'deleted_intentions',
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [
-        TableUpdate('graph_log_daily_choice_marks', kind: UpdateKind.insert),
+        TableUpdate(
+          'graph_log_deleted_intention_marks',
+          kind: UpdateKind.insert,
+        ),
       ],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
-        'daily_choices',
-        limitUpdateKind: UpdateKind.delete,
-      ),
-      result: [TableUpdate('daily_choice_path_steps', kind: UpdateKind.delete)],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'daily_choice_path_steps',
+        'deleted_relation_pairs',
         limitUpdateKind: UpdateKind.insert,
       ),
       result: [
-        TableUpdate('graph_log_daily_choice_marks', kind: UpdateKind.insert),
+        TableUpdate(
+          'graph_log_deleted_relation_pair_marks',
+          kind: UpdateKind.insert,
+        ),
       ],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
-        'daily_choice_path_steps',
-        limitUpdateKind: UpdateKind.update,
-      ),
-      result: [
-        TableUpdate('graph_log_daily_choice_marks', kind: UpdateKind.insert),
-      ],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'daily_choice_path_steps',
+        'deleted_relation_pairs',
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [
-        TableUpdate('graph_log_daily_choice_marks', kind: UpdateKind.insert),
+        TableUpdate(
+          'graph_log_deleted_relation_pair_marks',
+          kind: UpdateKind.insert,
+        ),
       ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'actions',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'action_path_items',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'action_path_items',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'action_path_items',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'actions',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [TableUpdate('action_path_items', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'action_path_items',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'action_path_items',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'deleted_intentions',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'intentions',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'deleted_relation_pairs',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'deleted_intentions',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'deleted_relation_pairs',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'intentions',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('deleted_intentions', kind: UpdateKind.insert)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'long_term_relations',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('deleted_relation_pairs', kind: UpdateKind.insert)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'long_term_relations',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [TableUpdate('deleted_relation_pairs', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'action_path_items',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [
+        TableUpdate('deleted_intentions', kind: UpdateKind.delete),
+        TableUpdate('deleted_relation_pairs', kind: UpdateKind.delete),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'long_term_relations',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'long_term_relations',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'long_term_relations',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'intentions',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'intentions',
+        limitUpdateKind: UpdateKind.insert,
+      ),
+      result: [TableUpdate('intention_titles_fts', kind: UpdateKind.insert)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'intentions',
+        limitUpdateKind: UpdateKind.update,
+      ),
+      result: [TableUpdate('intention_titles_fts', kind: UpdateKind.insert)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'intentions',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('intention_titles_fts', kind: UpdateKind.insert)],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
@@ -6264,62 +7846,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.update,
       ),
       result: [],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'daily_choices',
-        limitUpdateKind: UpdateKind.update,
-      ),
-      result: [],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'long_term_relations',
-        limitUpdateKind: UpdateKind.update,
-      ),
-      result: [],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'long_term_relations',
-        limitUpdateKind: UpdateKind.insert,
-      ),
-      result: [],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'long_term_relations',
-        limitUpdateKind: UpdateKind.update,
-      ),
-      result: [],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'intentions',
-        limitUpdateKind: UpdateKind.update,
-      ),
-      result: [],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'intentions',
-        limitUpdateKind: UpdateKind.insert,
-      ),
-      result: [TableUpdate('intention_titles_fts', kind: UpdateKind.insert)],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'intentions',
-        limitUpdateKind: UpdateKind.update,
-      ),
-      result: [TableUpdate('intention_titles_fts', kind: UpdateKind.insert)],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'intentions',
-        limitUpdateKind: UpdateKind.delete,
-      ),
-      result: [TableUpdate('intention_titles_fts', kind: UpdateKind.insert)],
     ),
   ]);
 }
@@ -7130,30 +8656,30 @@ typedef $GraphLogLongTermRelationMarksProcessedTableManager =
       GraphLogLongTermRelationMark,
       PrefetchHooks Function()
     >;
-typedef $GraphLogDailyChoiceMarksCreateCompanionBuilder =
-    GraphLogDailyChoiceMarksCompanion Function({
-      required String dailyChoiceId,
+typedef $GraphLogActionMarksCreateCompanionBuilder =
+    GraphLogActionMarksCompanion Function({
+      required String actionId,
       required String firstOperation,
       Value<int> rowid,
     });
-typedef $GraphLogDailyChoiceMarksUpdateCompanionBuilder =
-    GraphLogDailyChoiceMarksCompanion Function({
-      Value<String> dailyChoiceId,
+typedef $GraphLogActionMarksUpdateCompanionBuilder =
+    GraphLogActionMarksCompanion Function({
+      Value<String> actionId,
       Value<String> firstOperation,
       Value<int> rowid,
     });
 
-class $GraphLogDailyChoiceMarksFilterComposer
-    extends Composer<_$AppDatabase, GraphLogDailyChoiceMarks> {
-  $GraphLogDailyChoiceMarksFilterComposer({
+class $GraphLogActionMarksFilterComposer
+    extends Composer<_$AppDatabase, GraphLogActionMarks> {
+  $GraphLogActionMarksFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnFilters<String> get dailyChoiceId => $composableBuilder(
-    column: $table.dailyChoiceId,
+  ColumnFilters<String> get actionId => $composableBuilder(
+    column: $table.actionId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7163,17 +8689,17 @@ class $GraphLogDailyChoiceMarksFilterComposer
   );
 }
 
-class $GraphLogDailyChoiceMarksOrderingComposer
-    extends Composer<_$AppDatabase, GraphLogDailyChoiceMarks> {
-  $GraphLogDailyChoiceMarksOrderingComposer({
+class $GraphLogActionMarksOrderingComposer
+    extends Composer<_$AppDatabase, GraphLogActionMarks> {
+  $GraphLogActionMarksOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnOrderings<String> get dailyChoiceId => $composableBuilder(
-    column: $table.dailyChoiceId,
+  ColumnOrderings<String> get actionId => $composableBuilder(
+    column: $table.actionId,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -7183,19 +8709,17 @@ class $GraphLogDailyChoiceMarksOrderingComposer
   );
 }
 
-class $GraphLogDailyChoiceMarksAnnotationComposer
-    extends Composer<_$AppDatabase, GraphLogDailyChoiceMarks> {
-  $GraphLogDailyChoiceMarksAnnotationComposer({
+class $GraphLogActionMarksAnnotationComposer
+    extends Composer<_$AppDatabase, GraphLogActionMarks> {
+  $GraphLogActionMarksAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  GeneratedColumn<String> get dailyChoiceId => $composableBuilder(
-    column: $table.dailyChoiceId,
-    builder: (column) => column,
-  );
+  GeneratedColumn<String> get actionId =>
+      $composableBuilder(column: $table.actionId, builder: (column) => column);
 
   GeneratedColumn<String> get firstOperation => $composableBuilder(
     column: $table.firstOperation,
@@ -7203,61 +8727,56 @@ class $GraphLogDailyChoiceMarksAnnotationComposer
   );
 }
 
-class $GraphLogDailyChoiceMarksTableManager
+class $GraphLogActionMarksTableManager
     extends
         RootTableManager<
           _$AppDatabase,
-          GraphLogDailyChoiceMarks,
-          GraphLogDailyChoiceMark,
-          $GraphLogDailyChoiceMarksFilterComposer,
-          $GraphLogDailyChoiceMarksOrderingComposer,
-          $GraphLogDailyChoiceMarksAnnotationComposer,
-          $GraphLogDailyChoiceMarksCreateCompanionBuilder,
-          $GraphLogDailyChoiceMarksUpdateCompanionBuilder,
+          GraphLogActionMarks,
+          GraphLogActionMark,
+          $GraphLogActionMarksFilterComposer,
+          $GraphLogActionMarksOrderingComposer,
+          $GraphLogActionMarksAnnotationComposer,
+          $GraphLogActionMarksCreateCompanionBuilder,
+          $GraphLogActionMarksUpdateCompanionBuilder,
           (
-            GraphLogDailyChoiceMark,
+            GraphLogActionMark,
             BaseReferences<
               _$AppDatabase,
-              GraphLogDailyChoiceMarks,
-              GraphLogDailyChoiceMark
+              GraphLogActionMarks,
+              GraphLogActionMark
             >,
           ),
-          GraphLogDailyChoiceMark,
+          GraphLogActionMark,
           PrefetchHooks Function()
         > {
-  $GraphLogDailyChoiceMarksTableManager(
-    _$AppDatabase db,
-    GraphLogDailyChoiceMarks table,
-  ) : super(
+  $GraphLogActionMarksTableManager(_$AppDatabase db, GraphLogActionMarks table)
+    : super(
         TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
-              $GraphLogDailyChoiceMarksFilterComposer($db: db, $table: table),
+              $GraphLogActionMarksFilterComposer($db: db, $table: table),
           createOrderingComposer: () =>
-              $GraphLogDailyChoiceMarksOrderingComposer($db: db, $table: table),
+              $GraphLogActionMarksOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
-              $GraphLogDailyChoiceMarksAnnotationComposer(
-                $db: db,
-                $table: table,
-              ),
+              $GraphLogActionMarksAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
-                Value<String> dailyChoiceId = const Value.absent(),
+                Value<String> actionId = const Value.absent(),
                 Value<String> firstOperation = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
-              }) => GraphLogDailyChoiceMarksCompanion(
-                dailyChoiceId: dailyChoiceId,
+              }) => GraphLogActionMarksCompanion(
+                actionId: actionId,
                 firstOperation: firstOperation,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
-                required String dailyChoiceId,
+                required String actionId,
                 required String firstOperation,
                 Value<int> rowid = const Value.absent(),
-              }) => GraphLogDailyChoiceMarksCompanion.insert(
-                dailyChoiceId: dailyChoiceId,
+              }) => GraphLogActionMarksCompanion.insert(
+                actionId: actionId,
                 firstOperation: firstOperation,
                 rowid: rowid,
               ),
@@ -7269,25 +8788,374 @@ class $GraphLogDailyChoiceMarksTableManager
       );
 }
 
-typedef $GraphLogDailyChoiceMarksProcessedTableManager =
+typedef $GraphLogActionMarksProcessedTableManager =
     ProcessedTableManager<
       _$AppDatabase,
-      GraphLogDailyChoiceMarks,
-      GraphLogDailyChoiceMark,
-      $GraphLogDailyChoiceMarksFilterComposer,
-      $GraphLogDailyChoiceMarksOrderingComposer,
-      $GraphLogDailyChoiceMarksAnnotationComposer,
-      $GraphLogDailyChoiceMarksCreateCompanionBuilder,
-      $GraphLogDailyChoiceMarksUpdateCompanionBuilder,
+      GraphLogActionMarks,
+      GraphLogActionMark,
+      $GraphLogActionMarksFilterComposer,
+      $GraphLogActionMarksOrderingComposer,
+      $GraphLogActionMarksAnnotationComposer,
+      $GraphLogActionMarksCreateCompanionBuilder,
+      $GraphLogActionMarksUpdateCompanionBuilder,
       (
-        GraphLogDailyChoiceMark,
+        GraphLogActionMark,
+        BaseReferences<_$AppDatabase, GraphLogActionMarks, GraphLogActionMark>,
+      ),
+      GraphLogActionMark,
+      PrefetchHooks Function()
+    >;
+typedef $GraphLogDeletedIntentionMarksCreateCompanionBuilder =
+    GraphLogDeletedIntentionMarksCompanion Function({
+      required String intentionId,
+      required String firstOperation,
+      Value<int> rowid,
+    });
+typedef $GraphLogDeletedIntentionMarksUpdateCompanionBuilder =
+    GraphLogDeletedIntentionMarksCompanion Function({
+      Value<String> intentionId,
+      Value<String> firstOperation,
+      Value<int> rowid,
+    });
+
+class $GraphLogDeletedIntentionMarksFilterComposer
+    extends Composer<_$AppDatabase, GraphLogDeletedIntentionMarks> {
+  $GraphLogDeletedIntentionMarksFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get intentionId => $composableBuilder(
+    column: $table.intentionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get firstOperation => $composableBuilder(
+    column: $table.firstOperation,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $GraphLogDeletedIntentionMarksOrderingComposer
+    extends Composer<_$AppDatabase, GraphLogDeletedIntentionMarks> {
+  $GraphLogDeletedIntentionMarksOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get intentionId => $composableBuilder(
+    column: $table.intentionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get firstOperation => $composableBuilder(
+    column: $table.firstOperation,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $GraphLogDeletedIntentionMarksAnnotationComposer
+    extends Composer<_$AppDatabase, GraphLogDeletedIntentionMarks> {
+  $GraphLogDeletedIntentionMarksAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get intentionId => $composableBuilder(
+    column: $table.intentionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get firstOperation => $composableBuilder(
+    column: $table.firstOperation,
+    builder: (column) => column,
+  );
+}
+
+class $GraphLogDeletedIntentionMarksTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          GraphLogDeletedIntentionMarks,
+          GraphLogDeletedIntentionMark,
+          $GraphLogDeletedIntentionMarksFilterComposer,
+          $GraphLogDeletedIntentionMarksOrderingComposer,
+          $GraphLogDeletedIntentionMarksAnnotationComposer,
+          $GraphLogDeletedIntentionMarksCreateCompanionBuilder,
+          $GraphLogDeletedIntentionMarksUpdateCompanionBuilder,
+          (
+            GraphLogDeletedIntentionMark,
+            BaseReferences<
+              _$AppDatabase,
+              GraphLogDeletedIntentionMarks,
+              GraphLogDeletedIntentionMark
+            >,
+          ),
+          GraphLogDeletedIntentionMark,
+          PrefetchHooks Function()
+        > {
+  $GraphLogDeletedIntentionMarksTableManager(
+    _$AppDatabase db,
+    GraphLogDeletedIntentionMarks table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $GraphLogDeletedIntentionMarksFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $GraphLogDeletedIntentionMarksOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $GraphLogDeletedIntentionMarksAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> intentionId = const Value.absent(),
+                Value<String> firstOperation = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => GraphLogDeletedIntentionMarksCompanion(
+                intentionId: intentionId,
+                firstOperation: firstOperation,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String intentionId,
+                required String firstOperation,
+                Value<int> rowid = const Value.absent(),
+              }) => GraphLogDeletedIntentionMarksCompanion.insert(
+                intentionId: intentionId,
+                firstOperation: firstOperation,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $GraphLogDeletedIntentionMarksProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      GraphLogDeletedIntentionMarks,
+      GraphLogDeletedIntentionMark,
+      $GraphLogDeletedIntentionMarksFilterComposer,
+      $GraphLogDeletedIntentionMarksOrderingComposer,
+      $GraphLogDeletedIntentionMarksAnnotationComposer,
+      $GraphLogDeletedIntentionMarksCreateCompanionBuilder,
+      $GraphLogDeletedIntentionMarksUpdateCompanionBuilder,
+      (
+        GraphLogDeletedIntentionMark,
         BaseReferences<
           _$AppDatabase,
-          GraphLogDailyChoiceMarks,
-          GraphLogDailyChoiceMark
+          GraphLogDeletedIntentionMarks,
+          GraphLogDeletedIntentionMark
         >,
       ),
-      GraphLogDailyChoiceMark,
+      GraphLogDeletedIntentionMark,
+      PrefetchHooks Function()
+    >;
+typedef $GraphLogDeletedRelationPairMarksCreateCompanionBuilder =
+    GraphLogDeletedRelationPairMarksCompanion Function({
+      required String sourceIntentionId,
+      required String relatedIntentionId,
+      required String firstOperation,
+      Value<int> rowid,
+    });
+typedef $GraphLogDeletedRelationPairMarksUpdateCompanionBuilder =
+    GraphLogDeletedRelationPairMarksCompanion Function({
+      Value<String> sourceIntentionId,
+      Value<String> relatedIntentionId,
+      Value<String> firstOperation,
+      Value<int> rowid,
+    });
+
+class $GraphLogDeletedRelationPairMarksFilterComposer
+    extends Composer<_$AppDatabase, GraphLogDeletedRelationPairMarks> {
+  $GraphLogDeletedRelationPairMarksFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get sourceIntentionId => $composableBuilder(
+    column: $table.sourceIntentionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get relatedIntentionId => $composableBuilder(
+    column: $table.relatedIntentionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get firstOperation => $composableBuilder(
+    column: $table.firstOperation,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $GraphLogDeletedRelationPairMarksOrderingComposer
+    extends Composer<_$AppDatabase, GraphLogDeletedRelationPairMarks> {
+  $GraphLogDeletedRelationPairMarksOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get sourceIntentionId => $composableBuilder(
+    column: $table.sourceIntentionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get relatedIntentionId => $composableBuilder(
+    column: $table.relatedIntentionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get firstOperation => $composableBuilder(
+    column: $table.firstOperation,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $GraphLogDeletedRelationPairMarksAnnotationComposer
+    extends Composer<_$AppDatabase, GraphLogDeletedRelationPairMarks> {
+  $GraphLogDeletedRelationPairMarksAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get sourceIntentionId => $composableBuilder(
+    column: $table.sourceIntentionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get relatedIntentionId => $composableBuilder(
+    column: $table.relatedIntentionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get firstOperation => $composableBuilder(
+    column: $table.firstOperation,
+    builder: (column) => column,
+  );
+}
+
+class $GraphLogDeletedRelationPairMarksTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          GraphLogDeletedRelationPairMarks,
+          GraphLogDeletedRelationPairMark,
+          $GraphLogDeletedRelationPairMarksFilterComposer,
+          $GraphLogDeletedRelationPairMarksOrderingComposer,
+          $GraphLogDeletedRelationPairMarksAnnotationComposer,
+          $GraphLogDeletedRelationPairMarksCreateCompanionBuilder,
+          $GraphLogDeletedRelationPairMarksUpdateCompanionBuilder,
+          (
+            GraphLogDeletedRelationPairMark,
+            BaseReferences<
+              _$AppDatabase,
+              GraphLogDeletedRelationPairMarks,
+              GraphLogDeletedRelationPairMark
+            >,
+          ),
+          GraphLogDeletedRelationPairMark,
+          PrefetchHooks Function()
+        > {
+  $GraphLogDeletedRelationPairMarksTableManager(
+    _$AppDatabase db,
+    GraphLogDeletedRelationPairMarks table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $GraphLogDeletedRelationPairMarksFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $GraphLogDeletedRelationPairMarksOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $GraphLogDeletedRelationPairMarksAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> sourceIntentionId = const Value.absent(),
+                Value<String> relatedIntentionId = const Value.absent(),
+                Value<String> firstOperation = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => GraphLogDeletedRelationPairMarksCompanion(
+                sourceIntentionId: sourceIntentionId,
+                relatedIntentionId: relatedIntentionId,
+                firstOperation: firstOperation,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String sourceIntentionId,
+                required String relatedIntentionId,
+                required String firstOperation,
+                Value<int> rowid = const Value.absent(),
+              }) => GraphLogDeletedRelationPairMarksCompanion.insert(
+                sourceIntentionId: sourceIntentionId,
+                relatedIntentionId: relatedIntentionId,
+                firstOperation: firstOperation,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $GraphLogDeletedRelationPairMarksProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      GraphLogDeletedRelationPairMarks,
+      GraphLogDeletedRelationPairMark,
+      $GraphLogDeletedRelationPairMarksFilterComposer,
+      $GraphLogDeletedRelationPairMarksOrderingComposer,
+      $GraphLogDeletedRelationPairMarksAnnotationComposer,
+      $GraphLogDeletedRelationPairMarksCreateCompanionBuilder,
+      $GraphLogDeletedRelationPairMarksUpdateCompanionBuilder,
+      (
+        GraphLogDeletedRelationPairMark,
+        BaseReferences<
+          _$AppDatabase,
+          GraphLogDeletedRelationPairMarks,
+          GraphLogDeletedRelationPairMark
+        >,
+      ),
+      GraphLogDeletedRelationPairMark,
       PrefetchHooks Function()
     >;
 typedef $GraphSnapshotsCreateCompanionBuilder =
@@ -9248,30 +11116,6 @@ final class $LongTermRelationsReferences
       manager.$state.copyWith(prefetchedData: [item]),
     );
   }
-
-  static MultiTypedResultKey<DailyChoicePathSteps, List<DailyChoicePathStep>>
-  _dailyChoicePathStepsRefsTable(_$AppDatabase db) =>
-      MultiTypedResultKey.fromTable(
-        db.dailyChoicePathSteps,
-        aliasName: 'long_term_relations__id__daily_choice_path_steps__long_term_relation_id',
-      );
-
-  $DailyChoicePathStepsProcessedTableManager get dailyChoicePathStepsRefs {
-    final manager =
-        $DailyChoicePathStepsTableManager(
-          $_db,
-          $_db.dailyChoicePathSteps,
-        ).filter(
-          (f) => f.longTermRelationId.id.sqlEquals($_itemColumn<String>('id')!),
-        );
-
-    final cache = $_typedResult.readTableOrNull(
-      _dailyChoicePathStepsRefsTable($_db),
-    );
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: cache),
-    );
-  }
 }
 
 class $LongTermRelationsFilterComposer
@@ -9367,31 +11211,6 @@ class $LongTermRelationsFilterComposer
           ),
     );
     return composer;
-  }
-
-  Expression<bool> dailyChoicePathStepsRefs(
-    Expression<bool> Function($DailyChoicePathStepsFilterComposer f) f,
-  ) {
-    final $DailyChoicePathStepsFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.dailyChoicePathSteps,
-      getReferencedColumn: (t) => t.longTermRelationId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $DailyChoicePathStepsFilterComposer(
-            $db: $db,
-            $table: $db.dailyChoicePathSteps,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
   }
 }
 
@@ -9575,31 +11394,6 @@ class $LongTermRelationsAnnotationComposer
     );
     return composer;
   }
-
-  Expression<T> dailyChoicePathStepsRefs<T extends Object>(
-    Expression<T> Function($DailyChoicePathStepsAnnotationComposer a) f,
-  ) {
-    final $DailyChoicePathStepsAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.dailyChoicePathSteps,
-      getReferencedColumn: (t) => t.longTermRelationId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $DailyChoicePathStepsAnnotationComposer(
-            $db: $db,
-            $table: $db.dailyChoicePathSteps,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
 }
 
 class $LongTermRelationsTableManager
@@ -9618,7 +11412,6 @@ class $LongTermRelationsTableManager
           PrefetchHooks Function({
             bool sourceIntentionId,
             bool relatedIntentionId,
-            bool dailyChoicePathStepsRefs,
           })
         > {
   $LongTermRelationsTableManager(_$AppDatabase db, LongTermRelations table)
@@ -9689,16 +11482,10 @@ class $LongTermRelationsTableManager
               )
               .toList(),
           prefetchHooksCallback:
-              ({
-                sourceIntentionId = false,
-                relatedIntentionId = false,
-                dailyChoicePathStepsRefs = false,
-              }) {
+              ({sourceIntentionId = false, relatedIntentionId = false}) {
                 return PrefetchHooks(
                   db: db,
-                  explicitlyWatchedTables: [
-                    if (dailyChoicePathStepsRefs) db.dailyChoicePathSteps,
-                  ],
+                  explicitlyWatchedTables: [],
                   addJoins:
                       <
                         T extends TableManagerState<
@@ -9741,29 +11528,7 @@ class $LongTermRelationsTableManager
                         return state;
                       },
                   getPrefetchedDataCallback: (items) async {
-                    return [
-                      if (dailyChoicePathStepsRefs)
-                        await $_getPrefetchedData<
-                          LongTermRelation,
-                          LongTermRelations,
-                          DailyChoicePathStep
-                        >(
-                          currentTable: table,
-                          referencedTable: $LongTermRelationsReferences
-                              ._dailyChoicePathStepsRefsTable(db),
-                          managerFromTypedResult: (p0) =>
-                              $LongTermRelationsReferences(
-                                db,
-                                table,
-                                p0,
-                              ).dailyChoicePathStepsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.longTermRelationId == item.id,
-                              ),
-                          typedResults: items,
-                        ),
-                    ];
+                    return [];
                   },
                 );
               },
@@ -9783,89 +11548,51 @@ typedef $LongTermRelationsProcessedTableManager =
       $LongTermRelationsUpdateCompanionBuilder,
       (LongTermRelation, $LongTermRelationsReferences),
       LongTermRelation,
-      PrefetchHooks Function({
-        bool sourceIntentionId,
-        bool relatedIntentionId,
-        bool dailyChoicePathStepsRefs,
-      })
+      PrefetchHooks Function({bool sourceIntentionId, bool relatedIntentionId})
     >;
-typedef $DailyChoicesCreateCompanionBuilder = DailyChoicesCompanion Function({
+typedef $ActionsCreateCompanionBuilder = ActionsCompanion Function({
   Value<int> creationSequence,
   required String id,
-  required String sourceIntentionId,
-  required String selectedIntentionId,
-  required String choiceDate,
+  required String title,
   Value<String?> description,
+  required String date,
+  Value<int?> scheduledHour,
+  required int priority,
   required bool isCompleted,
-  Value<int?> scheduledMinute,
-  Value<int> priority,
+  required int createdAt,
+  required int updatedAt,
 });
-typedef $DailyChoicesUpdateCompanionBuilder = DailyChoicesCompanion Function({
+typedef $ActionsUpdateCompanionBuilder = ActionsCompanion Function({
   Value<int> creationSequence,
   Value<String> id,
-  Value<String> sourceIntentionId,
-  Value<String> selectedIntentionId,
-  Value<String> choiceDate,
+  Value<String> title,
   Value<String?> description,
-  Value<bool> isCompleted,
-  Value<int?> scheduledMinute,
+  Value<String> date,
+  Value<int?> scheduledHour,
   Value<int> priority,
+  Value<bool> isCompleted,
+  Value<int> createdAt,
+  Value<int> updatedAt,
 });
 
-final class $DailyChoicesReferences
-    extends BaseReferences<_$AppDatabase, DailyChoices, DailyChoice> {
-  $DailyChoicesReferences(super.$_db, super.$_table, super.$_typedResult);
+final class $ActionsReferences
+    extends BaseReferences<_$AppDatabase, Actions, Action> {
+  $ActionsReferences(super.$_db, super.$_table, super.$_typedResult);
 
-  static Intentions _sourceIntentionIdTable(_$AppDatabase db) => db.intentions
-      .createAlias('daily_choices__source_intention_id__intentions__id');
+  static MultiTypedResultKey<ActionPathItems, List<ActionPathItem>>
+  _actionPathItemsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.actionPathItems,
+    aliasName: 'actions__id__action_path_items__action_id',
+  );
 
-  $IntentionsProcessedTableManager get sourceIntentionId {
-    final $_column = $_itemColumn<String>('source_intention_id')!;
-
-    final manager = $IntentionsTableManager(
+  $ActionPathItemsProcessedTableManager get actionPathItemsRefs {
+    final manager = $ActionPathItemsTableManager(
       $_db,
-      $_db.intentions,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_sourceIntentionIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-
-  static Intentions _selectedIntentionIdTable(_$AppDatabase db) => db.intentions
-      .createAlias('daily_choices__selected_intention_id__intentions__id');
-
-  $IntentionsProcessedTableManager get selectedIntentionId {
-    final $_column = $_itemColumn<String>('selected_intention_id')!;
-
-    final manager = $IntentionsTableManager(
-      $_db,
-      $_db.intentions,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_selectedIntentionIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-
-  static MultiTypedResultKey<DailyChoicePathSteps, List<DailyChoicePathStep>>
-  _dailyChoicePathStepsRefsTable(_$AppDatabase db) =>
-      MultiTypedResultKey.fromTable(
-        db.dailyChoicePathSteps,
-        aliasName:
-            'daily_choices__id__daily_choice_path_steps__daily_choice_id',
-      );
-
-  $DailyChoicePathStepsProcessedTableManager get dailyChoicePathStepsRefs {
-    final manager = $DailyChoicePathStepsTableManager(
-      $_db,
-      $_db.dailyChoicePathSteps,
-    ).filter((f) => f.dailyChoiceId.id.sqlEquals($_itemColumn<String>('id')!));
+      $_db.actionPathItems,
+    ).filter((f) => f.actionId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(
-      _dailyChoicePathStepsRefsTable($_db),
+      _actionPathItemsRefsTable($_db),
     );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
@@ -9873,9 +11600,8 @@ final class $DailyChoicesReferences
   }
 }
 
-class $DailyChoicesFilterComposer
-    extends Composer<_$AppDatabase, DailyChoices> {
-  $DailyChoicesFilterComposer({
+class $ActionsFilterComposer extends Composer<_$AppDatabase, Actions> {
+  $ActionsFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -9892,8 +11618,8 @@ class $DailyChoicesFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get choiceDate => $composableBuilder(
-    column: $table.choiceDate,
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9902,13 +11628,13 @@ class $DailyChoicesFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<bool> get isCompleted => $composableBuilder(
-    column: $table.isCompleted,
+  ColumnFilters<String> get date => $composableBuilder(
+    column: $table.date,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get scheduledMinute => $composableBuilder(
-    column: $table.scheduledMinute,
+  ColumnFilters<int> get scheduledHour => $composableBuilder(
+    column: $table.scheduledHour,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9917,68 +11643,37 @@ class $DailyChoicesFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  $IntentionsFilterComposer get sourceIntentionId {
-    final $IntentionsFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.sourceIntentionId,
-      referencedTable: $db.intentions,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $IntentionsFilterComposer(
-            $db: $db,
-            $table: $db.intentions,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
+  ColumnFilters<bool> get isCompleted => $composableBuilder(
+    column: $table.isCompleted,
+    builder: (column) => ColumnFilters(column),
+  );
 
-  $IntentionsFilterComposer get selectedIntentionId {
-    final $IntentionsFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.selectedIntentionId,
-      referencedTable: $db.intentions,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $IntentionsFilterComposer(
-            $db: $db,
-            $table: $db.intentions,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
 
-  Expression<bool> dailyChoicePathStepsRefs(
-    Expression<bool> Function($DailyChoicePathStepsFilterComposer f) f,
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> actionPathItemsRefs(
+    Expression<bool> Function($ActionPathItemsFilterComposer f) f,
   ) {
-    final $DailyChoicePathStepsFilterComposer composer = $composerBuilder(
+    final $ActionPathItemsFilterComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.id,
-      referencedTable: $db.dailyChoicePathSteps,
-      getReferencedColumn: (t) => t.dailyChoiceId,
+      referencedTable: $db.actionPathItems,
+      getReferencedColumn: (t) => t.actionId,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $DailyChoicePathStepsFilterComposer(
+          }) => $ActionPathItemsFilterComposer(
             $db: $db,
-            $table: $db.dailyChoicePathSteps,
+            $table: $db.actionPathItems,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -9989,9 +11684,8 @@ class $DailyChoicesFilterComposer
   }
 }
 
-class $DailyChoicesOrderingComposer
-    extends Composer<_$AppDatabase, DailyChoices> {
-  $DailyChoicesOrderingComposer({
+class $ActionsOrderingComposer extends Composer<_$AppDatabase, Actions> {
+  $ActionsOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -10008,8 +11702,8 @@ class $DailyChoicesOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get choiceDate => $composableBuilder(
-    column: $table.choiceDate,
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -10018,13 +11712,13 @@ class $DailyChoicesOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<bool> get isCompleted => $composableBuilder(
-    column: $table.isCompleted,
+  ColumnOrderings<String> get date => $composableBuilder(
+    column: $table.date,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get scheduledMinute => $composableBuilder(
-    column: $table.scheduledMinute,
+  ColumnOrderings<int> get scheduledHour => $composableBuilder(
+    column: $table.scheduledHour,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -10033,56 +11727,24 @@ class $DailyChoicesOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  $IntentionsOrderingComposer get sourceIntentionId {
-    final $IntentionsOrderingComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.sourceIntentionId,
-      referencedTable: $db.intentions,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $IntentionsOrderingComposer(
-            $db: $db,
-            $table: $db.intentions,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
+  ColumnOrderings<bool> get isCompleted => $composableBuilder(
+    column: $table.isCompleted,
+    builder: (column) => ColumnOrderings(column),
+  );
 
-  $IntentionsOrderingComposer get selectedIntentionId {
-    final $IntentionsOrderingComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.selectedIntentionId,
-      referencedTable: $db.intentions,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $IntentionsOrderingComposer(
-            $db: $db,
-            $table: $db.intentions,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
-class $DailyChoicesAnnotationComposer
-    extends Composer<_$AppDatabase, DailyChoices> {
-  $DailyChoicesAnnotationComposer({
+class $ActionsAnnotationComposer extends Composer<_$AppDatabase, Actions> {
+  $ActionsAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -10097,91 +11759,52 @@ class $DailyChoicesAnnotationComposer
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumn<String> get choiceDate => $composableBuilder(
-    column: $table.choiceDate,
-    builder: (column) => column,
-  );
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
 
   GeneratedColumn<String> get description => $composableBuilder(
     column: $table.description,
     builder: (column) => column,
   );
 
-  GeneratedColumn<bool> get isCompleted => $composableBuilder(
-    column: $table.isCompleted,
-    builder: (column) => column,
-  );
+  GeneratedColumn<String> get date =>
+      $composableBuilder(column: $table.date, builder: (column) => column);
 
-  GeneratedColumn<int> get scheduledMinute => $composableBuilder(
-    column: $table.scheduledMinute,
+  GeneratedColumn<int> get scheduledHour => $composableBuilder(
+    column: $table.scheduledHour,
     builder: (column) => column,
   );
 
   GeneratedColumn<int> get priority =>
       $composableBuilder(column: $table.priority, builder: (column) => column);
 
-  $IntentionsAnnotationComposer get sourceIntentionId {
-    final $IntentionsAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.sourceIntentionId,
-      referencedTable: $db.intentions,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $IntentionsAnnotationComposer(
-            $db: $db,
-            $table: $db.intentions,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
+  GeneratedColumn<bool> get isCompleted => $composableBuilder(
+    column: $table.isCompleted,
+    builder: (column) => column,
+  );
 
-  $IntentionsAnnotationComposer get selectedIntentionId {
-    final $IntentionsAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.selectedIntentionId,
-      referencedTable: $db.intentions,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $IntentionsAnnotationComposer(
-            $db: $db,
-            $table: $db.intentions,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
-  Expression<T> dailyChoicePathStepsRefs<T extends Object>(
-    Expression<T> Function($DailyChoicePathStepsAnnotationComposer a) f,
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  Expression<T> actionPathItemsRefs<T extends Object>(
+    Expression<T> Function($ActionPathItemsAnnotationComposer a) f,
   ) {
-    final $DailyChoicePathStepsAnnotationComposer composer = $composerBuilder(
+    final $ActionPathItemsAnnotationComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.id,
-      referencedTable: $db.dailyChoicePathSteps,
-      getReferencedColumn: (t) => t.dailyChoiceId,
+      referencedTable: $db.actionPathItems,
+      getReferencedColumn: (t) => t.actionId,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $DailyChoicePathStepsAnnotationComposer(
+          }) => $ActionPathItemsAnnotationComposer(
             $db: $db,
-            $table: $db.dailyChoicePathSteps,
+            $table: $db.actionPathItems,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -10192,250 +11815,167 @@ class $DailyChoicesAnnotationComposer
   }
 }
 
-class $DailyChoicesTableManager
+class $ActionsTableManager
     extends
         RootTableManager<
           _$AppDatabase,
-          DailyChoices,
-          DailyChoice,
-          $DailyChoicesFilterComposer,
-          $DailyChoicesOrderingComposer,
-          $DailyChoicesAnnotationComposer,
-          $DailyChoicesCreateCompanionBuilder,
-          $DailyChoicesUpdateCompanionBuilder,
-          (DailyChoice, $DailyChoicesReferences),
-          DailyChoice,
-          PrefetchHooks Function({
-            bool sourceIntentionId,
-            bool selectedIntentionId,
-            bool dailyChoicePathStepsRefs,
-          })
+          Actions,
+          Action,
+          $ActionsFilterComposer,
+          $ActionsOrderingComposer,
+          $ActionsAnnotationComposer,
+          $ActionsCreateCompanionBuilder,
+          $ActionsUpdateCompanionBuilder,
+          (Action, $ActionsReferences),
+          Action,
+          PrefetchHooks Function({bool actionPathItemsRefs})
         > {
-  $DailyChoicesTableManager(_$AppDatabase db, DailyChoices table)
+  $ActionsTableManager(_$AppDatabase db, Actions table)
     : super(
         TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
-              $DailyChoicesFilterComposer($db: db, $table: table),
+              $ActionsFilterComposer($db: db, $table: table),
           createOrderingComposer: () =>
-              $DailyChoicesOrderingComposer($db: db, $table: table),
+              $ActionsOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
-              $DailyChoicesAnnotationComposer($db: db, $table: table),
+              $ActionsAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
                 Value<int> creationSequence = const Value.absent(),
                 Value<String> id = const Value.absent(),
-                Value<String> sourceIntentionId = const Value.absent(),
-                Value<String> selectedIntentionId = const Value.absent(),
-                Value<String> choiceDate = const Value.absent(),
+                Value<String> title = const Value.absent(),
                 Value<String?> description = const Value.absent(),
-                Value<bool> isCompleted = const Value.absent(),
-                Value<int?> scheduledMinute = const Value.absent(),
+                Value<String> date = const Value.absent(),
+                Value<int?> scheduledHour = const Value.absent(),
                 Value<int> priority = const Value.absent(),
-              }) => DailyChoicesCompanion(
+                Value<bool> isCompleted = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+              }) => ActionsCompanion(
                 creationSequence: creationSequence,
                 id: id,
-                sourceIntentionId: sourceIntentionId,
-                selectedIntentionId: selectedIntentionId,
-                choiceDate: choiceDate,
+                title: title,
                 description: description,
-                isCompleted: isCompleted,
-                scheduledMinute: scheduledMinute,
+                date: date,
+                scheduledHour: scheduledHour,
                 priority: priority,
+                isCompleted: isCompleted,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
               ),
           createCompanionCallback:
               ({
                 Value<int> creationSequence = const Value.absent(),
                 required String id,
-                required String sourceIntentionId,
-                required String selectedIntentionId,
-                required String choiceDate,
+                required String title,
                 Value<String?> description = const Value.absent(),
+                required String date,
+                Value<int?> scheduledHour = const Value.absent(),
+                required int priority,
                 required bool isCompleted,
-                Value<int?> scheduledMinute = const Value.absent(),
-                Value<int> priority = const Value.absent(),
-              }) => DailyChoicesCompanion.insert(
+                required int createdAt,
+                required int updatedAt,
+              }) => ActionsCompanion.insert(
                 creationSequence: creationSequence,
                 id: id,
-                sourceIntentionId: sourceIntentionId,
-                selectedIntentionId: selectedIntentionId,
-                choiceDate: choiceDate,
+                title: title,
                 description: description,
-                isCompleted: isCompleted,
-                scheduledMinute: scheduledMinute,
+                date: date,
+                scheduledHour: scheduledHour,
                 priority: priority,
+                isCompleted: isCompleted,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
               ),
           withReferenceMapper: (p0) => p0
               .map(
-                (e) =>
-                    (e.readTable(table), $DailyChoicesReferences(db, table, e)),
+                (e) => (e.readTable(table), $ActionsReferences(db, table, e)),
               )
               .toList(),
-          prefetchHooksCallback:
-              ({
-                sourceIntentionId = false,
-                selectedIntentionId = false,
-                dailyChoicePathStepsRefs = false,
-              }) {
-                return PrefetchHooks(
-                  db: db,
-                  explicitlyWatchedTables: [
-                    if (dailyChoicePathStepsRefs) db.dailyChoicePathSteps,
-                  ],
-                  addJoins:
-                      <
-                        T extends TableManagerState<
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic
-                        >
-                      >(state) {
-                        if (sourceIntentionId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.sourceIntentionId,
-                            referencedTable: $DailyChoicesReferences
-                                ._sourceIntentionIdTable(db),
-                            referencedColumn: $DailyChoicesReferences
-                                ._sourceIntentionIdTable(db)
-                                .id,
-                          ) as T;
-                        }
-                        if (selectedIntentionId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.selectedIntentionId,
-                            referencedTable: $DailyChoicesReferences
-                                ._selectedIntentionIdTable(db),
-                            referencedColumn: $DailyChoicesReferences
-                                ._selectedIntentionIdTable(db)
-                                .id,
-                          ) as T;
-                        }
-
-                        return state;
-                      },
-                  getPrefetchedDataCallback: (items) async {
-                    return [
-                      if (dailyChoicePathStepsRefs)
-                        await $_getPrefetchedData<
-                          DailyChoice,
-                          DailyChoices,
-                          DailyChoicePathStep
-                        >(
-                          currentTable: table,
-                          referencedTable: $DailyChoicesReferences
-                              ._dailyChoicePathStepsRefsTable(db),
-                          managerFromTypedResult: (p0) =>
-                              $DailyChoicesReferences(
-                                db,
-                                table,
-                                p0,
-                              ).dailyChoicePathStepsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.dailyChoiceId == item.id,
-                              ),
-                          typedResults: items,
-                        ),
-                    ];
-                  },
-                );
+          prefetchHooksCallback: ({actionPathItemsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (actionPathItemsRefs) db.actionPathItems,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (actionPathItemsRefs)
+                    await $_getPrefetchedData<Action, Actions, ActionPathItem>(
+                      currentTable: table,
+                      referencedTable: $ActionsReferences
+                          ._actionPathItemsRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $ActionsReferences(db, table, p0).actionPathItemsRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.actionId == item.id),
+                      typedResults: items,
+                    ),
+                ];
               },
+            );
+          },
         ),
       );
 }
 
-typedef $DailyChoicesProcessedTableManager =
+typedef $ActionsProcessedTableManager =
     ProcessedTableManager<
       _$AppDatabase,
-      DailyChoices,
-      DailyChoice,
-      $DailyChoicesFilterComposer,
-      $DailyChoicesOrderingComposer,
-      $DailyChoicesAnnotationComposer,
-      $DailyChoicesCreateCompanionBuilder,
-      $DailyChoicesUpdateCompanionBuilder,
-      (DailyChoice, $DailyChoicesReferences),
-      DailyChoice,
-      PrefetchHooks Function({
-        bool sourceIntentionId,
-        bool selectedIntentionId,
-        bool dailyChoicePathStepsRefs,
-      })
+      Actions,
+      Action,
+      $ActionsFilterComposer,
+      $ActionsOrderingComposer,
+      $ActionsAnnotationComposer,
+      $ActionsCreateCompanionBuilder,
+      $ActionsUpdateCompanionBuilder,
+      (Action, $ActionsReferences),
+      Action,
+      PrefetchHooks Function({bool actionPathItemsRefs})
     >;
-typedef $DailyChoicePathStepsCreateCompanionBuilder =
-    DailyChoicePathStepsCompanion Function({
-      required String id,
-      required String dailyChoiceId,
-      required String longTermRelationId,
-      Value<String?> previousStepId,
+typedef $ActionPathItemsCreateCompanionBuilder =
+    ActionPathItemsCompanion Function({
+      required String actionId,
+      required int position,
+      required String intentionId,
+      Value<String?> previousIntentionId,
+      required String role,
+      required String orderDate,
+      required int orderHour,
+      required int orderSequence,
       Value<int> rowid,
     });
-typedef $DailyChoicePathStepsUpdateCompanionBuilder =
-    DailyChoicePathStepsCompanion Function({
-      Value<String> id,
-      Value<String> dailyChoiceId,
-      Value<String> longTermRelationId,
-      Value<String?> previousStepId,
+typedef $ActionPathItemsUpdateCompanionBuilder =
+    ActionPathItemsCompanion Function({
+      Value<String> actionId,
+      Value<int> position,
+      Value<String> intentionId,
+      Value<String?> previousIntentionId,
+      Value<String> role,
+      Value<String> orderDate,
+      Value<int> orderHour,
+      Value<int> orderSequence,
       Value<int> rowid,
     });
 
-final class $DailyChoicePathStepsReferences
-    extends
-        BaseReferences<
-          _$AppDatabase,
-          DailyChoicePathSteps,
-          DailyChoicePathStep
-        > {
-  $DailyChoicePathStepsReferences(
-    super.$_db,
-    super.$_table,
-    super.$_typedResult,
-  );
+final class $ActionPathItemsReferences
+    extends BaseReferences<_$AppDatabase, ActionPathItems, ActionPathItem> {
+  $ActionPathItemsReferences(super.$_db, super.$_table, super.$_typedResult);
 
-  static DailyChoices _dailyChoiceIdTable(_$AppDatabase db) =>
-      db.dailyChoices.createAlias(
-        'daily_choice_path_steps__daily_choice_id__daily_choices__id',
-      );
+  static Actions _actionIdTable(_$AppDatabase db) =>
+      db.actions.createAlias('action_path_items__action_id__actions__id');
 
-  $DailyChoicesProcessedTableManager get dailyChoiceId {
-    final $_column = $_itemColumn<String>('daily_choice_id')!;
+  $ActionsProcessedTableManager get actionId {
+    final $_column = $_itemColumn<String>('action_id')!;
 
-    final manager = $DailyChoicesTableManager(
+    final manager = $ActionsTableManager(
       $_db,
-      $_db.dailyChoices,
+      $_db.actions,
     ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_dailyChoiceIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-
-  static LongTermRelations _longTermRelationIdTable(
-    _$AppDatabase db,
-  ) => db.longTermRelations.createAlias(
-    'daily_choice_path_steps__long_term_relation_id__long_term_relations__id',
-  );
-
-  $LongTermRelationsProcessedTableManager get longTermRelationId {
-    final $_column = $_itemColumn<String>('long_term_relation_id')!;
-
-    final manager = $LongTermRelationsTableManager(
-      $_db,
-      $_db.longTermRelations,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_longTermRelationIdTable($_db));
+    final item = $_typedResult.readTableOrNull(_actionIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
@@ -10443,62 +11983,64 @@ final class $DailyChoicePathStepsReferences
   }
 }
 
-class $DailyChoicePathStepsFilterComposer
-    extends Composer<_$AppDatabase, DailyChoicePathSteps> {
-  $DailyChoicePathStepsFilterComposer({
+class $ActionPathItemsFilterComposer
+    extends Composer<_$AppDatabase, ActionPathItems> {
+  $ActionPathItemsFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
+  ColumnFilters<int> get position => $composableBuilder(
+    column: $table.position,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get previousStepId => $composableBuilder(
-    column: $table.previousStepId,
+  ColumnFilters<String> get intentionId => $composableBuilder(
+    column: $table.intentionId,
     builder: (column) => ColumnFilters(column),
   );
 
-  $DailyChoicesFilterComposer get dailyChoiceId {
-    final $DailyChoicesFilterComposer composer = $composerBuilder(
+  ColumnFilters<String> get previousIntentionId => $composableBuilder(
+    column: $table.previousIntentionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get role => $composableBuilder(
+    column: $table.role,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get orderDate => $composableBuilder(
+    column: $table.orderDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get orderHour => $composableBuilder(
+    column: $table.orderHour,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get orderSequence => $composableBuilder(
+    column: $table.orderSequence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $ActionsFilterComposer get actionId {
+    final $ActionsFilterComposer composer = $composerBuilder(
       composer: this,
-      getCurrentColumn: (t) => t.dailyChoiceId,
-      referencedTable: $db.dailyChoices,
+      getCurrentColumn: (t) => t.actionId,
+      referencedTable: $db.actions,
       getReferencedColumn: (t) => t.id,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $DailyChoicesFilterComposer(
+          }) => $ActionsFilterComposer(
             $db: $db,
-            $table: $db.dailyChoices,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  $LongTermRelationsFilterComposer get longTermRelationId {
-    final $LongTermRelationsFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.longTermRelationId,
-      referencedTable: $db.longTermRelations,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $LongTermRelationsFilterComposer(
-            $db: $db,
-            $table: $db.longTermRelations,
+            $table: $db.actions,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -10509,62 +12051,64 @@ class $DailyChoicePathStepsFilterComposer
   }
 }
 
-class $DailyChoicePathStepsOrderingComposer
-    extends Composer<_$AppDatabase, DailyChoicePathSteps> {
-  $DailyChoicePathStepsOrderingComposer({
+class $ActionPathItemsOrderingComposer
+    extends Composer<_$AppDatabase, ActionPathItems> {
+  $ActionPathItemsOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
+  ColumnOrderings<int> get position => $composableBuilder(
+    column: $table.position,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get previousStepId => $composableBuilder(
-    column: $table.previousStepId,
+  ColumnOrderings<String> get intentionId => $composableBuilder(
+    column: $table.intentionId,
     builder: (column) => ColumnOrderings(column),
   );
 
-  $DailyChoicesOrderingComposer get dailyChoiceId {
-    final $DailyChoicesOrderingComposer composer = $composerBuilder(
+  ColumnOrderings<String> get previousIntentionId => $composableBuilder(
+    column: $table.previousIntentionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get role => $composableBuilder(
+    column: $table.role,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get orderDate => $composableBuilder(
+    column: $table.orderDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get orderHour => $composableBuilder(
+    column: $table.orderHour,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get orderSequence => $composableBuilder(
+    column: $table.orderSequence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $ActionsOrderingComposer get actionId {
+    final $ActionsOrderingComposer composer = $composerBuilder(
       composer: this,
-      getCurrentColumn: (t) => t.dailyChoiceId,
-      referencedTable: $db.dailyChoices,
+      getCurrentColumn: (t) => t.actionId,
+      referencedTable: $db.actions,
       getReferencedColumn: (t) => t.id,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $DailyChoicesOrderingComposer(
+          }) => $ActionsOrderingComposer(
             $db: $db,
-            $table: $db.dailyChoices,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  $LongTermRelationsOrderingComposer get longTermRelationId {
-    final $LongTermRelationsOrderingComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.longTermRelationId,
-      referencedTable: $db.longTermRelations,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $LongTermRelationsOrderingComposer(
-            $db: $db,
-            $table: $db.longTermRelations,
+            $table: $db.actions,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -10575,60 +12119,56 @@ class $DailyChoicePathStepsOrderingComposer
   }
 }
 
-class $DailyChoicePathStepsAnnotationComposer
-    extends Composer<_$AppDatabase, DailyChoicePathSteps> {
-  $DailyChoicePathStepsAnnotationComposer({
+class $ActionPathItemsAnnotationComposer
+    extends Composer<_$AppDatabase, ActionPathItems> {
+  $ActionPathItemsAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  GeneratedColumn<String> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
+  GeneratedColumn<int> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
 
-  GeneratedColumn<String> get previousStepId => $composableBuilder(
-    column: $table.previousStepId,
+  GeneratedColumn<String> get intentionId => $composableBuilder(
+    column: $table.intentionId,
     builder: (column) => column,
   );
 
-  $DailyChoicesAnnotationComposer get dailyChoiceId {
-    final $DailyChoicesAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.dailyChoiceId,
-      referencedTable: $db.dailyChoices,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $DailyChoicesAnnotationComposer(
-            $db: $db,
-            $table: $db.dailyChoices,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
+  GeneratedColumn<String> get previousIntentionId => $composableBuilder(
+    column: $table.previousIntentionId,
+    builder: (column) => column,
+  );
 
-  $LongTermRelationsAnnotationComposer get longTermRelationId {
-    final $LongTermRelationsAnnotationComposer composer = $composerBuilder(
+  GeneratedColumn<String> get role =>
+      $composableBuilder(column: $table.role, builder: (column) => column);
+
+  GeneratedColumn<String> get orderDate =>
+      $composableBuilder(column: $table.orderDate, builder: (column) => column);
+
+  GeneratedColumn<int> get orderHour =>
+      $composableBuilder(column: $table.orderHour, builder: (column) => column);
+
+  GeneratedColumn<int> get orderSequence => $composableBuilder(
+    column: $table.orderSequence,
+    builder: (column) => column,
+  );
+
+  $ActionsAnnotationComposer get actionId {
+    final $ActionsAnnotationComposer composer = $composerBuilder(
       composer: this,
-      getCurrentColumn: (t) => t.longTermRelationId,
-      referencedTable: $db.longTermRelations,
+      getCurrentColumn: (t) => t.actionId,
+      referencedTable: $db.actions,
       getReferencedColumn: (t) => t.id,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $LongTermRelationsAnnotationComposer(
+          }) => $ActionsAnnotationComposer(
             $db: $db,
-            $table: $db.longTermRelations,
+            $table: $db.actions,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -10639,138 +12179,461 @@ class $DailyChoicePathStepsAnnotationComposer
   }
 }
 
-class $DailyChoicePathStepsTableManager
+class $ActionPathItemsTableManager
     extends
         RootTableManager<
           _$AppDatabase,
-          DailyChoicePathSteps,
-          DailyChoicePathStep,
-          $DailyChoicePathStepsFilterComposer,
-          $DailyChoicePathStepsOrderingComposer,
-          $DailyChoicePathStepsAnnotationComposer,
-          $DailyChoicePathStepsCreateCompanionBuilder,
-          $DailyChoicePathStepsUpdateCompanionBuilder,
-          (DailyChoicePathStep, $DailyChoicePathStepsReferences),
-          DailyChoicePathStep,
-          PrefetchHooks Function({bool dailyChoiceId, bool longTermRelationId})
+          ActionPathItems,
+          ActionPathItem,
+          $ActionPathItemsFilterComposer,
+          $ActionPathItemsOrderingComposer,
+          $ActionPathItemsAnnotationComposer,
+          $ActionPathItemsCreateCompanionBuilder,
+          $ActionPathItemsUpdateCompanionBuilder,
+          (ActionPathItem, $ActionPathItemsReferences),
+          ActionPathItem,
+          PrefetchHooks Function({bool actionId})
         > {
-  $DailyChoicePathStepsTableManager(
-    _$AppDatabase db,
-    DailyChoicePathSteps table,
-  ) : super(
+  $ActionPathItemsTableManager(_$AppDatabase db, ActionPathItems table)
+    : super(
         TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
-              $DailyChoicePathStepsFilterComposer($db: db, $table: table),
+              $ActionPathItemsFilterComposer($db: db, $table: table),
           createOrderingComposer: () =>
-              $DailyChoicePathStepsOrderingComposer($db: db, $table: table),
+              $ActionPathItemsOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
-              $DailyChoicePathStepsAnnotationComposer($db: db, $table: table),
+              $ActionPathItemsAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
-                Value<String> id = const Value.absent(),
-                Value<String> dailyChoiceId = const Value.absent(),
-                Value<String> longTermRelationId = const Value.absent(),
-                Value<String?> previousStepId = const Value.absent(),
+                Value<String> actionId = const Value.absent(),
+                Value<int> position = const Value.absent(),
+                Value<String> intentionId = const Value.absent(),
+                Value<String?> previousIntentionId = const Value.absent(),
+                Value<String> role = const Value.absent(),
+                Value<String> orderDate = const Value.absent(),
+                Value<int> orderHour = const Value.absent(),
+                Value<int> orderSequence = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
-              }) => DailyChoicePathStepsCompanion(
-                id: id,
-                dailyChoiceId: dailyChoiceId,
-                longTermRelationId: longTermRelationId,
-                previousStepId: previousStepId,
+              }) => ActionPathItemsCompanion(
+                actionId: actionId,
+                position: position,
+                intentionId: intentionId,
+                previousIntentionId: previousIntentionId,
+                role: role,
+                orderDate: orderDate,
+                orderHour: orderHour,
+                orderSequence: orderSequence,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
-                required String id,
-                required String dailyChoiceId,
-                required String longTermRelationId,
-                Value<String?> previousStepId = const Value.absent(),
+                required String actionId,
+                required int position,
+                required String intentionId,
+                Value<String?> previousIntentionId = const Value.absent(),
+                required String role,
+                required String orderDate,
+                required int orderHour,
+                required int orderSequence,
                 Value<int> rowid = const Value.absent(),
-              }) => DailyChoicePathStepsCompanion.insert(
-                id: id,
-                dailyChoiceId: dailyChoiceId,
-                longTermRelationId: longTermRelationId,
-                previousStepId: previousStepId,
+              }) => ActionPathItemsCompanion.insert(
+                actionId: actionId,
+                position: position,
+                intentionId: intentionId,
+                previousIntentionId: previousIntentionId,
+                role: role,
+                orderDate: orderDate,
+                orderHour: orderHour,
+                orderSequence: orderSequence,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
                   e.readTable(table),
-                  $DailyChoicePathStepsReferences(db, table, e),
+                  $ActionPathItemsReferences(db, table, e),
                 ),
               )
               .toList(),
-          prefetchHooksCallback:
-              ({dailyChoiceId = false, longTermRelationId = false}) {
-                return PrefetchHooks(
-                  db: db,
-                  explicitlyWatchedTables: [],
-                  addJoins:
-                      <
-                        T extends TableManagerState<
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic
-                        >
-                      >(state) {
-                        if (dailyChoiceId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.dailyChoiceId,
-                            referencedTable: $DailyChoicePathStepsReferences
-                                ._dailyChoiceIdTable(db),
-                            referencedColumn: $DailyChoicePathStepsReferences
-                                ._dailyChoiceIdTable(db)
-                                .id,
-                          ) as T;
-                        }
-                        if (longTermRelationId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.longTermRelationId,
-                            referencedTable: $DailyChoicePathStepsReferences
-                                ._longTermRelationIdTable(db),
-                            referencedColumn: $DailyChoicePathStepsReferences
-                                ._longTermRelationIdTable(db)
-                                .id,
-                          ) as T;
-                        }
+          prefetchHooksCallback: ({actionId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (actionId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.actionId,
+                        referencedTable: $ActionPathItemsReferences
+                            ._actionIdTable(db),
+                        referencedColumn: $ActionPathItemsReferences
+                            ._actionIdTable(db)
+                            .id,
+                      ) as T;
+                    }
 
-                        return state;
-                      },
-                  getPrefetchedDataCallback: (items) async {
-                    return [];
+                    return state;
                   },
-                );
+              getPrefetchedDataCallback: (items) async {
+                return [];
               },
+            );
+          },
         ),
       );
 }
 
-typedef $DailyChoicePathStepsProcessedTableManager =
+typedef $ActionPathItemsProcessedTableManager =
     ProcessedTableManager<
       _$AppDatabase,
-      DailyChoicePathSteps,
-      DailyChoicePathStep,
-      $DailyChoicePathStepsFilterComposer,
-      $DailyChoicePathStepsOrderingComposer,
-      $DailyChoicePathStepsAnnotationComposer,
-      $DailyChoicePathStepsCreateCompanionBuilder,
-      $DailyChoicePathStepsUpdateCompanionBuilder,
-      (DailyChoicePathStep, $DailyChoicePathStepsReferences),
-      DailyChoicePathStep,
-      PrefetchHooks Function({bool dailyChoiceId, bool longTermRelationId})
+      ActionPathItems,
+      ActionPathItem,
+      $ActionPathItemsFilterComposer,
+      $ActionPathItemsOrderingComposer,
+      $ActionPathItemsAnnotationComposer,
+      $ActionPathItemsCreateCompanionBuilder,
+      $ActionPathItemsUpdateCompanionBuilder,
+      (ActionPathItem, $ActionPathItemsReferences),
+      ActionPathItem,
+      PrefetchHooks Function({bool actionId})
+    >;
+typedef $DeletedIntentionsCreateCompanionBuilder =
+    DeletedIntentionsCompanion Function({
+      required String intentionId,
+      required String title,
+      Value<int> rowid,
+    });
+typedef $DeletedIntentionsUpdateCompanionBuilder =
+    DeletedIntentionsCompanion Function({
+      Value<String> intentionId,
+      Value<String> title,
+      Value<int> rowid,
+    });
+
+class $DeletedIntentionsFilterComposer
+    extends Composer<_$AppDatabase, DeletedIntentions> {
+  $DeletedIntentionsFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get intentionId => $composableBuilder(
+    column: $table.intentionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $DeletedIntentionsOrderingComposer
+    extends Composer<_$AppDatabase, DeletedIntentions> {
+  $DeletedIntentionsOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get intentionId => $composableBuilder(
+    column: $table.intentionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $DeletedIntentionsAnnotationComposer
+    extends Composer<_$AppDatabase, DeletedIntentions> {
+  $DeletedIntentionsAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get intentionId => $composableBuilder(
+    column: $table.intentionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+}
+
+class $DeletedIntentionsTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          DeletedIntentions,
+          DeletedIntention,
+          $DeletedIntentionsFilterComposer,
+          $DeletedIntentionsOrderingComposer,
+          $DeletedIntentionsAnnotationComposer,
+          $DeletedIntentionsCreateCompanionBuilder,
+          $DeletedIntentionsUpdateCompanionBuilder,
+          (
+            DeletedIntention,
+            BaseReferences<_$AppDatabase, DeletedIntentions, DeletedIntention>,
+          ),
+          DeletedIntention,
+          PrefetchHooks Function()
+        > {
+  $DeletedIntentionsTableManager(_$AppDatabase db, DeletedIntentions table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $DeletedIntentionsFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $DeletedIntentionsOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $DeletedIntentionsAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> intentionId = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DeletedIntentionsCompanion(
+                intentionId: intentionId,
+                title: title,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String intentionId,
+                required String title,
+                Value<int> rowid = const Value.absent(),
+              }) => DeletedIntentionsCompanion.insert(
+                intentionId: intentionId,
+                title: title,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $DeletedIntentionsProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      DeletedIntentions,
+      DeletedIntention,
+      $DeletedIntentionsFilterComposer,
+      $DeletedIntentionsOrderingComposer,
+      $DeletedIntentionsAnnotationComposer,
+      $DeletedIntentionsCreateCompanionBuilder,
+      $DeletedIntentionsUpdateCompanionBuilder,
+      (
+        DeletedIntention,
+        BaseReferences<_$AppDatabase, DeletedIntentions, DeletedIntention>,
+      ),
+      DeletedIntention,
+      PrefetchHooks Function()
+    >;
+typedef $DeletedRelationPairsCreateCompanionBuilder =
+    DeletedRelationPairsCompanion Function({
+      required String sourceIntentionId,
+      required String relatedIntentionId,
+      required String type,
+      Value<int> rowid,
+    });
+typedef $DeletedRelationPairsUpdateCompanionBuilder =
+    DeletedRelationPairsCompanion Function({
+      Value<String> sourceIntentionId,
+      Value<String> relatedIntentionId,
+      Value<String> type,
+      Value<int> rowid,
+    });
+
+class $DeletedRelationPairsFilterComposer
+    extends Composer<_$AppDatabase, DeletedRelationPairs> {
+  $DeletedRelationPairsFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get sourceIntentionId => $composableBuilder(
+    column: $table.sourceIntentionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get relatedIntentionId => $composableBuilder(
+    column: $table.relatedIntentionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $DeletedRelationPairsOrderingComposer
+    extends Composer<_$AppDatabase, DeletedRelationPairs> {
+  $DeletedRelationPairsOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get sourceIntentionId => $composableBuilder(
+    column: $table.sourceIntentionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get relatedIntentionId => $composableBuilder(
+    column: $table.relatedIntentionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $DeletedRelationPairsAnnotationComposer
+    extends Composer<_$AppDatabase, DeletedRelationPairs> {
+  $DeletedRelationPairsAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get sourceIntentionId => $composableBuilder(
+    column: $table.sourceIntentionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get relatedIntentionId => $composableBuilder(
+    column: $table.relatedIntentionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+}
+
+class $DeletedRelationPairsTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          DeletedRelationPairs,
+          DeletedRelationPair,
+          $DeletedRelationPairsFilterComposer,
+          $DeletedRelationPairsOrderingComposer,
+          $DeletedRelationPairsAnnotationComposer,
+          $DeletedRelationPairsCreateCompanionBuilder,
+          $DeletedRelationPairsUpdateCompanionBuilder,
+          (
+            DeletedRelationPair,
+            BaseReferences<
+              _$AppDatabase,
+              DeletedRelationPairs,
+              DeletedRelationPair
+            >,
+          ),
+          DeletedRelationPair,
+          PrefetchHooks Function()
+        > {
+  $DeletedRelationPairsTableManager(
+    _$AppDatabase db,
+    DeletedRelationPairs table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $DeletedRelationPairsFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $DeletedRelationPairsOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $DeletedRelationPairsAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> sourceIntentionId = const Value.absent(),
+                Value<String> relatedIntentionId = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DeletedRelationPairsCompanion(
+                sourceIntentionId: sourceIntentionId,
+                relatedIntentionId: relatedIntentionId,
+                type: type,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String sourceIntentionId,
+                required String relatedIntentionId,
+                required String type,
+                Value<int> rowid = const Value.absent(),
+              }) => DeletedRelationPairsCompanion.insert(
+                sourceIntentionId: sourceIntentionId,
+                relatedIntentionId: relatedIntentionId,
+                type: type,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $DeletedRelationPairsProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      DeletedRelationPairs,
+      DeletedRelationPair,
+      $DeletedRelationPairsFilterComposer,
+      $DeletedRelationPairsOrderingComposer,
+      $DeletedRelationPairsAnnotationComposer,
+      $DeletedRelationPairsCreateCompanionBuilder,
+      $DeletedRelationPairsUpdateCompanionBuilder,
+      (
+        DeletedRelationPair,
+        BaseReferences<
+          _$AppDatabase,
+          DeletedRelationPairs,
+          DeletedRelationPair
+        >,
+      ),
+      DeletedRelationPair,
+      PrefetchHooks Function()
     >;
 typedef $IntentionTitlesFtsCreateCompanionBuilder =
     IntentionTitlesFtsCompanion Function({
@@ -10923,8 +12786,20 @@ class $AppDatabaseManager {
         _db,
         _db.graphLogLongTermRelationMarks,
       );
-  $GraphLogDailyChoiceMarksTableManager get graphLogDailyChoiceMarks =>
-      $GraphLogDailyChoiceMarksTableManager(_db, _db.graphLogDailyChoiceMarks);
+  $GraphLogActionMarksTableManager get graphLogActionMarks =>
+      $GraphLogActionMarksTableManager(_db, _db.graphLogActionMarks);
+  $GraphLogDeletedIntentionMarksTableManager
+  get graphLogDeletedIntentionMarks =>
+      $GraphLogDeletedIntentionMarksTableManager(
+        _db,
+        _db.graphLogDeletedIntentionMarks,
+      );
+  $GraphLogDeletedRelationPairMarksTableManager
+  get graphLogDeletedRelationPairMarks =>
+      $GraphLogDeletedRelationPairMarksTableManager(
+        _db,
+        _db.graphLogDeletedRelationPairMarks,
+      );
   $GraphSnapshotsTableManager get graphSnapshots =>
       $GraphSnapshotsTableManager(_db, _db.graphSnapshots);
   $GraphLogPackagesTableManager get graphLogPackages =>
@@ -10938,10 +12813,13 @@ class $AppDatabaseManager {
       $TagAssignmentsTableManager(_db, _db.tagAssignments);
   $LongTermRelationsTableManager get longTermRelations =>
       $LongTermRelationsTableManager(_db, _db.longTermRelations);
-  $DailyChoicesTableManager get dailyChoices =>
-      $DailyChoicesTableManager(_db, _db.dailyChoices);
-  $DailyChoicePathStepsTableManager get dailyChoicePathSteps =>
-      $DailyChoicePathStepsTableManager(_db, _db.dailyChoicePathSteps);
+  $ActionsTableManager get actions => $ActionsTableManager(_db, _db.actions);
+  $ActionPathItemsTableManager get actionPathItems =>
+      $ActionPathItemsTableManager(_db, _db.actionPathItems);
+  $DeletedIntentionsTableManager get deletedIntentions =>
+      $DeletedIntentionsTableManager(_db, _db.deletedIntentions);
+  $DeletedRelationPairsTableManager get deletedRelationPairs =>
+      $DeletedRelationPairsTableManager(_db, _db.deletedRelationPairs);
   $IntentionTitlesFtsTableManager get intentionTitlesFts =>
       $IntentionTitlesFtsTableManager(_db, _db.intentionTitlesFts);
 }

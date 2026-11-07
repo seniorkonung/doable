@@ -274,7 +274,7 @@ def restore_settings(device, saved):
     print(f"Параметры эмулятора восстановлены: {actual}", flush=True)
 
 
-def catalog_state(device):
+def day_state(device):
     labels = [node.attrib.get("content-desc", "") for node in device.ui()
               if node.attrib.get("package") == PACKAGE]
 
@@ -288,38 +288,45 @@ def catalog_state(device):
     return {
         "date": one(lambda label: re.fullmatch(r"\d{1,2} [^\n]+ \d{4}", label), "Выбранная дата"),
         "month": one(lambda label: re.fullmatch(r"[^\d\n,]+ \d{4}", label), "Месяц просмотра"),
-        "filter": one(lambda label: label.startswith(("Выполнение\n", "Completion\n")), "Фильтр"),
-        "total": one(lambda label: label.startswith(("Всего дневных выборов:", "Total daily choices:")), "Количество"),
     }
 
 
-def catalog_result(device):
-    # На узком экране строка выдачи находится ниже фильтра: читаем её прокруткой.
+def day_result(device):
+    # На узком экране секции и первая строка могут находиться ниже календаря.
+    sections = {}
+    result = None
     for attempt in range(5):
         nodes = device.ui()
-        labels = [node.attrib.get("content-desc", "") for node in nodes]
-        result = next((label for label in labels if label.startswith(("Выбор № 1.", "Choice #1."))
-                       or label in ("Дневных выборов по фильтрам нет.",
-                                    "No daily choices match the filters.")), None)
-        if result is not None and attempt == 0:
-            return result
+        labels = [node.attrib.get("content-desc", "") for node in nodes
+                  if node.attrib.get("package") == PACKAGE]
+        for label in labels:
+            for key, names in (("incomplete", ("Невыполненные", "Not completed")),
+                               ("completed", ("Выполненные", "Completed"))):
+                if any(re.fullmatch(re.escape(name) + r"\s+\d+", label) for name in names):
+                    sections[key] = label
+            if label.startswith(("Действие № 1.", "Action #1.")):
+                result = label
+            elif label in ("Нет действий на эту дату", "No actions for this date"):
+                result = label
+        empty = result in ("Нет действий на эту дату", "No actions for this date")
+        if empty or (result is not None and len(sections) == 2):
+            if attempt:
+                for _ in range(attempt):
+                    device.shell("input", "swipe", x, str(top + 10), x, str(bottom - 10), "100")
+                eventually(lambda: day_state(device), "Не удалось вернуть начало списка")
+            return {"sections": sections, "result": result}
         areas = [node.attrib for node in nodes if node.attrib.get("scrollable") == "true"
                  and node.attrib.get("package") == PACKAGE
                  and node.attrib.get("class") == "android.widget.ScrollView"]
         require(len(areas) == 1, f"Не найдена единственная прокрутка выдачи: {areas}")
         left, top, right, bottom = map(int, re.findall(r"\d+", areas[0]["bounds"]))
         x = str((left + right) // 2)
-        if result is not None:
-            if attempt:
-                device.shell("input", "swipe", x, str(top + 10), x, str(bottom - 10), "100")
-                eventually(lambda: catalog_state(device), "Не удалось вернуть начало списка")
-            return result
         device.shell("input", "swipe", x, str(bottom - 10), x, str(top + 10), "350")
-    raise AssertionError("Не найдены ни первая строка выдачи, ни пустое состояние")
+    raise AssertionError("Не найдены секции и первая строка или пустое состояние дня")
 
 
-def prepare_catalog(device):
-    device.tap_label("Дневные выборы", "Daily choices")
+def prepare_day(device):
+    device.tap_label("Действия", "Actions")
     def choose_day():
         days = [node.attrib for node in device.ui()
                 if node.attrib.get("package") == PACKAGE
@@ -332,13 +339,9 @@ def prepare_catalog(device):
         return (marked or days)[0]["content-desc"]
     day = eventually(choose_day, "Не удалось выбрать другой день")
     device.tap_label(day)
-    device.tap_label("Выполнение", "Completion")
-    device.tap_label("Не выполненные", "Not completed")
     device.tap_label("Развернуть календарь", "Expand calendar")
     device.tap_label("Следующий месяц", "Next month")
-    state = eventually(lambda: catalog_state(device), "Каталог не подготовлен")
-    require("Не выполненные" in state["filter"] or "Not completed" in state["filter"], "Фильтр не применён")
-    return state
+    return eventually(lambda: day_state(device), "Экран дня не подготовлен")
 
 
 def check_recents(device):
@@ -496,12 +499,12 @@ def main():
         device.shell("am", "start", "-W", "-a", "android.settings.SETTINGS")
         device.launcher()
         eventually(lambda: host_state(device, "LargeDisplayActivity"), "Нет большого хоста")
-        before = prepare_catalog(device)
-        before["result"] = catalog_result(device)
+        before = prepare_day(device)
+        before.update(day_result(device))
         pid = device.shell("pidof", PACKAGE)
         require(bool(pid), "Процесс приложения не найден")
         device.capture("before-split")
-        print(f"Каталог до переноса: {json.dumps(before, ensure_ascii=False)}; PID={pid}", flush=True)
+        print(f"Экран дня до переноса: {json.dumps(before, ensure_ascii=False)}; PID={pid}", flush=True)
 
         device.shell("input", "keyevent", "KEYCODE_APP_SWITCH")
         device.tap(lambda a: a.get("resource-id") == "com.android.launcher3:id/action_split")
@@ -514,18 +517,18 @@ def main():
         device.shell("wm", "size", "390x844")
         after = eventually(lambda: phone_state(device), "Перенос не дал полноэкранный телефон")
         require(device.shell("pidof", PACKAGE) == pid, "Процесс перезапущен при переносе")
-        current = eventually(lambda: catalog_state(device), "Каталог после переноса недоступен")
-        current["result"] = catalog_result(device)
-        require(current == before, f"Состояние каталога потеряно: {current}, ожидалось {before}")
+        current = eventually(lambda: day_state(device), "Экран дня после переноса недоступен")
+        current.update(day_result(device))
+        require(current == before, f"Состояние экрана дня потеряно: {current}, ожидалось {before}")
         device.capture("phone")
         eventually(lambda: check_recents(device), "После переноса остались лишние карточки")
-        print(f"Телефонное окно: {after}; PID={pid}; каталог сохранён", flush=True)
+        print(f"Телефонное окно: {after}; PID={pid}; экран дня сохранён", flush=True)
 
         device.shell("input", "keyevent", "KEYCODE_HOME")
         device.launcher()
         eventually(lambda: phone_state(device), "Launcher не вернул PhoneActivity")
-        current = eventually(lambda: catalog_state(device), "Launcher не вернул каталог")
-        current["result"] = catalog_result(device)
+        current = eventually(lambda: day_state(device), "Launcher не вернул экран дня")
+        current.update(day_result(device))
         require(current == before, f"Launcher потерял сессию: {current}")
         require(device.shell("pidof", PACKAGE) == pid, "Launcher перезапустил процесс")
         cards = eventually(lambda: check_recents(device), "Launcher добавил карточку приложения")

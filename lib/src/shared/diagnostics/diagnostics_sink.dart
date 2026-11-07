@@ -118,9 +118,10 @@ enum LongTermRelationCommandDiagnosticsType {
   delete,
 }
 
-enum DailyChoiceCommandDiagnosticsType { create, updateFields, delete }
+enum ActionCommandDiagnosticsType { create, updateFields, setPath, delete }
 
-enum DailyChoiceCommandDiagnosticsStage { validation, write, resultRead }
+/// Проверка состояния действия, запись и чтение подтверждённого результата.
+enum ActionCommandDiagnosticsStage { validation, write, resultRead }
 
 enum TagCommandDiagnosticsType {
   create,
@@ -173,22 +174,6 @@ final class TagDetailReadDiagnosticsEvent extends DiagnosticsEvent {
   final TagReadDiagnosticsStage stage;
 }
 
-final class DailyChoiceReadDiagnosticsEvent extends DiagnosticsEvent {
-  const DailyChoiceReadDiagnosticsEvent({required DiagnosticsStatus status})
-    : super(status);
-}
-
-/// Чтение состояний дней: исход, длительность и безопасная категория отказа.
-///
-/// Даты, диапазон, идентификаторы, пользовательский текст и исходное исключение
-/// не входят в контракт события.
-final class DailyChoiceDayStatusesReadDiagnosticsEvent
-    extends DiagnosticsEvent {
-  const DailyChoiceDayStatusesReadDiagnosticsEvent({
-    required DiagnosticsStatus status,
-  }) : super(status);
-}
-
 /// Вид чтения статистики, без его условий и пользовательских данных.
 enum StatisticsReadDiagnosticsType { homePage, intentionSection, breakdown }
 
@@ -219,50 +204,74 @@ final class StatisticsReadDiagnosticsEvent extends DiagnosticsEvent {
   final StatisticsReadDiagnosticsStage stage;
 }
 
-final class DailyChoiceCatalogPageReadDiagnosticsEvent
-    extends DiagnosticsEvent {
-  const DailyChoiceCatalogPageReadDiagnosticsEvent({
-    required this.pageSize,
-    required this.isContinuation,
-    required DiagnosticsStatus status,
-  }) : super(status);
-
-  final int pageSize;
-  final bool isContinuation;
-}
-
-enum ChoicePathContinuationReadStage { validation, read }
-
-final class ChoicePathContinuationReadDiagnosticsEvent
-    extends DiagnosticsEvent {
-  const ChoicePathContinuationReadDiagnosticsEvent({
-    required this.stage,
-    required this.pageSize,
-    required this.isContinuation,
-    required DiagnosticsStatus status,
-  }) : super(status);
-
-  final ChoicePathContinuationReadStage stage;
-  final int pageSize;
-  final bool isContinuation;
-}
-
-/// Проверка подтверждённого пути при создании дневного выбора.
-final class DailyChoicePathValidationDiagnosticsEvent extends DiagnosticsEvent {
-  const DailyChoicePathValidationDiagnosticsEvent({
-    required DiagnosticsStatus status,
-  }) : super(status);
-}
-
-final class DailyChoiceCommandDiagnosticsEvent extends DiagnosticsEvent {
-  const DailyChoiceCommandDiagnosticsEvent({
+/// Команда действия. Событие не несёт ни содержимого действия, ни его
+/// идентификатора, даты и пути.
+final class ActionCommandDiagnosticsEvent extends DiagnosticsEvent {
+  const ActionCommandDiagnosticsEvent({
     required this.commandType,
     required this.stage,
     required DiagnosticsStatus status,
   }) : super(status);
 
-  final DailyChoiceCommandDiagnosticsType commandType;
-  final DailyChoiceCommandDiagnosticsStage stage;
+  final ActionCommandDiagnosticsType commandType;
+  final ActionCommandDiagnosticsStage stage;
+}
+
+/// Чтение порции дня: размер порции, первая это порция или продолжение, исход
+/// и безопасная категория отказа. Дата, секция, идентификаторы, пользовательский
+/// текст и исходное исключение не входят в контракт события.
+final class ActionDayPageReadDiagnosticsEvent extends DiagnosticsEvent {
+  const ActionDayPageReadDiagnosticsEvent({
+    required this.pageSize,
+    required this.isContinuation,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final int pageSize;
+  final bool isContinuation;
+}
+
+/// Чтение состояний дней окна календаря: исход, длительность и безопасная
+/// категория отказа. Даты, окно, идентификаторы, пользовательский текст и
+/// исходное исключение не входят в контракт события.
+final class ActionDayStatusesReadDiagnosticsEvent extends DiagnosticsEvent {
+  const ActionDayStatusesReadDiagnosticsEvent({
+    required DiagnosticsStatus status,
+  }) : super(status);
+}
+
+/// Чтение действия с сохранённым путём: исход, длительность и безопасная
+/// категория отказа. Идентификаторы, пользовательский текст и исходное
+/// исключение не входят в контракт события.
+final class ActionReadDiagnosticsEvent extends DiagnosticsEvent {
+  const ActionReadDiagnosticsEvent({required DiagnosticsStatus status})
+    : super(status);
+}
+
+/// Чтение порции действий намерения: размер порции, первая это порция или
+/// продолжение, исход и безопасная категория отказа. Намерение, роль,
+/// идентификаторы, пользовательский текст и исходное исключение не входят в
+/// контракт события.
+final class IntentionActionsPageReadDiagnosticsEvent extends DiagnosticsEvent {
+  const IntentionActionsPageReadDiagnosticsEvent({
+    required this.pageSize,
+    required this.isContinuation,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final int pageSize;
+  final bool isContinuation;
+}
+
+final class PathCandidatesReadDiagnosticsEvent extends DiagnosticsEvent {
+  const PathCandidatesReadDiagnosticsEvent({
+    required this.pageSize,
+    required this.isContinuation,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final int pageSize;
+  final bool isContinuation;
 }
 
 final class BootstrapDiagnosticsEvent extends DiagnosticsEvent {
@@ -306,19 +315,6 @@ final class IntentionDetailReadDiagnosticsEvent extends DiagnosticsEvent {
 
 final class RelationGroupPageReadDiagnosticsEvent extends DiagnosticsEvent {
   const RelationGroupPageReadDiagnosticsEvent({
-    required this.pageSize,
-    required this.isContinuation,
-    required this.requiresNewSnapshot,
-    required DiagnosticsStatus status,
-  }) : super(status);
-
-  final int pageSize;
-  final bool isContinuation;
-  final bool requiresNewSnapshot;
-}
-
-final class DailyChoiceGroupPageReadDiagnosticsEvent extends DiagnosticsEvent {
-  const DailyChoiceGroupPageReadDiagnosticsEvent({
     required this.pageSize,
     required this.isContinuation,
     required this.requiresNewSnapshot,
@@ -680,7 +676,7 @@ enum GraphImportDiagnosticsStage {
 /// категория. Отмена диалога, отказ от подтверждения и отмена импорта
 /// отказом не считаются и события не дают.
 ///
-/// Записи графа, названия, описания, даты дневных выборов, идентификаторы,
+/// Записи графа, названия, описания, даты действий, идентификаторы,
 /// имя, путь и адрес файла и документа и исходное исключение не входят в
 /// контракт события. Конструкторы допускают этап только у отказа. Передача
 /// получателю — через [recordDiagnosticsSafely].

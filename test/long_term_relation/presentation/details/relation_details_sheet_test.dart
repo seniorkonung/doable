@@ -2,8 +2,6 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/design_system/components/priority_picker.dart';
 import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
@@ -12,11 +10,12 @@ import 'package:doable/src/graph/application/personal_graph_repository_provider.
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_sheet.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -910,8 +909,6 @@ void main() {
       RelationScope scope = RelationScope.active,
       IntentionArchiveState sourceArchiveState = IntentionArchiveState.active,
       IntentionArchiveState relatedArchiveState = IntentionArchiveState.active,
-      LongTermRelationPermissions permissions =
-          const LongTermRelationPermissions.unrestricted(),
     }) => testRelationDetails(
       relationId: relationId,
       sourceId: testIntentionId(1),
@@ -921,7 +918,6 @@ void main() {
       scope: scope,
       sourceArchiveState: sourceArchiveState,
       relatedArchiveState: relatedArchiveState,
-      permissions: permissions,
     );
 
     Future<ControlledRelationDetailsRepository> openPanel(
@@ -1090,33 +1086,6 @@ void main() {
       });
     }
 
-    testWidgets('удаление остаётся в меню с причиной, пока связь входит в путь '
-        'дневного выбора', (tester) async {
-      final semantics = tester.ensureSemantics();
-      final repository = await openPanel(
-        tester,
-        relation(
-          permissions:
-              const LongTermRelationPermissions.referencedByDailyPath(),
-        ),
-      );
-
-      await openMenu(tester);
-      expect(
-        find.text(
-          'Связь используется в сохранённом дневном пути, поэтому удалить её '
-          'нельзя.',
-        ),
-        findsOneWidget,
-      );
-      await tester.tap(find.text('Удалить'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Удалить связь?'), findsNothing);
-      expect(repository.relationCommands, isEmpty);
-      semantics.dispose();
-    });
-
     testWidgets('пока операция выполняется, пункты просят дождаться её '
         'окончания', (tester) async {
       final semantics = tester.ensureSemantics();
@@ -1152,30 +1121,6 @@ void main() {
 
       expect(repository.relationCommands, isEmpty);
       expect(find.text('Параметры связи'), findsNothing);
-      expect(find.text('много ходить').hitTestable(), findsOneWidget);
-      semantics.dispose();
-    });
-
-    testWidgets('зависимость, появившаяся при открытом подтверждении, не даёт '
-        'отправить удаление', (tester) async {
-      final semantics = tester.ensureSemantics();
-      final repository = await openPanel(tester, relation());
-
-      await choose(tester, 'Удалить');
-      repository
-          .watchAt(0)
-          .emitDetails(
-            relation(
-              permissions:
-                  const LongTermRelationPermissions.referencedByDailyPath(),
-            ),
-            revision: const TestGraphRevision(2),
-          );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Удалить'));
-      await tester.pumpAndSettle();
-
-      expect(repository.relationCommands, isEmpty);
       expect(find.text('много ходить').hitTestable(), findsOneWidget);
       semantics.dispose();
     });
@@ -1679,8 +1624,8 @@ Future<ControlledRelationDetailsRepository> _openSheet(
   final container = ProviderContainer(
     overrides: [
       personalGraphRepositoryProvider.overrideWithValue(repository),
-      dailyChoiceLocalDateSourceProvider.overrideWithValue(
-        () => DailyChoiceLocalDay(
+      localDateSourceProvider.overrideWithValue(
+        () => LocalDay(
           date: CalendarDate.fromParts(2026, 11, 2),
           untilNextDate: const Duration(hours: 1),
         ),

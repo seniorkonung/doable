@@ -16,7 +16,7 @@ void main() {
       'ru',
       'Импортировать эту копию?',
       'Она сохранена 3 октября 2026 года и содержит 12 намерений, 14 связей, '
-          '96 дневных выборов и 11 тегов.',
+          '96 действий и 11 тегов.',
       'Она заменит всё, что сейчас есть в Doable. Сначала текущее состояние '
           'сохраняется как резервная копия.',
       'Отмена',
@@ -26,7 +26,7 @@ void main() {
       'en',
       'Import this copy?',
       'It was saved on 3 October 2026 and holds 12 intentions, 14 relations, '
-          '96 daily choices and 11 tags.',
+          '96 actions and 11 tags.',
       'It will replace everything now in Doable. A backup of the current '
           'state is made first.',
       'Cancel',
@@ -41,7 +41,7 @@ void main() {
         header: _header(
           intentions: 12,
           longTermRelations: 14,
-          dailyChoices: 96,
+          actions: 96,
           tags: 11,
         ),
       );
@@ -54,19 +54,19 @@ void main() {
     (
       'ru',
       {
-        1: '1 намерение, 1 связь, 1 дневной выбор и 1 тег',
-        2: '2 намерения, 2 связи, 2 дневных выбора и 2 тега',
-        5: '5 намерений, 5 связей, 5 дневных выборов и 5 тегов',
-        21: '21 намерение, 21 связь, 21 дневной выбор и 21 тег',
+        1: '1 намерение, 1 связь, 1 действие и 1 тег',
+        2: '2 намерения, 2 связи, 2 действия и 2 тега',
+        5: '5 намерений, 5 связей, 5 действий и 5 тегов',
+        21: '21 намерение, 21 связь, 21 действие и 21 тег',
       },
     ),
     (
       'en',
       {
-        1: '1 intention, 1 relation, 1 daily choice and 1 tag',
-        2: '2 intentions, 2 relations, 2 daily choices and 2 tags',
-        5: '5 intentions, 5 relations, 5 daily choices and 5 tags',
-        21: '21 intentions, 21 relations, 21 daily choices and 21 tags',
+        1: '1 intention, 1 relation, 1 action and 1 tag',
+        2: '2 intentions, 2 relations, 2 actions and 2 tags',
+        5: '5 intentions, 5 relations, 5 actions and 5 tags',
+        21: '21 intentions, 21 relations, 21 actions and 21 tags',
       },
     ),
   ]) {
@@ -81,7 +81,7 @@ void main() {
           header: _header(
             intentions: count,
             longTermRelations: count,
-            dailyChoices: count,
+            actions: count,
             tags: count,
           ),
         );
@@ -130,7 +130,7 @@ void main() {
     final semantics = tester.ensureSemantics();
     const facts =
         'Она сохранена 3 октября 2026 года и содержит 12 намерений, '
-        '14 связей, 96 дневных выборов и 11 тегов.';
+        '14 связей, 96 действий и 11 тегов.';
     const replaces =
         'Она заменит всё, что сейчас есть в Doable. Сначала текущее '
         'состояние сохраняется как резервная копия.';
@@ -139,7 +139,7 @@ void main() {
       header: _header(
         intentions: 12,
         longTermRelations: 14,
-        dailyChoices: 96,
+        actions: 96,
         tags: 11,
       ),
     );
@@ -173,21 +173,23 @@ void main() {
   });
 }
 
-/// Заголовок файла, сохранённого в момент [_savedAt]. Назначения тегов
-/// подтверждение не называет.
+/// Заголовок файла, сохранённого в момент [_savedAt]. Назначения тегов и
+/// надгробия подтверждение не называет.
 GraphFormatHeader _header({
   int intentions = 3,
   int longTermRelations = 2,
-  int dailyChoices = 4,
+  int actions = 4,
   int tags = 1,
 }) => GraphFormatHeader(
   writtenAt: _savedAt,
   counts: GraphRecordCounts(
     tags: tags,
     intentions: intentions,
+    deletedIntentions: 5,
     tagAssignments: 7,
     longTermRelations: longTermRelations,
-    dailyChoices: dailyChoices,
+    deletedRelationPairs: 6,
+    actions: actions,
   ),
 );
 

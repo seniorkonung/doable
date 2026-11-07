@@ -225,6 +225,34 @@ void main() {
     },
   );
 
+  testWidgets('поздний успех начала пути не выбирает намерение', (
+    tester,
+  ) async {
+    final repository = ControlledCatalogRepository();
+    final created = <Object>[];
+    final router = await _openEditor(
+      tester,
+      repository,
+      launch: IntentionCreationForPathStart(
+        initialTitle: 'Бегать',
+        onCreated: created.add,
+      ),
+    );
+    await tester.tap(find.byKey(_submit));
+    await tester.pump();
+    await _tapClose(tester);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(_closeDiscard));
+    await tester.pump();
+    repository.completeCommand(0, _savedResult(title: 'Бегать'));
+    await tester.pump();
+    _completeCatalogRefresh(repository);
+    await tester.pumpAndSettle();
+    expect(created, isEmpty);
+    expect(find.text('Create — “Бегать”: Intention created.'), findsOneWidget);
+    expectIntentionGraphRootPage(router);
+  });
+
   testWidgets(
     'блокирует повторную отправку, сохраняя доступный уход с подтверждением',
     (tester) async {

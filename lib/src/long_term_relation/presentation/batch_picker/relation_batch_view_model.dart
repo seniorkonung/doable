@@ -133,7 +133,11 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
     if (!ref.mounted || !identical(_activeToken, completion.token)) return;
     _activeToken = null;
     _publish(switch (completion.result) {
-      GraphResultSuccess() => const RelationBatchAdded(),
+      GraphResultSuccess(value: LongTermRelationsAdded(:final relations)) =>
+        RelationBatchAdded(relations),
+      // Добавление другим успехом не завершается; оболочка назовёт его
+      // непредвиденным.
+      GraphResultSuccess() => RelationBatchAdded(const []),
       GraphResultFailure(:final failure) => RelationBatchFailed(
         failure: failure,
         claim: _coordinator.claimInitiatorFailure(completion.token),

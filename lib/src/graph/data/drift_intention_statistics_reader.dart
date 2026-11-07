@@ -80,49 +80,44 @@ extension _IntentionStatisticsReading on DriftPersonalGraphRepository {
             throw const StatisticsSnapshotExpired();
           }
           Future<StatisticsBreakdownFirstPage<StatisticsItem>> intentions(
-            _IntentionItemsBreakdown breakdown,
+            StatisticsBreakdown breakdown,
           ) => _IntentionItemsCursor(
             query,
             ready.key,
             0,
             breakdown,
           ).read(this, ready);
-          final uncompleted = ready.summary.uncompleted;
-          final details = switch (query.view) {
-            StatisticsView.sourceIntentions => IntentionStatisticsSourceDetails(
-              uncompleted: uncompleted,
-              selectedActions: await intentions(
-                _IntentionItemsBreakdown.selectedActions,
+          final details = switch (ready.view) {
+            StatisticsView.rootIntentions => IntentionStatisticsRootDetails(
+              terminalIntentions: await intentions(
+                StatisticsBreakdown.terminalIntentions,
               ),
             ),
             StatisticsView.intermediateIntentions =>
               IntentionStatisticsIntermediateDetails(
-                uncompleted: uncompleted,
-                sourceIntentions: await intentions(
-                  _IntentionItemsBreakdown.sourceIntentions,
+                rootIntentions: await intentions(
+                  StatisticsBreakdown.rootIntentions,
                 ),
-                selectedActions: await intentions(
-                  _IntentionItemsBreakdown.selectedActions,
+                terminalIntentions: await intentions(
+                  StatisticsBreakdown.terminalIntentions,
                 ),
               ),
-            StatisticsView.selectedActions =>
-              IntentionStatisticsSelectedDetails(
-                uncompleted: uncompleted,
-                sourceIntentions: await intentions(
-                  _IntentionItemsBreakdown.sourceIntentions,
+            StatisticsView.terminalIntentions =>
+              IntentionStatisticsTerminalDetails(
+                rootIntentions: await intentions(
+                  StatisticsBreakdown.rootIntentions,
                 ),
               ),
             StatisticsView.throughRelations =>
               IntentionStatisticsThroughRelationsDetails(
-                uncompleted: uncompleted,
-                explicitPathChoices: ready.throughRelations.explicitPathChoices,
+                explicitPathActions: ready.throughRelations.explicitPathActions,
                 relations: await _IntentionRelationsCursor(
                   query,
                   ready.key,
                   0,
                 ).read(this, ready),
-                selectedActions: await intentions(
-                  _IntentionItemsBreakdown.selectedActions,
+                terminalIntentions: await intentions(
+                  StatisticsBreakdown.terminalIntentions,
                 ),
               ),
           };
@@ -249,25 +244,27 @@ final class _IntentionStatisticsResult {
     IntentionStatisticsSourceSnapshot source,
     this.throughRelations,
   ) : revision = source.revision,
-      periodCounts = source.periodSummary.counts,
+      view = source.view,
+      periodCounts = source.periodCounts,
       cards = IntentionStatisticsCards(
-        sourceIntentions: source.sourceIntentions,
+        rootIntentions: source.rootIntentions,
         intermediateIntentions: source.intermediateIntentions,
-        selectedActions: source.selectedActions,
-        throughRelations: throughRelations.summary.counts,
+        terminalIntentions: source.terminalIntentions,
+        throughRelations: throughRelations.counts,
       ),
       savedPath = source.savedPathDetails;
 
   final Object key = Object();
   final IntentionStatisticsQuery query;
   final GraphRevision revision;
+
+  /// Вид запроса либо выбранный чтением; повторный запрос без вида на той же
+  /// ревизии получает тот же выбор.
+  final StatisticsView view;
   final ContributionCounts periodCounts;
   final IntentionStatisticsCards cards;
   final IntentionSavedPathStatistics? savedPath;
   final IntentionContributionResult<CalendarDate> throughRelations;
-
-  StatisticsPeriodSummary get summary =>
-      savedPath?.summary ?? throughRelations.summary;
 
   IntentionStatisticsCalendar get calendar {
     final counts = savedPath?.calendarCounts ?? throughRelations.calendarCounts;
@@ -277,8 +274,8 @@ final class _IntentionStatisticsResult {
         statuses: {
           for (final entry in counts.entries)
             entry.key: entry.value.uncompleted == 0
-                ? DailyChoiceDayStatus.allCompleted
-                : DailyChoiceDayStatus.hasIncomplete,
+                ? ActionDayStatus.allCompleted
+                : ActionDayStatus.hasIncomplete,
         },
       ),
       final StatisticsYear year => IntentionStatisticsYearCalendar(
@@ -296,7 +293,6 @@ final class _IntentionStatisticsResult {
       query.intentionId == other.intentionId &&
       query.period == other.period &&
       query.view == other.view &&
-      query.localDate == other.localDate &&
       revision.compareTo(currentRevision) == GraphRevisionOrder.same;
 }
 
@@ -314,8 +310,6 @@ sealed class _IntentionStatisticsCursor<T>
   );
 }
 
-enum _IntentionItemsBreakdown { sourceIntentions, selectedActions }
-
 final class _IntentionItemsCursor
     extends _IntentionStatisticsCursor<StatisticsItem> {
   const _IntentionItemsCursor(
@@ -324,22 +318,16 @@ final class _IntentionItemsCursor
     super.offset,
     this.breakdown,
   );
-  final _IntentionItemsBreakdown breakdown;
+  final StatisticsBreakdown breakdown;
 
   @override
   Future<StatisticsBreakdownFirstPage<StatisticsItem>> read(
     DriftPersonalGraphRepository repository,
     _IntentionStatisticsResult result,
   ) async {
-    final kind = switch (breakdown) {
-      _IntentionItemsBreakdown.sourceIntentions =>
-        StatisticsBreakdown.sourceIntentions,
-      _IntentionItemsBreakdown.selectedActions =>
-        StatisticsBreakdown.selectedActions,
-    };
     final entries = switch (result.savedPath) {
-      final saved? => saved.breakdowns[kind]!,
-      null => result.throughRelations.selectedActions,
+      final saved? => saved.breakdowns[breakdown]!,
+      null => result.throughRelations.terminalIntentions,
     };
     final end = (offset + query.pageSize).clamp(0, entries.length);
     return StatisticsBreakdownFirstPage(

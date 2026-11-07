@@ -6,7 +6,7 @@ import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/settings/settings_page.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/action/presentation/day/action_day_root_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -97,7 +97,7 @@ void main() {
       await tester.pumpAndSettle();
 
       for (final (destination, catalog) in [
-        (AppDestination.dailyChoices, DailyChoiceCatalogPage),
+        (AppDestination.actions, ActionDayRootPage),
         (AppDestination.intentionGraph, IntentionCatalogPage),
       ]) {
         await tester.tap(appNavigationDestination(destination));

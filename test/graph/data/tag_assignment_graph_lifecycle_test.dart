@@ -83,8 +83,8 @@ void main() {
     for (final table in [
       'intentions',
       'long_term_relations',
-      'daily_choices',
-      'daily_choice_path_steps',
+      'actions',
+      'action_path_items',
       'tags',
       'tag_assignments',
     ])
@@ -119,8 +119,8 @@ void main() {
       expect(assignedTags(3), [tagFixtureId(lastTagNumber)]);
       final otherIntentions = [row('intentions', 2), row('intentions', 3)];
       final alreadyArchivedRelation = row('long_term_relations', 102);
-      final dailyChoices = rows('daily_choices');
-      final pathSteps = rows('daily_choice_path_steps');
+      final actions = rows('actions');
+      final pathSteps = rows('action_path_items');
       final tags = rows('tags');
       final createdAt = row('intentions', 1)['created_at'];
       final activeDirectRelations = [
@@ -164,8 +164,8 @@ void main() {
         expect([row('intentions', 2), row('intentions', 3)], otherIntentions);
         expect(assignments(), originalAssignments);
         expect(rows('tags'), tags);
-        expect(rows('daily_choices'), dailyChoices);
-        expect(rows('daily_choice_path_steps'), pathSteps);
+        expect(rows('actions'), actions);
+        expect(rows('action_path_items'), pathSteps);
         await expectTagged(
           firstTagNumber,
           IntentionScope.active,
@@ -312,8 +312,8 @@ void main() {
         row('long_term_relations', 101),
         row('long_term_relations', 102),
       ];
-      final dailyChoices = rows('daily_choices');
-      final pathSteps = rows('daily_choice_path_steps');
+      final actions = rows('actions');
+      final pathSteps = rows('action_path_items');
       final tags = rows('tags');
 
       Future<void> expectRelationStep(
@@ -333,8 +333,8 @@ void main() {
           row('long_term_relations', 101),
           row('long_term_relations', 102),
         ], otherRelations);
-        expect(rows('daily_choices'), dailyChoices);
-        expect(rows('daily_choice_path_steps'), pathSteps);
+        expect(rows('actions'), actions);
+        expect(rows('action_path_items'), pathSteps);
         expect(rows('tags'), tags);
         expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
       }
@@ -378,12 +378,12 @@ void main() {
   );
 
   test(
-    'теги участников дневного пути меняются независимо от связи и пути',
+    'теги намерений пути действия меняются независимо от связи и пути',
     () async {
       final relationBefore = row('long_term_relations', 101);
       final intentionsBefore = rows('intentions');
-      final choicesBefore = rows('daily_choices');
-      final pathBefore = rows('daily_choice_path_steps');
+      final actionsBefore = rows('actions');
+      final pathBefore = rows('action_path_items');
 
       expect(
         await repository.execute(
@@ -402,8 +402,8 @@ void main() {
       );
       expect(row('long_term_relations', 101), relationBefore);
       expect(rows('intentions'), intentionsBefore);
-      expect(rows('daily_choices'), choicesBefore);
-      expect(rows('daily_choice_path_steps'), pathBefore);
+      expect(rows('actions'), actionsBefore);
+      expect(rows('action_path_items'), pathBefore);
       expect(assignedTags(1), [tagFixtureId(lastTagNumber)]);
 
       final assignmentsBeforeEdit = assignments();
@@ -428,8 +428,8 @@ void main() {
         'updated_at': now.microsecondsSinceEpoch,
       });
       expect(assignments(), assignmentsBeforeEdit);
-      expect(rows('daily_choices'), choicesBefore);
-      expect(rows('daily_choice_path_steps'), pathBefore);
+      expect(rows('actions'), actionsBefore);
+      expect(rows('action_path_items'), pathBefore);
     },
   );
 }

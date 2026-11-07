@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/action/application/action_command.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show LocalDatabaseConnectionObserver, LocalDatabaseSqlStatement;
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -392,11 +392,10 @@ final class _Commands {
         readiness: IntentionReadiness.notReady,
         tagIds: [for (var tag = 0; tag < 3; tag++) fixture.tagId(tag)],
       ),
-      // Выбор с номером 5k + 4 хранит путь из пяти шагов.
-      _CommandKind.dailyChoiceCompletion => UpdateDailyChoiceFields(
-        choiceId: fixture.dailyChoiceId(5 * entity + 4),
-        patch: DailyChoiceFieldsPatch(
-          isCompleted: DailyChoiceFieldSet((5 * entity + 4).isEven),
+      _CommandKind.actionCompletion => UpdateActionFields(
+        actionId: fixture.actionId(5 * entity + 4),
+        patch: ActionFieldsPatch(
+          isCompleted: ActionFieldSet((5 * entity + 4).isEven),
         ),
       ),
       _CommandKind.cascadeArchive => ArchiveIntention(fixture.hubIntentionId),
@@ -444,8 +443,8 @@ enum _CommandKind {
   /// Создание намерения с тремя тегами: факты двух секций.
   intentionCreation(4),
 
-  /// Отметка выполнения дневного выбора: факт с путём из пяти шагов.
-  dailyChoiceCompletion(4),
+  /// Отметка выполнения действия: факт с путём из пяти звеньев.
+  actionCompletion(4),
 
   /// Архивирование намерения с [_cascadeRelations] активными связями.
   cascadeArchive(25);
@@ -558,9 +557,11 @@ Future<void> _writeRecordsOfLength(
       counts: GraphRecordCounts(
         tags: 0,
         intentions: records,
+        deletedIntentions: 0,
         tagAssignments: 0,
         longTermRelations: 0,
-        dailyChoices: 0,
+        deletedRelationPairs: 0,
+        actions: 0,
       ),
     ),
     generate(),

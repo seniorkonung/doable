@@ -1,0 +1,821 @@
+## Phase 1: Приложение работает на действиях вместо дневных выборов
+
+- [x] 1.1 Календарная дата и наблюдатель местного дня принадлежат общему модулю
+  - **Критерии приёмки:**
+    - `CalendarDate` живёт в `lib/src/shared/domain/`, а наблюдатель и поставщик местного дня — в `lib/src/shared/presentation/local_day/` под именами без «дневного выбора» (D1 `design.md`).
+    - Статистика, формат данных, перенос данных, граф, страница намерения, модуль дневных выборов и бенчмарки импортируют их оттуда; `lib/src/daily_choice/` общих типов больше не определяет.
+    - Поведение не меняется: перенесённые тесты проходят с прежними ожиданиями.
+  - **Проверка:**
+    - `mise run codegen`, затем `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- flutter test test/shared test/daily_choice test/statistics test/data_transfer test/intention/presentation/details`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - переносятся `lib/src/daily_choice/domain/calendar_date.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_local_day_observer.dart`, `daily_choice_local_date_provider.dart` вместе с `.g.dart`;
+    - меняются импорты в `lib/src/statistics`, `lib/src/graph_format`, `lib/src/graph/data`, `lib/src/data_transfer/presentation`, `lib/src/intention/presentation/details/intention_details_page.dart` и `lib/src/daily_choice`;
+    - меняются импорты `CalendarDate` в `benchmark/support/graph_log_fixture.dart`, `contribution_statistics_fixture.dart`, `intention_statistics_fixture.dart`, `benchmark/statistics/drift_statistics_benchmark.dart`, `drift_intention_statistics_benchmark.dart`, `drift_through_relations_statistics_benchmark.dart`;
+    - переносятся `test/daily_choice/domain/calendar_date_test.dart` и `test/support/daily_choice_local_date.dart`.
+  - **Размер:** M по логике: переносятся три файла, а импорты меняются механически.
+
+- [x] 1.2 Базовая схема версии 8 хранит действия, их пути и надгробия удалённого
+  - **Критерии приёмки:**
+    - `action_schema.drift` создаёт `actions`, `action_path_items`, `deleted_intentions` и `deleted_relation_pairs` с ограничениями и индексами из D2 и D3 `design.md`: удаление действия удаляет его строки пути, а внешних ключей на намерения и связи у пути нет.
+    - Триггеры поддерживают надгробия по каждому правилу D3: надгробия намерения и пары создаются после удаления намерения или связи (`AFTER DELETE`) по удалённой строке. Триггеры отклоняют строку пути, чьё намерение не найдено ни среди намерений, ни среди надгробий, а также надгробие существующей сущности. Новые таблицы получают отметки журнала фактов, как остальные таблицы графа, а изменение строк пути отмечает действие изменённым.
+    - Версия 8 — новая базовая без миграции по D14: `drift_schemas/drift_schema_v8.json` заменяет снимок v7, загрузка сообщает о хранилище с отметкой 7 как о повреждении, не меняя его, а раздел README о локальных данных описывает очистку перед установкой и откатом. Таблицы дневных выборов остаются до задачи 1.29.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/data/local`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - добавляются `lib/src/data/local/schema/action_schema.drift`, `test/data/local/action_schema_test.dart`;
+    - меняются `lib/src/data/local/schema/graph_log_schema.drift`, `lib/src/data/local/app_database.dart` и `.g.dart`, `lib/src/data/local/migrations/migration_strategy.dart`, `README.md`;
+    - `drift_schemas/drift_schema_v7.json` заменяется `drift_schema_v8.json`;
+    - меняются `test/data/local/app_database_schema_test.dart`, `graph_log_schema_test.dart`, `bootstrap/local_data_bootstrap_test.dart`.
+  - **Размер:** M.
+
+- [x] 1.3 Предметные типы действия делают недопустимые поля и путь непредставимыми
+  - **Критерии приёмки:**
+    - `lib/src/action/domain/` содержит типизированный идентификатор действия по ADR-0003, название и описание по правилам текста намерения без копирования этих правил, закрытый тип запланированного времени «час 0–23 или весь день», приоритет P1–P4 и путь — непустую последовательность различных идентификаторов намерений.
+    - Конструкторы отклоняют пустое после обрезки название, час вне 0–23, пустой путь и повтор намерения в пути; путь из одного намерения допустим.
+    - Действие объединяет поля, выполнение, показания времени создания и изменения и порядок создания (ADR-0010).
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/action/domain`.
+  - **Зависимости:** 1.1.
+  - **Предполагаемые файлы:**
+    - добавляются `lib/src/action/domain/action.dart`, `action_id.dart`, `action_text.dart`, `action_schedule.dart`, `action_priority.dart`, `action_path.dart` и их тесты в `test/action/domain/`;
+    - при необходимости меняется `lib/src/intention/domain/intention_text.dart`.
+  - **Размер:** M.
+
+- [x] 1.4 Поля и выполнение действия меняются, а действие удаляется командами графа
+  - **Критерии приёмки:**
+    - `UpdateActionFields` с названием, описанием, датой, временем, приоритетом или выполнением и `DeleteAction` выполняются `GraphCommandCoordinator` в одной транзакции записи графа с одной ревизией (ADR-0009, D9). Изменение обновляет время изменения, только если состояние действительно изменилось; удаление уносит путь, а намерения и связи не меняются.
+    - Результаты различают ошибку ввода, отсутствие действия, конфликт, доказанно временную недоступность, повреждение и неизвестный отказ; координатор не принимает повтор той же команды и конфликтующее изменение того же действия, пока принятая выполняется.
+    - Пакет изменения несёт `ActionChange` с состоянием до и после, по которому потребители узнают затронутые даты и намерения пути. Диагностика различает операцию, этап и категорию без пользовательского содержимого по требованию «Диагностика действий без пользовательского содержимого».
+    - Представитель результатов называет удаление сообщением «Действие удалено» и не объявляет успех изменения полей и выполнения (ADR-0016, ADR-0046).
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/action/application test/graph/data/drift_action_update_test.dart test/graph/data/drift_action_delete_test.dart test/graph/application test/graph/presentation test/shared/diagnostics`.
+  - **Зависимости:** 1.2, 1.3.
+  - **Предполагаемые файлы:**
+    - добавляются `lib/src/action/application/action_command.dart`, `action_result.dart`, `lib/src/graph/data/drift_personal_graph_repository_action_commands.dart`;
+    - меняются `lib/src/graph/application/graph_change.dart`, `graph_command_coordinator.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, `developer_diagnostics_sink.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`;
+    - добавляются `test/action/application/action_command_test.dart`, `test/graph/data/drift_action_update_test.dart`, `drift_action_delete_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы, потому что новая команда проходит через существующие швы координатора, представителя и диагностики.
+
+- [x] 1.5 Формат данных описывает действия с путями и надгробия удалённого
+  - **Критерии приёмки:**
+    - Записи действия с путём, надгробия намерения с названием и надгробия пары с типом кодируются и читаются в формате версии 1 (ADR-0035, D14). Разделы идут «теги, намерения, надгробия намерений, назначения тегов, связи, надгробия пар, действия», каждая запись ссылается только на предыдущие, а заголовок считает все разделы; раздел дневных выборов остаётся до задачи 1.29.
+    - Чтение отклоняет запись с недопустимыми полями или путём и ссылку на отсутствующую предыдущую запись прежним отказом «не экспорт Doable или повреждён».
+    - Эталонные файлы `test/graph_format/golden` отражают новый состав.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph_format`.
+  - **Зависимости:** 1.3.
+  - **Предполагаемые файлы:** `lib/src/graph_format/graph_format_records.dart`, `graph_format_codec.dart`, `graph_format_file.dart`, `test/graph_format/graph_format_codec_test.dart`, `graph_format_file_test.dart`, `test/graph_format/golden/graph_format_v1.jsonl`.
+  - **Размер:** M.
+
+- [x] 1.6 Журнал фактов и снимки воспроизводят действия и надгробия
+  - **Критерии приёмки:**
+    - Изменение и удаление действия, а также появление и снятие надгробий пишут по одному факту на сущность в пакет той же транзакции (ADR-0034). Удаление намерения из путей нескольких действий пишет один факт надгробия и ни одного факта действий.
+    - Снимки, сборка состояния из снимка и фактов и сжатие журнала сохраняют действия, пути и надгробия; эталон `test/graph_format/golden/graph_fact_package_v1.jsonl` отражает новый состав.
+    - Факт создания действия проверяется с командой создания во второй фазе: сейчас действия появляются только заменой графа, которая фактов не пишет.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/graph_fact_capture_test.dart test/graph/data/drift_graph_fact_log_write_test.dart test/graph/data/drift_graph_fact_log_completeness_test.dart test/graph_snapshots test/graph_format`.
+  - **Зависимости:** 1.2, 1.4, 1.5.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/graph/data/graph_fact_capture.dart`, `graph_record_rows.dart`, `stored_graph_rows.dart`, `lib/src/graph_snapshots/graph_state_assembly.dart`, `graph_snapshot_store.dart`, `graph_log_compaction.dart`;
+    - меняются `test/support/graph_log_completeness_reference.dart`, `test/graph/data/graph_fact_capture_test.dart`, `drift_graph_fact_log_completeness_test.dart`, `test/graph_snapshots/graph_state_assembly_test.dart`, `test/graph_format/golden/graph_fact_package_v1.jsonl`.
+  - **Размер:** M.
+
+- [x] 1.7 Замена графа, экспорт, импорт и восстановление переносят действия и надгробия
+  - **Критерии приёмки:**
+    - Замена графа атомарно удаляет и вставляет действия, пути и надгробия вместе с остальными разделами (ADR-0036), а экспорт пишет их из одного подтверждённого состояния.
+    - Импорт и восстановление копии воспроизводят действия с теми же идентификаторами, полями, порядком создания и путями, включая удалённые намерения с названиями и удалённые связи с типами на момент удаления.
+    - Данные графа не пусты, пока есть хоть одно действие, даже без намерений и тегов; сводки экспорта и подтверждений импорта и восстановления называют число действий вместо дневных выборов и не считают надгробия.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_graph_replacement_test.dart test/graph/data/drift_graph_composition_read_test.dart test/data_transfer test/app/graph_export_app_flow_test.dart test/app/graph_import_app_flow_test.dart test/app/graph_restore_app_flow_test.dart`.
+  - **Зависимости:** 1.5, 1.6.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/graph/data/drift_personal_graph_repository_replacement.dart`, `drift_personal_graph_repository_composition.dart`, `lib/src/data_transfer/application/graph_composition.dart`, `graph_export.dart`;
+    - меняются `lib/src/data_transfer/presentation/export_data_sheet.dart`, `import_data_confirmation.dart`, `restore_backup_confirmation.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`;
+    - меняются тесты `test/graph/data/drift_graph_replacement_test.dart`, `test/data_transfer` и `test/app/graph_*_app_flow_test.dart`.
+  - **Размер:** M.
+
+- [x] 1.8 Сводка резервной копии считает действия, но не надгробия
+  - **Критерии приёмки:**
+    - Сводка изменений между копиями считает действие добавленным, изменённым или удалённым по его фактам, как остальные сущности.
+    - Факты надгробий не считаются ни изменениями действий, ни отдельными сущностями: удаление намерения без связей и тегов, составлявшего путь трёх действий, даёт «1 удалено».
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph_backups test/data_transfer/presentation/backups_sheet_test.dart`.
+  - **Зависимости:** 1.6.
+  - **Предполагаемые файлы:** `lib/src/graph_backups/graph_change_summary.dart`, `test/graph_backups/graph_change_summary_test.dart`.
+  - **Размер:** S.
+
+- [x] 1.9 Дизайн-система показывает действие и его сохранённый путь
+  - **Критерии приёмки:**
+    - `ActionCheck`, `ActionHead` и `ActionRow` заменяют `ChoiceCheck`, `ChoiceHead` и `ChoiceRow` по своим README в `context/doable-design-system/components/`, включая слоты отметок «В архиве» и «Удалено» после корня в шапке; потребители дневных выборов используют переименованные компоненты, пока их не заменят.
+    - Новый `ActionPath` показывает строки намерений от корня до выделенного конечного без действия в конце, связь со словом и приоритетом между ними, приглушённые архивные и удалённые звенья с отметками, ненажимаемые удалённые строки и строку под путём; `ChoicePath` остаётся до задачи 1.20.
+    - Компоненты остаются презентационными, без предметных типов и свойств выделения (ADR-0030, D16).
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system test/daily_choice/presentation`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - `lib/src/design_system/components/choice_check.dart`, `choice_head.dart`, `choice_row.dart` становятся `action_check.dart`, `action_head.dart`, `action_row.dart`, а их тесты в `test/design_system/` переименовываются так же;
+    - добавляются `lib/src/design_system/components/action_path.dart`, `test/design_system/action_path_test.dart`;
+    - меняются импорты в `lib/src/daily_choice/presentation`.
+  - **Размер:** M.
+
+- [x] 1.10 Дневной выбор больше нельзя создать
+  - **Критерии приёмки:**
+    - Удалены режим быстрого создания «Новый дневной выбор» и стартовый лист «От намерения / От действия», страница и поток создания, поиски действия и исходного намерения с их назначениями и закреплённым типом, пошаговое построение пути с чтением продолжений, их маршруты, кнопка создания пустого дня и «Добавить» вкладки «Выборы» вместе со строками и тестами.
+    - Быстрое создание предлагает только «Новое намерение», а сохранённый ключ прежнего режима приводит к нему по существующему правилу неизвестного ключа. Сохранённые дневные выборы по-прежнему показываются и меняются, пока их не заменят; команда их создания остаётся до задачи 1.28 только для подготовки тестовых данных.
+  - **Проверка:**
+    - `mise run codegen`, затем `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- flutter test test/app test/daily_choice test/intention test/long_term_relation`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - удаляются `lib/src/app/quick_creation/quick_creation_daily_choice_start_sheet.dart`, `lib/src/daily_choice/presentation/action_picker/`, `source_picker/`, `path/`, `editor/`, `daily_choice_creation_*.dart`, `daily_choice_picker_*.dart`, `lib/src/daily_choice/application/choice_path_continuations.dart`, `choice_path_draft.dart`, `lib/src/graph/data/drift_personal_graph_repository_choice_path_reads.dart`;
+    - меняются `lib/src/app/quick_creation/quick_creation_mode.dart`, `quick_creation_launcher.dart`, `quick_creation_mode_presentation.dart`, `lib/src/app/routing/app_router.dart` и `.gr.dart`, `lib/src/intention/presentation/catalog/intention_catalog_purpose.dart`, `intention_catalog_view_model.dart`, `lib/src/intention/presentation/search/intention_search_kind.dart`, `lib/src/intention/presentation/details/intention_details_page.dart`, `lib/src/daily_choice/presentation/catalog/daily_choice_catalog_body.dart`, `intention_choices/intention_choices_sliver.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`;
+    - удаляются или меняются тесты в `test/app/quick_creation`, `test/app/creation_flows_*`, `test/app/choice_path_dead_end_app_flow_test.dart`, `test/daily_choice/presentation` и `test/graph/data/drift_choice_path_continuations_test.dart`.
+  - **Размер:** M по логике: файлов больше нормы, но почти всё — удаление.
+
+- [x] 1.11 Выдача дня читает действия по секциям и группам времени
+  - **Критерии приёмки:**
+    - `ActionDayQuery(date, section)` возвращает ограниченные порции секции в порядке «Весь день», часы по возрастанию, приоритет, порядок создания, а также точные числа обеих секций и признак времени во всём дне на одной ревизии (ADR-0033, D10). Строка несёт поля действия, название корневого намерения — текущее или из надгробия — и число намерений пути без чтения всего пути.
+    - Продолжение привязано к ревизии и не повторяет и не пропускает строки; план запроса использует индексы `actions` и первичный ключ строк пути, что подтверждает проверка плана, как в существующих `*_read_cost_test.dart`.
+    - Отказ чтения различает доказанно временную недоступность, повреждение и неизвестный отказ, а диагностика чтения не содержит пользовательских данных.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_action_day_read_test.dart test/graph/data/drift_action_day_read_cost_test.dart`.
+  - **Зависимости:** 1.2, 1.3.
+  - **Предполагаемые файлы:**
+    - добавляются `lib/src/action/application/action_day.dart`, `action_read_contract.dart`, `lib/src/graph/data/drift_personal_graph_repository_action_day.dart`;
+    - меняются `lib/src/graph/application/personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`;
+    - добавляются `test/graph/data/drift_action_day_read_test.dart`, `drift_action_day_read_cost_test.dart`.
+  - **Размер:** M.
+
+- [x] 1.12 Отметки календаря читаются по выполнению действий
+  - **Критерии приёмки:**
+    - Чтение окна календаря возвращает для каждой даты окна состояние «все действия выполнены», «есть невыполненное» или отсутствие действий агрегатом по `actions(date, is_completed)` (ADR-0024, ADR-0025).
+    - План запроса использует индекс даты действий, а отказ различим по категориям.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_action_day_statuses_test.dart test/graph/data/drift_action_day_statuses_read_cost_test.dart`.
+  - **Зависимости:** 1.1, 1.2.
+  - **Предполагаемые файлы:** добавляются `lib/src/action/application/action_day_statuses.dart`, `lib/src/graph/data/drift_personal_graph_repository_action_day_statuses.dart` и два теста в `test/graph/data/`; меняются `lib/src/action/application/action_read_contract.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`.
+  - **Размер:** S.
+
+- [x] 1.13 Панель читает действие с сохранённым путём на текущих данных
+  - **Критерии приёмки:**
+    - `watchAction(id)` отдаёт поля действия и весь сохранённый путь: существующие намерения и связи звеньев — с текущими названием, архивным состоянием, типом и приоритетом, удалённые — с названием и типом из надгробий, а звено, между намерениями которого снова есть связь, — с данными этой связи (требования «Разрыв пути» и «Показ сохранённого пути»).
+    - Наблюдение перечитывает данные при изменении самого действия и при подтверждённых изменениях намерений и связей последнего прочитанного пути и различает отсутствие действия и отказ чтения.
+    - После полного перезапуска действие доступно с тем же идентификатором, всеми подтверждёнными полями и путём.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_action_watch_test.dart test/graph/data/file_backed_action_durability_test.dart`.
+  - **Зависимости:** 1.2, 1.3, 1.4.
+  - **Предполагаемые файлы:** добавляются `lib/src/action/application/action_details.dart`, `lib/src/graph/data/drift_personal_graph_repository_action_reads.dart`, `test/graph/data/drift_action_watch_test.dart`, `file_backed_action_durability_test.dart`; меняются `lib/src/action/application/action_read_contract.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`.
+  - **Размер:** M.
+
+- [x] 1.14 Вкладка «Действия» читает действия намерения по его ролям в путях
+  - **Критерии приёмки:**
+    - `getIntentionActionsPage(intentionId, role, pageSize, cursor)` в первой странице возвращает числа ролей «Корневое», «Промежуточное», «Конечное» и число действий с намерением в пути, считая каждое один раз, вместе со строками на одной ревизии; путь из одного намерения засчитывается корневым и конечным (D10).
+    - Строки идут в порядке требования «Список действий роли намерения» ограниченными порциями без повторов и пропусков и несут название корня и число намерений пути; план запроса использует индекс `(intention_id, action_id)` строк пути.
+    - Активное и архивное намерения читаются одинаково, а отказ различим по категориям.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_intention_actions_read_test.dart test/graph/data/drift_intention_actions_read_cost_test.dart`.
+  - **Зависимости:** 1.2, 1.3.
+  - **Предполагаемые файлы:** добавляются `lib/src/action/application/intention_actions.dart`, `lib/src/graph/data/drift_personal_graph_repository_intention_actions.dart` и два теста в `test/graph/data/`; меняются `lib/src/action/application/action_read_contract.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`.
+  - **Размер:** M.
+
+- [x] 1.15 Панель действия показывает «Обзор» и сразу меняет дату, время, приоритет и выполнение
+  - **Критерии приёмки:**
+    - Нижняя панель без маршрута (ADR-0059) показывает шапку `ActionHead` с флажком, корнем с цепочкой и названием, описание, поля даты, времени (час или «Весь день») и приоритета и строку дат по требованиям «Нижняя панель действия», «Поля даты, времени и приоритета действия» и «Время создания и изменения действия»; вкладки добавляет задача 1.18.
+    - Каждое изменение поля или выполнения — отдельная запись по требованию «Изменение полей действия в панели»: новое значение видно после подтверждения, другие изменения действия недоступны во время записи, а после отказа без повтора флажок недоступен до успешной актуализации.
+    - Шапка закреплена, пока занимает не больше половины тела, иначе прокручивается вместе с ним; при названиях в 255 графем, крупном шрифте и низком экране весь текст достижим и не обрезан.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/action/presentation/panel`.
+  - **Зависимости:** 1.4, 1.9, 1.13.
+  - **Предполагаемые файлы:**
+    - добавляются `lib/src/action/presentation/panel/action_panel.dart`, `action_panel_state.dart`, `action_panel_view_model.dart` с `.g.dart`, `action_panel_fields.dart`, `action_date_sheet.dart`, `action_time_sheet.dart` по образцу `lib/src/daily_choice/presentation/details/`;
+    - меняются `lib/l10n/app_ru.arb`, `app_en.arb`;
+    - добавляются тесты в `test/action/presentation/panel/` и `test/support/action_panel_controls.dart`.
+  - **Размер:** M по логике: панель переносится с образца панели дневного выбора на действие.
+
+- [x] 1.16 Название и описание действия меняются в панели
+  - **Критерии приёмки:**
+    - Нажатие на название в шапке, на описание или подсказку «Добавить описание» и пункт «Изменить название и описание» меню «Действие» открывают изменение под полосой по требованию «Изменение названия и описания действия»; поле, по которому нажали, получает фокус.
+    - «Сохранить» недоступна без изменений и при пустом после обрезки названии, записывает оба поля одним изменением без сообщения и возвращает вкладку, с которой начата правка; уход с правками спрашивает «Отменить изменения?».
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/action/presentation/panel`.
+  - **Зависимости:** 1.15.
+  - **Предполагаемые файлы:** добавляется `lib/src/action/presentation/panel/action_text_editor.dart`; меняются `action_panel.dart`, `action_panel_view_model.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и тесты в `test/action/presentation/panel/`.
+  - **Размер:** S.
+
+- [x] 1.17 Действие удаляется из панели после подтверждения
+  - **Критерии приёмки:**
+    - Пункт «Удалить действие» меню «Действие» с пояснением, что намерения и связи остаются, спрашивает «Удалить действие?» с датой словом «сегодня» или числом и месяцем по требованию «Подтверждённое удаление действия».
+    - Подтверждение закрывает панель и показывает «Действие удалено», отказ остаётся в открытой панели, а отмена ничего не меняет.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/action/presentation/panel`.
+  - **Зависимости:** 1.16.
+  - **Предполагаемые файлы:** добавляется `lib/src/action/presentation/panel/action_delete_confirmation.dart`; меняются `action_panel.dart`, `action_panel_view_model.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и тесты в `test/action/presentation/panel/`.
+  - **Размер:** S.
+
+- [x] 1.18 Вкладка «Путь» панели показывает сохранённый путь с архивными и удалёнными звеньями
+  - **Критерии приёмки:**
+    - Панель получает вкладки «Обзор» и «Путь» и открывается на «Обзоре»; нажатие на корень с цепочкой в шапке открывает «Путь», где этот элемент не действует.
+    - «Путь» показывает `ActionPath` только для чтения по требованиям «Показ сохранённого пути», «Архивные намерения и связи в сохранённом пути» и «Удалённые намерения и связи в сохранённом пути»: число намерений, отметку архива на вкладке, строку под путём и отметку «В архиве» или «Удалено» после корня в шапке.
+    - Существующее намерение пути открывает свою страницу, а существующая связь — подробный просмотр поверх панели, и возврат показывает панель на «Пути»; удалённые намерения и связи не открываются (требование «Переходы из пути»).
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/action/presentation/panel`.
+  - **Зависимости:** 1.9, 1.15.
+  - **Предполагаемые файлы:** добавляется `lib/src/action/presentation/panel/action_path_tab.dart`; меняются `action_panel.dart`, `action_panel_state.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и тесты в `test/action/presentation/panel/`.
+  - **Размер:** M.
+
+- [x] 1.19 Экран дня — пункт «Действия» — показывает действия выбранного дня
+  - **Критерии приёмки:**
+    - Экран дня в `lib/src/action/presentation/day/` заменяет каталог дневных выборов и сохраняет календарь, заголовок дня, секции, группы, подгрузку, возврат к началу и сохранение состояния по требованиям `action-management` от «Выдача действий выбранного дня» до «Экран дня на заданную дату»; строки показывает `ActionRow`, группы идут по часам, отметки календаря — по действиям.
+    - Флажок строки меняет выполнение по требованиям «Выполнение действия» и «Подтверждённые результаты и безопасные ошибки действия», нажатие на строку открывает панель действия, а пустой день показывает «Нет действий на эту дату» с пояснением без кнопки создания, которую добавит вторая фаза.
+    - Выдача и отметки согласуются с подтверждёнными изменениями действий и корневых намерений без ручного обновления, а пункт панели называется «Действия» / «Actions».
+    - Каталог дневных выборов, его маршрут на дату и тесты удалены; потребители маршрута на дату открывают экран дня на дату.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/action/presentation test/app/navigation test/app/routing test/app/localization`.
+  - **Зависимости:** 1.4, 1.9, 1.10, 1.11, 1.12, 1.15.
+  - **Предполагаемые файлы:**
+    - `lib/src/daily_choice/presentation/catalog/` переносится в `lib/src/action/presentation/day/` с переходом на чтения задач 1.11 и 1.12;
+    - меняются `lib/src/app/navigation/app_destination.dart`, `lib/src/app/routing/app_router.dart` и `.gr.dart`, `lib/src/app/home/home_page.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`;
+    - переносятся тесты `test/daily_choice/presentation/catalog/` в `test/action/presentation/day/`, `test/support/daily_choice_catalog_controls.dart` и `daily_choice_catalog_provider.dart`; меняются `test/app/daily_choice_app_flow_test.dart`, `daily_choice_app_lifecycle_test.dart`, `daily_choice_completion_lifecycle_scenarios.dart` и `test/app/navigation`.
+  - **Размер:** M по логике: каталог переносится почти целиком, а меняются источник данных, строка и пустой день.
+
+- [x] 1.20 Вкладка «Действия» страницы намерения показывает действия по ролям
+  - **Критерии приёмки:**
+    - Вкладка «Действия» с числом заменяет «Выборы» на странице активного и архивного намерения: три плитки с числами ролей видны до получения списка, открывается плитка с наибольшим числом, а выбранная сохраняется при переключении вкладок и в цели открытия страницы (требования «Вкладка «Действия» страницы намерения» и «Цель открытия страницы намерения»).
+    - Список роли следует требованию «Список действий роли намерения»: группы, первая линия даты и времени, корень только под «Промежуточным» и «Конечным», флажок без нажатия, объяснение пустой плитки и новое получение с первой порции при возвращении на вкладку. Нажатие на строку открывает панель действия.
+    - Числа и список согласуются с подтверждёнными изменениями действий и корневых намерений, в том числе пока над страницей открыта панель; шапка архивного намерения говорит, что оно остаётся в сохранённых путях.
+    - Модуль `intention_choices`, панель дневного выбора и `ChoicePath` удалены вместе с тестами.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/action/presentation test/intention/presentation/details test/design_system test/app/intention_statistics_navigation_test.dart`.
+  - **Зависимости:** 1.14, 1.15, 1.19.
+  - **Предполагаемые файлы:**
+    - добавляются `lib/src/action/presentation/intention_actions/intention_actions_sliver.dart`, `intention_actions_state.dart`, `intention_actions_view_model.dart` с `.g.dart`;
+    - меняются `lib/src/intention/presentation/details/intention_details_page.dart`, `intention_page_target.dart`, `intention_details_view_model.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`;
+    - удаляются `lib/src/daily_choice/presentation/intention_choices/`, `lib/src/daily_choice/presentation/details/`, `lib/src/design_system/components/choice_path.dart` и их тесты, `test/support/intention_choices_tab.dart`, `daily_choice_details_controls.dart`, `daily_choice_detail_fields_controls.dart`.
+  - **Размер:** M по логике: новая вкладка повторяет устройство прежней, а остальное — удаление.
+
+- [x] 1.21 Статистика Главной считает действия периода по ролям в пути
+  - **Критерии приёмки:**
+    - Сводка периода считает все действия периода и выполненные из них без деления на пропущенные и предстоящие, и удаление намерений её не меняет (требование «Меры статистики действий»).
+    - «Корневые», «Промежуточные» и «Конечные намерения» засчитывают действие по позициям строк пути, путь из одного намерения — корневым и конечным, а удалённое намерение элементом не становится; «Через связи» обходит снимок активных связей от существующих намерений пути (ADR-0026, ADR-0060, D15).
+    - Доля элемента — его запланированный вклад, делённый на число действий периода; изменения действий сбрасывают результаты, а снимок связей по-прежнему сбрасывают только изменения связей.
+    - Главная показывает новые названия видов и сводку без пропущенных и предстоящих, а запросы и проверки плана опираются на индексы действий.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/statistics test/graph/data/drift_statistics_read_test.dart test/graph/data/drift_statistics_read_failure_test.dart test/graph/data/drift_statistics_seed_groups_test.dart test/graph/data/drift_statistics_relation_snapshot_test.dart test/graph/data/drift_through_relations_statistics_read_test.dart test/graph/data/contribution_reachability_test.dart`.
+  - **Зависимости:** 1.2, 1.3, 1.4.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/statistics/application/statistics_read_contract.dart`, `contribution_counts.dart`, `lib/src/graph/data/drift_personal_graph_repository_statistics.dart`, `drift_statistics_seed_groups.dart`, `drift_through_relations_statistics_reader.dart`;
+    - меняются `lib/src/statistics/presentation/home_statistics_content.dart`, `home_statistics_state.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`;
+    - меняются перечисленные тесты и `test/support/contribution_reachability_reference.dart`.
+  - **Размер:** M по логике: меняются источник и меры одной статистики, а представление только следует контракту.
+
+- [x] 1.22 Главная выбирает вид в листе «Считать действия по» и различает пустые состояния
+  - **Критерии приёмки:**
+    - Выбор вида показывает название выбранного вида и число элементов и открывает лист «Считать действия по» с четырьмя видами и их поясняющими строками; выбор применяется сразу и закрывает лист, а для «Через связи» над каталогом стоит пояснение о связях на сейчас.
+    - Период без действий показывает одно сообщение без сводки, выбора вида и каталога, а вид без элементов при непустом периоде сохраняет сводку и сообщает об этом (требование «Состояния получения статистики действий»).
+    - При первом открытии в каждом запуске вид — «Корневые намерения».
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/statistics/presentation test/app/home_statistics_app_flow_test.dart`.
+  - **Зависимости:** 1.21.
+  - **Предполагаемые файлы:** добавляется `lib/src/statistics/presentation/statistics_view_sheet.dart`; меняются `home_statistics_content.dart`, `home_statistics_view_model.dart`, `home_statistics_state.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`, `test/statistics/presentation/home_statistics_content_test.dart`, `home_statistics_view_model_test.dart`, `test/app/home_statistics_app_flow_test.dart`.
+  - **Размер:** M.
+
+- [x] 1.23 Статистика намерения считает его действия по ролям в пути
+  - **Критерии приёмки:**
+    - Числа видов, сводка «X из N выполнено» с долей среди действий периода, для «Через связи» — число действий с намерением на пути, календарь месяца по действиям вида и 12 столбиков года читаются по позициям строк пути и снимку связей.
+    - Разбивки следуют требованию «Раздел статистики действий намерения»: «Корневые» — по конечным, «Промежуточные» — по корневым и конечным, «Конечные» — по корневым, «Через связи» — по связям и конечным, без самого намерения и без удалённых намерений и связей.
+    - Вид по умолчанию — роль с наибольшим числом действий за всё время, при равенстве — первая; без них — «Через связи», если до намерения доходят действия, иначе «Корневые».
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/statistics test/graph/data/drift_intention_statistics_read_test.dart test/graph/data/drift_intention_statistics_source_test.dart test/graph/data/intention_contribution_computation_test.dart`.
+  - **Зависимости:** 1.21.
+  - **Предполагаемые файлы:** `lib/src/statistics/application/intention_statistics_read_contract.dart`, `intention_statistics_breakdown.dart`, `intention_statistics_calendar.dart`, `lib/src/graph/data/drift_intention_statistics_reader.dart`, `drift_intention_statistics_source.dart`, `intention_contribution_computation.dart` и перечисленные тесты.
+  - **Размер:** M.
+
+- [x] 1.24 Раздел статистики намерения показывает четыре плитки, разбивки и пустое состояние
+  - **Критерии приёмки:**
+    - Плитки «Корневое», «Промежуточное», «Конечное» и широкая «Через связи, как сейчас» показывают числа за период, под ними стоит пояснение выбранного вида, разбивки называются «Корневые намерения», «Конечные намерения» и «Через какие связи», а пустая разбивка скрыта целиком.
+    - Без действий выбранного вида раздел сохраняет плитки и вместо сводки, календаря или столбиков и разбивок показывает сообщение о том, какие действия здесь будут посчитаны.
+    - Нажатие на день календаря открывает экран дня на эту дату, а переходы к намерениям открывают виды по требованию «Переходы из статистики к намерениям и дням».
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/statistics/presentation test/app/intention_statistics_app_flow_test.dart test/app/intention_statistics_navigation_test.dart`.
+  - **Зависимости:** 1.19, 1.23.
+  - **Предполагаемые файлы:** `lib/src/statistics/presentation/intention_statistics_overview.dart`, `intention_statistics_breakdowns.dart`, `intention_statistics_calendar.dart`, `intention_statistics_section.dart`, `intention_statistics_state.dart`, `intention_statistics_view_model.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и тесты в `test/statistics/presentation/`.
+  - **Размер:** M.
+
+- [x] 1.25 Удаление намерения и счётчики связей больше не учитывают дневные выборы
+  - **Критерии приёмки:**
+    - Проверка перед удалением намерения смотрит только на его связи: намерение без связей, входящее в пути действий, удаляется, действия и пути сохраняются, а его название остаётся в надгробии. Удаление по-прежнему требует отсутствия связей до четвёртой фазы.
+    - Сводка счётчиков и группы связей не содержат групп и чисел дневных выборов, а подсказка «Удалить» в параметрах намерения говорит только о связях.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_relation_count_aggregates_test.dart test/graph/data/drift_relation_group_page_test.dart test/intention test/long_term_relation`.
+  - **Зависимости:** 1.10, 1.20.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/long_term_relation/application/relation_counts.dart`, `relation_group.dart`, `relation_group_page.dart`, `lib/src/graph/data/drift_relation_count_aggregates.dart`, `drift_personal_graph_repository_relation_groups.dart`, `drift_personal_graph_repository.dart`, `lib/src/intention/presentation/details/intention_options.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`;
+    - удаляется `test/graph/data/drift_daily_choice_groups_test.dart`; меняются тесты счётчиков, групп и параметров намерения.
+  - **Размер:** M.
+
+- [x] 1.26 Удаление связи не блокируют пути
+  - **Критерии приёмки:**
+    - Подробный просмотр связи предлагает удаление любой существующей связи; разрешения связи и отказ «связь используется в дневном пути» удалены из данных, команд, пакетов изменений, состояния и сообщений.
+    - Удаление связи, пара которой входит в пути действий, удаляет связь, сохраняет действия и пути и оставляет надгробие пары с её типом.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation test/graph/data/drift_relation_delete_test.dart test/graph/data/drift_relation_archive_restore_test.dart test/app/long_term_relation_app_flow_test.dart`.
+  - **Зависимости:** 1.10.
+  - **Предполагаемые файлы:**
+    - удаляются `lib/src/long_term_relation/application/long_term_relation_permissions.dart`, `test/graph/data/drift_daily_path_protection_test.dart`;
+    - меняются `lib/src/long_term_relation/application/long_term_relation_command.dart`, `long_term_relation_projection.dart`, `lib/src/graph/application/graph_change.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `drift_personal_graph_repository_relation_commands.dart`, `drift_personal_graph_repository_relation_details.dart`;
+    - меняются `lib/src/long_term_relation/presentation/details/relation_details_state.dart`, `relation_details_view_model.dart`, `relation_details_sheet.dart`, `relation_command_failure_message.dart`, `relation_list_reconciliation.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и их тесты.
+  - **Размер:** M по логике: одно разрешение удаляется через все слои связи.
+
+- [x] 1.27 Бенчмарки статистики, журнала фактов, экспорта, импорта и восстановления работают на действиях
+  - **Критерии приёмки:**
+    - Фикстуры бенчмарков наполняют прежний профиль графа — 50 000 намерений и 150 000 связей с циклами — действиями с путями до 60 в день на несколько лет и надгробиями вместо дневных выборов.
+    - Бюджеты бенчмарков статистики Главной, статистики намерения, «Через связи», журнала фактов, экспорта, импорта и восстановления не ослаблены и соблюдаются.
+  - **Проверка:**
+    - `mise run benchmark`.
+  - **Зависимости:** 1.6, 1.7, 1.21, 1.23.
+  - **Предполагаемые файлы:** `benchmark/support/contribution_statistics_fixture.dart`, `intention_statistics_fixture.dart`, `graph_log_fixture.dart`, `graph_log_database.dart`, `graph_log_memory_worker.dart`, `graph_replacement_timing.dart`, `benchmark/statistics/drift_statistics_benchmark.dart`, `drift_intention_statistics_benchmark.dart`, `drift_through_relations_statistics_benchmark.dart`, `benchmark/graph_log/graph_log_benchmark.dart`.
+  - **Размер:** M.
+
+- [x] 1.28 Граф больше не читает и не меняет дневные выборы
+  - **Критерии приёмки:**
+    - Чтения, каталог, состояния дней, наблюдение, команды и проверка пути дневных выборов, их контракты в `PersonalGraphRepository` и координаторе, `DailyChoiceChange`, завершения и сообщения представителя, события диагностики и строки удалены.
+    - В `lib/src/daily_choice/` остаются только типы, которые нужны хранилищу, формату и журналу фактов до задачи 1.29; тесты, готовившие данные командой создания дневного выбора, готовят действия.
+  - **Проверка:**
+    - `mise run codegen`, затем `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- flutter test test/graph test/app test/shared/diagnostics test/intention test/long_term_relation`.
+  - **Зависимости:** 1.10, 1.19, 1.20, 1.22, 1.24, 1.25, 1.26.
+  - **Предполагаемые файлы:**
+    - удаляются `lib/src/daily_choice/application/`, `lib/src/graph/data/drift_personal_graph_repository_daily_choice_*.dart`, `drift_daily_choice_path_validation.dart`;
+    - меняются `lib/src/graph/application/graph_command_coordinator.dart`, `graph_change.dart`, `personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, `developer_diagnostics_sink.dart`, `lib/src/app/app_runtime.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`;
+    - удаляются `test/daily_choice/`, `test/graph/data/drift_daily_choice_*_test.dart`, `test/support/daily_choice_*.dart`; меняются тесты, готовившие данные дневными выборами.
+  - **Размер:** M по логике: файлов больше нормы, но почти всё — удаление.
+
+- [x] 1.29 Хранилище, формат и журнал фактов больше не содержат дневных выборов
+  - **Критерии приёмки:**
+    - Таблицы, индексы, триггеры и отметки журнала фактов дневных выборов удалены из базовой схемы версии 8, снимок `drift_schema_v8.json` перегенерирован, и ни один `INDEXED BY` не ссылается на индексы дневных выборов.
+    - Формат, сводки, замена графа, снимки и эталонные файлы больше не содержат дневных выборов; файл прежнего неопубликованного варианта отклоняется существующим отказом без изменения данных графа и копий.
+    - `lib/src/daily_choice/` и тесты, фикстуры и вспомогательные файлы дневных выборов удалены; тесты, проверявшие сохранность дневных выборов при удалении тега, намерения или связи, проверяют сохранность действий и путей.
+  - **Проверка:**
+    - `mise run codegen`, затем `mise run codegen-check` и `mise exec --no-deps -- flutter analyze`.
+    - `mise exec --no-deps -- flutter test test/data test/graph test/graph_format test/graph_snapshots test/graph_backups test/data_transfer test/tag test/app/graph_import_failures_app_flow_test.dart`.
+  - **Зависимости:** 1.27, 1.28.
+  - **Предполагаемые файлы:**
+    - удаляются `lib/src/data/local/schema/daily_choice_schema.drift`, `lib/src/daily_choice/`, `lib/src/graph/data/stored_choice_path_verification.dart`, `test/data/local/daily_choice_schema_test.dart`, `test/graph/data/file_backed_daily_choice_durability_test.dart`, `test/support/daily_choice_durability_fixture.dart`, `daily_choice_reconciliation_fixture.dart`;
+    - меняются `lib/src/data/local/schema/graph_log_schema.drift`, `lib/src/data/local/app_database.dart` и `.g.dart`, `drift_schemas/drift_schema_v8.json`, `lib/src/graph_format/graph_format_records.dart`, `graph_format_codec.dart`, `graph_format_file.dart`, `lib/src/graph/data/graph_fact_capture.dart`, `graph_record_rows.dart`, `stored_graph_rows.dart`, `drift_personal_graph_repository_replacement.dart`, `lib/src/graph_snapshots/graph_state_assembly.dart`, `lib/src/data_transfer/application/graph_composition.dart`;
+    - меняются `test/graph_format/golden/*.jsonl` и тесты удаления тегов, намерений и связей.
+  - **Размер:** M по логике: файлов больше нормы, но почти всё — удаление.
+
+- [x] 1.30 Системные тексты, ADR и разделы Purpose спек называют действия вместо дневных выборов
+  - **Критерии приёмки:**
+    - Подтверждение удаления тега говорит, что намерения, связи, действия и их пути сохранятся; ни одна строка локализации, событие диагностики и имя в `lib/`, `test/` и `benchmark/` не называет дневные выборы.
+    - Предложенные ADR из списка терминологических правок `adr.md` называют действия, экран дня и пути действий там, где говорили о дневных выборах, а индекс `docs/adr/README.md` с ними согласован; принятая ADR-0001 сохраняет исходное обоснование по `ADR-FORMAT.md`. Формулировки о готовности к действию ждут третьей фазы.
+    - Раздел Purpose канонической `openspec/specs/app-navigation/spec.md` описывает итоговое поведение по спекам изменения: постоянный доступ к Главной, экрану дня «Действия» и каталогу намерений, названия и подсказки пунктов, входы в экран дня и каталог намерений и лист нового действия над обычной страницей, без каталога дневных выборов и точек входа в каталоги. Раздел Purpose канонической `openspec/specs/contribution-statistics/spec.md` говорит, во что складываются действия за месяц или год. Требования этих спек не меняются: их обновляет синхронизация спек изменения.
+  - **Проверка:**
+    - `grep -rniE 'daily.?choice|дневн' lib test benchmark` ничего не находит.
+    - `grep -rniE 'daily.?choice|дневн' docs/adr` находит только поля Originating change, имена изменений и имена файлов в ссылках, обоснование принятой ADR-0001, записи ADR-0055–ADR-0060 и части ADR-0022, ADR-0026, ADR-0051 и ADR-0054, которые они заменяют, вместе со строками индекса об этих частях.
+    - `awk '/^## Purpose/,/^## Requirements/' openspec/specs/app-navigation/spec.md openspec/specs/contribution-statistics/spec.md | grep -niE 'дневн|точки входа'` ничего не находит.
+    - `mise exec --no-deps -- flutter test test/tag`.
+  - **Зависимости:** 1.29.
+  - **Предполагаемые файлы:** `lib/l10n/app_ru.arb`, `app_en.arb`, ADR `docs/adr/` с номерами 0017, 0024, 0025, 0028, 0031, 0032, 0033, 0034, 0035, 0041, 0047, 0049, 0050, 0052 и 0053, `docs/adr/README.md`, `openspec/specs/app-navigation/spec.md`, `openspec/specs/contribution-statistics/spec.md`.
+  - **Размер:** M по логике: файлов больше нормы, но меняются только формулировки.
+
+- [x] 1.31 Фаза 1 готова: приложение проходит полные проверки на действиях
+  - **Критерии приёмки:**
+    - Выполнено условие «Ready to advance» фазы 1 из `plan.md`: прежние таблицы, модуль и потоки дневных выборов удалены, приложение проходит полные проверки проекта на действиях, а бюджеты статистики подтверждены бенчмарками на действиях.
+    - Сгенерированный код согласован с исходниками, а изменение проходит строгую проверку OpenSpec.
+    - Собран APK, а результаты команд сообщены в сессии; ручная проверка на устройстве перенесена в конец изменения, после Фазы 4, и здесь не перечисляется.
+  - **Проверка:**
+    - `mise run codegen-check`, `mise run check`, `mise run benchmark`.
+    - `mise exec --no-deps -- openspec validate introduce-actions-and-intention-kinds --strict --no-interactive`.
+    - `mise exec --no-deps -- flutter build apk --release`; передать `build/app/outputs/flutter-apk/app-release.apk`.
+  - **Зависимости:** 1.1–1.30.
+  - **Предполагаемые файлы:** нет, только проверка.
+  - **Размер:** XS.
+
+- [x] 1.32 Порция вкладки «Действия» читается по индексу роли с копией ключа порядка действия
+  - **Критерии приёмки:**
+    - `action_path_items` внутри базовой версии схемы 8 без миграции хранит роль строки («корневое», «промежуточное», «конечное», «единственное» для пути из одного намерения) и копию ключа порядка действия — дату, час или `-1` для «Весь день» и `creation_sequence`, — а индекс `(intention_id, роль, дата DESC, час DESC, creation_sequence DESC)` отдаёт строки роли в порядке списка (D2). Снимок `drift_schemas/drift_schema_v8.json` и сгенерированный код перегенерированы.
+    - Триггер вставки отклоняет копию, не совпадающую с действием, и роль, не согласованную с позицией и ролью предыдущей позиции; изменение даты или часа действия переписывает копии в строках его пути, а триггер неизменности строк пути разрешает менять только скопированные столбцы. Пишущие пути задают роль и копию; формат данных, факты журнала и сводка изменений резервных копий их не содержат, а изменение копии не даёт фактов, кроме изменения самого действия.
+    - Первая порция и продолжение вкладки «Действия» выбирают строки роли по новому индексу, а курсор сравнивает копию ключа; списки «Корневое» и «Конечное» включают действия с путём из одного намерения. Порядок, группы, числа ролей и согласование с изменениями действий не меняются (требование «Список действий роли намерения»). Числа ролей первой страницы могут по-прежнему проходить все строки пути намерения (D10).
+    - Схемные тесты закрепляют синхронизацию копии при изменении даты и часа действия, отклонение неверной копии и неверной роли при вставке и отказ в изменении остальных столбцов строки пути.
+    - `test/graph/data/drift_intention_actions_read_cost_test.dart` дополнительно проверяет, что план первой порции и продолжения каждой роли не содержит `USE TEMP B-TREE`.
+    - Новый бенчмарк `benchmark/**/*_benchmark.dart` читает первую страницу и продолжение в глубине списка вкладки на профиле статистики, где одно намерение входит в пути до 60 действий в день за несколько лет, и сообщает бюджеты из D10: p95 продолжения не больше 10 мс, первой страницы вместе с числами ролей — не больше 200 мс; оба соблюдаются.
+  - **Проверка:**
+    - `mise run codegen`, затем `mise run codegen-check`.
+    - `mise exec --no-deps -- flutter test test/data/local test/graph/data/drift_intention_actions_read_cost_test.dart test/graph/data/drift_intention_actions_read_test.dart test/graph/data/drift_action_update_test.dart test/graph/data/graph_fact_capture_test.dart test/graph/data/drift_graph_fact_log_completeness_test.dart`.
+    - `mise exec --no-deps -- flutter test --no-pub <новый бенчмарк> --concurrency=1 --reporter=expanded` сообщает `withinBudget` для обоих бюджетов.
+  - **Зависимости:** 1.20, 1.27, 1.31.
+  - **Предполагаемые файлы:** `lib/src/data/local/schema/action_schema.drift`, `graph_log_schema.drift` (комментарий о неизменности строк пути), `lib/src/data/local/app_database.dart` с `.g.dart`, `drift_schemas/drift_schema_v8.json`, `lib/src/graph/data/drift_personal_graph_repository_intention_actions.dart`, `drift_personal_graph_repository_replacement.dart`, `test/support/action_seed.dart`, `benchmark/support/intention_statistics_fixture.dart` и другие фикстуры с прямой вставкой строк пути, `test/data/local/action_schema_test.dart`, `test/graph/data/drift_intention_actions_read_cost_test.dart`, новый `benchmark/intention/intention_actions_benchmark.dart`.
+  - **Размер:** M.
+
+- [x] 1.33 Закрытая во время удаления панель действия не меняет освобождённую модель
+  - **Критерии приёмки:**
+    - После `dispose()` модель `ActionPanelViewModel` не меняет состояние и не вызывает `notifyListeners()` при любом исходе идущей записи, в том числе в `delete()` после ожидания записи: подтверждённое удаление, отказ и отсутствие действия, пришедшее во время удаления, не трогают освобождённую модель. Продуктовое поведение не меняется.
+    - `delete()` по-прежнему возвращает вызывающему исход своей записи, а отказ удаления после закрытия панели доходит до общей поверхности результатов, как при закрытии панели во время любой другой записи (требование «Подтверждённое удаление действия», задача 1.17).
+    - Тест в `test/action/presentation/panel/action_panel_view_model_test.dart`: удаление стоит в очереди за другой операцией графа, модель освобождается до завершения записи; при успехе и при отказе записи нет ошибки освобождённого `ChangeNotifier`, `delete()` возвращает `true` и `false` соответственно, а отказ передан общей поверхности результатов.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/action/presentation/panel`.
+  - **Зависимости:** 1.17.
+  - **Предполагаемые файлы:** `lib/src/action/presentation/panel/action_panel_view_model.dart`, `test/action/presentation/panel/action_panel_view_model_test.dart`.
+  - **Размер:** XS.
+
+- [x] 1.34 Устаревший список вкладки «Действия» не показывает подгрузку, которая не начнётся
+  - **Критерии приёмки:**
+    - Подвал списка вкладки «Действия» (`_pageFooter` в `intention_actions_sliver.dart`) показывает индикатор «Загружаем ещё действия…», только когда подгрузка может начаться — часть списка свежая (`IntentionActionsCurrent`). В устаревшей части, где `loadMore` порцию не запрашивает, индикатора подгрузки нет, а отказ обновления по-прежнему показывается над списком — так же, как экран дня не показывает подгрузку при отказе обновления (`action_day_body.dart`). Отказ продолжения и его повтор показываются как прежде.
+    - Тест в `test/action/presentation/intention_actions`: у загруженной роли есть следующая порция, и в свежей части подвал показывает «Загружаем ещё действия…»; после отказа обновления этой части индикатор не показан, а отказ обновления виден.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/action/presentation/intention_actions test/intention/presentation/details/intention_details_actions_test.dart`.
+  - **Зависимости:** 1.20.
+  - **Предполагаемые файлы:** `lib/src/action/presentation/intention_actions/intention_actions_sliver.dart`, новый тест в `test/action/presentation/intention_actions/`.
+  - **Размер:** XS.
+
+- [x] 1.35 Скрипт проверки переноса окна на Android открывает экран дня «Действия»
+  - **Критерии приёмки:**
+    - `tool/check_android_display_transfer.py` открывает экран дня пунктом нижней панели «Действия»/«Actions» (`appDestinationActions`) и читает его состояние по текущим строкам `lib/l10n/app_ru.arb` и `app_en.arb`: выбранную дату, месяц просмотра, заголовки секций «Невыполненные»/«Not completed» и «Выполненные»/«Completed» с числами действий, первую строку «Действие № 1.»/«Action #1.» (`actionDayRowLabel`) или пустое состояние «Нет действий на эту дату»/«No actions for this date» (`actionDayEmptyTitle`). Фильтра выполнения и общего количества на экране дня нет (требование «Секции выполнения действий» из `action-management`), поэтому скрипт их не ищет, а числа в заголовках секций занимают место прежнего количества. Остальные проверки скрипта не меняются.
+    - Скрипт не упоминает дневные выборы ни в подписях, ни в именах, ни в сообщениях.
+    - Отчёт задачи прямо говорит, что скрипт на эмуляторе и устройстве не запускался и проверен только компиляцией, а его работу пользователь подтверждает при ручной проверке после Фазы 4.
+  - **Проверка:**
+    - `python3 -m py_compile tool/check_android_display_transfer.py`.
+    - `grep -rniP 'daily.?choice|(?<!еже)дневн' tool` ничего не находит.
+  - **Зависимости:** 1.19, 1.30.
+  - **Предполагаемые файлы:** `tool/check_android_display_transfer.py`.
+  - **Размер:** XS.
+
+- [x] 1.36 Тесты быстрого создания и маршрутизатора проверяют только регрессии, при которых могут упасть
+  - **Критерии приёмки:**
+    - В `test/app/quick_creation/quick_creation_mode_controller_test.dart` удалены тесты «поздние исходы отказ → отказ не меняют режим» и «повторный выбор текущего режима получает собственный исход»: при одном режиме `intention` они проходят и при откате, и при перезаписи режима. Тесты отката с двумя режимами появятся в Фазе 2 вместе со вторым режимом.
+    - В `test/app/routing/app_router_test.dart` удалена отрицательная проверка ключа `catalog-open-daily-choices`, которого в `lib/` нет.
+    - Тесты и случаи прежнего ключа удалённого режима — разрезанные литералы вида `'daily' '-choice'` и `'daily' 'Choice'` и значения `daily-choice-from-intention`, `daily-choice-from-action` — удалены из `file_quick_creation_mode_store_test.dart`, `quick_creation_mode_controller_test.dart`, `quick_creation_mode_process_test.dart`, `quick_creation_runtime_restart_test.dart` в `test/app/quick_creation/` и из `test/app/bootstrap/app_runtime_quick_creation_mode_test.dart`: по D13 `design.md` прежний ключ читается общим правилом неизвестного ключа, которое проверяет тест «неизвестный ключ возвращает начальный режим с категорией повреждения» в `file_quick_creation_mode_store_test.dart`; этот тест сохраняется.
+    - Если тест смешивает прежний ключ с другой проверкой, остаётся только другая проверка: там, где прежний ключ служил начальным содержимым файла, отличающим нетронутую настройку от записанной, это различие проверяется без прежнего ключа.
+    - Продуктовое поведение не меняется; ни один литерал не разрезан ради обхода текстовой проверки, и исключений в проверках не требуется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/quick_creation test/app/bootstrap/app_runtime_quick_creation_mode_test.dart test/app/routing`.
+    - `grep -rn "'daily'" test/app/quick_creation test/app/bootstrap test/app/routing` ничего не находит.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `test/app/quick_creation/quick_creation_mode_controller_test.dart`, `file_quick_creation_mode_store_test.dart`, `quick_creation_mode_process_test.dart`, `quick_creation_runtime_restart_test.dart`, `test/app/bootstrap/app_runtime_quick_creation_mode_test.dart`, `test/app/routing/app_router_test.dart`.
+  - **Размер:** S по логике: шесть тестовых файлов, изменения сводятся к удалениям.
+
+- [x] 1.37 Чтение групп связей и отказы команд действий не содержат элементов без потребителей
+  - **Критерии приёмки:**
+    - Закрытой иерархии `RelationGroup` в `lib/src/long_term_relation/application/relation_group.dart` нет: потребители используют `LongTermRelationGroup` напрямую, без надтипа. Если после удаления `forSelection` и `RelationGroupQuery.group` у `LongTermRelationGroup` не остаётся потребителей, удалены и он, и файл `relation_group.dart` с его импортом и реэкспортом.
+    - Закрытого `RelationGroupPageQuery` в `relation_group_page.dart` нет: репозиторий, его реализация на Drift и тестовые подмены принимают `RelationGroupQuery`, а группа строится из полей запроса без промежуточного типа. В `relation_counts.dart` нет `forSelection`, в `lib/src/graph/data/drift_personal_graph_repository_relation_groups.dart` нет переключений с одной ветвью; тест `test/app/navigation/app_shell_operation_reset_test.dart` берёт число группы через `forGroup` по полям запроса.
+    - В `lib/src/action/application/action_result.dart` нет `ActionValidationFailure` и его комментария; `ActionValidationField` удалён, если у него не остаётся потребителей. Сообщение этого отказа удалено из `lib/src/action/presentation/action_command_failure_message.dart`, а его случаи — из `test/graph/presentation/graph_operation_presenter_test.dart`. Строка `actionTitleInvalid` удалена из `lib/l10n/app_ru.arb` и `app_en.arb`, если её единственным потребителем было это сообщение; `actionDescriptionInvalid`, которую использует редактор текста действия, сохраняется.
+    - Строка `relationNeighborhoodEmpty` удалена из `lib/l10n/app_ru.arb` и `app_en.arb` вместе с описанием, локализация перегенерирована.
+    - Поведение не меняется: чтение групп связей, их числа и показ отказов команд действий остаются прежними.
+  - **Проверка:**
+    - `mise run codegen`, затем `mise run codegen-check` и `mise exec --no-deps -- flutter analyze`.
+    - `grep -rnE 'sealed class RelationGroup\b|RelationGroupPageQuery|forSelection|ActionValidationFailure|relationNeighborhoodEmpty' lib test benchmark` ничего не находит.
+    - `mise exec --no-deps -- flutter test test/long_term_relation test/graph/data/drift_relation_group_page_test.dart test/graph/data/drift_relation_group_large_fixture_test.dart test/graph/presentation/graph_operation_presenter_test.dart test/action test/app/navigation/app_shell_operation_reset_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/long_term_relation/application/relation_group.dart`, `relation_group_page.dart`, `relation_counts.dart`, `lib/src/graph/application/personal_graph_repository.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `drift_personal_graph_repository_relation_groups.dart`, `lib/src/action/application/action_result.dart`, `lib/src/action/presentation/action_command_failure_message.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и сгенерированные `app_localizations*.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`, `test/app/navigation/app_shell_operation_reset_test.dart` и тестовые подмены репозитория с сигнатурой `RelationGroupPageQuery` в `test/`.
+  - **Размер:** S.
+
+- [x] 1.38 Панель резервных копий и словарь копий в коде говорят о ежедневных копиях, как спека и глоссарий
+  - **Критерии приёмки:**
+    - Пояснение `dataBackupsExplanation` в `lib/l10n/app_ru.arb` совпадает с требованием «Список резервных копий» спеки `graph-backups`: «Копия делается каждый день, если данные менялись, и хранится на этом устройстве. Остаются 7 последних ежедневных копий. Выберите копию, чтобы восстановить её.» Описание `@dataBackupsExplanation` в `app_en.arb` говорит об окне хранения ежедневных копий; английский текст не меняется. Локализация перегенерирована.
+    - Комментарии, названия тестов и описания в `lib`, `test` и `benchmark` называют копии, которые делаются раз в день, ежедневными, а не суточными: `lib/src/graph_backups`, `lib/src/graph/data/drift_personal_graph_repository_backups.dart`, `lib/src/app/app_runtime.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart` и тесты копий, восстановления, импорта, раздела «Данные» и диагностики, в том числе `test/data_transfer/presentation/backups_sheet_test.dart`, который закрепляет видимый текст пояснения по спеке.
+    - Поведение не меняется; ни один литерал и ни одно слово не разрезаны ради обхода текстовых проверок. Спеки и `CONTEXT.md` не меняются.
+  - **Проверка:**
+    - `mise run codegen`, затем `mise run codegen-check`.
+    - `grep -rniP 'daily.?choice|(?<!еже)дневн' lib test benchmark` ничего не находит (шаблон не совпадает с «ежедневн»).
+    - `grep -rni 'суточн' lib test benchmark` ничего не находит.
+    - `mise exec --no-deps -- flutter test test/data_transfer test/graph_backups test/graph/data/drift_graph_backup_registry_test.dart test/app/graph_backups_app_flow_test.dart test/app/graph_restore_app_flow_test.dart test/app/graph_import_app_flow_test.dart test/app/graph_import_failures_app_flow_test.dart test/app/bootstrap/app_runtime_graph_backups_test.dart test/shared/diagnostics/diagnostics_sink_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/l10n/app_ru.arb`, `app_en.arb` и сгенерированные `app_localizations*.dart`, `lib/src/graph_backups/graph_backups.dart`, `graph_backups_provider.dart`, `graph_backup_registry.dart`, `lib/src/graph/data/drift_personal_graph_repository_backups.dart`, `lib/src/app/app_runtime.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, тесты в `test/data_transfer`, `test/graph_backups`, `test/graph/data/drift_graph_backup_registry_test.dart`, `test/app` (копии, восстановление, импорт, `bootstrap/app_runtime_graph_backups_test.dart`), `test/shared/diagnostics/diagnostics_sink_test.dart`, `test/support/graph_history_rows.dart`.
+  - **Размер:** S по логике: файлов больше нормы, но меняются только формулировки.
+
+- [x] 1.39 Регрессионные тесты закрепляют даты отметок экрана дня в UTC и принадлежность вкладки «Действия» странице намерения
+  - **Критерии приёмки:**
+    - `test/action/presentation/day/action_day_calendar_utc_dates_test.dart` проверяет каждый несгенерированный файл `lib/src/action/presentation/day/` с префиксом `action_day_calendar` или `action_day_marks_`, в том числе добавленный позже, вместе с `lib/src/shared/domain/calendar_date.dart`; сгенерированные `.g.dart` не проверяются. Обязательный набор путей включает `action_day_calendar.dart` и `action_day_marks_window.dart`. Комментарий к каталогу и название теста называют календарь и отметки экрана дня; поиск конструкций местного времени не меняется.
+    - Тест в `test/intention/presentation/details/intention_details_actions_test.dart` или `test/action/presentation/intention_actions/intention_actions_view_model_test.dart` показывает, что две страницы одного намерения не делят состояние вкладки «Действия»: выбор плитки роли и подгрузка порции на одной странице не меняют плитку, строки и продолжение другой (требование «Цель открытия страницы намерения» из `intention-management`).
+    - Тест в `test/action/presentation/intention_actions/intention_actions_view_model_test.dart` показывает, что подтверждённое переименование корневого намерения загруженной строки (ветвь `IntentionCatalogMutation` в `lib/src/action/presentation/intention_actions/intention_actions_view_model.dart`) перечитывает вкладку, и её строки показывают новое название корня (требование «Вкладка «Действия» страницы намерения» из `action-management`).
+    - Код `lib/` и продуктовое поведение не меняются. Названия тестов — на русском, в канонических терминах `CONTEXT.md`.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/action/presentation/day/action_day_calendar_utc_dates_test.dart test/action/presentation/intention_actions test/intention/presentation/details`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `test/action/presentation/day/action_day_calendar_utc_dates_test.dart`, `test/action/presentation/intention_actions/intention_actions_view_model_test.dart`, `test/intention/presentation/details/intention_details_actions_test.dart`.
+  - **Размер:** S.
+
+- [x] 1.40 Названия, тексты и вспомогательные параметры тестов называют корневые и конечные намерения, действия и экран дня
+  - **Критерии приёмки:**
+    - Устаревшие термины в названиях и описаниях тестов, текстах `fail`, комментариях, именах помощников и параметров заменены каноническими терминами `CONTEXT.md` и спек: корневое и конечное намерение, действие, экран дня. Переименование выполняется по текущему содержимому файлов, даже если к началу задачи они изменились.
+    - `test/app/home_statistics_app_flow_test.dart`: «исходные намерения» и «Новое исходное намерение» называют корневые намерения.
+    - `test/statistics/presentation/intention_statistics_view_model_test.dart`: «разбивка по исходным намерениям» называет разбивку по корневым намерениям.
+    - `test/statistics/application/intention_statistics_read_contract_test.dart`: «месяцы без выборов» называют месяцы без действий; «исходная карта» переименована, если под ней понимается не входная карта отметок теста.
+    - `test/app/intention_statistics_navigation_test.dart`: «день открывает каталог» называет открытие экрана дня.
+    - Параметры `sourcesCursor` и `actionsCursor` в `test/statistics/presentation/intention_statistics_test_support.dart` названы курсорами разбивок корневых и конечных намерений; все вызовы, в том числе в `intention_statistics_view_model_test.dart` и `intention_statistics_reconciliation_test.dart`, используют новые имена.
+    - В `test/action/presentation/day/action_day_rows_test.dart`, `action_day_root_page_test.dart` и `test/support/action_day_controls.dart` «каталог» в названиях, текстах и комментариях называет экран дня; помощники и параметры с префиксом `catalog` в `test/support/action_day_controls.dart` и `catalogDate` в `test/action/presentation/day/action_day_page_test_support.dart`, которым пользуется `action_day_root_page_test.dart`, переименованы вместе со всеми вызовами.
+    - `test/design_system/count_tiles_test.dart`: подпись «Выборы намерения» заменена на «Действия намерения».
+    - Проверки тестов, их данные и продуктовый код `lib/` не меняются; идентификаторы `IntentionCatalog*` и каталог намерений, который остаётся каноническим термином, не переименовываются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test` для изменённых тестовых файлов и тестов, вызывающих переименованные помощники из `test/support/action_day_controls.dart`, `test/action/presentation/day/action_day_page_test_support.dart` и `test/statistics/presentation/intention_statistics_test_support.dart`.
+    - `mise exec --no-deps -- flutter analyze test` — без замечаний.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `test/app/home_statistics_app_flow_test.dart`, `test/app/intention_statistics_navigation_test.dart`, `test/statistics/presentation/intention_statistics_view_model_test.dart`, `intention_statistics_reconciliation_test.dart`, `intention_statistics_test_support.dart`, `test/statistics/application/intention_statistics_read_contract_test.dart`, `test/action/presentation/day/action_day_rows_test.dart`, `action_day_root_page_test.dart`, `action_day_page_test_support.dart` и тесты экрана дня, вызывающие его помощники, `test/support/action_day_controls.dart` и его потребители в `test/app` и `test/action/presentation/day`, `test/design_system/count_tiles_test.dart`.
+  - **Размер:** S по логике: файлов больше нормы, но меняются только имена и тексты.
+
+- [x] 1.41 Сводка статистики намерения показывает долю без недостижимой ветви, а описания контракта называют только реальные условия
+  - **Критерии приёмки:**
+    - `_shareLabel` в `lib/src/statistics/presentation/intention_statistics_overview.dart` всегда возвращает долю (`String`, не `String?`) без ветви `periodCounts.planned == 0`: сводка строится только для `IntentionStatisticsData`, где `selectedCounts.planned > 0`, а `IntentionStatisticsSection` отклоняет `selectedCounts.planned > periodCounts.planned`. Комментарий функции не упоминает случай без действий периода, а сводка показывает долю без проверки на `null`.
+    - В комментарии к `periodCounts` в `lib/src/statistics/application/intention_statistics_read_contract.dart` нет описания случая «при нуле доли нет».
+    - Описание привязки курсора `StatisticsBreakdownCursor` в `lib/src/statistics/application/intention_statistics_breakdown.dart` не называет местную дату и перечисляет только условия, которые курсор действительно связывает.
+    - Поведение не меняется: сводка, доля и продолжение разбивок остаются прежними.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter analyze` — без замечаний.
+    - `mise exec --no-deps -- flutter test test/statistics`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `lib/src/statistics/presentation/intention_statistics_overview.dart`, `lib/src/statistics/application/intention_statistics_read_contract.dart`, `lib/src/statistics/application/intention_statistics_breakdown.dart`.
+  - **Размер:** XS.
+
+- [x] 1.42 Тесты формата, статистики Главной, тегов связи и сохранности действий проверяют только собственные регрессии
+  - **Критерии приёмки:**
+    - В `test/graph_format/graph_format_file_test.dart` нет случаев «пустой путь действия» и «повтор намерения в пути действия»: оба проходят через то же отклонение `ActionPath`, которое проверяет `test/graph_format/graph_format_codec_test.dart`, и не добавляют поведения уровня файла. Остальные случаи отказа файла сохраняются.
+    - В `test/statistics/presentation/home_statistics_content_test.dart` нет теста «в виде «Через связи» одно действие даёт каждому намерению полный вклад и долю 100%»: показ чисел и доли проверяют другие тесты этого файла, а полный вклад одного действия каждому намерению — `test/graph/data/drift_through_relations_statistics_read_test.dart`.
+    - В `test/long_term_relation/presentation/details/relation_details_tags_test.dart` нет признака `usedByAction`: перебор, название теста и комментарий к перебору говорят только об активности и типе связи, а засев не удаляет действие фикстуры и не создаёт действие с путём через связь, потому что панель связи не читает пути действий. Перебор активности и типа связи и проверки отсутствия собственных тегов сохраняются.
+    - В тесте «сохранённые действия переживают перезапуск, правки и удаление дубликата» из `test/app/action_day_app_flow_test.dart` нет перезапуска между засевом и первыми проверками и нет `createdPath`: сохранность засеянных данных при повторном открытии проверяет `test/graph/data/file_backed_action_durability_test.dart`. Путь действия проверяется по засеянным идентификаторам намерений и связей, а перезапуск после правок через панель и удаления дубликата с проверками после него сохраняется.
+    - Имена вспомогательных функций и параметров берутся по текущему содержимому файлов, даже если к началу задачи они изменились. Код `lib/` и продуктовое поведение не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph_format/graph_format_file_test.dart test/statistics/presentation/home_statistics_content_test.dart test/long_term_relation/presentation/details/relation_details_tags_test.dart test/app/action_day_app_flow_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `test/graph_format/graph_format_file_test.dart`, `test/statistics/presentation/home_statistics_content_test.dart`, `test/long_term_relation/presentation/details/relation_details_tags_test.dart`, `test/app/action_day_app_flow_test.dart`.
+  - **Размер:** XS.
+
+- [x] 1.43 Продолжение списков «Корневое» и «Конечное» сливает роль «единственное» с многозвенной ролью без повторов и пропусков
+  - **Критерии приёмки:**
+    - В `test/graph/data/drift_intention_actions_read_test.dart` есть один поведенческий тест с русским названием. Он читает список роли «Корневое» или «Конечное» несколькими порциями малого размера (`pageSize` 2–3) через `nextCursor`.
+    - У читаемого намерения есть действия с путём из одного намерения (роль «единственное», путь `[намерение]`) и действия с многозвенным путём, где намерение стоит на читаемой роли. По ключу порядка (дата, час, последовательность) они чередуются, и действия обоих видов попадают на границу порции.
+    - Тест сверяет полный порядок идентификаторов по всем порциям без повторов и пропусков. Он падает, если в любой из двух ветвей `UNION ALL` в `lib/src/graph/data/drift_personal_graph_repository_intention_actions.dart` теряется условие курсора `(order_date, order_hour, order_sequence) < (?, ?, ?)` или его переменные привязаны неверно.
+    - Код `lib/`, `test/graph/data/drift_intention_actions_read_cost_test.dart` и бенчмарки не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_intention_actions_read_test.dart`.
+    - `mise exec --no-deps -- flutter analyze test` — без замечаний.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `test/graph/data/drift_intention_actions_read_test.dart`.
+  - **Размер:** XS.
+
+- [x] 1.44 Тесты экрана дня называют экран дня, а не «каталог»
+  - **Критерии приёмки:**
+    - В `test/action/presentation/day/action_day_layout_test.dart` переменная `catalog` («экран дня на дату» или «корневой экран дня»), которая подставляется в названия тестов, переименована по образцу `action_day_root_page_test.dart` (например, в `screen`) вместе со всеми подстановками в названия тестов.
+    - В `test/action/presentation/day/action_day_supported_layout_test.dart` помощники `_expectUsableCatalog` и `_catalogContent` переименованы в термины экрана дня (например, `_expectUsableScreen` и `_screenContent`) вместе со всеми вызовами и использованиями.
+    - После переименования в тестах `test/action/presentation/day` «catalog» и «каталог» встречаются только в значении каталога намерений (`IntentionCatalog*`, `getCatalogPage`, `catalogMutation`, `answerCatalogQuery` и т. п. не переименовываются) или каталога файловой системы (`_catalogDirectory` в `action_day_calendar_utc_dates_test.dart` остаётся).
+    - Имена берутся по текущему содержимому файлов, даже если к началу задачи они изменились. Проверки тестов, их данные и код `lib/` не меняются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/action/presentation/day/action_day_layout_test.dart test/action/presentation/day/action_day_supported_layout_test.dart`.
+    - `mise exec --no-deps -- flutter analyze test` — без замечаний.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `test/action/presentation/day/action_day_layout_test.dart`, `test/action/presentation/day/action_day_supported_layout_test.dart`.
+  - **Размер:** XS.
+
+- [x] 1.45 Тест освобождения контроллера быстрого создания задаёт исход отказа без псевдонима и перебора
+  - **Критерии приёмки:**
+    - В `test/app/quick_creation/quick_creation_mode_controller_test.dart` тест «исход … после освобождения не обращается к состоянию» передаёт в `store.completeNext` исход `QuickCreationModeSaveFailed(DiagnosticsFailureCode.unavailable)` напрямую, без пары констант `failed` и `outcome = failed`.
+    - Название теста содержит «отказ» обычным текстом, например «исход «отказ» после освобождения не обращается к состоянию».
+    - Функция `_outcomeName` удалена, если у неё не осталось других потребителей.
+    - Проверки теста не меняются: `expect(await saving, isA<QuickCreationModeSaveFailed>())` и `expect(_acceptedModes(store), [QuickCreationMode.intention])`. Код `lib/` не меняется.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/quick_creation/quick_creation_mode_controller_test.dart`.
+    - `mise exec --no-deps -- flutter analyze test` — без замечаний.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `test/app/quick_creation/quick_creation_mode_controller_test.dart`.
+  - **Размер:** XS.
+
+## Phase 2: Действия создаются быстро, а их пути строятся и меняются
+
+- [x] 2.1 Действие создаётся командой графа с атомарной проверкой пути
+  - **Критерии приёмки:**
+    - `CreateAction(title, description, path, date, schedule, priority)` выполняется `GraphCommandCoordinator` в одной транзакции записи графа с одной ревизией (ADR-0009, D9): записывает невыполненное действие с равными показаниями времени создания и изменения и строки пути с ролями и копией ключа порядка (D2), не меняя намерения и связи.
+    - Транзакция проверяет, что все намерения пути существуют и активны, а каждая соседняя пара соединена активной связью «нужно» или «можно» в направлении пути; нарушение завершает команду конфликтом пути (`ActionPathConflictFailure`, D9) без записи (требование «Допустимый путь действия»). Ошибка ввода, временная недоступность, повреждение и неизвестный отказ различимы, а диагностика различает операцию создания, этап и категорию без пользовательского содержимого.
+    - Отправку принимает ключ формы сессии: повтор той же формы во время записи не принимается, а другая сессия с теми же полями и путём создаёт отдельное действие. Пакет изменения несёт `ActionChange` созданного действия, по которому экран дня, отметки календаря и вкладка «Действия» страницы намерения показывают его без ручного обновления.
+    - Представитель результатов называет успех сообщением «Действие создано», а конфликт пути — безопасным объяснением, что путь больше не совпадает с графом.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_action_create_test.dart test/graph/application test/graph/presentation test/shared/diagnostics test/action/presentation/day/action_day_view_model_test.dart test/action/presentation/day/action_day_marks_view_model_test.dart test/action/presentation/intention_actions/intention_actions_view_model_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - меняются `lib/src/action/application/action_command.dart`, `action_result.dart`, `lib/src/action/presentation/action_command_failure_message.dart`, `lib/src/graph/application/graph_change.dart`, `graph_command_coordinator.dart`, `lib/src/graph/data/drift_personal_graph_repository_action_commands.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, `developer_diagnostics_sink.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`;
+    - добавляется `test/graph/data/drift_action_create_test.dart`; меняются тесты координатора, представителя, диагностики и потребителей `ActionChange` в `test/action/presentation/`.
+  - **Размер:** M по логике: новая команда проходит через существующие швы команд действия.
+
+- [x] 2.2 Путь существующего действия заменяется командой графа
+  - **Критерии приёмки:**
+    - `SetActionPath(id, path)` с той же проверкой пути, что и создание, атомарно заменяет все строки пути с ролями и копиями ключа порядка, сохраняя идентичность и остальные поля действия; время изменения обновляется, только если последовательность намерений изменилась (требования «Изменение пути существующего действия» и «Время создания и изменения действия»).
+    - Конфликт пути и отсутствие действия завершают команду без изменений; координатор не принимает её одновременно с другим изменением того же действия; успех не объявляется сообщением (ADR-0016, ADR-0046), а диагностика различает замену пути.
+    - `ActionUpdatedChange` несёт путь до и после: панель перечитывает путь, а вкладка «Действия» переносит действие между ролями намерения и убирает его из ролей намерения, которого больше нет в пути (сценарий «Смена пути убирает действие из выбранной роли»).
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_action_path_update_test.dart test/graph/data/drift_action_watch_test.dart test/graph/application test/shared/diagnostics test/action/presentation/intention_actions`.
+  - **Зависимости:** 2.1.
+  - **Предполагаемые файлы:** меняются `lib/src/action/application/action_command.dart`, `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/data/drift_personal_graph_repository_action_commands.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, `developer_diagnostics_sink.dart`; добавляется `test/graph/data/drift_action_path_update_test.dart`; меняются тесты вкладки «Действия» в `test/action/presentation/intention_actions/`.
+  - **Размер:** M.
+
+- [x] 2.3 Кандидаты следующего намерения читаются порциями по черновику пути
+  - **Критерии приёмки:**
+    - `getPathCandidates(draft, half, pageSize, cursor)` в `ActionReadContract` на одной ревизии возвращает целый начальный участок черновика — намерения от корневого до первого разрыва по требованию «Разрыв пути» с текущими названиями и типами и приоритетами связей, — точные числа кандидатов обеих половин и первую порцию открытой половины (D10). Кандидат — намерение, к которому от последнего намерения участка ведёт активная связь типа половины и которого нет в участке; архивные намерения и связи не предлагаются.
+    - Порции идут по приоритету связи от P1 к P4, затем по порядку создания связей и несут название намерения, приоритет и пару связи; продолжение привязано к ревизии и не повторяет и не пропускает строки. План запроса использует индексы связей без временного B-дерева, что подтверждает проверка плана, как в существующих `*_read_cost_test.dart`.
+    - Отказ чтения различает доказанно временную недоступность, повреждение и неизвестный отказ и отличим от пустой половины, а диагностика чтения не содержит пользовательских данных.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_path_candidates_read_test.dart test/graph/data/drift_path_candidates_read_cost_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** добавляются `lib/src/action/application/path_candidates.dart`, `lib/src/graph/data/drift_personal_graph_repository_path_candidates.dart` и два теста в `test/graph/data/`; меняются `lib/src/action/application/action_read_contract.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/shared/diagnostics/diagnostics_sink.dart`, `test/support/action_read_contract_test_fallback.dart`.
+  - **Размер:** M.
+
+- [x] 2.4 Дизайн-система рисует построение пути компонентами `PathBuilder`, `StepOption` и `PathAction`
+  - **Критерии приёмки:**
+    - Компоненты следуют своим README в `context/doable-design-system/components/`: путь сверху вниз с глифами и связями `ActionPath` в плотных размерах, место «Выберите причину» с подсказкой, цепочка, которую замыкает действие с приглушённым «Новое действие» без названия, переключатель «Нужно» и «Можно» с числами, включая 0, и «Добавить», строки кандидатов с приоритетом связи, стрелкой и отметкой «Новое», карточка пустой половины.
+    - Названия корня и промежуточных намерений — кнопки; в пути из одного намерения его название — кнопка корня; простым текстом остаётся только последнее намерение пути из двух и более намерений (требование «Сокращение пути и смена корня»); доступные имена называют путь, связь кандидата и действие, как в README.
+    - Тест компонента `PathBuilder` проверяет оба случая: название единственного намерения пути — кнопка, название последнего намерения пути из двух и более намерений — простой текст.
+    - Компоненты остаются презентационными, без предметных типов и без свойств выделения кандидатов (ADR-0030, D16).
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/path_builder_test.dart test/design_system/step_option_test.dart test/design_system/path_action_test.dart test/design_system/action_path_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** добавляются `lib/src/design_system/components/path_builder.dart`, `step_option.dart`, `path_action.dart` и их тесты в `test/design_system/`; при необходимости меняются `lib/src/design_system/components/action_path.dart` для плотных размеров и `lib/src/design_system/doable_icon.dart`.
+  - **Размер:** M.
+
+- [x] 2.5 Дизайн-система показывает свёрнутый путь и значения нового действия компонентами `PathBrief` и `ValueChip`
+  - **Критерии приёмки:**
+    - `PathBrief` следует README: пустой — пунктирный ромб и «Выберите причину» со строкой под блоком; одно намерение; два — корень, связь и конечное; три и больше — корень, строка числа промежуточных и конечное; названия переносятся без обрезки, а доступное имя читает весь путь. Слоты отметок «В архиве» и «Удалено» стоят после названий корневого и конечного намерений и на самом блоке (требование «Свёрнутый путь в листе нового действия»).
+    - `ValueChip` следует README: значок календаря или часов либо кольцо приоритета и значение без переноса, а доступное имя называет полное значение и действие нажатия.
+    - Компоненты остаются презентационными (ADR-0030).
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/design_system/path_brief_test.dart test/design_system/value_chip_test.dart`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** добавляются `lib/src/design_system/components/path_brief.dart`, `value_chip.dart` и их тесты в `test/design_system/`.
+  - **Размер:** S.
+
+- [x] 2.6 Поиск начала пути выбирает корневое намерение
+  - **Критерии приёмки:**
+    - Назначение поиска начала пути (D10) встраивается в модуль поиска (ADR-0049): экран выбора с заголовком «Выбор намерения» предлагает все активные намерения, без архивированных и без текущего корня, когда поиск открыт для смены корня, а пустой охват объясняет, что выбрать не из чего.
+    - Подзаголовок и лист «Что вы выбираете» называют поток «Новое действие» или «Изменение пути» и показывают два пронумерованных шага с отметкой «Вы здесь» у первого (требование «Поиск начала пути»).
+    - Поиск — страница-задача без панели навигации: нажатие на текст карточки закрывает его и возвращает выбранное намерение вызывающему, крестик и системное «назад» закрывают его без выбора, а стрелка открывает полную страницу намерения поверх поиска.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/action/presentation/path_start test/intention/presentation/picker test/intention/presentation/search test/intention/presentation/catalog`.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:**
+    - добавляются `lib/src/action/presentation/path_start/path_start_picker_page.dart`, `path_start_picker_purpose.dart` и тесты в `test/action/presentation/path_start/`;
+    - меняются `lib/src/intention/presentation/catalog/intention_catalog_purpose.dart`, `intention_catalog_view_model.dart`, `lib/src/intention/presentation/search/intention_search_kind.dart`, `lib/src/app/routing/app_router.dart` и `.gr.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`.
+  - **Размер:** M.
+
+- [x] 2.7 Поиск начала пути создаёт намерение и выбирает его корнем
+  - **Критерии приёмки:**
+    - Плюс в шапке и строка «Создать «название»» — пока подстрока непуста и ни одно активное намерение не называется так без учёта регистра — открывают над поиском панель создания намерения с этим названием и без строки «Сразу отмечается для новых связей» (требование «Создание намерения из поиска начала пути»).
+    - Подтверждённый успех в сохраняющейся сессии панели закрывает панель и поиск и возвращает созданное намерение вызывающему как выбранный корень; страница намерения не открывается, а сообщение называет «Намерение создано и выбрано началом пути».
+    - Поздний успех после ухода из сессии панели не меняет путь и поиск и предъявляется обычным сообщением о создании намерения.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/action/presentation/path_start test/intention/presentation/editor test/intention/presentation/picker test/graph/application test/graph/presentation`.
+  - **Зависимости:** 2.6.
+  - **Предполагаемые файлы:** меняются `lib/src/intention/presentation/editor/intention_creation_launch.dart`, `intention_editor_page.dart`, `lib/src/intention/presentation/picker/intention_picker_view.dart`, `lib/src/graph/application/graph_command_coordinator.dart`, `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/src/action/presentation/path_start/path_start_picker_page.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и их тесты.
+  - **Размер:** M.
+
+- [x] 2.8 Экран пути показывает путь, меняет корень, сокращает путь и спрашивает при уходе с изменениями
+  - **Критерии приёмки:**
+    - Экран пути — страница-задача без панели навигации (D12, ADR-0059) с «Назад», заголовком «Путь» и «Сохранить»: `PathBuilder` показывает путь сверху вниз по участку из чтения задачи 2.3, замыкает его названием действия или приглушённым «Новое действие», а пустой путь — кнопкой «Выберите причину» с подсказкой (требование «Экран пути»).
+    - «Выберите причину» и название корня открывают поиск начала пути: выбор, в том числе созданного в нём намерения, заменяет путь одним корнем, а закрытие без выбора путь не меняет; название промежуточного намерения заканчивает путь на нём, а граф не меняется (требование «Сокращение пути и смена корня»). Стрелка намерения и нажатие на связь пути открывают страницу намерения и подробный просмотр связи поверх экрана, а возврат показывает тот же путь.
+    - «Сохранить» доступна, пока последовательность намерений непуста и отличается от исходной, и возвращает путь вызывающему; «Назад» без изменений возвращает сразу, а с изменениями спрашивает «Отменить изменения?» с «Отменить» и «Продолжить правку» (требования «Сохранение пути» и «Выход с экрана пути без сохранения»).
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/action/presentation/path`.
+  - **Зависимости:** 2.3, 2.4, 2.7.
+  - **Предполагаемые файлы:**
+    - добавляются `lib/src/action/presentation/path/path_page.dart`, `path_state.dart`, `path_view_model.dart` с `.g.dart`, тесты в `test/action/presentation/path/` и `test/support/path_screen_controls.dart`;
+    - меняются `lib/src/app/routing/app_router.dart` и `.gr.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`.
+  - **Размер:** M.
+
+- [x] 2.9 Кандидаты на экране пути продолжают путь вниз
+  - **Критерии приёмки:**
+    - Под путём стоит блок следующего намерения для последнего намерения: переключатель «Нужно» и «Можно» с точными числами, включая 0, обе половины доступны, а открытой становится «Нужно» с кандидатами, иначе «Можно» с кандидатами, иначе «Нужно» — заново при каждой смене последнего намерения (требование «Половины «Нужно» и «Можно» на экране пути»).
+    - Кандидаты открытой половины приходят порциями чтения задачи 2.3 с подгрузкой при прокрутке; нажатие добавляет кандидата в конец пути, не меняя граф, а стрелка открывает страницу его намерения, не добавляя его. Пустая половина показывает своё пояснение, а загрузка и отказ с явным повтором не выглядят числом 0 или пустой половиной (требование «Кандидаты следующего намерения»).
+    - Возврат к исходному пути после правок снова делает «Сохранить» недоступной.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/action/presentation/path`.
+  - **Зависимости:** 2.3, 2.8.
+  - **Предполагаемые файлы:** добавляется `lib/src/action/presentation/path/path_candidates_block.dart`; меняются `path_page.dart`, `path_state.dart`, `path_view_model.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и тесты в `test/action/presentation/path/`.
+  - **Размер:** M.
+
+- [x] 2.10 Путь существующего действия меняется с панели на экране «Изменить путь»
+  - **Критерии приёмки:**
+    - Меню «Действие» панели получает пункт «Изменить путь» с пояснением «Намерения, ради которых делается действие» между «Изменить название и описание» и «Удалить действие»; он открывает экран пути с заголовком «Изменить путь» и сохранённым путём, а поиск начала пути с этого экрана называет поток «Изменение пути» (требования «Параметры действия» и «Изменение пути существующего действия»).
+    - Сохранённый путь с разрывом открывается с первого целого участка от первого актуального намерения, а без актуальных намерений — пустым с «Выберите причину»; участок отличается от исходного пути, поэтому «Сохранить» доступна сразу, если в нём есть намерение (требование «Изменение разорванного пути»).
+    - «Сохранить» выполняет замену пути задачи 2.2 на самом экране: при успехе экран закрывается, а панель показывает вкладку «Путь» с новым путём; отказ, в том числе конфликт пути, показывается на экране, который остаётся открытым с тем же путём; «Назад» оставляет путь действия прежним.
+    - Пока принятая замена выполняется, «Назад» и системное «назад» закрывают экран без вопроса «Отменить изменения?», а замена не отменяется и не повторяется. Успех после ухода не объявляется сообщением: открытая панель показывает новый путь обычным согласованием данных, без смены вкладки и навигации. Отказ после ухода один раз показывается на общей поверхности результатов, а панель показывает прежний сохранённый путь. Поздний результат не закрывает и не меняет другие страницы и панель (требование «Изменение пути существующего действия»).
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/action/presentation/panel test/action/presentation/path test/app/action_path_app_flow_test.dart`.
+    - Тест в `test/app/action_path_app_flow_test.dart`: замена пути задержана, пользователь уходит с экрана «Изменить путь»; при успехе вопрос не показан, а панель показывает новый путь без смены вкладки; при отказе показано одно сообщение на общей поверхности результатов, а панель показывает прежний путь.
+  - **Зависимости:** 2.2, 2.9.
+  - **Предполагаемые файлы:**
+    - добавляются `lib/src/action/presentation/path/path_segment.dart`, `test/app/action_path_app_flow_test.dart`;
+    - меняются `lib/src/action/presentation/panel/action_panel.dart`, `action_panel_state.dart`, `lib/src/action/presentation/path/path_page.dart`, `path_view_model.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и тесты в `test/action/presentation/panel/` и `test/action/presentation/path/`.
+  - **Размер:** M.
+
+- [x] 2.11 «Добавить» на экране пути создаёт связи последнего намерения
+  - **Критерии приёмки:**
+    - «Добавить» рядом с переключателем при любом последнем намерении открывает поиск участника с ним в роли якоря — группу «Нужно» или «Можно использовать» по открытой половине, — а лист «Что вы выбираете» подписывает карточку якоря «Последнее намерение пути» (требования «Добавление связей на экране пути» и «Назначение поиска участника группы»).
+    - После подтверждённого добавления поиск закрывается и возвращает экран пути на ту же половину с тем же путём; новые кандидаты стоят после прежних с P4 в порядке отметок с отметкой «Новое» до закрытия экрана, а связь с намерением, которое уже стоит в пути, кандидатом не становится.
+    - Вопрос «Отменить изменения?» называет число связей, добавленных на экране, и намерений, созданных в поисках, открытых с него, и говорит, что они останутся; «Отменить» их не удаляет.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/action/presentation/path test/long_term_relation/presentation/batch_picker test/app/action_path_app_flow_test.dart`.
+  - **Зависимости:** 2.9.
+  - **Предполагаемые файлы:** меняются `lib/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart`, `relation_batch_picker_purpose.dart`, `relation_batch_view_model.dart`, `lib/src/action/presentation/path/path_page.dart`, `path_view_model.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и их тесты.
+  - **Размер:** M.
+
+- [x] 2.12 Разрыв во время правки сокращает путь на экране пути
+  - **Критерии приёмки:**
+    - Пока экран пути открыт, подтверждённые изменения намерений и связей перечитывают участок и кандидатов: архивирование или удаление намерения или связи пути — на странице, в просмотре связи или последствием другой операции — сокращает путь до целого участка перед разрывом, а разрыв у корня делает путь пустым с «Выберите причину» (требование «Разрыв во время изменения пути»).
+    - Сокращение считается изменением пути для «Сохранить» и вопроса при уходе, а разорванное звено больше не предлагается кандидатом; переименование намерения и смена типа или приоритета связи видны на экране без изменения пути.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/action/presentation/path test/app/action_path_app_flow_test.dart`.
+  - **Зависимости:** 2.9.
+  - **Предполагаемые файлы:** меняются `lib/src/action/presentation/path/path_view_model.dart`, `path_state.dart` и тесты в `test/action/presentation/path/`, `test/app/action_path_app_flow_test.dart`.
+  - **Размер:** S.
+
+- [x] 2.13 Лист нового действия создаёт действие и остаётся открытым для следующего
+  - **Критерии приёмки:**
+    - Лист — прозрачный маршрут над корневым навигатором с собственной сессией черновика и одним ключом формы на сессию (D11, ADR-0058, ADR-0018): компактный лист без раскрытия на весь экран перекрывает панель навигации и показывает «Новое действие», название, описание с подсказкой «Добавить описание», свёрнутый путь с корневым и конечным намерениями и числом промежуточных, значения «Дата», «Время» и «Приоритет» и «Создать действие» (требования «Лист нового действия» и «Поля даты, времени и приоритета действия»). Дата и время выбираются в листах панели действия, приоритет — в листе P1–P4 с пояснениями «Самый высокий» и «Самый низкий»; переходы со свёрнутого пути подключает задача 2.16.
+    - Каждая новая сессия листа из любого входа — режима «Новое действие», пустого дня и вкладки «Действия» — начинается со времени «Весь день» и приоритета P4 независимо от приоритетов связей пути и от значений прежних сессий; внутри сессии после подтверждённого создания время и приоритет сохраняются, как сказано ниже (требования «Запланированное время действия» и «Приоритет действия»).
+    - «Создать действие» недоступна при пустом после обрезки названии или пустом пути; подтверждённое создание командой задачи 2.1 очищает название и описание, оставляет путь, дату, время и приоритет и показывает «Действие создано» над листом. Пока команда выполняется, повторная отправка и правка текста недоступны, а отказ, в том числе конфликт пути, оставляет все поля и снова допускает правку (требование «Создание действия без закрытия листа»).
+    - Закрытие смахиванием, затемнением или «назад» при непустых после обрезки названии или описании спрашивает «Отменить новое действие?» с «Продолжить ввод» и «Сбросить», при пустых закрывает без вопроса, а во время создания закрывает без вопроса, не отменяя команду; страница под листом и выбранный пункт сохраняются.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/action/presentation/editor test/action/presentation/panel`.
+    - Тест листа: создание без изменения времени и приоритета сохраняет действие со временем «Весь день» и приоритетом P4, а новая сессия листа после сессии с изменёнными временем и приоритетом снова начинается с «Весь день» и P4.
+  - **Зависимости:** 2.1, 2.5.
+  - **Предполагаемые файлы:**
+    - добавляются `lib/src/action/presentation/editor/action_editor_page.dart`, `action_editor_state.dart`, `action_editor_view_model.dart` с `.g.dart`, `action_priority_sheet.dart`, тесты в `test/action/presentation/editor/` и `test/support/action_editor_controls.dart`;
+    - меняются `lib/src/app/routing/app_router.dart` и `.gr.dart`, `lib/src/action/presentation/panel/action_date_sheet.dart`, `action_time_sheet.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`.
+  - **Размер:** M.
+
+- [x] 2.14 Режим «Новое действие» кнопки быстрого создания открывает лист нового действия
+  - **Критерии приёмки:**
+    - Быстрое создание получает режим «Новое действие» с ключом `action` после «Новое намерение»: значок календаря, названия «Новое действие» и «New action», пояснение в меню и объявление экранным диктором; сохранение, восстановление и неизвестный ключ следуют действующим правилам (D13, требования «Режимы кнопки быстрого создания» и «Локализация и доступность быстрого создания»).
+    - Нажатие в этом режиме сразу открывает лист нового действия с пустым путём над текущей обычной страницей, одним потоком на быстрые повторные нажатия; датой по умолчанию становится день, открытый на экране дня под листом — корневом или на заданную дату, — а над любой другой страницей сегодняшний день.
+    - Раздел Purpose канонической `openspec/specs/quick-creation/spec.md` описывает два режима, создающие намерение и действие, без долговременной связи и дневного выбора; требования этой спеки не меняются: их обновляет синхронизация спек изменения.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/app/quick_creation test/app/navigation test/action/presentation/day`.
+    - `awk '/^## Purpose/,/^## Requirements/' openspec/specs/quick-creation/spec.md | grep -niE 'дневн|долговременн|четыре'` ничего не находит.
+  - **Зависимости:** 2.13.
+  - **Предполагаемые файлы:** меняются `lib/src/app/quick_creation/quick_creation_mode.dart`, `quick_creation_mode_presentation.dart`, `quick_creation_launcher.dart`, `lib/src/action/presentation/day/action_day_root_page.dart`, `action_day_date_page.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`, `openspec/specs/quick-creation/spec.md` и тесты в `test/app/quick_creation/`.
+  - **Размер:** M.
+
+- [x] 2.15 Пустой день и вкладка «Действия» страницы намерения открывают лист нового действия
+  - **Критерии приёмки:**
+    - Пустой день экрана дня показывает кнопку «Новое действие», которая открывает лист с датой этого дня и пустым путём независимо от режима кнопки быстрого создания; других действий создания у экрана дня нет (требования «Пустой день» и «Входы в создание действия»).
+    - Вкладка «Действия» страницы активного намерения, как бы страница ни была открыта, показывает над списком «Добавить», которое открывает лист с путём из этого намерения и сегодняшней датой; у архивированного намерения «Добавить» нет.
+    - Создание из листа не меняет выбранные дату, секции, плитку и позицию прокрутки страницы под листом (требование «Создание действия без закрытия листа»).
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/action/presentation/day test/action/presentation/intention_actions test/app/action_creation_app_flow_test.dart`.
+  - **Зависимости:** 2.13.
+  - **Предполагаемые файлы:** меняются `lib/src/action/presentation/day/action_day_body.dart`, `lib/src/action/presentation/intention_actions/intention_actions_sliver.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и тесты в `test/action/presentation/day/`, `test/action/presentation/intention_actions/`; добавляется `test/app/action_creation_app_flow_test.dart`.
+  - **Размер:** M.
+
+- [x] 2.16 Свёрнутый путь листа выбирает причину через поиск начала пути и экран пути
+  - **Критерии приёмки:**
+    - Пустой путь листа показывает «Выберите причину» со строкой «Действию нужно хотя бы одно намерение, которому оно служит.» и открывает поиск начала пути с подзаголовком «Новое действие: с чего начинается путь»; выбор или создание намерения закрывает поиск и открывает экран «Путь» с путём из одного намерения, а закрытие поиска без выбора возвращает лист с пустым путём (требования «Поиск начала пути» и «Свёрнутый путь в листе нового действия»).
+    - Непустой путь открывает экран «Путь» с путём листа и названием действия из листа; «Сохранить» возвращает лист с новым путём и прежними названием, описанием, датой, временем и приоритетом без создания действия, а «Назад» и «Отменить» оставляют прежний путь листа. Поиск и экран пути над листом — страницы-задачи без панели, и их закрытие возвращает тот же лист, не завершая поток (требования «Лист нового действия над обычной страницей» и «Выход из потока создания»).
+    - «Добавить» на странице намерения, открытой стрелкой из поиска начала пути листа, открывает второй лист с путём из этого намерения; после его закрытия видна та же страница, а первый лист ниже сохраняет свои данные без изменений.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/action/presentation/editor test/action/presentation/path test/app/action_creation_app_flow_test.dart`.
+  - **Зависимости:** 2.9, 2.15.
+  - **Предполагаемые файлы:** меняются `lib/src/action/presentation/editor/action_editor_page.dart`, `action_editor_view_model.dart`, `lib/src/action/presentation/path/path_page.dart`, `lib/src/action/presentation/path_start/path_start_picker_page.dart`, `lib/l10n/app_ru.arb`, `app_en.arb` и тесты в `test/action/presentation/editor/`, `test/app/action_creation_app_flow_test.dart`.
+  - **Размер:** M.
+
+- [ ] 2.17 Разорванный путь черновика отмечается в листе и открывается с первого целого участка
+  - **Критерии приёмки:**
+    - Лист читает текущее состояние пути черновика той же сборкой пути, что и панель действия (задача 1.13), и согласует его с подтверждёнными изменениями намерений и связей черновика: свёрнутый путь показывает текущие названия, а удалённое намерение — названием, которое было при удалении.
+    - Архивное или удалённое звено черновика даёт отметку «В архиве», «Удалено» или обе после названия корневого или конечного намерения либо на самом свёрнутом пути для промежуточных намерений и связей; «Создать действие» остаётся доступной, а создание завершается конфликтом с сохранением полей и пути (требования «Свёрнутый путь в листе нового действия» и «Допустимый путь действия»).
+    - Нажатие на такой путь открывает экран «Путь» с первого целого участка по правилу задачи 2.10; путь листа меняется только по «Сохранить».
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_action_path_state_read_test.dart test/action/presentation/editor test/app/action_creation_app_flow_test.dart`.
+  - **Зависимости:** 2.10, 2.16.
+  - **Предполагаемые файлы:** меняются `lib/src/action/application/action_read_contract.dart`, `action_details.dart`, `lib/src/graph/data/drift_personal_graph_repository_action_reads.dart`, `test/support/action_read_contract_test_fallback.dart`, `lib/src/action/presentation/editor/action_editor_page.dart`, `action_editor_state.dart`, `action_editor_view_model.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`; добавляется `test/graph/data/drift_action_path_state_read_test.dart`; меняются тесты в `test/action/presentation/editor/`.
+  - **Размер:** M.
+
+- [ ] 2.18 Сброс истории пунктом панели спрашивает о листах нового действия с введённым текстом
+  - **Критерии приёмки:**
+    - Выбор любого пункта панели — в оболочке или на обычной странице — перед сбросом просматривает стек корневого маршрутизатора и, если хоть один лист нового действия при закрытии спросил бы «Отменить новое действие?», один раз задаёт этот вопрос (D11, ADR-0058, требование «Сброс истории выбором пункта панели»).
+    - «Продолжить ввод» оставляет историю, листы с их данными и выбранный пункт без изменений, «Сбросить» выполняет сброс и показывает корневую страницу выбранного пункта; без таких листов сброс идёт без вопроса, как прежде.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/app/navigation test/action/presentation/editor test/app/action_creation_app_flow_test.dart`.
+  - **Зависимости:** 2.16.
+  - **Предполагаемые файлы:** меняются `lib/src/app/navigation/app_navigation.dart`, `lib/src/action/presentation/editor/action_editor_page.dart`, `action_editor_view_model.dart` и тесты в `test/app/navigation/`, `test/app/action_creation_app_flow_test.dart`.
+  - **Размер:** S.
+
+- [ ] 2.19 Фаза 2 готова: действия создаются, а их пути меняются из всех входов спек
+  - **Критерии приёмки:**
+    - Выполнено условие «Ready to advance» фазы 2 из `plan.md`: действие можно создать и изменить его путь из всех входов спек — кнопкой быстрого создания в режиме «Новое действие», кнопкой пустого дня, «Добавить» вкладки «Действия», в том числе на странице из поиска, и пунктом «Изменить путь» панели действия, — а приложение проходит полные проверки проекта.
+    - Сгенерированный код согласован с исходниками, а изменение проходит строгую проверку OpenSpec.
+    - Собран APK, а результаты команд сообщены в сессии; ручная проверка на устройстве перенесена в конец изменения, после Фазы 4, и здесь не перечисляется.
+  - **Проверка:**
+    - `mise run codegen-check`, `mise run check`.
+    - `mise exec --no-deps -- openspec validate introduce-actions-and-intention-kinds --strict --no-interactive`.
+    - `mise exec --no-deps -- flutter build apk --release`; передать `build/app/outputs/flutter-apk/app-release.apk`.
+  - **Зависимости:** 2.1–2.18.
+  - **Предполагаемые файлы:** нет, только проверка.
+  - **Размер:** XS.

@@ -9,54 +9,47 @@ void _registerOrdinaryLayoutTests() {
   const screen = _screen;
   for (final insets in [_safeArea, _keyboardOpen]) {
     final conditions = '${locale.languageCode}, ${insets.name}';
-    testWidgets('быстрое создание из каталогов при тексте 2×, $conditions: '
-        'кнопка помещается в панели и запускает оба режима', (tester) async {
-      final semantics = tester.ensureSemantics();
-      try {
-        final app = await _start(
-          tester,
-          locale: locale,
-          screen: screen,
-          insets: insets,
-        );
-        await _select(tester, AppDestination.intentionGraph);
-        _expectQuickCreationInPanel(tester, insets);
-        await openQuickCreation(
-          tester,
-          QuickCreationMode.intention,
-          openedPage: find.byType(IntentionEditorPage),
-          wait: _until,
-        );
-        expect(find.byType(IntentionEditorPage), findsOneWidget);
-        await app.router.maybePop();
-        await tester.pumpAndSettle();
-        await _select(tester, AppDestination.dailyChoices);
-        _expectQuickCreationInPanel(tester, insets);
-        await openDailyChoiceQuickCreation(
-          tester,
-          ChoicePathDraftDirection.bottomUp,
-          openedPage: find.byType(DailyChoiceActionPickerPage),
-          wait: _until,
-        );
-        expect(find.byType(DailyChoiceActionPickerPage), findsOneWidget);
-        await app.router.maybePop();
-        await tester.pumpAndSettle();
-        _expectQuickCreationInPanel(tester, insets);
-        final l10n = lookupAppLocalizations(locale);
-        final name =
-            '${l10n.quickCreationLabel}, '
-            '${l10n.quickCreationModeDailyChoice}';
-        expect(
-          find.semantics.byPredicate((node) => node.label == name),
-          findsOneWidget,
-        );
-        expect(tester.takeException(), isNull);
-      } finally {
-        semantics.dispose();
-      }
-    });
+    testWidgets(
+      'быстрое создание с корневых страниц при тексте 2×, $conditions: '
+      'кнопка помещается в панели и запускает создание намерения',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        try {
+          final app = await _start(
+            tester,
+            locale: locale,
+            screen: screen,
+            insets: insets,
+          );
+          await _select(tester, AppDestination.intentionGraph);
+          _expectQuickCreationInPanel(tester, insets);
+          await openQuickCreation(
+            tester,
+            QuickCreationMode.intention,
+            openedPage: find.byType(IntentionEditorPage),
+            wait: _until,
+          );
+          expect(find.byType(IntentionEditorPage), findsOneWidget);
+          await app.router.maybePop();
+          await tester.pumpAndSettle();
+          await _select(tester, AppDestination.actions);
+          _expectQuickCreationInPanel(tester, insets);
+          final l10n = lookupAppLocalizations(locale);
+          final name =
+              '${l10n.quickCreationLabel}, '
+              '${l10n.quickCreationModeIntention}';
+          expect(
+            find.semantics.byPredicate((node) => node.label == name),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
 
-    testWidgets('дневной выбор, $conditions: общее сообщение видно над '
+    testWidgets('действие, $conditions: общее сообщение видно над '
         'панелью до и после перехода', (tester) async {
       final app = await _start(
         tester,
@@ -68,11 +61,11 @@ void _registerOrdinaryLayoutTests() {
       await _until(tester, _messageOf(3));
       await tester.pumpAndSettle();
       _expectLayoutMessage(tester, insets);
-      await _select(tester, AppDestination.dailyChoices);
-      await _until(tester, _dailyChoiceRow(1));
-      await tester.tap(_dailyChoiceRow(1));
-      await _until(tester, dailyChoiceDetailsReady);
-      await openDailyChoicePathIntention(tester, 2);
+      await _select(tester, AppDestination.actions);
+      await _until(tester, _actionDayRow(1));
+      await tester.tap(_actionDayRow(1));
+      await _until(tester, actionPanelReady);
+      await _openPanelPathIntention(tester, locale, _intentionTitle(2));
       await _until(tester, find.byType(IntentionDetailsPage));
       await tester.pumpAndSettle();
       _expectLayoutMessage(tester, insets);
@@ -89,6 +82,26 @@ void _registerOrdinaryLayoutTests() {
       expect(tester.takeException(), isNull);
     });
   }
+}
+
+/// Открывает на вкладке «Путь» панели действия намерение с названием [title].
+Future<void> _openPanelPathIntention(
+  WidgetTester tester,
+  Locale locale,
+  String title,
+) async {
+  // Панель могла ещё въезжать, и нажатие пришлось бы мимо вкладки.
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.descendant(
+      of: actionPanel,
+      matching: find.text(lookupAppLocalizations(locale).actionPanelPathTab),
+    ),
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.descendant(of: actionPanel, matching: find.text(title)),
+  );
 }
 
 /// Кнопка занимает место в панели, а не в области содержимого над ней.

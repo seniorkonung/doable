@@ -5,18 +5,20 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/components/tag_row.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_root_pages.dart';
-import '../support/daily_choice_catalog_controls.dart';
-import '../support/daily_choice_details_controls.dart';
+import '../support/action_day_controls.dart';
+import '../support/action_panel_controls.dart';
+import '../support/action_seed.dart';
+import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/intention_catalog_controls.dart';
 import '../support/tag_storage_fixture.dart';
@@ -194,22 +196,32 @@ void main() {
     );
     expect(_assigned(raw, existingTagId, number), isTrue);
     expect(
-      raw.select('SELECT id FROM daily_choices WHERE id = ?', [
+      raw.select('SELECT id FROM actions WHERE id = ?', [tagFixtureId(201)]),
+      hasLength(1),
+    );
+    expect(
+      raw.select('SELECT position FROM action_path_items WHERE action_id = ?', [
         tagFixtureId(201),
       ]),
-      hasLength(1),
+      hasLength(2),
     );
     expect(retainedTagFixtureGraph(raw), graphBefore);
 
     router.pop();
     await tester.pumpAndSettle();
-    await openDailyChoices(tester, tap: _tap);
-    await selectDailyChoiceCatalogDate(
-      tester,
-      CalendarDate.fromParts(2026, 9, 25),
-    );
-    await _tap(tester, find.byKey(const ValueKey('daily-choice-row-1')));
-    await _until(tester, dailyChoiceDetailsReady);
+    // Действие создаётся вне назначения тега: экран дня остаётся рабочим.
+    seedRawGraph(raw, () {
+      seedAction(
+        raw,
+        id: tagFixtureId(401),
+        path: [tagFixtureId(1), tagFixtureId(3)],
+        date: '2026-09-25',
+      );
+    });
+    await openActions(tester, tap: _tap);
+    await selectActionDayDate(tester, CalendarDate.fromParts(2026, 9, 25));
+    await _tap(tester, find.byKey(const ValueKey('action-day-row-1')));
+    await _until(tester, actionPanelReady);
     expect(choose, findsNothing);
     expect(tester.takeException(), isNull);
   });

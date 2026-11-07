@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -27,7 +26,6 @@ import 'package:doable/src/shared/domain/text_preview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../../support/daily_choice_reconciliation_fixture.dart';
 import '../relation_graph_test_support.dart';
 
 void main() {
@@ -525,64 +523,6 @@ void main() {
     await pumpEventQueue();
     expect(harness.loaded.items.single.neighbor.title, 'Новое название');
   });
-
-  test(
-    'дневной выбор владельца обновляет сводку при выбранной группе',
-    () async {
-      final repository = ControlledRelationGraphRepository();
-      final harness = await _RelationsHarness.open(repository);
-      addTearDown(harness.dispose);
-      final ownerId = harness.intentionId;
-      repository.completePage(
-        0,
-        RelationGroupFirstPage(
-          items: testGroupRows(ownerId: ownerId, from: 1, count: 1),
-          counts: testRelationCounts(activeNeedOutgoing: 1, dailySource: 1),
-          nextCursor: null,
-          revision: const TestGraphRevision(4),
-        ),
-      );
-      await pumpEventQueue();
-      final choice = reconciliationChoice(
-        source: ownerId,
-        selected: testIntentionId(2),
-      );
-      final start = harness.coordinator.acceptDailyChoiceDelete(
-        DeleteDailyChoice(choice.id),
-      ) as DailyChoiceCommandAccepted;
-      repository.completeDailyChoiceCommand(
-        0,
-        reconciliationChoiceDeleted(
-          choice: choice,
-          pathRelationId: testRelationId(1),
-          revision: const TestGraphRevision(9),
-          counts: {
-            ownerId: testRelationCounts(activeNeedOutgoing: 1),
-            testIntentionId(2): testRelationCounts(),
-          },
-        ),
-      );
-      await start.future;
-      await pumpEventQueue();
-      expect(
-        harness.loaded.summaryStatus,
-        isA<RelationListSummaryRefreshing>(),
-      );
-
-      repository.completePage(
-        1,
-        RelationGroupFirstPage(
-          items: testGroupRows(ownerId: ownerId, from: 1, count: 1),
-          counts: testRelationCounts(activeNeedOutgoing: 1),
-          nextCursor: null,
-          revision: const TestGraphRevision(9),
-        ),
-      );
-      await pumpEventQueue();
-      expect(harness.loaded.counts.dailySource, 0);
-      expect(harness.loaded.summaryStatus, isA<RelationListSummaryCurrent>());
-    },
-  );
 
   test(
     'замена на новой ревизии возвращает прокрутку к видимой связи',

@@ -22,37 +22,3 @@ final class ContributionCounts {
 
   int get uncompleted => planned - contribution;
 }
-
-/// Невыполненные выборы до местной даты и начиная с неё соответственно.
-final class UncompletedSplit {
-  factory UncompletedSplit({required int missed, required int upcoming}) {
-    if (missed < 0 || upcoming < 0) {
-      throw const StatisticsDataValidationException();
-    }
-    return UncompletedSplit._(missed, upcoming);
-  }
-
-  const UncompletedSplit._(this.missed, this.upcoming);
-
-  final int missed;
-  final int upcoming;
-}
-
-/// Каждый выбор периода учтён один раз независимо от выбранного вида
-/// и числа намерений, которым он засчитан.
-final class StatisticsPeriodSummary {
-  factory StatisticsPeriodSummary({
-    required ContributionCounts counts,
-    required UncompletedSplit uncompleted,
-  }) {
-    if (uncompleted.missed + uncompleted.upcoming != counts.uncompleted) {
-      throw const StatisticsDataValidationException();
-    }
-    return StatisticsPeriodSummary._(counts, uncompleted);
-  }
-
-  const StatisticsPeriodSummary._(this.counts, this.uncompleted);
-
-  final ContributionCounts counts;
-  final UncompletedSplit uncompleted;
-}

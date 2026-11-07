@@ -278,16 +278,6 @@ void main() {
       testRelationCounts(archivedCanIncoming: 1),
       'Сначала удалите его связи',
     ),
-    (
-      'дневной выбор, начатый намерением,',
-      testRelationCounts(dailySource: 1),
-      'Сначала удалите его дневные выборы',
-    ),
-    (
-      'дневной выбор, выбравший намерение,',
-      testRelationCounts(dailySelected: 1),
-      'Сначала удалите его дневные выборы',
-    ),
   ]) {
     testWidgets('$scenario блокирует удаление: «Удалить» выключено и называет '
         'причину', (tester) async {

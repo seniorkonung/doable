@@ -53,7 +53,7 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
 
   /// Порция заполняется секциями по порядку файла формата, поэтому неполная
   /// порция дошла до конца последней секции. Транзакция согласует строки
-  /// порции, в том числе дневные выборы с шагами их путей, с позицией лога.
+  /// порции, в том числе действия с их путями, с позицией лога.
   Future<GraphRecordPortion> _readGraphRecordPortion(
     GraphRecordOrderKey? after,
   ) => _sequencer.run(
@@ -68,6 +68,10 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
           after: after is IntentionOrderKey ? after : null,
           limit: limit,
         ),
+        (limit) => _readDeletedIntentionRecords(
+          after: after is DeletedIntentionOrderKey ? after : null,
+          limit: limit,
+        ),
         (limit) => _readTagAssignmentRecords(
           after: after is TagAssignmentOrderKey ? after.creationSequence : 0,
           limit: limit,
@@ -76,17 +80,23 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
           after: after is LongTermRelationOrderKey ? after.creationSequence : 0,
           limit: limit,
         ),
-        (limit) => _readDailyChoiceRecords(
-          after: after is DailyChoiceOrderKey ? after.creationSequence : 0,
+        (limit) => _readDeletedRelationPairRecords(
+          after: after is DeletedRelationPairOrderKey ? after : null,
+          limit: limit,
+        ),
+        (limit) => _readActionRecords(
+          after: after is ActionOrderKey ? after.creationSequence : 0,
           limit: limit,
         ),
       ];
       final firstSection = switch (after) {
         null || TagOrderKey() => 0,
         IntentionOrderKey() => 1,
-        TagAssignmentOrderKey() => 2,
-        LongTermRelationOrderKey() => 3,
-        DailyChoiceOrderKey() => 4,
+        DeletedIntentionOrderKey() => 2,
+        TagAssignmentOrderKey() => 3,
+        LongTermRelationOrderKey() => 4,
+        DeletedRelationPairOrderKey() => 5,
+        ActionOrderKey() => 6,
       };
       final records = <_OrderedRecord>[];
       for (final read in sections.skip(firstSection)) {
@@ -166,6 +176,32 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
     );
   }
 
+  Future<List<_OrderedRecord>> _readDeletedIntentionRecords({
+    required DeletedIntentionOrderKey? after,
+    required int limit,
+  }) async {
+    final rows = await _database
+        .customSelect(
+          '''SELECT intention_id, title FROM deleted_intentions
+         WHERE intention_id > ?
+         ORDER BY intention_id
+         LIMIT ?''',
+          variables: [
+            Variable.withString(after?.id.toCanonicalString() ?? ''),
+            Variable.withInt(limit),
+          ],
+          readsFrom: {_database.deletedIntentions},
+        )
+        .get();
+    final records = [
+      for (final row in rows) storedDeletedIntentionRecord(row.data),
+    ];
+    return [
+      for (final record in records)
+        (DeletedIntentionOrderKey(record.id), record),
+    ];
+  }
+
   Future<List<_OrderedRecord>> _readTagAssignmentRecords({
     required int after,
     required int limit,
@@ -219,40 +255,83 @@ extension _GraphFactLogAccess on DriftPersonalGraphRepository {
     ];
   }
 
-  Future<List<_OrderedRecord>> _readDailyChoiceRecords({
+  Future<List<_OrderedRecord>> _readDeletedRelationPairRecords({
+    required DeletedRelationPairOrderKey? after,
+    required int limit,
+  }) async {
+    final (afterKey, keyVariables) = switch (after) {
+      null => ('', const <Variable<Object>>[]),
+      DeletedRelationPairOrderKey(
+        :final sourceIntentionId,
+        :final relatedIntentionId,
+      ) =>
+        (
+          'WHERE (source_intention_id, related_intention_id) > (?, ?)',
+          [
+            Variable.withString(sourceIntentionId.toCanonicalString()),
+            Variable.withString(relatedIntentionId.toCanonicalString()),
+          ],
+        ),
+    };
+    final rows = await _database
+        .customSelect(
+          '''SELECT source_intention_id, related_intention_id, type
+         FROM deleted_relation_pairs
+         $afterKey
+         ORDER BY source_intention_id, related_intention_id
+         LIMIT ?''',
+          variables: [...keyVariables, Variable.withInt(limit)],
+          readsFrom: {_database.deletedRelationPairs},
+        )
+        .get();
+    final records = [
+      for (final row in rows) storedDeletedRelationPairRecord(row.data),
+    ];
+    return [
+      for (final record in records)
+        (
+          DeletedRelationPairOrderKey(
+            sourceIntentionId: record.sourceIntentionId,
+            relatedIntentionId: record.relatedIntentionId,
+          ),
+          record,
+        ),
+    ];
+  }
+
+  Future<List<_OrderedRecord>> _readActionRecords({
     required int after,
     required int limit,
   }) async {
     final rows = await _database
         .customSelect(
-          '''SELECT creation_sequence, id, source_intention_id,
-                selected_intention_id, choice_date, description, is_completed,
-                scheduled_minute, priority
-         FROM daily_choices
+          '''SELECT creation_sequence, id, title, description, date,
+                scheduled_hour, priority, is_completed, created_at, updated_at
+         FROM actions
          WHERE creation_sequence > ?
          ORDER BY creation_sequence
          LIMIT ?''',
           variables: [Variable.withInt(after), Variable.withInt(limit)],
-          readsFrom: {_database.dailyChoices},
+          readsFrom: {_database.actions},
         )
         .get();
     if (rows.isEmpty) return const [];
-    final paths = await readStoredChoicePaths(
+    final paths = await readStoredActionPathRows(
       _database,
-      choiceIds:
-          'SELECT id FROM daily_choices '
+      actionIds:
+          'SELECT id FROM actions '
           'WHERE creation_sequence > ? AND creation_sequence <= ?',
       variables: [
         Variable.withInt(after),
         Variable.withInt(rows.last.read<int>('creation_sequence')),
       ],
-      readsFrom: {_database.dailyChoices},
+      readsFrom: {_database.actions},
     );
     return [
       for (final row in rows)
         (
-          DailyChoiceOrderKey(row.read<int>('creation_sequence')),
-          storedDailyChoiceRecord(decodeStoredDailyChoice(row.data), paths),
+          ActionOrderKey(row.read<int>('creation_sequence')),
+          storedActionRecord(row.data, paths),
         ),
     ];
   }

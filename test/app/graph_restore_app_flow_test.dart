@@ -7,8 +7,6 @@ import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/settings/settings_page.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show
         LocalDatabaseConnectionObserver,
@@ -29,6 +27,8 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/presentation/home_statistics_state.dart';
 import 'package:doable/src/statistics/presentation/home_statistics_view_model.dart';
@@ -45,7 +45,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/app_flow_wait.dart' as app_flow;
 import '../support/app_root_pages.dart';
-import '../support/daily_choice_durability_fixture.dart';
+import '../support/graph_durability_fixture.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
@@ -527,7 +527,7 @@ final class _RestoreApp {
       diagnosticsSink: InMemoryDiagnosticsSink(),
       quickCreationModeStore: InMemoryQuickCreationModeStore(),
       graphFilesFactory: _files.create,
-      dailyChoiceLocalDateSource: () => DailyChoiceLocalDay(
+      localDateSource: () => LocalDay(
         date: CalendarDate.fromParts(now.year, now.month, now.day),
         untilNextDate: const Duration(hours: 12),
       ),
@@ -684,7 +684,7 @@ final class _HeldReplacement extends LocalDatabaseConnectionObserver {
     final hold = this.hold;
     if (hold == null ||
         !statement.statements.any(
-          (sql) => sql.startsWith('DELETE FROM daily_choices '),
+          (sql) => sql.startsWith('DELETE FROM deleted_relation_pairs '),
         )) {
       return null;
     }

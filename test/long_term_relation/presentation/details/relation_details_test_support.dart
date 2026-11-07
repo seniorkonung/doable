@@ -1,12 +1,5 @@
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
-
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
-
-import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -18,7 +11,6 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/application/relation_counts.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -27,6 +19,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 
 import '../relation_graph_test_support.dart';
 import '../../../support/tag_read_contract_test_fallback.dart';
+import '../../../support/action_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
 
 /// Одно наблюдение подробных данных связи, которым управляет тест.
@@ -64,32 +57,11 @@ final class ControlledRelationWatch {
 
 /// Управляемый граф для подробного просмотра связи и переходов к участникам.
 final class ControlledRelationDetailsRepository
-    with StatisticsReadContractTestFallback, TagReadContractTestFallback
+    with
+        ActionReadContractTestFallback,
+        StatisticsReadContractTestFallback,
+        TagReadContractTestFallback
     implements PersonalGraphRepository {
-  @override
-  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
-    DailyChoiceDayStatusQuery query,
-  ) => throw UnsupportedError(
-    'Чтение состояний дней не используется в этом тесте.',
-  );
-
-  @override
-  Future<ChoicePathContinuationResult> getChoicePathContinuations(
-    ChoicePathContinuationQuery query,
-  ) => throw UnimplementedError();
-
-  @override
-  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Чтение дневного выбора не используется этим тестом.',
-      );
-
-  @override
-  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Наблюдение дневного выбора не используется этим тестом.',
-      );
-
   final relationWatches = <ControlledRelationWatch>[];
   final watchedIntentionIds = <IntentionId>[];
   final groupQueries = <RelationGroupQuery>[];
@@ -192,17 +164,10 @@ final class ControlledRelationDetailsRepository
   }
 
   @override
-  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
-    DailyChoiceCatalogQuery query,
-  ) => throw UnsupportedError(
-    'Каталог дневных выборов не используется в этом тесте.',
-  );
-
-  @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) {
-    groupQueries.add(query as RelationGroupQuery);
+    groupQueries.add(query);
     final request = Completer<RelationGroupPageResult>();
     _groupRequests.add(request);
     return request.future;
@@ -267,8 +232,6 @@ LongTermRelationDetails testRelationDetails({
   RelationScope scope = RelationScope.active,
   int creationSequence = 1,
   String? description,
-  LongTermRelationPermissions permissions =
-      const LongTermRelationPermissions.unrestricted(),
   DateTime? createdAt,
   DateTime? updatedAt,
 }) => LongTermRelationDetails(
@@ -296,5 +259,4 @@ LongTermRelationDetails testRelationDetails({
   description: description == null
       ? null
       : LongTermRelationDescription.fromInput(description),
-  permissions: permissions,
 );

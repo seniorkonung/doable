@@ -113,46 +113,6 @@ void main() {
         );
       }
     });
-
-    test('дневные роли учитываются отдельно от восьми прежних групп', () {
-      final counts = RelationCounts(
-        activeNeedIncoming: 1,
-        activeNeedOutgoing: 0,
-        activeCanIncoming: 0,
-        activeCanOutgoing: 0,
-        archivedNeedIncoming: 0,
-        archivedNeedOutgoing: 0,
-        archivedCanIncoming: 0,
-        archivedCanOutgoing: 0,
-        dailySource: 2,
-        dailySelected: 3,
-      );
-
-      expect(counts.active, 1);
-      expect(counts.archived, 0);
-      expect(counts.dailySource, 2);
-      expect(counts.dailySelected, 3);
-      expect(counts.dailyTotal, 5);
-      expect(counts.longTermTotal, 1);
-      expect(counts.total, 6);
-    });
-
-    test('отклоняет отрицательное дневное количество', () {
-      expect(
-        () => RelationCounts(
-          activeNeedIncoming: 0,
-          activeNeedOutgoing: 0,
-          activeCanIncoming: 0,
-          activeCanOutgoing: 0,
-          archivedNeedIncoming: 0,
-          archivedNeedOutgoing: 0,
-          archivedCanIncoming: 0,
-          archivedCanOutgoing: 0,
-          dailySource: -1,
-        ),
-        throwsA(isA<RelationCountsValidationException>()),
-      );
-    });
   });
 }
 
