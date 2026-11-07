@@ -857,3 +857,19 @@
   - **Зависимости:** 2.4.
   - **Предполагаемые файлы:** меняются `lib/src/design_system/components/path_builder.dart`, `test/design_system/path_builder_test.dart`.
   - **Размер:** XS.
+
+- [ ] 2.23 Выбор текущего корня в поиске начала пути сокращает путь на экране до него
+  - **Критерии приёмки:**
+    - Поиск начала пути, открытый названием корня на экране пути, предлагает текущее корневое намерение на его месте выдачи по тем же правилам охвата и фильтров, что и остальные намерения; его карточка несёт отметку «Сейчас в начале пути» (en: «Current start of path») первой в линии меток, а доступное имя карточки называет эту отметку (требования «Поиск начала пути» в `action-paths` и «Карточка намерения в каталоге и поисках» в `intention-management`).
+    - `SelectPathStart` (`lib/src/intention/presentation/catalog/intention_catalog_purpose.dart`) больше не исключает `currentRoot` из выдачи, а передаёт его для отметки карточки. Если после этого у исключения намерения в запросе каталога (`excludedIntentionId` в `IntentionCatalogQuery`) не остаётся вызывающего кода, исключение удаляется из запроса и хранилища вместе с его тестами; исключение в вычислении вклада (`contribution_reachability.dart`) не меняется.
+    - Нажатие на текст карточки текущего корня закрывает поиск, а экран пути показывает путь из одного этого корня и отбрасывает следующие намерения; намерения и связи графа не меняются. «Сохранить» и вопрос при уходе считают это изменением пути по прежним правилам (сценарии «Выбор текущего корня сокращает путь до него» и «Смена корня заменяет весь путь»).
+    - Закрытие поиска без выбора оставляет путь прежним. Поиск начала пути без корня (пустой путь листа нового действия и экрана пути) отметки не показывает и ведёт себя по-прежнему.
+    - Строки ru и en добавлены в `lib/l10n/app_ru.arb` и `app_en.arb` с совпадающими ключами, сгенерированные файлы локализации обновлены. Изменения тех же файлов по другим задачам сохраняются.
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise exec --no-deps -- flutter test test/action/presentation/path_start test/action/presentation/path test/intention/presentation/catalog test/intention/data/drift_intention_catalog_test.dart`.
+    - Тест поиска начала пути в `test/action/presentation/path_start/path_start_picker_page_test.dart`: при открытии с текущим корнем его карточка показана с отметкой «Сейчас в начале пути» и доступным именем с ней, а её выбор возвращает этот корень; при открытии без корня отметки нет.
+    - Тест экрана пути в `test/action/presentation/path/path_page_test.dart`: путь «Быть здоровым» → «Много ходить», нажатие на корень и выбор «Быть здоровым» оставляют путь из одного «Быть здоровым», а «Сохранить» доступна, если исходный путь был другим.
+  - **Зависимости:** 2.6, 2.8.
+  - **Предполагаемые файлы:** меняются `lib/src/intention/presentation/catalog/intention_catalog_purpose.dart`, `intention_catalog_view_model.dart`, `lib/src/intention/presentation/picker/intention_picker_row.dart` или `intention_picker_view.dart`, при необходимости `lib/src/action/presentation/path_start/path_start_picker_page.dart`, `lib/src/action/presentation/path/path_page.dart`, `path_view_model.dart`, `lib/src/intention/application/intention_catalog.dart` и `lib/src/graph/data/drift_personal_graph_repository.dart` при удалении исключения, `lib/l10n/app_ru.arb`, `app_en.arb` и сгенерированные файлы локализации, тесты в `test/action/presentation/path_start/`, `test/action/presentation/path/`, `test/intention/presentation/catalog/`, `test/intention/data/`.
+  - **Размер:** S.
