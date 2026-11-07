@@ -346,14 +346,6 @@ void main() {
 
       await tester.tap(find.text('Быть здоровым'));
       await tester.pumpAndSettle();
-      // Текущий корень поиск не предлагает.
-      expect(
-        find.descendant(
-          of: find.byType(PathStartPickerPage),
-          matching: find.text('Быть здоровым'),
-        ),
-        findsNothing,
-      );
       await tester.tap(find.text('Высыпаться'));
       await settlePathScreen(tester);
       expect(find.byType(PathStartPickerPage), findsNothing);
@@ -361,6 +353,43 @@ void main() {
       expect(find.text('Быть здоровым'), findsNothing);
       expect(find.text('Много ходить'), findsNothing);
       expect(isPathSaveEnabled(tester), isTrue);
+    },
+  );
+
+  testWidgets(
+    'выбор текущего корня в поиске начала пути сокращает путь до него',
+    (tester) async {
+      final result = await openPathScreen(
+        tester,
+        router: router,
+        repository: repository,
+        purpose: NewActionPathPurpose(_path([1, 2])),
+      );
+      expect(isPathSaveEnabled(tester), isFalse);
+
+      await tester.tap(find.text('Быть здоровым'));
+      await tester.pumpAndSettle();
+      final root = find.descendant(
+        of: find.byType(PathStartPickerPage),
+        matching: find.text('Быть здоровым'),
+      );
+      expect(root, findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(PathStartPickerPage),
+          matching: find.text('Сейчас в начале пути'),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(root);
+      await settlePathScreen(tester);
+      expect(find.byType(PathStartPickerPage), findsNothing);
+      expect(isPathSaveEnabled(tester), isTrue);
+
+      await tester.tap(pathSave);
+      await tester.pumpAndSettle();
+      expect((await result)!.intentions, _path([1]).intentions);
+      expect(relationsFrom(1), [(seedUuid(2), LongTermRelationType.need.name)]);
     },
   );
 

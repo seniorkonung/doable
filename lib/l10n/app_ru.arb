@@ -800,6 +800,7 @@
   "intentionCatalogEmptyArchiveText": "Архивированное намерение уходит из активного списка и остаётся здесь.",
   "pathStartPickerTitle": "Выбор намерения",
   "pathStartPickerEmpty": "Нет доступных намерений для начала пути.",
+  "pathStartPickerCurrentRoot": "Сейчас в начале пути",
   "pathStartNewAction": "Новое действие",
   "pathStartEditPath": "Изменение пути",
   "pathStartSubtitle": "{flow}: с чего начинается путь",

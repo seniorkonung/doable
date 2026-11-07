@@ -25,6 +25,11 @@ sealed class Badge extends StatelessWidget {
     Key? key,
   }) = BadgeMark;
 
+  /// Метка-слово строки списка на заливке `fill`: слово [word] цвета `muted`
+  /// на плоскости `bg` без значка, например «Сейчас в начале пути». Как и
+  /// метку-значок, её называет доступное название строки.
+  const factory Badge.word({required String word, Key? key}) = BadgeWord;
+
   /// Метка «Архив» после названия: слово [word] цвета `muted` на плоскости
   /// `fill` за коробкой архива. Диктор читает слово.
   const factory Badge.archived({required String word, Key? key}) =
@@ -76,6 +81,34 @@ final class BadgeMark extends Badge {
               BadgeTone.muted => colors.muted,
             },
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Метка-слово: [word] цвета `muted` на плоскости `bg`.
+final class BadgeWord extends Badge {
+  const BadgeWord({required this.word, super.key}) : super._();
+
+  final String word;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DoableColors>()!;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.bg,
+        borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+        child: Text(
+          word,
+          maxLines: 1,
+          softWrap: false,
+          style: DoableType.caption.copyWith(color: colors.muted),
         ),
       ),
     );

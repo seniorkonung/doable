@@ -2689,6 +2689,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'There are no intentions available to start a path.';
 
   @override
+  String get pathStartPickerCurrentRoot => 'Current start of path';
+
+  @override
   String get pathStartNewAction => 'New action';
 
   @override

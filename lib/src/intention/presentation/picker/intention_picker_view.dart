@@ -224,6 +224,11 @@ final class _IntentionPickerViewState
                       requiredTagIds: results.query.tagFilter.requiredTagIds,
                       onPick: () => onPick(snapshot),
                       onOpenPage: openPage,
+                      currentPathStart: switch (widget.purpose) {
+                        SelectPathStart(:final currentRoot) =>
+                          summary.id == currentRoot,
+                        SelectRelationParticipant() => false,
+                      },
                     ),
                     IntentionPickerCheckable(
                       :final group,

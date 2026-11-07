@@ -132,10 +132,6 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
           SelectRelationParticipant(:final pairProbe) => pairProbe,
           BrowseIntentionCatalog() || SelectPathStart() => null,
         },
-        excludedIntentionId: switch (purpose) {
-          SelectPathStart(:final currentRoot) => currentRoot,
-          _ => null,
-        },
         countExactActiveTitle: purpose is SelectPathStart,
         order: _order,
         pageSize: _policy.pageSize,
@@ -598,7 +594,6 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         titleFilter: confirmed.query.titleFilter?.map((value) => value),
         tagFilter: confirmed.query.tagFilter,
         pairProbe: confirmed.query.pairProbe,
-        excludedIntentionId: confirmed.query.excludedIntentionId,
         order: confirmed.query.order,
         pageSize: confirmed.query.pageSize,
         cursor: confirmed.nextCursor,

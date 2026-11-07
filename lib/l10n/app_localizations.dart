@@ -4151,6 +4151,12 @@ abstract class AppLocalizations {
   /// **'There are no intentions available to start a path.'**
   String get pathStartPickerEmpty;
 
+  /// Отметка текущего корневого намерения в поиске начала пути, открытом для смены корня
+  ///
+  /// In en, this message translates to:
+  /// **'Current start of path'**
+  String get pathStartPickerCurrentRoot;
+
   /// Текст поиска начала пути
   ///
   /// In en, this message translates to:

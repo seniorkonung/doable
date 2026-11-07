@@ -7,7 +7,7 @@ import '../../application/intention_catalog.dart';
 import '../search/intention_row_content.dart';
 
 /// Строка экрана выбора для найденного намерения: название, начало описания,
-/// метка архива у архивированного намерения, молния у действия и теги, где
+/// отметка текущего начала пути, метка архива у архивированного намерения, молния у действия и теги, где
 /// обязательные для выдачи идут первыми.
 final class IntentionPickerRow extends StatelessWidget {
   IntentionPickerRow({
@@ -15,6 +15,7 @@ final class IntentionPickerRow extends StatelessWidget {
     required this.requiredTagIds,
     required VoidCallback onPick,
     required this.onOpenPage,
+    this.currentPathStart = false,
     super.key,
   }) : _behavior = _Pick(onPick);
 
@@ -25,7 +26,8 @@ final class IntentionPickerRow extends StatelessWidget {
     required VoidCallback onPick,
     required this.onOpenPage,
     super.key,
-  }) : _behavior = _Check(onPick, chosen);
+  }) : currentPathStart = false,
+       _behavior = _Check(onPick, chosen);
 
   IntentionPickerRow.occupied({
     required this.summary,
@@ -33,6 +35,7 @@ final class IntentionPickerRow extends StatelessWidget {
     required this.onOpenPage,
     super.key,
   }) : requiredTagIds = const {},
+       currentPathStart = false,
        _behavior = _Occupied(reason);
 
   final IntentionSummary summary;
@@ -41,6 +44,10 @@ final class IntentionPickerRow extends StatelessWidget {
   /// текущих условий: пока новая порция загружается, они уже могут быть
   /// другими.
   final Set<TagId> requiredTagIds;
+
+  /// Строка текущего корня в поиске начала пути, открытом для смены корня:
+  /// первой в линии меток стоит отметка «Сейчас в начале пути».
+  final bool currentPathStart;
 
   final _PickerBehavior _behavior;
   final VoidCallback onOpenPage;
@@ -52,6 +59,7 @@ final class IntentionPickerRow extends StatelessWidget {
       l10n,
       summary: summary,
       requiredTagIds: requiredTagIds,
+      currentPathStart: currentPathStart,
     );
 
     final pageLabel = content.isAction

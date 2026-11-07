@@ -116,6 +116,43 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('отметка начала пути стоит первой в линии меток, а диктор '
+      'слышит её на двух языках', (tester) async {
+    final semantics = tester.ensureSemantics();
+
+    for (final (locale, word, label) in const [
+      (
+        Locale('ru'),
+        'Сейчас в начале пути',
+        'Пройти пешком до парка, Сейчас в начале пути, действие, Без тегов',
+      ),
+      (
+        Locale('en'),
+        'Current start of path',
+        'Пройти пешком до парка, Current start of path, action, No tags',
+      ),
+    ]) {
+      await tester.pumpWidget(
+        _app(
+          locale: locale,
+          summary: _summary('Пройти пешком до парка'),
+          currentPathStart: true,
+        ),
+      );
+      final marks = tester.widgetList<Badge>(find.bySubtype<Badge>()).toList();
+      expect(marks, [
+        isA<BadgeWord>().having((mark) => mark.word, 'word', word),
+        isA<BadgeMark>().having(
+          (mark) => mark.icon,
+          'icon',
+          DoableIconData.bolt,
+        ),
+      ]);
+      expect(find.bySemanticsLabel(label), findsOneWidget);
+    }
+    semantics.dispose();
+  });
+
   testWidgets('теги из фильтра стоят первыми и выделены, а цвет тега '
       'сохраняется', (tester) async {
     final semantics = tester.ensureSemantics();
@@ -242,6 +279,7 @@ Widget _app({
   Set<TagId> requiredTagIds = const {},
   VoidCallback? onPick,
   VoidCallback? onOpenPage,
+  bool currentPathStart = false,
 }) => MaterialApp(
   theme: doableTheme(Brightness.light),
   locale: locale,
@@ -256,6 +294,7 @@ Widget _app({
           requiredTagIds: requiredTagIds,
           onPick: onPick ?? () {},
           onOpenPage: onOpenPage ?? () {},
+          currentPathStart: currentPathStart,
         ),
       ),
     ),

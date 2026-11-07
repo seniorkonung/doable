@@ -1302,12 +1302,6 @@ final class DriftPersonalGraphRepository
               .equals(pairProbe.counterpartId.toCanonicalString())
               .not();
     }
-    final excludedId = query.excludedIntentionId;
-    if (excludedId != null) {
-      condition =
-          condition &
-          intentions.id.equals(excludedId.toCanonicalString()).not();
-    }
     final requiredTagIds = query.tagFilter.requiredTagIds;
     if (requiredTagIds.isNotEmpty) {
       condition = condition & _RequiredCatalogTagsExpression(requiredTagIds);
@@ -1643,7 +1637,6 @@ final class _DriftIntentionCatalogEntrySnapshot
     if (!matchesScope ||
         !matchesReadiness ||
         summary.id == query.pairProbe?.counterpartId ||
-        summary.id == query.excludedIntentionId ||
         !query.tagFilter.matches(summary.tags.map((tag) => tag.id).toSet())) {
       return false;
     }

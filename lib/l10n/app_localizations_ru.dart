@@ -2719,6 +2719,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get pathStartPickerEmpty => 'Нет доступных намерений для начала пути.';
 
   @override
+  String get pathStartPickerCurrentRoot => 'Сейчас в начале пути';
+
+  @override
   String get pathStartNewAction => 'Новое действие';
 
   @override

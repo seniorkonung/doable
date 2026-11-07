@@ -23,11 +23,13 @@ final class IntentionRowContent {
 
   /// [requiredTagIds] — обязательные теги применённого запроса, который
   /// отобрал строку, а не текущих условий: пока новая порция загружается, они
-  /// уже могут быть другими.
+  /// уже могут быть другими. [currentPathStart] — намерение стоит в начале
+  /// пути, корень которого меняет поиск начала пути.
   factory IntentionRowContent.of(
     AppLocalizations l10n, {
     required IntentionSummary summary,
     required Set<TagId> requiredTagIds,
+    bool currentPathStart = false,
   }) {
     final isAction = switch (summary.readiness) {
       IntentionReadiness.ready => true,
@@ -51,6 +53,7 @@ final class IntentionRowContent {
       archived: archived,
       isAction: isAction,
       marks: [
+        if (currentPathStart) Badge.word(word: l10n.pathStartPickerCurrentRoot),
         if (archived)
           const Badge.mark(icon: DoableIconData.archive, tone: BadgeTone.muted),
         if (isAction) Badge.mark(icon: DoableIconData.bolt, tone: markTone),
@@ -67,6 +70,7 @@ final class IntentionRowContent {
       ],
       label: [
         summary.title,
+        if (currentPathStart) l10n.pathStartPickerCurrentRoot,
         if (archived) l10n.intentionPickerArchived,
         isAction
             ? l10n.intentionPickerKindAction
@@ -93,12 +97,13 @@ final class IntentionRowContent {
   /// Готово ли намерение к выполнению, то есть является ли оно действием.
   final bool isAction;
 
-  /// Метка архива и молния действия в порядке показа.
+  /// Отметка начала пути, метка архива и молния действия в порядке показа.
   final List<Badge> marks;
 
   /// Все теги в порядке показа: обязательные первыми.
   final List<TagChip> tags;
 
-  /// Доступное название: название, архив, тип, начало описания и теги.
+  /// Доступное название: название, отметка начала пути, архив, тип, начало
+  /// описания и теги.
   final String label;
 }

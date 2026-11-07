@@ -381,10 +381,7 @@ void main() {
         candidateRole: RelationParticipantRole.related,
       ),
     ),
-    SelectPathStart(
-      session: IntentionSearchSession(),
-      currentRoot: testSummary(index: 9).id,
-    ),
+    SelectPathStart(session: IntentionSearchSession()),
   ]) {
     final context = switch (purpose) {
       BrowseIntentionCatalog() => 'каталог',
@@ -452,10 +449,6 @@ void main() {
           expect(
             query.pairProbe,
             purpose is SelectRelationParticipant ? purpose.pairProbe : null,
-          );
-          expect(
-            query.excludedIntentionId,
-            purpose is SelectPathStart ? purpose.currentRoot : null,
           );
           expect(query.titleFilter?.map((value) => value), 'ходить');
           expect(query.order, IntentionCatalogOrder.updatedAtAscending);

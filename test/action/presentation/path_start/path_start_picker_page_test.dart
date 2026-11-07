@@ -92,16 +92,24 @@ void main() {
   }
 
   testWidgets(
-    'поиск исключает корень и архив, показывает назначение и возвращает выбор',
+    'поиск отмечает текущий корень, скрывает архив, показывает назначение и '
+    'возвращает выбор корня',
     (tester) async {
       final (:result) = await open(
         tester,
         currentRoot: id(1),
         flow: PathStartFlow.editPath,
       );
-      expect(find.text('Корень'), findsNothing);
+      expect(find.text('Корень'), findsOneWidget);
+      expect(find.text('Сейчас в начале пути'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(
+          'Корень, Сейчас в начале пути, намерение, Без тегов',
+        ),
+        findsOneWidget,
+      );
+      expect(find.bySemanticsLabel('Другой, намерение, Без тегов'), findsOne);
       expect(find.text('Архив'), findsNothing);
-      expect(find.text('Другой'), findsOneWidget);
       expect(find.text('Выбор намерения'), findsOneWidget);
       expect(
         find.text('Изменение пути: с чего начинается путь'),
@@ -119,18 +127,27 @@ void main() {
       expect(find.text('Вы здесь'), findsOneWidget);
       await tester.tap(find.text('Вернуться к списку'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Другой'));
+      await tester.tap(find.text('Корень'));
       await tester.pumpAndSettle();
       expect(
         await result,
         isA<PathStartSelected>().having(
           (choice) => choice.intention,
           'intention',
-          id(2),
+          id(1),
         ),
       );
     },
   );
+
+  testWidgets('поиск без корня не показывает отметку начала пути', (
+    tester,
+  ) async {
+    await open(tester);
+    expect(find.text('Корень'), findsOneWidget);
+    expect(find.text('Другой'), findsOneWidget);
+    expect(find.text('Сейчас в начале пути'), findsNothing);
+  });
 
   testWidgets('закрытие поиска не выбирает намерение', (tester) async {
     final (:result) = await open(tester);
@@ -163,10 +180,10 @@ void main() {
   testWidgets('пустой охват объясняет отсутствие выбора', (tester) async {
     await seedGraph(database, () async {
       await (database.update(database.intentions)
-            ..where((row) => row.id.equals(uuid(2))))
+            ..where((row) => row.id.isIn([uuid(1), uuid(2)])))
           .write(const IntentionsCompanion(isArchived: Value(true)));
     });
-    await open(tester, currentRoot: id(1));
+    await open(tester);
     expect(find.text('Выбрать не из чего'), findsOneWidget);
     expect(
       find.text('Нет доступных намерений для начала пути.'),
@@ -209,7 +226,7 @@ void main() {
     );
   });
 
-  testWidgets('создание из строки учитывает даже исключённый корень', (
+  testWidgets('создание из строки учитывает название текущего корня', (
     tester,
   ) async {
     final (:result) = await open(tester, currentRoot: id(1));

@@ -55,6 +55,55 @@ void main() {
     ('светлой', Brightness.light, DoableColors.light),
     ('тёмной', Brightness.dark, DoableColors.dark),
   ]) {
+    testWidgets('в $themeName теме метка-слово — слово caption цвета muted '
+        'в одну строку на bg с углами radius-xs без значка', (tester) async {
+      await tester.pumpWidget(
+        _app(
+          brightness: brightness,
+          child: const Badge.word(word: 'Сейчас в начале пути'),
+        ),
+      );
+
+      final badge = tester.getRect(find.bySubtype<Badge>());
+      final ground = tester.widget<DecoratedBox>(
+        find.descendant(
+          of: find.bySubtype<Badge>(),
+          matching: find.byType(DecoratedBox),
+        ),
+      );
+      expect(
+        ground.decoration,
+        BoxDecoration(
+          color: colors.bg,
+          borderRadius: BorderRadius.circular(DoableMetrics.radiusXs),
+        ),
+      );
+      expect(find.byType(DoableIcon), findsNothing);
+
+      final word = tester.getRect(find.text('Сейчас в начале пути'));
+      expect(word.top - badge.top, 1);
+      expect(badge.bottom - word.bottom, 1);
+      expect(word.left - badge.left, 7);
+      expect(badge.right - word.right, 7);
+
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(
+          of: find.text('Сейчас в начале пути'),
+          matching: find.byType(RichText),
+        ),
+      );
+      expect(paragraph.maxLines, 1);
+      expect(paragraph.softWrap, isFalse);
+      final style = paragraph.text.style!;
+      expect(style.color, colors.muted);
+      expect(style.fontSize, DoableType.caption.fontSize);
+    });
+  }
+
+  for (final (themeName, brightness, colors) in [
+    ('светлой', Brightness.light, DoableColors.light),
+    ('тёмной', Brightness.dark, DoableColors.dark),
+  ]) {
     testWidgets('в $themeName теме метка архива — слово caption цвета muted '
         'в одну строку на fill с углами radius-xs за значком архива 13', (
       tester,

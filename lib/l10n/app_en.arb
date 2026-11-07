@@ -1995,6 +1995,8 @@
   "@pathStartPickerTitle": {"description": "Текст поиска начала пути"},
   "pathStartPickerEmpty": "There are no intentions available to start a path.",
   "@pathStartPickerEmpty": {"description": "Текст поиска начала пути"},
+  "pathStartPickerCurrentRoot": "Current start of path",
+  "@pathStartPickerCurrentRoot": {"description": "Отметка текущего корневого намерения в поиске начала пути, открытом для смены корня"},
   "pathStartNewAction": "New action",
   "@pathStartNewAction": {"description": "Текст поиска начала пути"},
   "pathStartEditPath": "Edit path",

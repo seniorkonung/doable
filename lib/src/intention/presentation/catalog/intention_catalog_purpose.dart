@@ -37,7 +37,8 @@ sealed class IntentionPickerPurpose extends IntentionCatalogPurpose {
   const IntentionPickerPurpose();
 }
 
-/// Поиск начала пути исключает текущий корень при его замене.
+/// Поиск начала пути; при смене корня [currentRoot] остаётся в выдаче на
+/// своём месте и несёт отметку текущего начала пути.
 final class SelectPathStart extends IntentionPickerPurpose {
   const SelectPathStart({required this.session, this.currentRoot});
 
