@@ -46,11 +46,7 @@ void main() {
       expect(store.writes, isEmpty);
     });
 
-    const failed = QuickCreationModeSaveFailed(
-      DiagnosticsFailureCode.unavailable,
-    );
-    const outcome = failed;
-    test('исход «${_outcomeName(outcome)}» после освобождения '
+    test('исход «отказ» после освобождения '
         'не обращается к состоянию', () async {
       final store = _ControlledModeStore();
       final container = _container(store);
@@ -59,18 +55,15 @@ void main() {
           .select(QuickCreationMode.intention);
 
       container.dispose();
-      store.completeNext(outcome);
+      store.completeNext(
+        const QuickCreationModeSaveFailed(DiagnosticsFailureCode.unavailable),
+      );
 
       expect(await saving, isA<QuickCreationModeSaveFailed>());
       expect(_acceptedModes(store), [QuickCreationMode.intention]);
     });
   });
 }
-
-String _outcomeName(QuickCreationModeSaveResult outcome) => switch (outcome) {
-  QuickCreationModeSaved() => 'успех',
-  QuickCreationModeSaveFailed() => 'отказ',
-};
 
 ProviderContainer _container(
   _ControlledModeStore store, {

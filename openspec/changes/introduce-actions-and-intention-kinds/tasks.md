@@ -574,7 +574,7 @@
   - **Предполагаемые файлы:** `test/action/presentation/day/action_day_layout_test.dart`, `test/action/presentation/day/action_day_supported_layout_test.dart`.
   - **Размер:** XS.
 
-- [ ] 1.45 Тест освобождения контроллера быстрого создания задаёт исход отказа без псевдонима и перебора
+- [x] 1.45 Тест освобождения контроллера быстрого создания задаёт исход отказа без псевдонима и перебора
   - **Критерии приёмки:**
     - В `test/app/quick_creation/quick_creation_mode_controller_test.dart` тест «исход … после освобождения не обращается к состоянию» передаёт в `store.completeNext` исход `QuickCreationModeSaveFailed(DiagnosticsFailureCode.unavailable)` напрямую, без пары констант `failed` и `outcome = failed`.
     - Название теста содержит «отказ» обычным текстом, например «исход «отказ» после освобождения не обращается к состоянию».
