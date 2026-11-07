@@ -130,17 +130,24 @@ final class PathBuilder extends StatelessWidget {
                   below: RelationStrokeKind.can(colors.grip),
                 ),
                 const SizedBox(width: 10),
-                Semantics(
-                  excludeSemantics: true,
-                  button: true,
-                  label: slotLabel,
-                  onTap: onChooseRoot,
-                  child: InkWell(
+                Expanded(
+                  child: Semantics(
+                    excludeSemantics: true,
+                    button: true,
+                    label: slotLabel,
                     onTap: onChooseRoot,
-                    excludeFromSemantics: true,
-                    child: Text(
-                      slotText,
-                      style: DoableType.action.copyWith(color: colors.accent),
+                    child: InkWell(
+                      onTap: onChooseRoot,
+                      excludeFromSemantics: true,
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Text(
+                          slotText,
+                          style: DoableType.action.copyWith(
+                            color: colors.accent,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -176,27 +183,30 @@ final class PathBuilder extends StatelessWidget {
                   Expanded(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(minHeight: 40),
-                      child: Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: i == steps.length - 1 && i != 0
-                            ? Text(
+                      child: i == steps.length - 1 && i != 0
+                          ? Align(
+                              alignment: AlignmentDirectional.centerStart,
+                              child: Text(
                                 step.name,
                                 style: DoableType.action.copyWith(
                                   color: colors.ink,
                                 ),
-                              )
-                            : Semantics(
-                                excludeSemantics: true,
-                                button: true,
-                                label: step.label,
+                              ),
+                            )
+                          : Semantics(
+                              excludeSemantics: true,
+                              button: true,
+                              label: step.label,
+                              onTap: i == 0
+                                  ? onChooseRoot
+                                  : () => onStep(step.id),
+                              child: InkWell(
                                 onTap: i == 0
                                     ? onChooseRoot
                                     : () => onStep(step.id),
-                                child: InkWell(
-                                  onTap: i == 0
-                                      ? onChooseRoot
-                                      : () => onStep(step.id),
-                                  excludeFromSemantics: true,
+                                excludeFromSemantics: true,
+                                child: Align(
+                                  alignment: AlignmentDirectional.centerStart,
                                   child: Text(
                                     step.name,
                                     style: DoableType.action.copyWith(
@@ -205,7 +215,7 @@ final class PathBuilder extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                      ),
+                            ),
                     ),
                   ),
                   SizedBox(

@@ -76,9 +76,23 @@ void main() {
           ),
         ),
       ]);
-      await tester.tap(find.text('Промежуточное'));
+      for (final name in ['Корень', 'Промежуточное']) {
+        final ink = find
+            .ancestor(of: find.text(name), matching: find.byType(InkWell))
+            .first;
+        final bounds = tester.getRect(ink);
+        final arrow = tester.getRect(
+          find.byTooltip(
+            name == 'Корень' ? 'Открыть корень' : 'Открыть промежуточное',
+          ),
+        );
+        expect(bounds.left, tester.getTopLeft(find.text(name)).dx);
+        expect(bounds.right, arrow.left);
+        expect(bounds.height, greaterThanOrEqualTo(40));
+        await tester.tapAt(Offset(bounds.right - 8, bounds.center.dy));
+      }
       await tester.tap(find.text('Конечное'));
-      expect(selected, ['root', 'b']);
+      expect(selected, ['root', 'root', 'b']);
     },
   );
   testWidgets(
@@ -135,7 +149,20 @@ void main() {
       );
       await pump([]);
       expect(find.text('Новое действие'), findsOneWidget);
-      await tester.tap(find.text('Выберите причину'));
+      final slotInk = find
+          .ancestor(
+            of: find.text('Выберите причину'),
+            matching: find.byType(InkWell),
+          )
+          .first;
+      final slotBounds = tester.getRect(slotInk);
+      expect(
+        slotBounds.left,
+        tester.getTopLeft(find.text('Выберите причину')).dx,
+      );
+      expect(slotBounds.right, tester.getRect(find.byType(PathBuilder)).right);
+      expect(slotBounds.height, 40);
+      await tester.tapAt(Offset(slotBounds.right - 8, slotBounds.center.dy));
       expect(rootChosen, isTrue);
       await pump([
         const PathBuilderStep(
