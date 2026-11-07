@@ -1,5 +1,6 @@
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import 'action_seed.dart';
 import 'graph_seed.dart';
 import 'tag_positions.dart';
 
@@ -68,13 +69,11 @@ void _writeTagRecipientGraph(sqlite.Database database) {
       ],
     );
   }
-  database.execute(
-    'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
-    [tagFixtureId(201), tagFixtureId(1), tagFixtureId(3), '2026-09-25', 1],
-  );
-  database.execute(
-    'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
-    [tagFixtureId(202), tagFixtureId(201), tagFixtureId(101)],
+  seedAction(
+    database,
+    id: tagFixtureId(201),
+    path: [tagFixtureId(1), tagFixtureId(3)],
+    isCompleted: true,
   );
 }
 
@@ -84,8 +83,8 @@ Map<String, List<List<Object?>>> retainedTagFixtureGraph(sqlite.Database db) =>
         'intentions',
         'intention_titles_fts',
         'long_term_relations',
-        'daily_choices',
-        'daily_choice_path_steps',
+        'actions',
+        'action_path_items',
       ])
         table: db
             .select('SELECT * FROM $table ORDER BY rowid')
