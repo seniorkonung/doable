@@ -5,7 +5,7 @@
 **Format version:** 1
 **Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Фаза 1 по существу выполнена: дневные выборы заменены действиями в хранилище, формате, журнале фактов, копиях, интерфейсе и статистике. Полные проверки проекта проходят, `openspec validate --strict` — valid. Остаются три находки низкой важности; они касаются обработки недостижимого состояния в статистике намерения, тестов без собственной регрессии и устаревшей терминологии. Принятых остаточных рисков нет.
+**Summary:** Фаза 1 по существу выполнена: дневные выборы заменены действиями в хранилище, формате, журнале фактов, копиях, интерфейсе и статистике. Полные проверки проекта проходят, `openspec validate --strict` — valid. Остаются две находки низкой важности; они касаются обработки недостижимого состояния в статистике намерения и тестов без собственной регрессии. Принятых остаточных рисков нет.
 
 ## Review target
 
@@ -87,15 +87,6 @@
 | Code quality | Complete | Те же пять проходов применили линзы корректности, читаемости, архитектуры, безопасности и производительности `code-review-and-quality` ко всем путям поставки своих блоков с проверкой вызывающих, тестов, схемы и границ выполнения. На `70603dd3` в этом рабочем дереве `mise run check` — EXIT 0: `dart format` без изменений (845 файлов), `flutter analyze` — No issues found, все 3931 обычных теста и 18 процессных тестов прошли. Каждая находка ниже перепроверена координатором по коду головы. |
 
 ## Findings
-
-### F10 · Low — Названия тестов и вспомогательных параметров сохраняют прежнюю терминологию
-
-- **Evidence:** `test/app/home_statistics_app_flow_test.dart:250, 365, 522` («исходные намерения», «Новое исходное намерение» при виде «Корневые намерения»); `test/statistics/presentation/intention_statistics_view_model_test.dart:326` («разбивка по исходным намерениям»); `test/statistics/application/intention_statistics_read_contract_test.dart:79` («месяцы без выборов»); `test/app/intention_statistics_navigation_test.dart:230` («день открывает каталог» при открытии экрана дня); `test/statistics/presentation/intention_statistics_test_support.dart:169-170` (параметры `sourcesCursor` и `actionsCursor` означают разбивки корневых и конечных намерений); `test/action/presentation/day/action_day_rows_test.dart:216, 354`, `action_day_root_page_test.dart:191, 269, 302`, `test/support/action_day_controls.dart:275, 364` («каталог» вместо экрана дня, помощники `catalog*`); `test/design_system/count_tiles_test.dart:140, 286, 340-371` («Выборы намерения»).
-- **Evidence revisions:** ["70603dd3735a93a26734d943c29d42e099e2e98d"]
-- **Impact:** Описания тестов противоречат каноническим терминам `CONTEXT.md` и спек (корневое и конечное намерение, действие, экран дня), поэтому читатель неверно понимает проверяемое поведение; правило domain-language нарушено.
-- **Required outcome:** Названия, тексты и вспомогательные параметры тестов изменённых областей используют канонические термины действий, ролей пути и экрана дня.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["test/app/home_statistics_app_flow_test.dart", "test/statistics", "test/app/intention_statistics_navigation_test.dart", "test/action/presentation/day", "test/support/action_day_controls.dart", "test/design_system/count_tiles_test.dart"]
 
 ### F11 · Low — Статистика намерения обрабатывает недостижимую нулевую долю и описывает несуществующую привязку курсора
 

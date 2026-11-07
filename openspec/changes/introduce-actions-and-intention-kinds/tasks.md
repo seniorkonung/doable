@@ -503,3 +503,21 @@
   - **Зависимости:** нет.
   - **Предполагаемые файлы:** `test/action/presentation/day/action_day_calendar_utc_dates_test.dart`, `test/action/presentation/intention_actions/intention_actions_view_model_test.dart`, `test/intention/presentation/details/intention_details_actions_test.dart`.
   - **Размер:** S.
+
+- [ ] 1.40 Названия, тексты и вспомогательные параметры тестов называют корневые и конечные намерения, действия и экран дня
+  - **Критерии приёмки:**
+    - Устаревшие термины в названиях и описаниях тестов, текстах `fail`, комментариях, именах помощников и параметров заменены каноническими терминами `CONTEXT.md` и спек: корневое и конечное намерение, действие, экран дня. Переименование выполняется по текущему содержимому файлов, даже если к началу задачи они изменились.
+    - `test/app/home_statistics_app_flow_test.dart`: «исходные намерения» и «Новое исходное намерение» называют корневые намерения.
+    - `test/statistics/presentation/intention_statistics_view_model_test.dart`: «разбивка по исходным намерениям» называет разбивку по корневым намерениям.
+    - `test/statistics/application/intention_statistics_read_contract_test.dart`: «месяцы без выборов» называют месяцы без действий; «исходная карта» переименована, если под ней понимается не входная карта отметок теста.
+    - `test/app/intention_statistics_navigation_test.dart`: «день открывает каталог» называет открытие экрана дня.
+    - Параметры `sourcesCursor` и `actionsCursor` в `test/statistics/presentation/intention_statistics_test_support.dart` названы курсорами разбивок корневых и конечных намерений; все вызовы, в том числе в `intention_statistics_view_model_test.dart` и `intention_statistics_reconciliation_test.dart`, используют новые имена.
+    - В `test/action/presentation/day/action_day_rows_test.dart`, `action_day_root_page_test.dart` и `test/support/action_day_controls.dart` «каталог» в названиях, текстах и комментариях называет экран дня; помощники и параметры с префиксом `catalog` в `test/support/action_day_controls.dart` и `catalogDate` в `test/action/presentation/day/action_day_page_test_support.dart`, которым пользуется `action_day_root_page_test.dart`, переименованы вместе со всеми вызовами.
+    - `test/design_system/count_tiles_test.dart`: подпись «Выборы намерения» заменена на «Действия намерения».
+    - Проверки тестов, их данные и продуктовый код `lib/` не меняются; идентификаторы `IntentionCatalog*` и каталог намерений, который остаётся каноническим термином, не переименовываются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test` для изменённых тестовых файлов и тестов, вызывающих переименованные помощники из `test/support/action_day_controls.dart`, `test/action/presentation/day/action_day_page_test_support.dart` и `test/statistics/presentation/intention_statistics_test_support.dart`.
+    - `mise exec --no-deps -- flutter analyze test` — без замечаний.
+  - **Зависимости:** нет.
+  - **Предполагаемые файлы:** `test/app/home_statistics_app_flow_test.dart`, `test/app/intention_statistics_navigation_test.dart`, `test/statistics/presentation/intention_statistics_view_model_test.dart`, `intention_statistics_reconciliation_test.dart`, `intention_statistics_test_support.dart`, `test/statistics/application/intention_statistics_read_contract_test.dart`, `test/action/presentation/day/action_day_rows_test.dart`, `action_day_root_page_test.dart`, `action_day_page_test_support.dart` и тесты экрана дня, вызывающие его помощники, `test/support/action_day_controls.dart` и его потребители в `test/app` и `test/action/presentation/day`, `test/design_system/count_tiles_test.dart`.
+  - **Размер:** S по логике: файлов больше нормы, но меняются только имена и тексты.
