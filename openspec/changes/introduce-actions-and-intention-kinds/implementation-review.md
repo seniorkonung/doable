@@ -5,7 +5,7 @@
 **Format version:** 1
 **Result:** Changes needed
 **Coverage status:** Complete
-**Summary:** Задачи 2.20–2.30 в целом реализованы, как требуют их критерии, и `mise run check` на `b8c45c8b` проходит. Три находки. F3 (Medium): `mise run codegen-check` падает, потому что хэши провайдеров в `path_view_model.g.dart` и `relation_batch_view_model.g.dart` не перегенерированы после задач 2.25 и 2.26; из-за этого не выполнено условие готовности фазы 2. F1: повтор после отказа чтения пути (`PathViewModel.retry()`) теряет подтверждённые числа половин, хотя последнее намерение не менялось; связь черновика и переключателя держится на порядке присваиваний и `path.candidates!`. F2: после задачи 2.26 полезную нагрузку `RelationBatchAdded.relations` никто не читает, а успех добавления разбирается в двух местах. Принятых остаточных рисков нет.
+**Summary:** Задачи 2.20–2.30 в целом реализованы, как требуют их критерии, и `mise run check` на `b8c45c8b` проходит. Две находки. F1: повтор после отказа чтения пути (`PathViewModel.retry()`) теряет подтверждённые числа половин, хотя последнее намерение не менялось; связь черновика и переключателя держится на порядке присваиваний и `path.candidates!`. F2: после задачи 2.26 полезную нагрузку `RelationBatchAdded.relations` никто не читает, а успех добавления разбирается в двух местах. Перегенерацию `.g.dart` провайдеров экрана пути и поиска участника, без которой `mise run codegen-check` падает, теперь ведёт задача 2.31 фазы 2. Принятых остаточных рисков нет.
 
 ## Review target
 
@@ -75,19 +75,10 @@
 | Pass | Status | Evidence or limitation |
 |---|---|---|
 | Independent decision review | Complete | Каждому блоку или группе пересечения дан свежий изолированный рецензент `implementation-decision-review` с нейтральным описанием намерения, точными `c0a5b10d…b8c45c8b` и полным списком путей без `openspec/`. U1 — sonnet, U5 — sonnet, U6 — opus. U2, U3 и U4 делят `path_page.dart`, `path_page_test.dart` и файлы локализации, поэтому образуют одну группу с общей целью из 38 путей и одним совмещённым описанием. Её покрыли два рецензента opus с разными основными областями: U2 и U3+U4. Каждый подтвердил полное покрытие своей области, вместе области покрывают все 38 путей. |
-| OpenSpec conformance | Complete | Координатор сверил критерии и проверки задач 2.20–2.30 с диффом каждого коммита и с добавленными тестами. Команды запущены в этом рабочем дереве (`HEAD` = `b8c45c8b`, дерево чистое, кроме отчёта): `mise exec --no-deps -- openspec validate introduce-actions-and-intention-kinds --strict --no-interactive` — valid. `mise run check` — EXIT 0: формат, `flutter analyze` без замечаний, 4063 обычных теста и 18 процессных тестов прошли. `mise run codegen-check` — EXIT 1 (F3); запущен при отложенном отчёте и восстановленном отчёте после, перегенерированные файлы возвращены к `b8c45c8b`. APK не собирался: это вывод готовности фазы, а не ревью. |
+| OpenSpec conformance | Complete | Координатор сверил критерии и проверки задач 2.20–2.30 с диффом каждого коммита и с добавленными тестами. Команды запущены в этом рабочем дереве (`HEAD` = `b8c45c8b`, дерево чистое, кроме отчёта): `mise exec --no-deps -- openspec validate introduce-actions-and-intention-kinds --strict --no-interactive` — valid. `mise run check` — EXIT 0: формат, `flutter analyze` без замечаний, 4063 обычных теста и 18 процессных тестов прошли. `mise run codegen-check` — EXIT 1 (несогласованные хэши `.g.dart`, работу ведёт задача 2.31); запущен при отложенном отчёте и восстановленном отчёте после, перегенерированные файлы возвращены к `b8c45c8b`. APK не собирался: это вывод готовности фазы, а не ревью. |
 | Code quality | Complete | Координатор применил линзы корректности, читаемости, архитектуры, безопасности и производительности ко всем путям поставки. Навык `code-review-and-quality` не загружался, линзы применены напрямую. |
 
 ## Findings
-
-### F3 · Medium — Сгенерированные провайдеры экрана пути и поиска участника не согласованы с исходниками
-
-- **Evidence:** Коммиты `b8bc7f68` (задача 2.25) и `d3a82d8e` (задача 2.26) меняют `lib/src/action/presentation/path/path_view_model.dart` и `lib/src/long_term_relation/presentation/batch_picker/relation_batch_view_model.dart`, но не их `.g.dart`. На `b8c45c8b` `mise run codegen-check` завершается EXIT 1 с сообщением «Рабочая копия содержит изменённые tracked-файлы: после повторной генерации». Генерация меняет только хэши: `_$pathViewModelHash` с `df119cf2…` на `bc31f90a…` и `_$relationBatchViewModelHash` с `49ceddd3…` на `19ab6956…`.
-- **Evidence revisions:** ["b8c45c8b16c52494e1ebf9e447c6bae70bfac98a"]
-- **Impact:** Проверка согласованности сгенерированного кода (`codegen-check`, отдельная обязательная проверка CI) красная. Поэтому не выполнены условие готовности фазы 2 из задачи 2.19 («Сгенерированный код согласован с исходниками») и критерий задачи 2.20. Хэши провайдеров Riverpod, кроме того, служат для обнаружения изменений при горячей перезагрузке.
-- **Required outcome:** На голове ветки `mise run codegen-check` проходит, а сгенерированные файлы соответствуют исходникам.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["lib/src/action/presentation/path/path_view_model.g.dart", "lib/src/long_term_relation/presentation/batch_picker/relation_batch_view_model.g.dart"]
 
 ### F1 · Low — Повтор после отказа чтения пути теряет подтверждённые числа половин
 

@@ -965,3 +965,15 @@
   - **Зависимости:** 2.13, 2.17.
   - **Предполагаемые файлы:** меняются `lib/src/action/presentation/editor/action_editor_state.dart`, `action_editor_view_model.dart`, `test/app/creation_flows_integration_test.dart`; добавляется или меняется тест состояния или модели листа в `test/action/presentation/editor/`.
   - **Размер:** S.
+
+- [ ] 2.31 Сгенерированные провайдеры экрана пути и поиска участника согласованы с исходниками
+  - **Критерии приёмки:**
+    - `lib/src/action/presentation/path/path_view_model.g.dart` и `lib/src/long_term_relation/presentation/batch_picker/relation_batch_view_model.g.dart` перегенерированы по текущим исходникам провайдеров, изменённым задачами 2.25 и 2.26: обновлены хэши `_$pathViewModelHash` и `_$relationBatchViewModelHash`.
+    - Исходники `lib/` и тесты не меняются; меняются только сгенерированные файлы.
+    - На голове ветки `mise run codegen-check` проходит, тем самым выполнено условие готовности фазы 2 «Сгенерированный код согласован с исходниками».
+  - **Проверка:**
+    - `mise run codegen`.
+    - `mise run codegen-check`.
+  - **Зависимости:** 2.25, 2.26.
+  - **Предполагаемые файлы:** меняются `lib/src/action/presentation/path/path_view_model.g.dart`, `lib/src/long_term_relation/presentation/batch_picker/relation_batch_view_model.g.dart`.
+  - **Размер:** XS.
