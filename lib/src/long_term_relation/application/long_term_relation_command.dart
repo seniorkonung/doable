@@ -38,19 +38,53 @@ final class AddLongTermRelations extends LongTermRelationCommand {
     required IntentionId pageIntentionId,
     required IntentionRelationGroup group,
     required Iterable<IntentionId> candidateIds,
+  }) => AddLongTermRelations._validated(
+    pageIntentionId: pageIntentionId,
+    group: group,
+    candidateIds: List.unmodifiable(candidateIds),
+    supportingCandidateIds: const {},
+  );
+
+  /// Добавляет связи в исходящую группу: кандидаты оказываются ниже намерения
+  /// страницы, поэтому созданное в поиске намерение может стать
+  /// вспомогательным вместе со своей связью.
+  factory AddLongTermRelations.outgoing({
+    required IntentionId pageIntentionId,
+    required LongTermRelationType type,
+    required Iterable<OutgoingRelationCandidate> candidates,
   }) {
-    final candidates = List<IntentionId>.unmodifiable(candidateIds);
-    if (candidates.isEmpty) {
+    final ordered = List<OutgoingRelationCandidate>.of(candidates);
+    return AddLongTermRelations._validated(
+      pageIntentionId: pageIntentionId,
+      group: switch (type) {
+        LongTermRelationType.need => IntentionRelationGroup.needs,
+        LongTermRelationType.can => IntentionRelationGroup.canUse,
+      },
+      candidateIds: List.unmodifiable(ordered.map((candidate) => candidate.id)),
+      supportingCandidateIds: Set.unmodifiable({
+        for (final candidate in ordered)
+          if (candidate.becomesSupporting) candidate.id,
+      }),
+    );
+  }
+
+  factory AddLongTermRelations._validated({
+    required IntentionId pageIntentionId,
+    required IntentionRelationGroup group,
+    required List<IntentionId> candidateIds,
+    required Set<IntentionId> supportingCandidateIds,
+  }) {
+    if (candidateIds.isEmpty) {
       throw const AddLongTermRelationsValidationException(
         AddLongTermRelationsValidationFailure.noCandidates,
       );
     }
-    if (candidates.toSet().length != candidates.length) {
+    if (candidateIds.toSet().length != candidateIds.length) {
       throw const AddLongTermRelationsValidationException(
         AddLongTermRelationsValidationFailure.duplicateCandidates,
       );
     }
-    if (candidates.contains(pageIntentionId)) {
+    if (candidateIds.contains(pageIntentionId)) {
       throw const AddLongTermRelationsValidationException(
         AddLongTermRelationsValidationFailure.pageIntentionAmongCandidates,
       );
@@ -58,7 +92,8 @@ final class AddLongTermRelations extends LongTermRelationCommand {
     return AddLongTermRelations._(
       pageIntentionId: pageIntentionId,
       group: group,
-      candidateIds: candidates,
+      candidateIds: candidateIds,
+      supportingCandidateIds: supportingCandidateIds,
     );
   }
 
@@ -66,11 +101,25 @@ final class AddLongTermRelations extends LongTermRelationCommand {
     required this.pageIntentionId,
     required this.group,
     required this.candidateIds,
+    required this.supportingCandidateIds,
   });
 
   final IntentionId pageIntentionId;
   final IntentionRelationGroup group;
   final List<IntentionId> candidateIds;
+
+  /// Кандидаты, которые становятся вспомогательными в той же операции, что и
+  /// их связи. Непуст только у исходящей группы.
+  final Set<IntentionId> supportingCandidateIds;
+}
+
+/// Кандидат исходящей группы; [becomesSupporting] делает его вспомогательным
+/// вместе со связью.
+final class OutgoingRelationCandidate {
+  const OutgoingRelationCandidate(this.id, {this.becomesSupporting = false});
+
+  final IntentionId id;
+  final bool becomesSupporting;
 }
 
 sealed class LongTermRelationFieldPatch<T extends Object> {

@@ -11,6 +11,7 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
@@ -256,6 +257,44 @@ void main() {
         );
       },
     );
+
+    test('отмеченный кандидат исходящей группы становится вспомогательным вместе со связью', () async {
+      final result = await repository.execute(
+        AddLongTermRelations.outgoing(
+          pageIntentionId: pageId,
+          type: LongTermRelationType.need,
+          candidates: [
+            OutgoingRelationCandidate(firstId, becomesSupporting: true),
+            OutgoingRelationCandidate(secondId),
+          ],
+        ),
+      );
+
+      final confirmed = _confirmed(result);
+      final added = confirmed.value as LongTermRelationsAdded;
+      final createdAt = added.relations.first.createdAt.value;
+      final stored = {
+        for (final row in await database.select(database.intentions).get())
+          row.id: row,
+      };
+      final first = stored[firstId.toCanonicalString()]!;
+      expect(first.kind, 'supporting');
+      expect(first.updatedAt, createdAt.microsecondsSinceEpoch);
+      expect(stored[secondId.toCanonicalString()]!.kind, 'main');
+
+      final catalogUpdate = added.changes
+          .whereType<IntentionCatalogUpdated>()
+          .single;
+      expect(catalogUpdate.before.summary.id, firstId);
+      expect(catalogUpdate.before.summary.kind, IntentionKind.main);
+      expect(catalogUpdate.after.summary.kind, IntentionKind.supporting);
+      expect(catalogUpdate.after.summary.updatedAt.value, createdAt);
+      expect(
+        catalogUpdate.revision.compareTo(confirmed.revision),
+        GraphRevisionOrder.same,
+      );
+      expect(added.changes.whereType<IntentionHoldingChanged>(), hasLength(1));
+    });
 
     test('готовность участников не ограничивает связь и не меняется', () async {
       await seedGraph(
@@ -583,6 +622,39 @@ void main() {
       );
       await _expectGraphUnchanged(database, repository, otherId, before);
     });
+
+    test(
+      'отклонённое добавление оставляет отмеченного кандидата главным',
+      () async {
+        await _seedRelation(
+          database,
+          relationIds[3],
+          source: pageId,
+          related: secondId,
+          type: 'need',
+        );
+        final before = await _snapshotOfGraph(database, repository, pageId);
+
+        final result = await repository.execute(
+          AddLongTermRelations.outgoing(
+            pageIntentionId: pageId,
+            type: LongTermRelationType.can,
+            candidates: [
+              OutgoingRelationCandidate(firstId, becomesSupporting: true),
+              OutgoingRelationCandidate(secondId),
+            ],
+          ),
+        );
+
+        expect(_failure(result), isA<LongTermRelationPairOccupiedFailure>());
+        await _expectGraphUnchanged(database, repository, pageId, before);
+        final first =
+            await (database.select(database.intentions)
+                  ..where((row) => row.id.equals(firstId.toCanonicalString())))
+                .getSingle();
+        expect(first.kind, 'main');
+      },
+    );
 
     test('отказ записи второй связи откатывает первую', () async {
       repository = _repository(database, diagnostics, [

@@ -153,6 +153,13 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
         ),
       );
     }
+    final kindChanges = <_IntentionCatalogChange>[];
+    for (final candidateId in command.candidateIds) {
+      if (command.supportingCandidateIds.contains(candidateId)) {
+        final change = await _makeSupportingWithRelation(candidateId, clock);
+        if (change != null) kindChanges.add(change);
+      }
+    }
     final affectedCounts = await _readVerifiedRelationCountsFor([
       command.pageIntentionId,
       ...command.candidateIds,
@@ -160,7 +167,33 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
     return _CommittedLongTermRelationsAddition(
       relations: relations,
       affectedCounts: affectedCounts,
+      kindChanges: kindChanges,
     );
+  }
+
+  /// Делает вспомогательным кандидата, входящую связь которого команда уже
+  /// записала. Уже вспомогательное намерение не меняется.
+  Future<_IntentionCatalogChange?> _makeSupportingWithRelation(
+    IntentionId id,
+    _GraphWriteClock clock,
+  ) async {
+    final storedBefore = await _readCommandSnapshot(id);
+    if (storedBefore == null) throw const StoredGraphCorruption();
+    if (storedBefore.intention.kind == domain.IntentionKind.supporting) {
+      return null;
+    }
+    final before = await _catalogEntrySnapshot(storedBefore);
+    await (_database.update(
+      _database.intentions,
+    )..where((row) => row.id.equals(id.toCanonicalString()))).write(
+      local.IntentionsCompanion(
+        kind: Value(domain.IntentionKind.supporting.name),
+        updatedAt: Value(clock.read().microsecondsSinceEpoch),
+      ),
+    );
+    final stored = await _readCommandSnapshot(id);
+    if (stored == null) throw const StoredGraphCorruption();
+    return (before: before, after: await _catalogEntrySnapshot(stored));
   }
 
   Future<_CommittedLongTermRelationUpdate> _updateLongTermRelation(
@@ -454,16 +487,28 @@ sealed class _CommittedLongTermRelationCommand
   const _CommittedLongTermRelationCommand();
 }
 
+/// Строка каталога намерения до и после изменения, подтверждаемого ревизией
+/// команды.
+typedef _IntentionCatalogChange = ({
+  IntentionCatalogEntrySnapshot before,
+  IntentionCatalogEntrySnapshot after,
+});
+
 final class _CommittedLongTermRelationsAddition
     extends _CommittedLongTermRelationCommand {
   _CommittedLongTermRelationsAddition({
     required Iterable<relation_domain.LongTermRelation> relations,
     required Map<IntentionId, RelationCounts> affectedCounts,
+    required Iterable<_IntentionCatalogChange> kindChanges,
   }) : relations = List.unmodifiable(relations),
-       affectedCounts = Map.unmodifiable(affectedCounts);
+       affectedCounts = Map.unmodifiable(affectedCounts),
+       kindChanges = List.unmodifiable(kindChanges);
 
   final List<relation_domain.LongTermRelation> relations;
   final Map<IntentionId, RelationCounts> affectedCounts;
+
+  /// Кандидаты, ставшие вспомогательными вместе со своими связями.
+  final List<_IntentionCatalogChange> kindChanges;
 
   @override
   bool get didMutate => true;
@@ -483,6 +528,12 @@ final class _CommittedLongTermRelationsAddition
             LongTermRelationCreatedChange(
               revision: revision,
               relation: relation,
+            ),
+          for (final change in kindChanges)
+            IntentionCatalogUpdated(
+              revision: revision,
+              before: change.before,
+              after: change.after,
             ),
           IntentionHoldingChanged(revision: revision),
         ],
