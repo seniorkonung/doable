@@ -2850,6 +2850,56 @@ class AppLocalizationsRu extends AppLocalizations {
   String get pathContinueAction => 'Продолжить правку';
 
   @override
+  String pathDiscardKeptRelations(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Добавленные $count связи останутся.',
+      many: 'Добавленные $count связей останутся.',
+      few: 'Добавленные $count связи останутся.',
+      one: 'Добавленная $count связь останется.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pathDiscardKeptIntentions(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Созданные $count намерения останутся.',
+      many: 'Созданные $count намерений останутся.',
+      few: 'Созданные $count намерения останутся.',
+      one: 'Созданное $count намерение останется.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pathDiscardKeptBoth(int relations, int intentions) {
+    String _temp0 = intl.Intl.pluralLogic(
+      relations,
+      locale: localeName,
+      other: 'Добавленные $relations связи',
+      many: 'Добавленные $relations связей',
+      few: 'Добавленные $relations связи',
+      one: 'Добавленная $relations связь',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      intentions,
+      locale: localeName,
+      other: 'созданные $intentions намерения',
+      many: 'созданные $intentions намерений',
+      few: 'созданные $intentions намерения',
+      one: 'созданное $intentions намерение',
+    );
+    return '$_temp0 и $_temp1 останутся.';
+  }
+
+  @override
+  String get pathCandidateNew => 'Новое';
+
+  @override
   String get participantPickerTitle => 'Выбор намерений';
 
   @override
@@ -3087,6 +3137,9 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get batchAnchorNote => 'Намерение, со страницы которого вы пришли';
+
+  @override
+  String get batchPathEndAnchorNote => 'Последнее намерение пути';
 
   @override
   String get batchEmpty => 'Пока ничего не выбрано';

@@ -57,7 +57,7 @@ void main() {
     await database.close();
   });
 
-  Future<({Future<IntentionId?> result})> open(
+  Future<({Future<PathStartChoice?> result})> open(
     WidgetTester tester, {
     IntentionId? currentRoot,
     PathStartFlow flow = PathStartFlow.newAction,
@@ -84,7 +84,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final result = router.push<IntentionId>(
+    final result = router.push<PathStartChoice>(
       PathStartPickerRoute(flow: flow, currentRoot: currentRoot),
     );
     await tester.pumpAndSettle();
@@ -121,7 +121,14 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Другой'));
       await tester.pumpAndSettle();
-      expect(await result, id(2));
+      expect(
+        await result,
+        isA<PathStartSelected>().having(
+          (choice) => choice.intention,
+          'intention',
+          id(2),
+        ),
+      );
     },
   );
 
@@ -185,7 +192,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('intention-editor-title')), findsNothing);
     expect(find.text('Выбор намерения'), findsNothing);
-    final createdId = await result;
+    final created = await result;
     final rows = await tester.runAsync(
       () => (database.select(
         database.intentions,
@@ -193,8 +200,12 @@ void main() {
     );
     expect(rows, hasLength(1));
     expect(
-      createdId,
-      (IntentionId.decode(rows!.single.id) as IntentionIdDecodingSuccess).id,
+      created,
+      isA<PathStartCreated>().having(
+        (choice) => choice.intention,
+        'intention',
+        (IntentionId.decode(rows!.single.id) as IntentionIdDecodingSuccess).id,
+      ),
     );
   });
 
@@ -217,6 +228,6 @@ void main() {
       () => Future<void>.delayed(const Duration(milliseconds: 50)),
     );
     await tester.pumpAndSettle();
-    expect(await result, isNotNull);
+    expect(await result, isA<PathStartCreated>());
   });
 }

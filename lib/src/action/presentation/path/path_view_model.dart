@@ -13,6 +13,7 @@ import '../../application/action_result.dart';
 import '../../application/path_candidates.dart';
 import '../../domain/action_id.dart';
 import '../../domain/action_path.dart';
+import '../path_start/path_start_picker_page.dart';
 import 'path_state.dart';
 
 part 'path_view_model.g.dart';
@@ -49,9 +50,29 @@ final class PathViewModel extends _$PathViewModel {
     return PathState(original: purpose.original, draft: draft);
   }
 
-  void selectRoot(IntentionId root) {
+  void selectRoot(PathStartChoice choice) {
+    if (choice is PathStartCreated) acceptCreatedIntention();
+    final root = choice.intention;
     state = state.withDraft(LoadingPathDraft([root]));
     unawaited(_read([root]));
+  }
+
+  /// Связи, добавленные к последнему намерению, сами в путь не входят: экран
+  /// остаётся на той же половине, где они стали кандидатами.
+  void acceptAddedRelations(
+    LongTermRelationType half,
+    List<LongTermRelation> relations,
+  ) {
+    state = state.withCreations(
+      state.creations.withRelations(relations.map((relation) => relation.id)),
+    );
+    if (state.draft is LoadedPathDraft) {
+      unawaited(_read(state.draft.intentions, half: half));
+    }
+  }
+
+  void acceptCreatedIntention() {
+    state = state.withCreations(state.creations.withIntention());
   }
 
   void endAt(IntentionId intention) {

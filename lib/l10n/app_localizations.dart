@@ -4367,6 +4367,30 @@ abstract class AppLocalizations {
   /// **'Keep editing'**
   String get pathContinueAction;
 
+  /// Связи, добавленные на экране пути, в вопросе об отмене
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{The added relation will remain.} other{The {count} added relations will remain.}}'**
+  String pathDiscardKeptRelations(int count);
+
+  /// Намерения, созданные в поисках экрана пути, в вопросе об отмене
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{The created intention will remain.} other{The {count} created intentions will remain.}}'**
+  String pathDiscardKeptIntentions(int count);
+
+  /// Связи и намерения, созданные с экрана пути, в вопросе об отмене
+  ///
+  /// In en, this message translates to:
+  /// **'{relations, plural, one{The added relation} other{The {relations} added relations}} and {intentions, plural, one{the created intention} other{the {intentions} created intentions}} will remain.'**
+  String pathDiscardKeptBoth(int relations, int intentions);
+
+  /// Отметка кандидата пути, связь к которому добавлена на экране
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get pathCandidateNew;
+
   /// Заголовок поиска участников связи
   ///
   /// In en, this message translates to:
@@ -4738,6 +4762,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The intention whose page you came from'**
   String get batchAnchorNote;
+
+  /// Подпись карточки якоря в поиске участника, открытом с экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'The last intention of the path'**
+  String get batchPathEndAnchorNote;
 
   /// Текст поиска участников группы
   ///

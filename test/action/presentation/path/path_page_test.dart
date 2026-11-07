@@ -10,6 +10,7 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -104,6 +105,27 @@ void main() {
       () => repository.watchAction(seedActionId(201)).first,
     );
     return ExistingActionPathPurpose((read! as ActionReadSuccess).value.value!);
+  }
+
+  /// Связи графа, исходящие из намерения [source], в порядке создания.
+  List<(String, String)> relationsFrom(int source) => [
+    for (final row in raw.select(
+      'SELECT related_intention_id, type FROM long_term_relations '
+      'WHERE source_intention_id = ? ORDER BY creation_sequence',
+      [seedUuid(source)],
+    ))
+      (row['related_intention_id'] as String, row['type'] as String),
+  ];
+
+  /// Отмечает в открытом поиске участника намерения [titles] по порядку и
+  /// добавляет связи.
+  Future<void> addRelations(WidgetTester tester, List<String> titles) async {
+    for (final title in titles) {
+      await tester.tap(find.text(title));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.textContaining(RegExp(r'^Добавить \d+ связ')));
+    await settlePathScreen(tester);
   }
 
   /// Путь действия в хранилище.
@@ -666,4 +688,162 @@ void main() {
     expect(find.text('Быть здоровым'), findsNothing);
     expect(isPathSaveEnabled(tester), isFalse);
   });
+
+  testWidgets(
+    '«Добавить» создаёт связи последнего намерения, а их кандидаты стоят '
+    'последними с отметкой «Новое»',
+    (tester) async {
+      await openPathScreen(
+        tester,
+        router: router,
+        repository: repository,
+        purpose: NewActionPathPurpose(_path([1])),
+      );
+      expect(find.text('Много ходить'), findsOneWidget);
+
+      await tester.tap(find.text('Добавить'));
+      await tester.pumpAndSettle();
+      expect(find.byType(RelationBatchPickerPage), findsOneWidget);
+      await tester.tap(find.text('Добавить в "Нужно"'));
+      await tester.pumpAndSettle();
+      expect(find.text('Быть здоровым'), findsOneWidget);
+      expect(find.text('Последнее намерение пути'), findsOneWidget);
+      await tester.tap(find.text('Вернуться к списку'));
+      await tester.pumpAndSettle();
+      await addRelations(tester, ['Высыпаться', 'Покупать обувь']);
+
+      expect(find.byType(RelationBatchPickerPage), findsNothing);
+      expect(relationsFrom(1), [
+        (seedUuid(2), 'need'),
+        (seedUuid(4), 'need'),
+        (seedUuid(3), 'need'),
+      ]);
+      // Путь прежний, а связи не входят в него сами.
+      expect(isPathSaveEnabled(tester), isFalse);
+      expect(find.text('3'), findsOneWidget);
+      final rows = [
+        'Много ходить',
+        'Высыпаться',
+        'Покупать обувь',
+      ].map((text) => tester.getTopLeft(find.text(text)).dy).toList();
+      expect(rows, orderedEquals([...rows]..sort()));
+      expect(find.text('Новое'), findsNWidgets(2));
+      expect(
+        find.bySemanticsLabel(RegExp('«Покупать обувь».*Новое')),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel(RegExp('«Много ходить».*Новое')),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'открытая половина «Можно» добавляет в «Можно использовать» и остаётся '
+    'открытой, а намерение из пути кандидатом не становится',
+    (tester) async {
+      await openPathScreen(
+        tester,
+        router: router,
+        repository: repository,
+        purpose: NewActionPathPurpose(_path([1, 2])),
+      );
+      expect(find.text('Покупать обувь'), findsOneWidget);
+
+      await tester.tap(find.text('Добавить'));
+      await tester.pumpAndSettle();
+      expect(find.text('Добавить в "Можно использовать"'), findsOneWidget);
+      await addRelations(tester, ['Быть здоровым', 'Высыпаться']);
+
+      expect(relationsFrom(2), [
+        (seedUuid(3), 'can'),
+        (seedUuid(1), 'can'),
+        (seedUuid(4), 'can'),
+      ]);
+      expect(find.text('Пока ничего не нужно'), findsNothing);
+      expect(find.text('Покупать обувь'), findsOneWidget);
+      expect(find.text('Высыпаться'), findsOneWidget);
+      // «Быть здоровым» стоит только в пути.
+      expect(find.text('Быть здоровым'), findsOneWidget);
+      expect(find.text('Новое'), findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'вопрос при уходе называет добавленные связи и созданное намерение, а '
+    '«Отменить» их не удаляет',
+    (tester) async {
+      final result = await openPathScreen(
+        tester,
+        router: router,
+        repository: repository,
+        purpose: NewActionPathPurpose(_path([1])),
+      );
+      await tester.tap(find.text('Много ходить'));
+      await settlePathScreen(tester);
+
+      await tester.tap(find.text('Добавить'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Создать намерение'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('intention-editor-title')),
+        'Плавать',
+      );
+      await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+      await settlePathScreen(tester);
+      await addRelations(tester, ['Высыпаться']);
+      expect(find.byType(RelationBatchPickerPage), findsNothing);
+
+      await tapPathBack(tester);
+      expect(
+        find.text(
+          'Изменения пути не сохранятся. Добавленные 2 связи и созданное 1 '
+          'намерение останутся.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Отменить'));
+      await tester.pumpAndSettle();
+      expect(await result, isNull);
+      expect(relationsFrom(2), hasLength(3));
+      expect(
+        raw.select('SELECT 1 FROM intentions WHERE title = ?', ['Плавать']),
+        hasLength(1),
+      );
+    },
+  );
+
+  testWidgets(
+    'вопрос при уходе называет намерение, созданное в поиске начала пути',
+    (tester) async {
+      await openPathScreen(
+        tester,
+        router: router,
+        repository: repository,
+        purpose: NewActionPathPurpose(_path([1])),
+      );
+      await tester.tap(find.text('Быть здоровым'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel('Создать намерение'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('intention-editor-title')),
+        'Плавать',
+      );
+      await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+      await settlePathScreen(tester);
+      expect(find.text('Плавать'), findsOneWidget);
+
+      await tapPathBack(tester);
+      expect(
+        find.text(
+          'Изменения пути не сохранятся. Созданное 1 намерение останется.',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 }

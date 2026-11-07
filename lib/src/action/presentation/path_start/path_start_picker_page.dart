@@ -14,7 +14,24 @@ import 'path_start_picker_purpose.dart';
 /// Поток, в котором выбирается начало пути.
 enum PathStartFlow { newAction, editPath }
 
-/// Возвращает выбранное намерение или null при закрытии без выбора.
+/// Начало пути, выбранное в поиске.
+sealed class PathStartChoice {
+  const PathStartChoice(this.intention);
+
+  final IntentionId intention;
+}
+
+/// Выбрано намерение, которое уже было в графе.
+final class PathStartSelected extends PathStartChoice {
+  const PathStartSelected(super.intention);
+}
+
+/// Намерение создано в этом поиске и выбрано началом пути.
+final class PathStartCreated extends PathStartChoice {
+  const PathStartCreated(super.intention);
+}
+
+/// Возвращает выбранное начало пути или null при закрытии без выбора.
 @RoutePage()
 final class PathStartPickerPage extends StatefulWidget {
   const PathStartPickerPage({required this.flow, this.currentRoot, super.key});
@@ -42,8 +59,9 @@ final class _PathStartPickerPageState extends State<PathStartPickerPage> {
       emptyScopeMessage: l10n.pathStartPickerEmpty,
       onClose: () => unawaited(context.router.maybePop()),
       rowBehavior: IntentionPickerSingle(
-        onPick: (snapshot) =>
-            unawaited(context.router.maybePop(snapshot.value.id)),
+        onPick: (snapshot) => unawaited(
+          context.router.maybePop(PathStartSelected(snapshot.value.id)),
+        ),
         onCreate: (title, _) {
           final router = context.router;
           final pickerMatchId = context.routeData.matchId;
@@ -63,7 +81,7 @@ final class _PathStartPickerPageState extends State<PathStartPickerPage> {
                       if (mounted &&
                           router.stackData.lastOrNull?.matchId ==
                               pickerMatchId) {
-                        unawaited(router.maybePop(id));
+                        unawaited(router.maybePop(PathStartCreated(id)));
                       }
                     });
                   },

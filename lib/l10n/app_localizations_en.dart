@@ -2818,6 +2818,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pathContinueAction => 'Keep editing';
 
   @override
+  String pathDiscardKeptRelations(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'The $count added relations will remain.',
+      one: 'The added relation will remain.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pathDiscardKeptIntentions(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'The $count created intentions will remain.',
+      one: 'The created intention will remain.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pathDiscardKeptBoth(int relations, int intentions) {
+    String _temp0 = intl.Intl.pluralLogic(
+      relations,
+      locale: localeName,
+      other: 'The $relations added relations',
+      one: 'The added relation',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      intentions,
+      locale: localeName,
+      other: 'the $intentions created intentions',
+      one: 'the created intention',
+    );
+    return '$_temp0 and $_temp1 will remain.';
+  }
+
+  @override
+  String get pathCandidateNew => 'New';
+
+  @override
   String get participantPickerTitle => 'Choose intentions';
 
   @override
@@ -3052,6 +3094,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get batchAnchorNote => 'The intention whose page you came from';
+
+  @override
+  String get batchPathEndAnchorNote => 'The last intention of the path';
 
   @override
   String get batchEmpty => 'Nothing selected yet';

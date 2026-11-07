@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../long_term_relation/domain/long_term_relation.dart';
+import '../../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../application/action_details.dart';
 import '../../application/action_result.dart';
 import '../../application/path_candidates.dart';
@@ -142,19 +143,47 @@ final class FailedPathDraft extends PathDraft {
   bool get canRetry => failure is PathCandidatesUnavailableFailure;
 }
 
+/// Связи и намерения, созданные с экрана пути. Они уже в графе и остаются
+/// там при любом уходе с экрана.
+final class PathCreations {
+  const PathCreations({this.relations = const {}, this.intentions = 0});
+
+  /// Связи, добавленные «Добавить»; их кандидаты отмечены «Новое».
+  final Set<LongTermRelationId> relations;
+
+  /// Намерения, созданные в поисках, открытых с экрана.
+  final int intentions;
+
+  PathCreations withRelations(Iterable<LongTermRelationId> added) =>
+      PathCreations(
+        relations: {...relations, ...added},
+        intentions: intentions,
+      );
+  PathCreations withIntention() =>
+      PathCreations(relations: relations, intentions: intentions + 1);
+}
+
 final class PathState {
   PathState({required ActionPath? original, required this.draft})
     : original = original?.intentions ?? const [],
       candidates = null,
-      saving = const PathSavingIdle();
+      saving = const PathSavingIdle(),
+      creations = const PathCreations();
 
-  const PathState._(this.original, this.draft, this.candidates, this.saving);
+  const PathState._(
+    this.original,
+    this.draft,
+    this.candidates,
+    this.saving,
+    this.creations,
+  );
 
   /// Исходный путь, с которым открыт экран; пустой, пока путь не выбран.
   final List<IntentionId> original;
   final PathDraft draft;
   final CandidateState? candidates;
   final PathSaving saving;
+  final PathCreations creations;
 
   /// Пути сравниваются по последовательности намерений.
   bool get isChanged => !listEquals(draft.intentions, original);
@@ -171,11 +200,13 @@ final class PathState {
       : PathCloseDecision.close;
 
   PathState withDraft(PathDraft value) =>
-      PathState._(original, value, null, saving);
+      PathState._(original, value, null, saving, creations);
   PathState withCandidates(CandidateState value) =>
-      PathState._(original, draft, value, saving);
+      PathState._(original, draft, value, saving, creations);
   PathState withSaving(PathSaving value) =>
-      PathState._(original, draft, candidates, value);
+      PathState._(original, draft, candidates, value, creations);
+  PathState withCreations(PathCreations value) =>
+      PathState._(original, draft, candidates, saving, value);
 }
 
 final class CandidateState {

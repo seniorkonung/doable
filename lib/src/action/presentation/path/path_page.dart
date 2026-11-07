@@ -18,6 +18,8 @@ import '../../../design_system/doable_priority.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../../long_term_relation/domain/long_term_relation.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
+import '../../../long_term_relation/application/intention_relation_group.dart';
+import '../../../long_term_relation/presentation/batch_picker/relation_batch_picker_purpose.dart';
 import '../../../long_term_relation/presentation/details/relation_details_sheet.dart';
 import '../../application/path_candidates.dart';
 import '../../domain/action_path.dart';
@@ -34,6 +36,9 @@ import 'path_view_model.dart';
 /// сокращение нажатием на промежуточное намерение граф не меняют.
 /// «Сохранить» возвращает путь вызывающему, а уход без сохранения — `null`.
 /// Изменённый путь закрывается только после ответа «Отменить».
+///
+/// «Добавить» создаёт связи последнего намерения сразу: они и намерения,
+/// созданные в поисках, открытых с экрана, остаются при любом уходе.
 ///
 /// Путь существующего действия «Сохранить» заменяет сама и закрывает экран
 /// только после подтверждённой замены; отказ остаётся на экране. Пока замена
@@ -152,13 +157,13 @@ final class _PathPageState extends ConsumerState<PathPage> {
                 )
               : null,
         ),
-        EmptyPathDraft() => _builder(l10n, model, const [], null, null),
+        EmptyPathDraft() => _builder(l10n, model, path, const [], null),
         final LoadedPathDraft loaded => _builder(
           l10n,
           model,
+          path,
           loaded.intentions,
           loaded.segment,
-          path.candidates,
           appended: loaded.appended,
         ),
       };
@@ -166,11 +171,12 @@ final class _PathPageState extends ConsumerState<PathPage> {
   Widget _builder(
     AppLocalizations l10n,
     PathViewModel model,
+    PathState path,
     List<IntentionId> ids,
-    PathSegment? segment,
-    CandidateState? candidates, {
+    PathSegment? segment, {
     PathCandidate? appended,
   }) {
+    final candidates = path.candidates;
     final steps = segment == null
         ? const <PathBuilderStep>[]
         : _steps(l10n, segment, appended);
@@ -228,21 +234,38 @@ final class _PathPageState extends ConsumerState<PathPage> {
           : null,
       addText: l10n.pathAdd,
       addLabel: l10n.pathAdd,
-      onAdd: () {},
+      onAdd: () {
+        if (segment == null) return;
+        _addRelations(
+          appended == null
+              ? (id: segment.last.id, title: segment.last.title)
+              : (
+                  id: appended.relation.relatedIntentionId,
+                  title: appended.title,
+                ),
+          candidates?.half ?? LongTermRelationType.need,
+        );
+      },
       children: [
         if (candidates != null) ...[
           for (final candidate in candidates.items)
             StepOption(
               name: candidate.title,
               priority: _designPriority(candidate.relation.priority),
-              label: l10n.pathCandidateLabel(
-                candidate.title,
-                l10n.actionPriorityOption(
-                  actionPriorityName(
-                    _designPriority(candidate.relation.priority),
+              freshText: _isFresh(path, candidate)
+                  ? l10n.pathCandidateNew
+                  : null,
+              label: [
+                l10n.pathCandidateLabel(
+                  candidate.title,
+                  l10n.actionPriorityOption(
+                    actionPriorityName(
+                      _designPriority(candidate.relation.priority),
+                    ),
                   ),
                 ),
-              ),
+                if (_isFresh(path, candidate)) l10n.pathCandidateNew,
+              ].join('. '),
               openLabel: l10n.intentionPickerOpenIntentionPage(candidate.title),
               onPick: () => model.selectCandidate(candidate),
               onOpen: () => unawaited(
@@ -370,12 +393,46 @@ final class _PathPageState extends ConsumerState<PathPage> {
   /// Выбор в поиске начала пути заменяет весь путь одним корнем, а закрытие
   /// без выбора путь не меняет.
   Future<void> _chooseRoot(IntentionId? currentRoot) async {
-    final root = await context.router.push<IntentionId>(
+    final root = await context.router.push<PathStartChoice>(
       PathStartPickerRoute(flow: _flow, currentRoot: currentRoot),
     );
     if (mounted && root != null) {
       ref.read(_provider.notifier).selectRoot(root);
     }
+  }
+
+  /// Поиск участника с последним намерением в роли якоря кладёт связи в
+  /// открытую половину и сам закрывается после подтверждённого добавления.
+  void _addRelations(
+    ({IntentionId id, String title}) last,
+    LongTermRelationType half,
+  ) {
+    unawaited(
+      context.router.push(
+        RelationBatchPickerRoute(
+          pageIntentionId: last.id,
+          pageTitle: last.title,
+          group: switch (half) {
+            LongTermRelationType.need => IntentionRelationGroup.needs,
+            LongTermRelationType.can => IntentionRelationGroup.canUse,
+          },
+          anchor: RelationBatchPathEndAnchor(
+            onAdded: (relations) {
+              if (mounted) {
+                ref
+                    .read(_provider.notifier)
+                    .acceptAddedRelations(half, relations);
+              }
+            },
+            onIntentionCreated: () {
+              if (mounted) {
+                ref.read(_provider.notifier).acceptCreatedIntention();
+              }
+            },
+          ),
+        ),
+      ),
+    );
   }
 
   /// Экран, с которого ушли до исхода замены, ничего не закрывает.
@@ -390,16 +447,31 @@ final class _PathPageState extends ConsumerState<PathPage> {
       return;
     }
     final l10n = AppLocalizations.of(context);
+    final creations = ref.read(_provider).creations;
     final discarded = await showDiscardDialog(
       context: context,
       title: l10n.pathDiscardTitle,
-      text: l10n.pathDiscardMessage,
+      text: [
+        l10n.pathDiscardMessage,
+        ?switch ((creations.relations.length, creations.intentions)) {
+          (0, 0) => null,
+          (final relations, 0) => l10n.pathDiscardKeptRelations(relations),
+          (0, final intentions) => l10n.pathDiscardKeptIntentions(intentions),
+          (final relations, final intentions) => l10n.pathDiscardKeptBoth(
+            relations,
+            intentions,
+          ),
+        },
+      ].join(' '),
       discardLabel: l10n.pathDiscardAction,
       keepLabel: l10n.pathContinueAction,
     );
     if (discarded && mounted) context.router.pop();
   }
 }
+
+bool _isFresh(PathState path, PathCandidate candidate) =>
+    path.creations.relations.contains(candidate.relation.id);
 
 String _failureMessage(
   AppLocalizations l10n,

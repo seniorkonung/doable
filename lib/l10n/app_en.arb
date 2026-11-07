@@ -2067,6 +2067,14 @@
   "@pathDiscardAction": {"description": "Текст экрана пути"},
   "pathContinueAction": "Keep editing",
   "@pathContinueAction": {"description": "Текст экрана пути"},
+  "pathDiscardKeptRelations": "{count, plural, one{The added relation will remain.} other{The {count} added relations will remain.}}",
+  "@pathDiscardKeptRelations": {"description": "Связи, добавленные на экране пути, в вопросе об отмене", "placeholders": {"count": {"type": "int"}}},
+  "pathDiscardKeptIntentions": "{count, plural, one{The created intention will remain.} other{The {count} created intentions will remain.}}",
+  "@pathDiscardKeptIntentions": {"description": "Намерения, созданные в поисках экрана пути, в вопросе об отмене", "placeholders": {"count": {"type": "int"}}},
+  "pathDiscardKeptBoth": "{relations, plural, one{The added relation} other{The {relations} added relations}} and {intentions, plural, one{the created intention} other{the {intentions} created intentions}} will remain.",
+  "@pathDiscardKeptBoth": {"description": "Связи и намерения, созданные с экрана пути, в вопросе об отмене", "placeholders": {"relations": {"type": "int"}, "intentions": {"type": "int"}}},
+  "pathCandidateNew": "New",
+  "@pathCandidateNew": {"description": "Отметка кандидата пути, связь к которому добавлена на экране"},
   "participantPickerTitle": "Choose intentions",
   "@participantPickerTitle": {
     "description": "Заголовок поиска участников связи"
@@ -2237,6 +2245,8 @@
   "@batchDefaults": {"description": "Текст поиска участников группы"},
   "batchAnchorNote": "The intention whose page you came from",
   "@batchAnchorNote": {"description": "Текст поиска участников группы"},
+  "batchPathEndAnchorNote": "The last intention of the path",
+  "@batchPathEndAnchorNote": {"description": "Подпись карточки якоря в поиске участника, открытом с экрана пути"},
   "batchEmpty": "Nothing selected yet",
   "@batchEmpty": {"description": "Текст поиска участников группы"},
   "batchSelected": "Selected intentions",
