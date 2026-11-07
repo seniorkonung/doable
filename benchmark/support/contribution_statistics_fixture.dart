@@ -170,6 +170,31 @@ final class ContributionStatisticsFixture {
     }
   }
 
+  /// Номер первого главного намерения: узлы до него — вспомогательные,
+  /// которые связи первой полосы и замыкание 999 → 0 соединяют в цикл без
+  /// входящих активных связей от главных, поэтому они не удерживаются.
+  static const firstMainIntention = 1000;
+
+  /// Делит граф на главные и вспомогательные намерения: начиная с
+  /// [firstMainIntention] главное каждое десятое, остальные вспомогательные.
+  /// Связи ведут только вперёд по номерам, кроме замыкающих цикл, поэтому
+  /// активные узлы от [firstMainIntention] удерживаются, а цикл до него — нет.
+  void assignIntentionKinds(sqlite.Database database) {
+    final markMain = database.prepare(
+      "UPDATE intentions SET kind = 'main' WHERE id = ?",
+    );
+    try {
+      seedRawGraph(database, () {
+        database.execute("UPDATE intentions SET kind = 'supporting'");
+        for (var node = firstMainIntention; node < 50000; node += 10) {
+          markMain.execute([id(node + 1)]);
+        }
+      });
+    } finally {
+      markMain.close();
+    }
+  }
+
   void archivePathParts(sqlite.Database database) {
     seedRawGraph(database, () {
       database.execute('''UPDATE long_term_relations SET is_archived = 1
