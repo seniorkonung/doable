@@ -527,6 +527,11 @@ final class _App {
     await tester.runAsync(() async {
       final coordinator = runtime.commandCoordinator;
       final start = switch (command) {
+        CreateAction() => coordinator.acceptActionCreation(
+          ActionCreationFormKey(),
+          command,
+        ),
+        SetActionPath() => coordinator.acceptActionPathUpdate(command),
         UpdateActionFields() => coordinator.acceptActionUpdate(command),
         DeleteAction() => coordinator.acceptActionDelete(command),
       };

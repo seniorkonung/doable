@@ -118,22 +118,31 @@ void main() {
           action,
         );
         await tester.pumpAndSettle();
-        expect(find.byType(BottomSheet), findsOneWidget);
+        final sheet = find.byType(BottomSheet);
+        expect(sheet, findsOneWidget);
         expect(
           tester
-              .widgetList<OptionRow>(find.byType(OptionRow))
+              .widgetList<OptionRow>(
+                find.descendant(of: sheet, matching: find.byType(OptionRow)),
+              )
               .map((row) => row.name),
           titles,
         );
         expect(appNavigationDestinations().hitTestable(), findsNothing);
         expect(find.semantics.byLabel(node.label), findsNothing);
-        final title = find.text(titles[mode.index]);
-        final row = find.widgetWithText(OptionRow, titles[mode.index]);
+        final title = find.descendant(
+          of: sheet,
+          matching: find.text(titles[mode.index]),
+        );
+        final row = find.descendant(
+          of: sheet,
+          matching: find.widgetWithText(OptionRow, titles[mode.index]),
+        );
         await tester.ensureVisible(row);
         await tester.pumpAndSettle();
         final viewport = tester.getRect(
           find.descendant(
-            of: find.byType(BottomSheet),
+            of: sheet,
             matching: find.byType(SingleChildScrollView),
           ),
         );
