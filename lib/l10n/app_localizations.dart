@@ -4393,6 +4393,12 @@ abstract class AppLocalizations {
   /// **'No intentions with this name'**
   String get intentionPickerNoIntentionsByTitle;
 
+  /// Подсказка о совпадениях другого вида при пустой выдаче каталога
+  ///
+  /// In en, this message translates to:
+  /// **'{kind, select, main{There are no matches among main intentions, but there are matches among supporting intentions.} supporting{There are no matches among supporting intentions, but there are matches among main intentions.} other{}}'**
+  String intentionCatalogOtherKindMatches(String kind);
+
   /// Совет пустой выдачи экрана выбора из-за фильтра названия
   ///
   /// In en, this message translates to:

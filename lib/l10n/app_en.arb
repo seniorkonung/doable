@@ -2044,6 +2044,11 @@
     "placeholders": {"count": {"type": "int"}}
   },
   "intentionPickerNoIntentionsByTitle": "No intentions with this name",
+  "intentionCatalogOtherKindMatches": "{kind, select, main{There are no matches among main intentions, but there are matches among supporting intentions.} supporting{There are no matches among supporting intentions, but there are matches among main intentions.} other{}}",
+  "@intentionCatalogOtherKindMatches": {
+    "description": "Подсказка о совпадениях другого вида при пустой выдаче каталога",
+    "placeholders": {"kind": {"type": "String"}}
+  },
   "@intentionPickerNoIntentionsByTitle": {
     "description": "Заголовок пустой выдачи выбора намерения из-за фильтра названия"
   },

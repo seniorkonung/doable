@@ -849,6 +849,7 @@
   "intentionPickerFilterLabel": "{count, plural, =0{Фильтр по тегам} one{Фильтр по тегам, {count} условие} few{Фильтр по тегам, {count} условия} many{Фильтр по тегам, {count} условий} other{Фильтр по тегам, {count} условия}}",
   "@intentionPickerFilterLabel": {"placeholders": {"count": {"type": "int"}}},
   "intentionPickerNoIntentionsByTitle": "Нет намерений с таким названием",
+  "intentionCatalogOtherKindMatches": "{kind, select, main{Среди главных совпадений нет, но они есть среди вспомогательных.} supporting{Среди вспомогательных совпадений нет, но они есть среди главных.} other{}}",
   "intentionPickerTryShorterTitle": "Попробуйте название короче.",
   "intentionPickerNoIntentionsByTags": "Нет намерений под эти теги",
   "intentionPickerChangeTags": "Измените теги в фильтре или сбросьте его.",

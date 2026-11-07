@@ -2912,6 +2912,18 @@ class AppLocalizationsRu extends AppLocalizations {
       'Нет намерений с таким названием';
 
   @override
+  String intentionCatalogOtherKindMatches(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'main':
+          'Среди главных совпадений нет, но они есть среди вспомогательных.',
+      'supporting':
+          'Среди вспомогательных совпадений нет, но они есть среди главных.',
+      'other': '',
+    });
+    return '$_temp0';
+  }
+
+  @override
   String get intentionPickerTryShorterTitle => 'Попробуйте название короче.';
 
   @override

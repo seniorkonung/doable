@@ -9,7 +9,7 @@ import 'button.dart';
 
 /// Пустое состояние списка: заголовок о том, что пусто, и текст о том, что
 /// здесь появится или что изменить. Над заголовком может стоять круг
-/// с иконкой, а под текстом — одна тихая кнопка.
+/// с иконкой, а под текстом — тихие кнопки действий.
 ///
 /// Блок центрируется в высоте, которую даёт родитель, и оставляет над собой
 /// свободное поле [spaceAbove], а под собой — [spaceBelow]. В прокручиваемом
@@ -21,6 +21,7 @@ final class EmptyState extends StatelessWidget {
     required this.text,
     this.icon,
     this.action,
+    this.secondaryAction,
     this.textMaxWidth = 260,
     this.spaceAbove = 0,
     this.spaceBelow = DoableMetrics.space10,
@@ -35,6 +36,9 @@ final class EmptyState extends StatelessWidget {
   /// Действие, которое меняет то, из-за чего пусто, например «Сбросить
   /// фильтры».
   final ({String label, VoidCallback onPressed})? action;
+
+  /// Дополнительное действие под первым.
+  final ({String label, VoidCallback onPressed})? secondaryAction;
 
   /// Наибольшая ширина текста.
   final double textMaxWidth;
@@ -120,6 +124,8 @@ final class EmptyState extends StatelessWidget {
               const SizedBox(height: 12),
               Button.quiet(label: label, onPressed: onPressed),
             ],
+            if (secondaryAction case (:final label, :final onPressed))
+              Button.quiet(label: label, onPressed: onPressed),
           ],
         ),
       ),

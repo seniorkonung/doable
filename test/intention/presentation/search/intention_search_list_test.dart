@@ -480,6 +480,38 @@ void main() {
   });
 
   group('пустая выдача по фильтрам называет искомое намерениями', () {
+    testWidgets('при фильтре тегов вспомогательные подсказывают совпадения '
+        'среди главных', (tester) async {
+      final h = await _openCatalog(tester, locale: const Locale('ru'));
+      h.notifier.changeKind(IntentionKindFilter.supportingOnly);
+      h.notifier.changeTagFilter(
+        IntentionTagFilter(excludedTagIds: [_sport.id]),
+      );
+      await _settle(tester);
+      h.repository.complete(
+        h.repository.queries.length - 1,
+        _otherKindOnlyPage(shown: IntentionKind.supporting),
+      );
+      await _settle(tester);
+
+      expect(
+        find.textContaining('совпадений нет, но они есть среди главных'),
+        findsOneWidget,
+      );
+      expect(find.text('Показать оба типа'), findsOneWidget);
+      expect(find.text('Сбросить фильтры'), findsOneWidget);
+    });
+
+    testWidgets('пустой поиск участника предлагает только сброс фильтров', (
+      tester,
+    ) async {
+      final h = await _openRelationParticipants(tester);
+      await _showTitleResults(tester, h, 'бег', _firstPage(const []));
+
+      expect(find.text('Сбросить фильтры'), findsOneWidget);
+      expect(find.text('Показать оба типа'), findsNothing);
+    });
+
     for (final kind in IntentionKindFilter.values) {
       for (final (cause, title, tagged, titled) in [
         ('название', 'Нет намерений с таким названием', false, true),

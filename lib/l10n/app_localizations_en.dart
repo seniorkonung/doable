@@ -2870,6 +2870,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'No intentions with this name';
 
   @override
+  String intentionCatalogOtherKindMatches(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'main': 'There are no matches among main intentions, but there are matches among supporting intentions.',
+      'supporting': 'There are no matches among supporting intentions, but there are matches among main intentions.',
+      'other': '',
+    });
+    return '$_temp0';
+  }
+
+  @override
   String get intentionPickerTryShorterTitle => 'Try a shorter name.';
 
   @override

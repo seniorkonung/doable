@@ -235,16 +235,19 @@ final class _IntentionSearchListState
       },
       (byTitle: true, byTags: false) => _filteredEmpty(
         l10n,
+        empty: empty,
         title: l10n.intentionPickerNoIntentionsByTitle,
         text: l10n.intentionPickerTryShorterTitle,
       ),
       (byTitle: false, byTags: true) => _filteredEmpty(
         l10n,
+        empty: empty,
         title: l10n.intentionPickerNoIntentionsByTags,
         text: l10n.intentionPickerChangeTags,
       ),
       (byTitle: true, byTags: true) => _filteredEmpty(
         l10n,
+        empty: empty,
         title: l10n.intentionPickerNoIntentionsFound,
         text: l10n.intentionPickerChangeTitleOrTags,
       ),
@@ -277,17 +280,39 @@ final class _IntentionSearchListState
 
   EmptyState _filteredEmpty(
     AppLocalizations l10n, {
+    required IntentionCatalogEmpty empty,
     required String title,
     required String text,
-  }) => EmptyState(
-    icon: DoableIconData.search,
-    title: title,
-    text: text,
-    action: (
+  }) {
+    final selectedKind = switch ((empty.query.kindFilter, empty.kindCounts)) {
+      (IntentionKindFilter.mainOnly, final counts?)
+          when counts.supporting > 0 =>
+        IntentionKind.main,
+      (IntentionKindFilter.supportingOnly, final counts?)
+          when counts.main > 0 =>
+        IntentionKind.supporting,
+      _ => null,
+    };
+    final reset = (
       label: l10n.intentionPickerResetFilters,
       onPressed: widget.onResetFilters,
-    ),
-  );
+    );
+    return EmptyState(
+      icon: DoableIconData.search,
+      title: title,
+      text: selectedKind == null
+          ? text
+          : '${l10n.intentionCatalogOtherKindMatches(selectedKind.name)} $text',
+      action: selectedKind == null
+          ? reset
+          : (
+              label: l10n.intentionPickerShowBothTypes,
+              onPressed: () =>
+                  _notifier.changeKind(IntentionKindFilter.mainAndSupporting),
+            ),
+      secondaryAction: selectedKind == null ? null : reset,
+    );
+  }
 
   Widget? _continuation(
     AppLocalizations l10n,

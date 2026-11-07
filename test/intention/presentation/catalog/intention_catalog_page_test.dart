@@ -1351,8 +1351,7 @@ void main() {
 
       await enterIntentionCatalogTitle(tester, 'плавать');
       await _pumpUntilQueries(tester, repository, 2);
-      // В охвате есть вспомогательные намерения, но фильтр названия называет
-      // свою причину раньше причины вида.
+      // Совпадения другого вида есть только за пределами выбранного охвата.
       repository.completeVerbatim(
         1,
         ResultSuccess(
@@ -1360,8 +1359,8 @@ void main() {
             items: const [],
             totalCount: 0,
             counts: IntentionCountsByScopeAndKind(
-              active: IntentionKindCounts(main: 0, supporting: 2),
-              archived: IntentionKindCounts(main: 0, supporting: 0),
+              active: IntentionKindCounts(main: 0, supporting: 0),
+              archived: IntentionKindCounts(main: 0, supporting: 2),
             ),
             nextCursor: null,
             revision: const TestCatalogRevision(0),
@@ -1383,6 +1382,77 @@ void main() {
       );
       expect(_inEmptyState(find.text('Сбросить фильтры')), findsOneWidget);
       expect(_inEmptyState(find.text('Показать оба типа')), findsNothing);
+    });
+
+    testWidgets('совпадение другого вида сохраняет название и теги при '
+        'показе обоих типов', (tester) async {
+      final repository = ControlledCatalogRepository();
+      final container = reconciliationCatalogContainer(repository);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        _testAppWithContainer(container, locale: const Locale('ru')),
+      );
+      repository.complete(0, _firstPage(const []));
+      await tester.pumpAndSettle();
+      final tag = _tag(1, 'Здоровье');
+      await _selectCondition(
+        tester,
+        container,
+        tag,
+        IntentionTagRequirement.mustBePresent,
+      );
+      await _pumpUntilQueries(tester, repository, 2);
+      await enterIntentionCatalogTitle(tester, 'парк');
+      await _pumpUntilQueries(tester, repository, 3);
+      final counts = IntentionCountsByScopeAndKind(
+        active: IntentionKindCounts(main: 0, supporting: 1),
+        archived: IntentionKindCounts(main: 0, supporting: 0),
+      );
+      repository.completeVerbatim(
+        2,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: const [],
+            totalCount: 0,
+            counts: counts,
+            nextCursor: null,
+            revision: const TestCatalogRevision(0),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(intentionCatalogTotal(0), findsOneWidget);
+      expect(find.textContaining('среди вспомогательных'), findsOneWidget);
+      expect(_inEmptyState(find.text('Показать оба типа')), findsOneWidget);
+      expect(_inEmptyState(find.text('Сбросить фильтры')), findsOneWidget);
+      await tester.tap(_inEmptyState(find.text('Показать оба типа')));
+      await tester.pump();
+      final query = repository.queries.last;
+      expect(query.scope, IntentionScope.active);
+      expect(query.kindFilter, IntentionKindFilter.mainAndSupporting);
+      expect(query.titleFilter?.map((value) => value), 'парк');
+      expect(query.tagFilter, IntentionTagFilter(requiredTagIds: [tag.id]));
+      repository.completeVerbatim(
+        repository.queries.length - 1,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: [
+              testSummary(
+                index: 1,
+                title: 'Пройти до парка',
+                kind: IntentionKind.supporting,
+              ),
+            ],
+            totalCount: 1,
+            counts: counts,
+            nextCursor: null,
+            revision: const TestCatalogRevision(0),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Пройти до парка'), findsOneWidget);
     });
 
     testWidgets('«Сбросить фильтры» очищает поле и снимает условия, сохраняя '

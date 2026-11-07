@@ -1138,7 +1138,7 @@
   - **Предполагаемые файлы:** меняются `lib/src/intention/application/intention_catalog.dart`, `lib/src/graph/data/drift_personal_graph_repository.dart`, `lib/src/intention/presentation/catalog/intention_catalog_state.dart`, `intention_catalog_view_model.dart`, `lib/src/intention/presentation/search/show_and_sort_sheet.dart`, `intention_list_header.dart`, `intention_search_list.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`, `benchmark/intention/intention_catalog_benchmark.dart`, `test/support/intention_catalog_large_fixture.dart`, `intention_type_counts.dart` и тесты каталога.
   - **Размер:** M по логике: один фильтр заменяется во всех слоях каталога.
 
-- [ ] 3.12 Пустая выдача по фильтру в каталоге подсказывает совпадения другого вида
+- [x] 3.12 Пустая выдача по фильтру в каталоге подсказывает совпадения другого вида
   - **Критерии приёмки:**
     - В каталоге с «Только главные» или «Только вспомогательные», когда при том же названии, тех же условиях по тегам и том же охвате совпадения есть у намерений другого вида, сообщение пустой выдачи по фильтру дополнительно говорит об этом, а под ним стоят «Показать оба типа» и «Сбросить фильтры». «Показать оба типа» выбирает «Главные и вспомогательные» и сохраняет фильтр названия и условия по тегам (требование «Пустая выдача поиска намерений», сценарий «Совпадения есть только у другого типа»).
     - Без совпадений другого вида и в поисках для выбора сообщение даёт только «Сбросить фильтры».
