@@ -4,11 +4,6 @@
 
 Файл ведёт оркестратор. Решения приняты пользователем в сессии решений и исполняются автономно, по одной finding за сессию. Сессия исполнения удаляет раздел своей finding в коммите её устранения.
 
-## F2 · Low — Составленная подсказка последствий в параметрах связи не закреплена ни одним тестом
-
-- **Решение:** Устранить
-- **Как устранить:** Устранить прямо в сессии решения finding по особому разрешению пользователя: сессия сама пишет тест и коммитит его, не добавляя задач в tasks.md и не меняя plan.md. Итог: составленная подсказка последствий в параметрах связи закреплена тестом. Создать test/long_term_relation/presentation/details/relation_details_options_test.dart по образцу test/intention/presentation/details/intention_options_test.dart. Тест вызывает `relationOptions` из lib/src/long_term_relation/presentation/details/relation_details_options.dart напрямую с русской локализацией и проверяет полный текст `hint` в трёх ветках, где склеиваются несколько последствий: архивирование активной связи (ArchiveCascadePreview, непустой withSupporting.departing): relationArchivePathsHint + relationArchiveIntentionsHint; восстановление архивной связи (RestoreCascadePreview, непустой withSupporting.restored): relationRestorePathsHint + relationRestoreIntentionsHint; удаление (RelationDeleteCascadePreview, непустые departing и archivedByInvariant): detailsOptionDeleteKeepsPaths + relationDeleteIntentionsHint + detailsCascadeDeleteArchiveHint. Ожидаемый текст: каждое последствие — отдельное предложение с заглавной буквы, части разделены '. ', склейки через '; ' нет. Названия и описания тестов писать на русском. Данных — ровно столько, чтобы получить нужные последствия, без таймингов. Код приложения не менять. Проверка: `mise exec --no-deps -- flutter test test/long_term_relation/presentation/details/relation_details_options_test.dart`. Commit type: test(relation).
-
 ## F3 · Low — В тестах остались пустые строки на месте удалённого аргумента `mainsLosingRelation:`
 
 - **Решение:** Устранить
