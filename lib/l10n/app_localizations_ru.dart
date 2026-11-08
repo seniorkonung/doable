@@ -3477,7 +3477,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String detailsCascadeDeleteArchiveHint(int count) {
-    return 'в архив уйдут намерения: $count';
+    return 'В архив уйдут намерения: $count';
   }
 
   @override

@@ -3221,8 +3221,8 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count intentions became primary',
-      one: '$count intention became primary',
+      other: '$count intentions became main',
+      one: '$count intention became main',
     );
     return 'Archived, $_temp0';
   }
@@ -3240,7 +3240,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cascadeArchiveRelationPromoted =>
-      'Relation archived, intention became primary';
+      'Relation archived, intention became main';
 
   @override
   String cascadeDeleteIntentionSupporting(int count) {
@@ -3258,8 +3258,8 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count intentions became primary',
-      one: '$count intention became primary',
+      other: '$count intentions became main',
+      one: '$count intention became main',
     );
     return 'Intention deleted, $_temp0';
   }
@@ -3277,7 +3277,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cascadeDeleteRelationPromoted =>
-      'Relation deleted, intention became primary';
+      'Relation deleted, intention became main';
 
   @override
   String cascadeDeleteIntentionArchived(int count) {
@@ -3324,7 +3324,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get cascadeRestoreIntentionMain => 'Restored as primary';
+  String get cascadeRestoreIntentionMain => 'Restored as main';
 
   @override
   String cascadeRestoreIntentionMainSupporting(int count) {
@@ -3334,7 +3334,7 @@ class AppLocalizationsEn extends AppLocalizations {
       other: '$count supporting intentions',
       one: '$count supporting intention',
     );
-    return 'Restored as primary with $_temp0';
+    return 'Restored as main with $_temp0';
   }
 
   @override
@@ -3350,7 +3350,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cascadeRestoreRelationMain =>
-      'Relation restored, intention returned as primary';
+      'Relation restored, intention returned as main';
 
   @override
   String cascadeRestoreRelationMainOthers(int count) {
@@ -3360,7 +3360,7 @@ class AppLocalizationsEn extends AppLocalizations {
       other: '$count intentions',
       one: '$count intention',
     );
-    return 'Relation restored with $_temp0, one as primary';
+    return 'Relation restored with $_temp0, one as main';
   }
 
   @override
@@ -3402,7 +3402,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String detailsCascadeDeleteArchiveHint(int count) {
-    return 'intentions archived: $count';
+    return 'Intentions archived: $count';
   }
 
   @override
@@ -3422,7 +3422,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String detailsDeleteCascadeText(String title) {
-    return 'Supporting intentions no longer held by any primary intention will be deleted with “$title”.';
+    return 'Supporting intentions no longer held by any main intention will be deleted with “$title”.';
   }
 
   @override
@@ -3459,7 +3459,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String detailsDeleteMainsList(int count) {
-    return 'Primary, only lose their relation · $count';
+    return 'Main, only lose their relation · $count';
   }
 
   @override
@@ -3477,8 +3477,8 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count become primary',
-      one: '$count becomes primary',
+      other: '$count become main',
+      one: '$count becomes main',
     );
     return '$_temp0';
   }
@@ -3511,7 +3511,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String relationDeleteCascadeText(String title) {
-    return '“$title” is a supporting intention and will no longer be held by any primary intention after deleting the relation.';
+    return '“$title” is a supporting intention and will no longer be held by any main intention after deleting the relation.';
   }
 
   @override
@@ -3521,10 +3521,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get relationDeleteKeepMainEffect =>
-      'Keep as primary: the intention will become primary';
+      'Keep as main: the intention will become main';
 
   @override
-  String get relationDeleteKeepMain => 'Keep as primary';
+  String get relationDeleteKeepMain => 'Keep as main';
 
   @override
   String get relationDeleteAll => 'Delete all';

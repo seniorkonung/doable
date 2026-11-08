@@ -1597,7 +1597,7 @@
   - **Предполагаемые файлы:** `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`, `app_localizations.dart`, `app_localizations_ru.dart`, `app_localizations_en.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`.
   - **Размер:** XS.
 
-- [ ] 4.25 Тексты каскада называют главное намерение одним словом, а подсказки последствий читаются цельной фразой
+- [x] 4.25 Тексты каскада называют главное намерение одним словом, а подсказки последствий читаются цельной фразой
   - **Критерии приёмки:**
     - В `lib/l10n/app_en.arb` строки каскада (`cascadeArchiveIntentionPromoted`, `cascadeArchiveRelationPromoted`, `cascadeDeleteIntentionPromoted`, `cascadeDeleteRelationPromoted`, `cascadeRestoreIntentionMain`, `cascadeRestoreIntentionMainSupporting`, `cascadeRestoreRelationMain`, `cascadeRestoreRelationMainOthers`, `detailsDeleteCascadeText`, `detailsDeleteMainsList`, `detailsDeletePromoted`, `relationDeleteCascadeText`, `relationDeleteKeepMainEffect`, `relationDeleteKeepMain` и другие строки каскада) называют главное намерение словом «main», как `intentionKindMain` («Main»); ни одна строка каскада не называет вид намерения словом «primary». Смысл текстов не меняется.
     - Подсказки последствий под пунктами меню параметров намерения (`deleteHint` в `lib/src/intention/presentation/details/intention_options.dart`) и связи (`stateHint` и `deleteHint` в `lib/src/long_term_relation/presentation/details/relation_details_options.dart`) читаются цельной фразой при любом наборе последствий на русском и английском: каждое последствие — самостоятельное предложение с заглавной буквы либо для каждой комбинации есть отдельная строка ARB. Склейка через `'; '` фраз с разным регистром не остаётся.

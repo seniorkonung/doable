@@ -36,14 +36,14 @@ List<OptionsMenuItem<RelationOption>> relationOptions(
         localizations.relationArchiveIntentionsHint(
           plan.withSupporting.departing.length,
         ),
-    ].join('; '),
+    ].join('. '),
     RestoreCascadePreview(:final plan) => [
       localizations.relationRestorePathsHint,
       if (plan.withSupporting.restored.isNotEmpty)
         localizations.relationRestoreIntentionsHint(
           plan.withSupporting.restored.length,
         ),
-    ].join('; '),
+    ].join('. '),
     _ => null,
   };
   final deleteHint = switch (deletePreview) {
@@ -57,7 +57,7 @@ List<OptionsMenuItem<RelationOption>> relationOptions(
         localizations.detailsCascadeDeleteArchiveHint(
           plan.withSupporting.archivedByInvariant.length,
         ),
-    ].join('; '),
+    ].join('. '),
     _ => null,
   };
 

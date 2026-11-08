@@ -988,7 +988,7 @@
   "@detailsCascadeRestoreHint": {"placeholders": {"count": {"type": "int"}}},
   "detailsCascadeDeleteHint": "Вместе с ним будут удалены вспомогательные намерения: {count}",
   "@detailsCascadeDeleteHint": {"placeholders": {"count": {"type": "int"}}},
-  "detailsCascadeDeleteArchiveHint": "в архив уйдут намерения: {count}",
+  "detailsCascadeDeleteArchiveHint": "В архив уйдут намерения: {count}",
   "@detailsCascadeDeleteArchiveHint": {"placeholders": {"count": {"type": "int"}}},
   "detailsOptionDeleteKeepsPaths": "В сохранённых путях останется с пометкой «Удалено»",
   "detailsDeleteCascadeTitle": "Удалить {count, plural, one{{count} намерение} few{{count} намерения} many{{count} намерений} other{{count} намерения}}?",

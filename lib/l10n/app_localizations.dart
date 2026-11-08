@@ -4894,7 +4894,7 @@ abstract class AppLocalizations {
   /// Сообщение об исходе каскадной операции
   ///
   /// In en, this message translates to:
-  /// **'Archived, {count, plural, one{{count} intention became primary} other{{count} intentions became primary}}'**
+  /// **'Archived, {count, plural, one{{count} intention became main} other{{count} intentions became main}}'**
   String cascadeArchiveIntentionPromoted(int count);
 
   /// Сообщение об исходе каскадной операции
@@ -4906,7 +4906,7 @@ abstract class AppLocalizations {
   /// Сообщение об исходе каскадной операции
   ///
   /// In en, this message translates to:
-  /// **'Relation archived, intention became primary'**
+  /// **'Relation archived, intention became main'**
   String get cascadeArchiveRelationPromoted;
 
   /// Сообщение об исходе каскадной операции
@@ -4918,7 +4918,7 @@ abstract class AppLocalizations {
   /// Сообщение об исходе каскадной операции
   ///
   /// In en, this message translates to:
-  /// **'Intention deleted, {count, plural, one{{count} intention became primary} other{{count} intentions became primary}}'**
+  /// **'Intention deleted, {count, plural, one{{count} intention became main} other{{count} intentions became main}}'**
   String cascadeDeleteIntentionPromoted(int count);
 
   /// Сообщение об исходе каскадной операции
@@ -4930,7 +4930,7 @@ abstract class AppLocalizations {
   /// Сообщение об исходе каскадной операции
   ///
   /// In en, this message translates to:
-  /// **'Relation deleted, intention became primary'**
+  /// **'Relation deleted, intention became main'**
   String get cascadeDeleteRelationPromoted;
 
   /// Удаление намерения с архивированием по инварианту
@@ -4960,13 +4960,13 @@ abstract class AppLocalizations {
   /// Сообщение об исходе каскадной операции
   ///
   /// In en, this message translates to:
-  /// **'Restored as primary'**
+  /// **'Restored as main'**
   String get cascadeRestoreIntentionMain;
 
   /// Сообщение об исходе каскадной операции
   ///
   /// In en, this message translates to:
-  /// **'Restored as primary with {count, plural, one{{count} supporting intention} other{{count} supporting intentions}}'**
+  /// **'Restored as main with {count, plural, one{{count} supporting intention} other{{count} supporting intentions}}'**
   String cascadeRestoreIntentionMainSupporting(int count);
 
   /// Сообщение об исходе каскадной операции
@@ -4978,13 +4978,13 @@ abstract class AppLocalizations {
   /// Сообщение об исходе каскадной операции
   ///
   /// In en, this message translates to:
-  /// **'Relation restored, intention returned as primary'**
+  /// **'Relation restored, intention returned as main'**
   String get cascadeRestoreRelationMain;
 
   /// Сообщение об исходе каскадной операции
   ///
   /// In en, this message translates to:
-  /// **'Relation restored with {count, plural, one{{count} intention} other{{count} intentions}}, one as primary'**
+  /// **'Relation restored with {count, plural, one{{count} intention} other{{count} intentions}}, one as main'**
   String cascadeRestoreRelationMainOthers(int count);
 
   /// Каскад намерения
@@ -5044,7 +5044,7 @@ abstract class AppLocalizations {
   /// Каскад намерения
   ///
   /// In en, this message translates to:
-  /// **'intentions archived: {count}'**
+  /// **'Intentions archived: {count}'**
   String detailsCascadeDeleteArchiveHint(int count);
 
   /// Каскад намерения
@@ -5062,7 +5062,7 @@ abstract class AppLocalizations {
   /// Подтверждение удаления намерения
   ///
   /// In en, this message translates to:
-  /// **'Supporting intentions no longer held by any primary intention will be deleted with “{title}”.'**
+  /// **'Supporting intentions no longer held by any main intention will be deleted with “{title}”.'**
   String detailsDeleteCascadeText(String title);
 
   /// Подтверждение удаления намерения
@@ -5104,7 +5104,7 @@ abstract class AppLocalizations {
   /// Подтверждение удаления намерения
   ///
   /// In en, this message translates to:
-  /// **'Primary, only lose their relation · {count}'**
+  /// **'Main, only lose their relation · {count}'**
   String detailsDeleteMainsList(int count);
 
   /// Подтверждение удаления намерения
@@ -5122,7 +5122,7 @@ abstract class AppLocalizations {
   /// Подтверждение удаления намерения
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, one{{count} becomes primary} other{{count} become primary}}'**
+  /// **'{count, plural, one{{count} becomes main} other{{count} become main}}'**
   String detailsDeletePromoted(int count);
 
   /// Подтверждение удаления намерения
@@ -5152,7 +5152,7 @@ abstract class AppLocalizations {
   /// Подтверждение удаления связи
   ///
   /// In en, this message translates to:
-  /// **'“{title}” is a supporting intention and will no longer be held by any primary intention after deleting the relation.'**
+  /// **'“{title}” is a supporting intention and will no longer be held by any main intention after deleting the relation.'**
   String relationDeleteCascadeText(String title);
 
   /// Подтверждение удаления связи
@@ -5164,13 +5164,13 @@ abstract class AppLocalizations {
   /// Подтверждение удаления связи
   ///
   /// In en, this message translates to:
-  /// **'Keep as primary: the intention will become primary'**
+  /// **'Keep as main: the intention will become main'**
   String get relationDeleteKeepMainEffect;
 
   /// Подтверждение удаления связи
   ///
   /// In en, this message translates to:
-  /// **'Keep as primary'**
+  /// **'Keep as main'**
   String get relationDeleteKeepMain;
 
   /// Подтверждение удаления связи

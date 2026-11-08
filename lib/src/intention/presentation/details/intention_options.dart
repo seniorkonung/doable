@@ -93,7 +93,7 @@ List<OptionsMenuItem<IntentionOption>> intentionOptions(
                 localizations.detailsCascadeDeleteArchiveHint(
                   plan.withSupporting.archivedByInvariant.length,
                 ),
-            ].join('; ')
+            ].join('. ')
           : isInActionPath
           ? localizations.detailsOptionDeleteKeepsPaths
           : localizations.detailsOptionDeleteKeepsTags,

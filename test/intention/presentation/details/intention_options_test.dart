@@ -147,9 +147,40 @@ void main() {
     );
     expect(
       intentionOptions(ru, _loaded(), deletePreview: preview)[2].hint,
-      'Вместе с ним будут удалены вспомогательные намерения: 1; в архив уйдут намерения: 1',
+      'Вместе с ним будут удалены вспомогательные намерения: 1. В архив уйдут намерения: 1',
     );
   });
+
+  test(
+    'удаление без уходящих вспомогательных называет только архивируемые',
+    () {
+      final composition = DeleteCascadeComposition(
+        departing: [],
+        promoted: [],
+        archivedByInvariant: [
+          testDetailsIntentionId(3),
+          testDetailsIntentionId(4),
+        ],
+        mainsLosingRelation: [],
+        deletedRelationCount: 1,
+        archivedRelationCount: 2,
+      );
+      final preview = IntentionDeleteCascadePreview(
+        revision: revision,
+        plan: CascadePlan(
+          withSupporting: composition,
+          onlyThis: composition,
+          asksQuestion: false,
+        ),
+        titles: const {},
+        isInActionPath: false,
+      );
+      expect(
+        intentionOptions(ru, _loaded(), deletePreview: preview)[2].hint,
+        'В архив уйдут намерения: 2',
+      );
+    },
+  );
 
   test('во время операции все пункты недоступны', () {
     final items = intentionOptions(ru, _loaded(running: true));
