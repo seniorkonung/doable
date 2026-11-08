@@ -103,6 +103,7 @@ part 'drift_personal_graph_repository_action_commands.dart';
 part 'drift_personal_graph_repository_action_day.dart';
 part 'drift_personal_graph_repository_action_day_statuses.dart';
 part 'drift_personal_graph_repository_action_reads.dart';
+part 'drift_personal_graph_repository_cascade_commands.dart';
 part 'drift_personal_graph_repository_intention_actions.dart';
 part 'drift_personal_graph_repository_path_candidates.dart';
 part 'drift_personal_graph_repository_relation_commands.dart';
@@ -573,16 +574,8 @@ final class DriftPersonalGraphRepository
           ),
           UpdateIntention() => _updateIntention(command, clock),
           ChangeIntentionKind() => _changeIntentionKind(command, clock),
-          ArchiveIntention() => _changeArchiveState(
-            command.id,
-            domain.IntentionArchiveState.archived,
-            clock,
-          ),
-          RestoreIntention() => _changeArchiveState(
-            command.id,
-            domain.IntentionArchiveState.active,
-            clock,
-          ),
+          ArchiveIntention() => _archiveIntentionCascade(command, clock),
+          RestoreIntention() => _restoreIntention(command.id, clock),
           DeleteIntention() => _deleteIntention(command.id),
         },
       );
@@ -910,9 +903,8 @@ final class DriftPersonalGraphRepository
     );
   }
 
-  Future<_CommittedIntentionCommand> _changeArchiveState(
+  Future<_CommittedIntentionCommand> _restoreIntention(
     IntentionId id,
-    domain.IntentionArchiveState archiveState,
     _GraphWriteClock clock,
   ) async {
     final storedBefore = await _readCommandSnapshot(id);
@@ -920,129 +912,26 @@ final class DriftPersonalGraphRepository
 
     final existing = storedBefore.intention;
     final before = await _catalogEntrySnapshot(storedBefore);
-    if (existing.archiveState == archiveState) {
+    if (existing.archiveState == domain.IntentionArchiveState.active) {
       return _CommittedIntentionUnchanged(intention: existing, entry: before);
     }
 
-    final cascadedNeighborIds =
-        archiveState == domain.IntentionArchiveState.archived
-        ? await _readActiveRelationNeighborIds(id)
-        : const <IntentionId>[];
-    final archivedRelations = cascadedNeighborIds.isNotEmpty
-        ? await _archiveActiveRelations(id, clock)
-        : const <_CascadedRelationArchive>[];
-
-    final updated = domain.Intention(
-      id: existing.id,
-      title: existing.title,
-      description: existing.description,
-      kind: existing.kind,
-      archiveState: archiveState,
-      createdAt: existing.createdAt,
-      updatedAt: domain.IntentionTimestamp(clock.read()),
-    );
     await (_database.update(
       _database.intentions,
     )..where((row) => row.id.equals(id.toCanonicalString()))).write(
       local.IntentionsCompanion(
-        isArchived: Value(
-          archiveState == domain.IntentionArchiveState.archived,
-        ),
-        updatedAt: Value(updated.updatedAt.value.microsecondsSinceEpoch),
+        isArchived: const Value(false),
+        updatedAt: Value(clock.read().microsecondsSinceEpoch),
       ),
     );
     final stored = await _readCommandSnapshot(id);
     if (stored == null) throw const StoredGraphCorruption();
-    final affectedCounts = archiveState == domain.IntentionArchiveState.archived
-        ? await _readVerifiedRelationCountsFor([id, ...cascadedNeighborIds])
-        : const <IntentionId, RelationCounts>{};
     return _CommittedIntentionUpdated(
       changesHolding: true,
       intention: stored.intention,
       before: before,
       after: await _catalogEntrySnapshot(stored),
-      affectedCounts: affectedCounts,
-      archivedRelations: archivedRelations,
     );
-  }
-
-  Future<List<IntentionId>> _readActiveRelationNeighborIds(
-    IntentionId id,
-  ) async {
-    final serializedId = id.toCanonicalString();
-    final rows = await _database
-        .customSelect(
-          '''
-            SELECT DISTINCT
-              CASE
-                WHEN source_intention_id = ? THEN related_intention_id
-                ELSE source_intention_id
-              END AS neighbor_id
-            FROM long_term_relations
-            WHERE
-              is_archived = 0 AND
-              (source_intention_id = ? OR related_intention_id = ?)
-            ORDER BY neighbor_id
-          ''',
-          variables: [
-            Variable<String>(serializedId),
-            Variable<String>(serializedId),
-            Variable<String>(serializedId),
-          ],
-          readsFrom: {_database.longTermRelations},
-        )
-        .get();
-    return [
-      for (final row in rows)
-        decodeStoredIntentionId(requiredStoredString(row.data, 'neighbor_id')),
-    ];
-  }
-
-  Future<List<_CascadedRelationArchive>> _archiveActiveRelations(
-    IntentionId id,
-    _GraphWriteClock clock,
-  ) async {
-    final serializedId = id.toCanonicalString();
-    final rows = await _database
-        .customSelect(
-          '''SELECT relation.creation_sequence, relation.id,
-                relation.source_intention_id, relation.related_intention_id,
-                relation.type, relation.priority, relation.is_archived,
-                relation.created_at, relation.updated_at
-         FROM long_term_relations AS relation
-         WHERE relation.is_archived = 0 AND
-               (relation.source_intention_id = ? OR relation.related_intention_id = ?)''',
-          variables: [
-            Variable<String>(serializedId),
-            Variable<String>(serializedId),
-          ],
-          readsFrom: {_database.longTermRelations},
-        )
-        .get();
-    final archivedAt = relation_domain.RelationTimestamp(clock.read());
-    final archived = [
-      for (final row in rows)
-        _CascadedRelationArchive(
-          StoredLongTermRelation.decode(row.data).toDomain(),
-          archivedAt,
-        ),
-    ];
-    await _database.customUpdate(
-      '''
-        UPDATE long_term_relations
-        SET is_archived = 1, updated_at = ?
-        WHERE
-          is_archived = 0 AND
-          (source_intention_id = ? OR related_intention_id = ?)
-      ''',
-      variables: [
-        Variable<int>(archivedAt.value.microsecondsSinceEpoch),
-        Variable<String>(serializedId),
-        Variable<String>(serializedId),
-      ],
-      updates: {_database.longTermRelations},
-    );
-    return archived;
   }
 
   Future<_CommittedIntentionCommand> _deleteIntention(IntentionId id) async {
@@ -1680,16 +1569,11 @@ final class _CommittedIntentionUpdated extends _CommittedIntentionCommand {
     required this.before,
     required this.after,
     required this.changesHolding,
-    Map<IntentionId, RelationCounts> affectedCounts = const {},
-    List<_CascadedRelationArchive> archivedRelations = const [],
-  }) : affectedCounts = Map.unmodifiable(affectedCounts),
-       archivedRelations = List.unmodifiable(archivedRelations);
+  });
 
   final domain.Intention intention;
   final IntentionCatalogEntrySnapshot before;
   final IntentionCatalogEntrySnapshot after;
-  final Map<IntentionId, RelationCounts> affectedCounts;
-  final List<_CascadedRelationArchive> archivedRelations;
 
   /// Изменение вида или архивного состояния, после которого пакет несёт
   /// [IntentionHoldingChanged].
@@ -1710,13 +1594,6 @@ final class _CommittedIntentionUpdated extends _CommittedIntentionCommand {
       after: after,
     ),
     additionalChanges: [
-      for (final relation in archivedRelations) relation.toChange(revision),
-      for (final entry in affectedCounts.entries)
-        IntentionRelationCountsChanged(
-          revision: revision,
-          intentionId: entry.key,
-          counts: entry.value,
-        ),
       if (changesHolding) IntentionHoldingChanged(revision: revision),
     ],
   );
@@ -1904,6 +1781,9 @@ IntentionFailure _classifyCommandFailure(
   if (error is _IntentionNotFound) {
     return const IntentionNotFoundFailure();
   }
+  if (error is _CascadeCompositionConflict) {
+    return const IntentionCascadeConflictFailure();
+  }
   if (error case _IntentionHasBlockingRelations(:final intentionId)) {
     return IntentionHasBlockingRelationsFailure(intentionId);
   }
@@ -1976,6 +1856,8 @@ DiagnosticsFailureCode _diagnosticsFailureCode(IntentionFailure failure) =>
       IntentionValidationFailure() => DiagnosticsFailureCode.validation,
       IntentionNotFoundFailure() => DiagnosticsFailureCode.notFound,
       IntentionConflictFailure() => DiagnosticsFailureCode.conflict,
+      IntentionCascadeConflictFailure() =>
+        DiagnosticsFailureCode.cascadeConflict,
       IntentionHasBlockingRelationsFailure() => DiagnosticsFailureCode.conflict,
       IntentionUnavailableFailure() => DiagnosticsFailureCode.unavailable,
       IntentionCorruptionFailure() => DiagnosticsFailureCode.corruption,

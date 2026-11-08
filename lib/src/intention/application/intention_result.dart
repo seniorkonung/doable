@@ -92,6 +92,16 @@ final class IntentionConflictFailure extends IntentionFailure {
   IntentionFailureCode get code => IntentionFailureCode.conflict;
 }
 
+/// Каскад по текущему состоянию затронул бы другие намерения иначе, чем
+/// состав выбранного варианта, переданный командой (D7, ADR-0057). Ничего
+/// не записано; следующая попытка снова читает предпросмотр.
+final class IntentionCascadeConflictFailure extends IntentionFailure {
+  const IntentionCascadeConflictFailure();
+
+  @override
+  IntentionFailureCode get code => IntentionFailureCode.conflict;
+}
+
 final class IntentionHasBlockingRelationsFailure extends IntentionFailure {
   const IntentionHasBlockingRelationsFailure(this.intentionId);
 

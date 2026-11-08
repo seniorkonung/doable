@@ -574,6 +574,36 @@ void main() {
     );
   }
 
+  testWidgets('конфликт состава каскада предъявляется общей поверхностью '
+      'текстом о конфликте актуального состояния', (tester) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final archive = harness.startArchive();
+    harness.completeFailure(archive, const IntentionCascadeConflictFailure());
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Архивирование — «Намерение»: Состояние намерения не изменено: '
+        'связанные намерения изменились, и операция затронула бы их иначе. '
+        'Попробуйте снова.',
+      ),
+      findsOneWidget,
+    );
+    await _closeMessage(tester);
+
+    final relationArchive = harness.startRelationArchive();
+    harness.completeRelationFailure(
+      relationArchive,
+      const LongTermRelationCascadeConflictFailure(),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining(
+        'Связь не удалось архивировать из-за конфликта актуального состояния.',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets(
     'отказ предпросмотра, принятый без фокуса на странице, после ухода с '
     'неё ждёт возвращения фокуса и предъявляется один раз',
@@ -2210,6 +2240,17 @@ final class _PresenterHarness {
       ChangeIntentionKind(testDetailsIntentionId(1), IntentionKind.supporting),
       presentationTitle: 'Намерение',
     ) as IntentionCommandAccepted;
+    _commandIndexes[accepted] = commandIndex;
+    return accepted;
+  }
+
+  IntentionCommandAccepted startArchive() {
+    final commandIndex = repository.commands.length;
+    final accepted = _coordinator.acceptExisting(
+      givenArchiveIntention(testDetailsIntentionId(1)),
+      presentationTitle: 'Намерение',
+    ) as IntentionCommandAccepted;
+    _coordinator.releaseInitiatorPresentation(accepted.token);
     _commandIndexes[accepted] = commandIndex;
     return accepted;
   }

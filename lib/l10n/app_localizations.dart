@@ -1484,6 +1484,12 @@ abstract class AppLocalizations {
   /// **'The intention changed elsewhere. Its state wasn’t changed.'**
   String get detailsStateChangeConflict;
 
+  /// Конфликт актуального состояния: каскад архивирования или восстановления затронул бы другие намерения иначе, чем показанный состав
+  ///
+  /// In en, this message translates to:
+  /// **'The intention state wasn’t changed: related intentions changed, so the operation would affect them differently. Try again.'**
+  String get detailsStateChangeCascadeConflict;
+
   /// Устранимая недоступность перехода состояния намерения
   ///
   /// In en, this message translates to:
@@ -1519,6 +1525,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The intention changed elsewhere. It wasn’t deleted.'**
   String get detailsDeleteConflict;
+
+  /// Конфликт актуального состояния: каскад удаления затронул бы другие намерения иначе, чем показанный состав
+  ///
+  /// In en, this message translates to:
+  /// **'The intention wasn’t deleted: related intentions changed, so deletion would affect them differently. Try again.'**
+  String get detailsDeleteCascadeConflict;
 
   /// Объяснение блокировки удаления намерения его связями
   ///

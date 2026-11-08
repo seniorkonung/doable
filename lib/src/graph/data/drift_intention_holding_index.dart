@@ -44,6 +44,15 @@ final class _IntentionHoldingIndex {
   };
 }
 
+/// Порционное чтение строк графа удержания по возрастающему ключу.
+typedef _HoldingRowsQuery = ({
+  String query,
+  TableInfo<Table, Object?> table,
+  Variable firstKey,
+  Variable Function(Map<String, Object?> data) nextKey,
+  void Function(Map<String, Object?> data) add,
+});
+
 /// Индекс удержания устарел до окончания построения.
 final class _IntentionHoldingIndexExpired implements Exception {
   const _IntentionHoldingIndexExpired();
@@ -103,48 +112,27 @@ extension _IntentionHoldingIndexReading on DriftPersonalGraphRepository {
     int sequence,
   ) async {
     final builder = IntentionHoldingGraphBuilder();
+    // Каждая порция занимает отдельную транзакцию очереди: команды ждут
+    // только короткие чтения (ADR-0026). Граница транзакции находится внутри
+    // отдельного входа в очередь:
+    // https://drift.simonbinder.eu/dart_api/transactions/
+    Future<List<QueryRow>> readPage(Future<List<QueryRow>> Function() read) =>
+        _sequencer
+            .run(() {
+              _requireHoldingSequence(sequence);
+              return _database.transaction(read);
+            })
+            .then((rows) {
+              _requireHoldingSequence(sequence);
+              return rows;
+            });
     await _holdingIndexStage(
       IntentionHoldingIndexDiagnosticsStage.intentions,
-      () => _readHoldingPages(
-        sequence,
-        '''SELECT id AS page_key, id, kind, is_archived FROM intentions
-           WHERE id > ? ORDER BY id LIMIT ?''',
-        _database.intentions,
-        firstKey: const Variable<String>(''),
-        nextKey: (data) =>
-            Variable<String>(requiredStoredString(data, 'page_key')),
-        add: (data) => builder.addIntention(
-          decodeStoredIntentionId(requiredStoredString(data, 'id')),
-          decodeStoredIntentionKind(data, 'kind'),
-          decodeStoredIntentionArchiveState(data, 'is_archived'),
-        ),
-      ),
+      () => _readHoldingPages(_holdingIntentionRows(builder), readPage),
     );
     await _holdingIndexStage(
       IntentionHoldingIndexDiagnosticsStage.relations,
-      () => _readHoldingPages(
-        sequence,
-        '''SELECT creation_sequence AS page_key, source_intention_id,
-                  related_intention_id, type, priority, is_archived
-           FROM long_term_relations
-           WHERE creation_sequence > ? ORDER BY creation_sequence LIMIT ?''',
-        _database.longTermRelations,
-        firstKey: const Variable<int>(0),
-        nextKey: (data) =>
-            Variable<int>(requiredStoredInteger(data, 'page_key')),
-        add: (data) => builder.addRelation(
-          decodeStoredIntentionId(
-            requiredStoredString(data, 'source_intention_id'),
-          ),
-          decodeStoredIntentionId(
-            requiredStoredString(data, 'related_intention_id'),
-          ),
-          decodeStoredRelationScope(data),
-          type: decodeStoredRelationType(data),
-          priority: decodeStoredRelationPriority(data),
-          creationSequence: requiredStoredInteger(data, 'page_key'),
-        ),
-      ),
+      () => _readHoldingPages(_holdingRelationRows(builder), readPage),
     );
     final (:graph, :indexes, :ids) = builder.build();
     final held = await _holdingIndexStage(
@@ -166,39 +154,94 @@ extension _IntentionHoldingIndexReading on DriftPersonalGraphRepository {
     return index;
   }
 
-  /// Каждая порция занимает отдельную транзакцию очереди: команды ждут
-  /// только короткие чтения (ADR-0026).
+  /// Индекс удержания текущей ревизии для транзакции команды: годный индекс
+  /// берётся как есть, а устаревший или ещё не построенный строится в этой
+  /// транзакции (ADR-0056). Подсчёт идёт в ней же без изолята: подменяемый
+  /// подсчёт обслуживает построение вне очереди, а транзакция уже держит
+  /// очередь записи.
+  Future<_IntentionHoldingIndex> _holdingIndexInTransaction() async {
+    if (_intentionHoldingIndex case final index?
+        when index.sequence == _lastHoldingChangeSequence) {
+      return index;
+    }
+    final builder = IntentionHoldingGraphBuilder();
+    Future<List<QueryRow>> readPage(Future<List<QueryRow>> Function() read) =>
+        read();
+    await _readHoldingPages(_holdingIntentionRows(builder), readPage);
+    await _readHoldingPages(_holdingRelationRows(builder), readPage);
+    final (:graph, :indexes, :ids) = builder.build();
+    return _IntentionHoldingIndex(
+      sequence: _lastHoldingChangeSequence,
+      graph: graph,
+      indexes: indexes,
+      ids: ids,
+      held: computeIntentionHolding(graph),
+    );
+  }
+
+  _HoldingRowsQuery _holdingIntentionRows(
+    IntentionHoldingGraphBuilder builder,
+  ) => (
+    query: '''SELECT id AS page_key, id, kind, is_archived FROM intentions
+           WHERE id > ? ORDER BY id LIMIT ?''',
+    table: _database.intentions,
+    firstKey: const Variable<String>(''),
+    nextKey: (data) => Variable<String>(requiredStoredString(data, 'page_key')),
+    add: (data) => builder.addIntention(
+      decodeStoredIntentionId(requiredStoredString(data, 'id')),
+      decodeStoredIntentionKind(data, 'kind'),
+      decodeStoredIntentionArchiveState(data, 'is_archived'),
+    ),
+  );
+
+  _HoldingRowsQuery _holdingRelationRows(
+    IntentionHoldingGraphBuilder builder,
+  ) => (
+    query: '''SELECT creation_sequence AS page_key, source_intention_id,
+                  related_intention_id, type, priority, is_archived
+           FROM long_term_relations
+           WHERE creation_sequence > ? ORDER BY creation_sequence LIMIT ?''',
+    table: _database.longTermRelations,
+    firstKey: const Variable<int>(0),
+    nextKey: (data) => Variable<int>(requiredStoredInteger(data, 'page_key')),
+    add: (data) => builder.addRelation(
+      decodeStoredIntentionId(
+        requiredStoredString(data, 'source_intention_id'),
+      ),
+      decodeStoredIntentionId(
+        requiredStoredString(data, 'related_intention_id'),
+      ),
+      decodeStoredRelationScope(data),
+      type: decodeStoredRelationType(data),
+      priority: decodeStoredRelationPriority(data),
+      creationSequence: requiredStoredInteger(data, 'page_key'),
+    ),
+  );
+
+  /// Читает строки [rows] порциями по ключу; [readPage] выполняет чтение
+  /// одной порции.
   Future<void> _readHoldingPages(
-    int sequence,
-    String query,
-    TableInfo<Table, Object?> table, {
-    required Variable firstKey,
-    required Variable Function(Map<String, Object?> data) nextKey,
-    required void Function(Map<String, Object?> data) add,
-  }) async {
+    _HoldingRowsQuery rows,
+    Future<List<QueryRow>> Function(Future<List<QueryRow>> Function() read)
+    readPage,
+  ) async {
     const pageSize = 1024;
-    var after = firstKey;
+    var after = rows.firstKey;
     while (true) {
-      // Граница транзакции находится внутри отдельного входа в очередь:
-      // https://drift.simonbinder.eu/dart_api/transactions/
-      final rows = await _sequencer.run(() {
-        _requireHoldingSequence(sequence);
-        return _database.transaction(
-          () => _database
-              .customSelect(
-                query,
-                variables: [after, const Variable<int>(pageSize)],
-                readsFrom: {table},
-              )
-              .get(),
-        );
-      });
-      _requireHoldingSequence(sequence);
-      for (final row in rows) {
-        add(row.data);
+      final page = await readPage(
+        () => _database
+            .customSelect(
+              rows.query,
+              variables: [after, const Variable<int>(pageSize)],
+              readsFrom: {rows.table},
+            )
+            .get(),
+      );
+      for (final row in page) {
+        rows.add(row.data);
       }
-      if (rows.length < pageSize) return;
-      after = nextKey(rows.last.data);
+      if (page.length < pageSize) return;
+      after = rows.nextKey(page.last.data);
     }
   }
 

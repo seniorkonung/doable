@@ -21,6 +21,7 @@ String longTermRelationCommandFailureMessage(
       localizations.relationsAdditionCorruption,
     LongTermRelationNotFoundFailure() ||
     LongTermRelationArchivedTypeChangeFailure() ||
+    LongTermRelationCascadeConflictFailure() ||
     LongTermRelationUnexpectedFailure() =>
       localizations.relationsAdditionUnexpected,
   },
@@ -38,6 +39,7 @@ String longTermRelationCommandFailureMessage(
     LongTermRelationPairOccupiedFailure() ||
     LongTermRelationParticipantNotFoundFailure() ||
     LongTermRelationParticipantArchivedFailure() ||
+    LongTermRelationCascadeConflictFailure() ||
     LongTermRelationUnexpectedFailure() =>
       localizations.relationEditorUpdateUnexpected,
   },
@@ -47,6 +49,7 @@ String longTermRelationCommandFailureMessage(
       localizations.relationArchiveUnavailable,
     LongTermRelationCorruptionFailure() =>
       localizations.relationArchiveCorruption,
+    LongTermRelationCascadeConflictFailure() ||
     LongTermRelationPairOccupiedFailure() ||
     LongTermRelationArchivedTypeChangeFailure() ||
     LongTermRelationParticipantNotFoundFailure() ||
@@ -73,6 +76,7 @@ String longTermRelationCommandFailureMessage(
       localizations.relationRestoreUnavailable,
     LongTermRelationCorruptionFailure() =>
       localizations.relationRestoreCorruption,
+    LongTermRelationCascadeConflictFailure() ||
     LongTermRelationPairOccupiedFailure() ||
     LongTermRelationArchivedTypeChangeFailure() =>
       localizations.relationRestoreConflict,
@@ -85,6 +89,7 @@ String longTermRelationCommandFailureMessage(
       localizations.relationDeleteUnavailable,
     LongTermRelationCorruptionFailure() =>
       localizations.relationDeleteCorruption,
+    LongTermRelationCascadeConflictFailure() ||
     LongTermRelationPairOccupiedFailure() ||
     LongTermRelationArchivedTypeChangeFailure() ||
     LongTermRelationParticipantNotFoundFailure() ||

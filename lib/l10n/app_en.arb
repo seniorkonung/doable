@@ -657,6 +657,10 @@
   "@detailsStateChangeConflict": {
     "description": "Безопасная ошибка конфликта перехода состояния"
   },
+  "detailsStateChangeCascadeConflict": "The intention state wasn’t changed: related intentions changed, so the operation would affect them differently. Try again.",
+  "@detailsStateChangeCascadeConflict": {
+    "description": "Конфликт актуального состояния: каскад архивирования или восстановления затронул бы другие намерения иначе, чем показанный состав"
+  },
   "detailsStateChangeUnavailable": "The intention state couldn’t be changed. Try again.",
   "@detailsStateChangeUnavailable": {
     "description": "Устранимая недоступность перехода состояния намерения"
@@ -680,6 +684,10 @@
   "detailsDeleteConflict": "The intention changed elsewhere. It wasn’t deleted.",
   "@detailsDeleteConflict": {
     "description": "Безопасная ошибка конфликта при удалении намерения"
+  },
+  "detailsDeleteCascadeConflict": "The intention wasn’t deleted: related intentions changed, so deletion would affect them differently. Try again.",
+  "@detailsDeleteCascadeConflict": {
+    "description": "Конфликт актуального состояния: каскад удаления затронул бы другие намерения иначе, чем показанный состав"
   },
   "detailsDeleteBlockedByRelations": "The intention wasn’t deleted: its relations still block deletion. Archived relations and relations that aren’t loaded yet block it too.",
   "@detailsDeleteBlockedByRelations": {

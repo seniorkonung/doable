@@ -940,6 +940,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'The intention changed elsewhere. Its state wasn’t changed.';
 
   @override
+  String get detailsStateChangeCascadeConflict =>
+      'The intention state wasn’t changed: related intentions changed, so the operation would affect them differently. Try again.';
+
+  @override
   String get detailsStateChangeUnavailable =>
       'The intention state couldn’t be changed. Try again.';
 
@@ -961,6 +965,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get detailsDeleteConflict =>
       'The intention changed elsewhere. It wasn’t deleted.';
+
+  @override
+  String get detailsDeleteCascadeConflict =>
+      'The intention wasn’t deleted: related intentions changed, so deletion would affect them differently. Try again.';
 
   @override
   String get detailsDeleteBlockedByRelations =>

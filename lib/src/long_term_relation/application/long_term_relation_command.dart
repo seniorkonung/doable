@@ -278,6 +278,17 @@ final class LongTermRelationParticipantArchivedFailure
   GraphFailureCategory get category => GraphFailureCategory.conflict;
 }
 
+/// Каскад по текущему состоянию затронул бы намерения иначе, чем состав
+/// выбранного варианта, переданный командой (D7, ADR-0057). Ничего не
+/// записано; следующая попытка снова читает предпросмотр.
+final class LongTermRelationCascadeConflictFailure
+    extends LongTermRelationCommandFailure {
+  const LongTermRelationCascadeConflictFailure();
+
+  @override
+  GraphFailureCategory get category => GraphFailureCategory.conflict;
+}
+
 final class LongTermRelationUnavailableFailure
     extends LongTermRelationCommandFailure {
   const LongTermRelationUnavailableFailure();

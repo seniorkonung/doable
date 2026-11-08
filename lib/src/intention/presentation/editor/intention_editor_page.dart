@@ -533,6 +533,7 @@ _FailurePlace _failurePlace(IntentionFailure failure) => switch (failure) {
   IntentionNotFoundFailure() ||
   IntentionConflictFailure() ||
   IntentionHasBlockingRelationsFailure() ||
+  IntentionCascadeConflictFailure() ||
   IntentionCascadePreviewFailure() ||
   IntentionUnavailableFailure() ||
   IntentionCorruptionFailure() ||
@@ -573,6 +574,7 @@ String _failureMessage(
   IntentionGenericValidationFailure() => localizations.editorInvalidInput,
   IntentionConflictFailure() => localizations.editorCreateConflict,
   IntentionHasBlockingRelationsFailure() ||
+  IntentionCascadeConflictFailure() ||
   IntentionCascadePreviewFailure() => localizations.editorCreateUnexpected,
   IntentionUnavailableFailure() => localizations.editorCreateUnavailable,
   IntentionCorruptionFailure() => localizations.editorCreateCorruption,

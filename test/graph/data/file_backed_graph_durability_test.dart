@@ -34,9 +34,11 @@ const _sourceIdValue = '018f0b5d-6b2e-7c80-8000-000000000901';
 const _firstNeighborIdValue = '018f0b5d-6b2e-7c80-8000-000000000902';
 const _secondNeighborIdValue = '018f0b5d-6b2e-7c80-8000-000000000903';
 const _unrelatedIdValue = '018f0b5d-6b2e-7c80-8000-000000000904';
+const _deepNeighborIdValue = '018f0b5d-6b2e-7c80-8000-000000000905';
 const _firstRelationIdValue = '018f0b5d-6b2e-7c80-8000-000000000951';
 const _secondRelationIdValue = '018f0b5d-6b2e-7c80-8000-000000000952';
 const _unrelatedRelationIdValue = '018f0b5d-6b2e-7c80-8000-000000000953';
+const _deepRelationIdValue = '018f0b5d-6b2e-7c80-8000-000000000955';
 
 const _workerOperationEnvironment = 'DOABLE_GRAPH_OPERATION';
 const _workerStopPointEnvironment = 'DOABLE_GRAPH_STOP_POINT';
@@ -48,9 +50,11 @@ final _sourceId = _intentionId(_sourceIdValue);
 final _firstNeighborId = _intentionId(_firstNeighborIdValue);
 final _secondNeighborId = _intentionId(_secondNeighborIdValue);
 final _unrelatedId = _intentionId(_unrelatedIdValue);
+final _deepNeighborId = _intentionId(_deepNeighborIdValue);
 final _firstRelationId = _relationId(_firstRelationIdValue);
 final _secondRelationId = _relationId(_secondRelationIdValue);
 final _unrelatedRelationId = _relationId(_unrelatedRelationIdValue);
+final _deepRelationId = _relationId(_deepRelationIdValue);
 
 void main() {
   test('сохраняет создание и порядок после повторного открытия при переводе часов назад', () async {
@@ -305,7 +309,9 @@ void main() {
     observer.arm();
 
     expect(
-      await repository.execute(givenArchiveIntention(_sourceId)),
+      await repository.execute(
+        await previewedArchiveIntention(repository, _sourceId),
+      ),
       isA<ResultFailure>(),
     );
     expect(observer.didFail, isTrue);
@@ -389,6 +395,7 @@ Future<void> _insertIntention(
   AppDatabase database,
   IntentionId id, {
   required String title,
+  String kind = 'main',
   bool isArchived = false,
 }) => seedGraph(
   database,
@@ -398,6 +405,7 @@ Future<void> _insertIntention(
         IntentionsCompanion.insert(
           id: id.toCanonicalString(),
           title: title,
+          kind: Value(kind),
           isArchived: Value(isArchived),
           createdAt: DateTime.utc(2026, 9, 19).microsecondsSinceEpoch,
           updatedAt: DateTime.utc(2026, 9, 19).microsecondsSinceEpoch,
@@ -433,11 +441,25 @@ Future<void> _insertRelation(
       ),
 );
 
+/// Каскад: главное «Изучать язык» держит вспомогательное «Читать», под
+/// которым вспомогательное «Читать книги» и главное «Отдыхать»; главное
+/// «Говорить» связано с «Изучать язык» входящей связью.
 Future<void> _seedCascade(AppDatabase database) async {
   await _insertIntention(database, _sourceId, title: 'Изучать язык');
-  await _insertIntention(database, _firstNeighborId, title: 'Читать');
+  await _insertIntention(
+    database,
+    _firstNeighborId,
+    title: 'Читать',
+    kind: 'supporting',
+  );
   await _insertIntention(database, _secondNeighborId, title: 'Говорить');
   await _insertIntention(database, _unrelatedId, title: 'Отдыхать');
+  await _insertIntention(
+    database,
+    _deepNeighborId,
+    title: 'Читать книги',
+    kind: 'supporting',
+  );
   await _insertRelation(
     database,
     id: _firstRelationId,
@@ -456,6 +478,12 @@ Future<void> _seedCascade(AppDatabase database) async {
     id: _unrelatedRelationId,
     sourceId: _firstNeighborId,
     relatedId: _unrelatedId,
+  );
+  await _insertRelation(
+    database,
+    id: _deepRelationId,
+    sourceId: _firstNeighborId,
+    relatedId: _deepNeighborId,
   );
 }
 
@@ -509,26 +537,43 @@ Future<void> _expectCascadeState(
   AppDatabase database, {
   required bool committed,
 }) async {
+  const cascade = {_sourceIdValue, _firstNeighborIdValue, _deepNeighborIdValue};
   final intentions = await _intentionRows(database);
   expect(
-    intentions.singleWhere((row) => row['id'] == _sourceIdValue)['is_archived'],
-    committed ? 1 : 0,
+    {
+      for (final row in intentions)
+        row['id']: (row['kind'], row['is_archived']),
+    },
+    {
+      _sourceIdValue: ('main', committed ? 1 : 0),
+      _firstNeighborIdValue: ('supporting', committed ? 1 : 0),
+      _secondNeighborIdValue: ('main', 0),
+      _unrelatedIdValue: ('main', 0),
+      _deepNeighborIdValue: ('supporting', committed ? 1 : 0),
+    },
   );
   expect(
-    intentions
-        .where((row) => row['id'] != _sourceIdValue)
-        .map((row) => row['is_archived']),
-    everyElement(0),
+    intentions.map((row) => row['updated_at']).toSet(),
+    hasLength(committed ? 2 : 1),
+    reason: 'Каскад пишет одно показание часов',
+  );
+  expect(
+    {
+      for (final row in intentions)
+        if (!cascade.contains(row['id'])) row['updated_at'],
+    },
+    {DateTime.utc(2026, 9, 19).microsecondsSinceEpoch},
   );
   final relations = await _relationRows(database);
   expect(relations.map((row) => row['id']), [
     _firstRelationIdValue,
     _secondRelationIdValue,
     _unrelatedRelationIdValue,
+    _deepRelationIdValue,
   ]);
   expect(
     relations.map((row) => row['is_archived']),
-    committed ? [1, 1, 0] : [0, 0, 0],
+    everyElement(committed ? 1 : 0),
   );
 
   final sourceCounts = await _counts(

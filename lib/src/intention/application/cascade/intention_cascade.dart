@@ -146,6 +146,18 @@ final class CascadeExecution<C extends CascadeComposition> {
   final C expected;
 }
 
+/// Исход подтверждённой каскадной операции: состав выбранного варианта,
+/// который команда исполнила. Из него собирается сообщение об исходе
+/// (ADR-0057).
+final class CascadeOutcome<C extends CascadeComposition>
+    implements GraphChange {
+  const CascadeOutcome({required this.revision, required this.executed});
+
+  @override
+  final GraphRevision revision;
+  final C executed;
+}
+
 /// Чтение предпросмотра каскада. Подмешивается в `PersonalGraphRepository`:
 /// отдельного репозитория нет (ADR-0009).
 abstract interface class IntentionCascadePreviewReadContract {

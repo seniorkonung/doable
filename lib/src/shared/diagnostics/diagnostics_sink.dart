@@ -44,6 +44,10 @@ enum DiagnosticsFailureCode {
   validation,
   notFound,
   conflict,
+
+  /// Состав каскада, вычисленный в транзакции команды, разошёлся с составом
+  /// выбранного варианта, который передала команда (ADR-0057).
+  cascadeConflict,
   unavailable,
   corruption,
 

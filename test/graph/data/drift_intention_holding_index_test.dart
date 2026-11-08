@@ -8,6 +8,7 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/graph/data/intention_holding_computation.dart';
+import 'package:doable/src/intention/application/cascade/intention_cascade.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -351,16 +352,69 @@ void main() {
     );
   }
 
-  test('восстановление связи и намерения сбрасывает индекс', () async {
-    await confirm(
-      await previewedArchiveRelation(previews, durabilityRelation(101)),
+  Future<CascadePlan<ArchiveCascadeComposition>> archivePlan(
+    CascadeSubject subject,
+  ) async => (await previews.previewCurrentCascade(
+    subject,
+    CascadeOperation.archive,
+  ) as ArchiveCascadePreview).plan;
+
+  test('архивирование намерения меняет состав и удержание по варианту, '
+      'переданному командой', () async {
+    final plan = await archivePlan(
+      IntentionCascadeSubject(durabilityIntention(2)),
     );
-    expect(await holdings([2]), {2: IntentionHolding.notHeld});
+    expect(plan.withSupporting.departing, [durabilityIntention(3)]);
+    expect(plan.onlyThis.promoted, [durabilityIntention(3)]);
+    expect(await holdings([2, 3]), {
+      2: IntentionHolding.held,
+      3: IntentionHolding.held,
+    });
+
+    final onlyThis = await confirm(
+      ArchiveIntention(
+        durabilityIntention(2),
+        execution: CascadeExecution(
+          choice: CascadeChoice.onlyThis,
+          expected: plan.onlyThis,
+        ),
+      ),
+    );
+
+    final executed =
+        onlyThis.changes.whereType<CascadeOutcome>().single.executed
+            as ArchiveCascadeComposition;
+    expect(executed.departing, isEmpty);
+    expect(executed.promoted, [durabilityIntention(3)]);
+    // «3» стало главным и удерживает само себя, а архивное «2» — нет.
+    expect(await holdings([2, 3]), {
+      2: IntentionHolding.notHeld,
+      3: IntentionHolding.held,
+    });
+    expect(runner.calls, 2);
+  });
+
+  test('восстановление связи и намерения сбрасывает индекс', () async {
+    // «7» становится главным и удерживает «6» связью 106.
+    final plan = await archivePlan(
+      RelationCascadeSubject(durabilityRelation(105)),
+    );
+    expect(await holdings([6]), {6: IntentionHolding.notHeld});
+    await confirm(
+      ArchiveLongTermRelation(
+        durabilityRelation(105),
+        execution: CascadeExecution(
+          choice: CascadeChoice.onlyThis,
+          expected: plan.onlyThis,
+        ),
+      ),
+    );
+    expect(await holdings([6]), {6: IntentionHolding.held});
     final restored = await confirm(
-      await previewedRestoreRelation(previews, durabilityRelation(101)),
+      await previewedRestoreRelation(previews, durabilityRelation(105)),
     );
     expect(restored.changes, contains(isA<IntentionHoldingChanged>()));
-    expect(await holdings([2]), {2: IntentionHolding.held});
+    expect(await holdings([6]), {6: IntentionHolding.held});
 
     await confirm(
       await previewedArchiveIntention(previews, durabilityIntention(4)),
@@ -371,7 +425,7 @@ void main() {
     );
     expect(restoredIntention.changes, contains(isA<IntentionHoldingChanged>()));
     expect(await holdings([4]), {4: IntentionHolding.held});
-    expect(runner.calls, 4);
+    expect(runner.calls, 5);
   });
 
   test('удаление намерения сбрасывает индекс', () async {

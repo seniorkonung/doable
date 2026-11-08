@@ -4,6 +4,8 @@ import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/intention/application/cascade/intention_cascade.dart';
+import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
@@ -318,6 +320,83 @@ void main() {
     );
     expect(await _timestamps(database, secondRelationId), otherRelation);
   });
+
+  for (final choice in CascadeChoice.values) {
+    test('каскадное архивирование варианта ${choice.name} пишет одно показание '
+        'часов в каждую изменённую строку и не меняет остальные', () async {
+      // 1 главное → 2 вспомогательное → 3 вспомогательное, которое удерживает
+      // и главное 4. Связь 4 → 2 архивирована раньше.
+      await seedGraph(database, () async {
+        await database.customStatement(
+          '''UPDATE intentions SET kind = 'supporting' WHERE id IN (?, ?)''',
+          [relatedId.toCanonicalString(), thirdId.toCanonicalString()],
+        );
+        for (final (number, source, related, archived) in [
+          (201, sourceId, relatedId, 0),
+          (202, relatedId, thirdId, 0),
+          (203, fourthId, thirdId, 0),
+          (204, fourthId, relatedId, 1),
+        ]) {
+          await database.customStatement(
+            '''INSERT INTO long_term_relations
+               (id, source_intention_id, related_intention_id,
+                type, priority, is_archived, created_at, updated_at)
+               VALUES (?, ?, ?, 'need', 2, ?, 5, 5)''',
+            [
+              _uuid(number),
+              source.toCanonicalString(),
+              related.toCanonicalString(),
+              archived,
+            ],
+          );
+        }
+      });
+      final intentionsBefore = {
+        for (final id in [sourceId, relatedId, thirdId, fourthId])
+          id: await _intentionUpdatedAt(database, id),
+      };
+      final preview = await repository.previewCurrentCascade(
+        IntentionCascadeSubject(sourceId),
+        CascadeOperation.archive,
+      ) as ArchiveCascadePreview;
+      clock = DateTime.utc(2026, 9, 26, 6, 5, 4, 3, 2);
+
+      await _expectSucceeded(
+        repository.execute(
+          ArchiveIntention(
+            sourceId,
+            execution: CascadeExecution(
+              choice: choice,
+              expected: switch (choice) {
+                CascadeChoice.withSupporting => preview.plan.withSupporting,
+                CascadeChoice.onlyThis => preview.plan.onlyThis,
+              },
+            ),
+          ),
+        ),
+      );
+
+      final stamped = clock.microsecondsSinceEpoch;
+      // При «только это» 2 остаётся активным, но становится главным.
+      final changedIntentions = {sourceId, relatedId};
+      final changedRelations = switch (choice) {
+        CascadeChoice.withSupporting => {201, 202},
+        CascadeChoice.onlyThis => {201},
+      };
+      for (final MapEntry(key: id, value: before) in intentionsBefore.entries) {
+        expect(
+          await _intentionUpdatedAt(database, id),
+          changedIntentions.contains(id) ? stamped : before,
+        );
+      }
+      for (final number in [201, 202, 203, 204]) {
+        expect(await _timestamps(database, _relationId(_uuid(number))), (
+          createdAt: 5,
+          updatedAt: changedRelations.contains(number) ? stamped : 5,
+        ), reason: 'Связь $number');
+      }
+    });
+  }
 
   test('изменение каскада несёт показание часов команды намерения', () async {
     final createdAt = clock;

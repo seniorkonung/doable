@@ -946,6 +946,10 @@ class AppLocalizationsRu extends AppLocalizations {
       'Намерение было изменено в другом месте. Его состояние не изменено.';
 
   @override
+  String get detailsStateChangeCascadeConflict =>
+      'Состояние намерения не изменено: связанные намерения изменились, и операция затронула бы их иначе. Попробуйте снова.';
+
+  @override
   String get detailsStateChangeUnavailable =>
       'Не удалось изменить состояние намерения. Повторите попытку.';
 
@@ -967,6 +971,10 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get detailsDeleteConflict =>
       'Намерение изменено в другом месте и не удалено.';
+
+  @override
+  String get detailsDeleteCascadeConflict =>
+      'Намерение не удалено: связанные намерения изменились, и удаление затронуло бы их иначе. Попробуйте снова.';
 
   @override
   String get detailsDeleteBlockedByRelations =>

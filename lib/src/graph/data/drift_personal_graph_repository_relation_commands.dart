@@ -8,21 +8,24 @@ final class _CascadedRelationArchive {
   final relation_domain.LongTermRelation before;
   final relation_domain.RelationTimestamp archivedAt;
 
+  relation_domain.LongTermRelation get archived =>
+      relation_domain.LongTermRelation(
+        id: before.id,
+        sourceIntentionId: before.sourceIntentionId,
+        relatedIntentionId: before.relatedIntentionId,
+        type: before.type,
+        priority: before.priority,
+        scope: relation_domain.RelationScope.archived,
+        creationSequence: before.creationSequence,
+        createdAt: before.createdAt,
+        updatedAt: archivedAt,
+      );
+
   LongTermRelationUpdatedChange toChange(GraphRevision revision) =>
       LongTermRelationUpdatedChange(
         revision: revision,
         before: before,
-        after: relation_domain.LongTermRelation(
-          id: before.id,
-          sourceIntentionId: before.sourceIntentionId,
-          relatedIntentionId: before.relatedIntentionId,
-          type: before.type,
-          priority: before.priority,
-          scope: relation_domain.RelationScope.archived,
-          creationSequence: before.creationSequence,
-          createdAt: before.createdAt,
-          updatedAt: archivedAt,
-        ),
+        after: archived,
       );
 }
 
@@ -38,11 +41,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
         (clock) => switch (command) {
           AddLongTermRelations() => _addLongTermRelations(command, clock),
           UpdateLongTermRelation() => _updateLongTermRelation(command, clock),
-          ArchiveLongTermRelation() => _setLongTermRelationScope(
-            relationId: command.relationId,
-            scope: relation_domain.RelationScope.archived,
-            clock: clock,
-          ),
+          ArchiveLongTermRelation() => _archiveRelationCascade(command, clock),
           RestoreLongTermRelation() => _setLongTermRelationScope(
             relationId: command.relationId,
             scope: relation_domain.RelationScope.active,
@@ -621,6 +620,9 @@ final class _CommittedLongTermRelationDeletion
 LongTermRelationCommandFailure _classifyLongTermRelationCommandFailure(
   Object error,
 ) {
+  if (error is _CascadeCompositionConflict) {
+    return const LongTermRelationCascadeConflictFailure();
+  }
   if (error case _LongTermRelationPairOccupied(:final relationId)) {
     return LongTermRelationPairOccupiedFailure(relationId);
   }
@@ -668,6 +670,8 @@ LongTermRelationCommandDiagnosticsType _longTermRelationCommandDiagnosticsType(
 DiagnosticsFailureCode _graphCommandDiagnosticsFailureCode(
   GraphCommandFailure failure,
 ) => switch (failure.category) {
+  _ when failure is LongTermRelationCascadeConflictFailure =>
+    DiagnosticsFailureCode.cascadeConflict,
   GraphFailureCategory.validation => DiagnosticsFailureCode.validation,
   GraphFailureCategory.notFound => DiagnosticsFailureCode.notFound,
   GraphFailureCategory.conflict => DiagnosticsFailureCode.conflict,
