@@ -42,6 +42,7 @@ import '../../graph_snapshots/graph_snapshot_store.dart'
         GraphHistoryPackage,
         UnregisteredGraphSnapshot,
         graphSnapshotFailureCode;
+import '../../intention/application/cascade/intention_cascade.dart';
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_id_generator.dart';
 import '../../intention/application/intention_catalog.dart';
@@ -90,6 +91,7 @@ import 'drift_relation_count_aggregates.dart';
 import 'contribution_reachability.dart';
 import 'graph_fact_capture.dart';
 import 'graph_record_rows.dart';
+import 'intention_cascade_planner.dart';
 import 'intention_holding_computation.dart';
 import 'stored_graph_rows.dart';
 
@@ -119,6 +121,7 @@ part 'drift_intention_statistics_source.dart';
 part 'drift_intention_statistics_reader.dart';
 part 'drift_through_relations_statistics_reader.dart';
 part 'drift_intention_holding_index.dart';
+part 'drift_intention_cascade_preview.dart';
 
 final class DriftPersonalGraphRepository
     implements
@@ -230,6 +233,12 @@ final class DriftPersonalGraphRepository
   @override
   Future<IntentionHoldingResult> getIntentionHolding(Set<IntentionId> ids) =>
       _readIntentionHolding(ids);
+
+  @override
+  Future<CascadePreviewResult> previewCascade(
+    CascadeSubject subject,
+    CascadeOperation operation,
+  ) => _previewCascade(subject, operation);
 
   @override
   Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) =>

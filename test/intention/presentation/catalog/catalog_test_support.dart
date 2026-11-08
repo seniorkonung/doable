@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/intention/application/cascade/intention_cascade.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
@@ -116,6 +117,12 @@ final class ControlledCatalogRepository
     _holdingRequests.add(request);
     return request.future;
   }
+
+  @override
+  Future<CascadePreviewResult> previewCascade(
+    CascadeSubject subject,
+    CascadeOperation operation,
+  ) async => const CascadePreviewUnexpected();
 
   void completeTagCommand(int index, TagCommandResult result) {
     _tagCommandRequests[index].complete(result);

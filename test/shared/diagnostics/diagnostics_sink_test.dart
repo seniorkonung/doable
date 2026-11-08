@@ -78,6 +78,30 @@ void main() {
       });
     });
 
+    test('отказ предпросмотра каскада кодируется без данных графа', () {
+      final messages = <String>[];
+      final sink = DeveloperDiagnosticsSink(messages.add);
+
+      recordDiagnosticsSafely(
+        sink,
+        const IntentionCascadePreviewDiagnosticsEvent(
+          stage: IntentionCascadePreviewDiagnosticsStage.titles,
+          status: DiagnosticsFailed(
+            duration: Duration(microseconds: 4321),
+            code: DiagnosticsFailureCode.conflict,
+          ),
+        ),
+      );
+
+      expect(jsonDecode(messages.single), {
+        'operation': 'intentionCascadePreview',
+        'stage': 'titles',
+        'outcome': 'failed',
+        'durationMicros': 4321,
+        'failureCode': 'conflict',
+      });
+    });
+
     test('успех чтения порции каталога кодируется с полем сортировки', () {
       final messages = <String>[];
       final sink = DeveloperDiagnosticsSink(messages.add);

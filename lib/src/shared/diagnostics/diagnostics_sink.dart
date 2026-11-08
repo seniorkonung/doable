@@ -226,6 +226,31 @@ final class IntentionHoldingIndexDiagnosticsEvent extends DiagnosticsEvent {
   final IntentionHoldingIndexDiagnosticsStage stage;
 }
 
+enum IntentionCascadePreviewDiagnosticsStage {
+  /// Получение индекса удержания текущей ревизии.
+  holdingIndex,
+
+  /// Чтение строки предмета, состав обоих вариантов и признак участия в
+  /// путях действий.
+  composition,
+
+  /// Чтение названий намерений из списков составов.
+  titles,
+}
+
+/// Этап предпросмотра каскада: исход, длительность и категория отказа.
+/// Предмет, операция, пользовательский текст, идентификаторы, размеры
+/// составов и исходное исключение не входят в контракт события.
+/// Передача получателю — через [recordDiagnosticsSafely].
+final class IntentionCascadePreviewDiagnosticsEvent extends DiagnosticsEvent {
+  const IntentionCascadePreviewDiagnosticsEvent({
+    required this.stage,
+    required DiagnosticsStatus status,
+  }) : super(status);
+
+  final IntentionCascadePreviewDiagnosticsStage stage;
+}
+
 /// Команда действия. Событие не несёт ни содержимого действия, ни его
 /// идентификатора, даты и пути.
 final class ActionCommandDiagnosticsEvent extends DiagnosticsEvent {

@@ -22,6 +22,7 @@ final class _IntentionHoldingIndex {
     required this.sequence,
     required this.graph,
     required this.indexes,
+    required this.ids,
     required Uint8List held,
   }) : held = held.asUnmodifiableView();
 
@@ -31,6 +32,7 @@ final class _IntentionHoldingIndex {
   /// Смежность и признаки намерений, по которым посчитан [held].
   final IntentionHoldingGraph graph;
   final Map<IntentionId, int> indexes;
+  final List<IntentionId> ids;
   final Uint8List held;
 
   /// Намерения нет в индексе, только если оно создано после построения:
@@ -144,7 +146,7 @@ extension _IntentionHoldingIndexReading on DriftPersonalGraphRepository {
         ),
       ),
     );
-    final (:graph, :indexes, ids: _) = builder.build();
+    final (:graph, :indexes, :ids) = builder.build();
     final held = await _holdingIndexStage(
       IntentionHoldingIndexDiagnosticsStage.computation,
       () async {
@@ -157,6 +159,7 @@ extension _IntentionHoldingIndexReading on DriftPersonalGraphRepository {
       sequence: sequence,
       graph: graph,
       indexes: indexes,
+      ids: ids,
       held: held,
     );
     _intentionHoldingIndex = index;

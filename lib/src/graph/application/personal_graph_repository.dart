@@ -1,4 +1,5 @@
 import '../../action/application/action_read_contract.dart';
+import '../../intention/application/cascade/intention_cascade.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_details.dart';
 import '../../intention/application/intention_holding.dart';
@@ -24,6 +25,7 @@ abstract interface class PersonalGraphRepository
         GraphCommandRepository,
         ActionReadContract,
         IntentionHoldingReadContract,
+        IntentionCascadePreviewReadContract,
         TagReadContract,
         StatisticsReadContract {
   Future<Result<IntentionCatalogPage>> getCatalogPage(
