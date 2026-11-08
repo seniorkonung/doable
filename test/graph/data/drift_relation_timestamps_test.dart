@@ -365,13 +365,7 @@ void main() {
         repository.execute(
           ArchiveIntention(
             sourceId,
-            execution: CascadeExecution(
-              choice: choice,
-              expected: switch (choice) {
-                CascadeChoice.withSupporting => preview.plan.withSupporting,
-                CascadeChoice.onlyThis => preview.plan.onlyThis,
-              },
-            ),
+            execution: CascadeExecution.of(preview.plan, choice),
           ),
         ),
       );

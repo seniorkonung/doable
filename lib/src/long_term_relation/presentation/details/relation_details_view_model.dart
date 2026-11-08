@@ -440,12 +440,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
           () => _coordinator.acceptRelationArchive(
             ArchiveLongTermRelation(
               relationId,
-              execution: CascadeExecution(
-                choice: choice,
-                expected: choice == CascadeChoice.onlyThis
-                    ? plan.onlyThis
-                    : plan.withSupporting,
-              ),
+              execution: CascadeExecution.of(plan, choice),
             ),
           ),
         );
@@ -466,12 +461,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
           () => _coordinator.acceptRelationRestore(
             RestoreLongTermRelation(
               relationId,
-              execution: CascadeExecution(
-                choice: choice,
-                expected: choice == CascadeChoice.onlyThis
-                    ? plan.onlyThis
-                    : plan.withSupporting,
-              ),
+              execution: CascadeExecution.of(plan, choice),
             ),
           ),
         );
@@ -486,12 +476,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
           () => _coordinator.acceptRelationDelete(
             DeleteLongTermRelation(
               relationId,
-              execution: CascadeExecution(
-                choice: choice,
-                expected: choice == CascadeChoice.onlyThis
-                    ? plan.onlyThis
-                    : plan.withSupporting,
-              ),
+              execution: CascadeExecution.of(plan, choice),
             ),
           ),
         );

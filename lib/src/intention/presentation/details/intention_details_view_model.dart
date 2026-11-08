@@ -339,12 +339,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
         return _CommandStart(
           ArchiveIntention(
             intentionId,
-            execution: CascadeExecution(
-              choice: choice,
-              expected: choice == CascadeChoice.onlyThis
-                  ? plan.onlyThis
-                  : plan.withSupporting,
-            ),
+            execution: CascadeExecution.of(plan, choice),
           ),
         );
       case (
@@ -358,12 +353,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
         return _CommandStart(
           RestoreIntention(
             intentionId,
-            execution: CascadeExecution(
-              choice: choice,
-              expected: choice == CascadeChoice.onlyThis
-                  ? plan.onlyThis
-                  : plan.withSupporting,
-            ),
+            execution: CascadeExecution.of(plan, choice),
           ),
         );
       case (
@@ -376,12 +366,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
         return _CommandStart(
           DeleteIntention(
             intentionId,
-            execution: CascadeExecution(
-              choice: choice,
-              expected: choice == CascadeChoice.onlyThis
-                  ? plan.onlyThis
-                  : plan.withSupporting,
-            ),
+            execution: CascadeExecution.of(plan, choice),
           ),
         );
       // Вид предпросмотра соответствует операции; иной вид, включая

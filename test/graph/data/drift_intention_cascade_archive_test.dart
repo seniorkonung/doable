@@ -556,13 +556,7 @@ void main() {
 CascadeExecution<ArchiveCascadeComposition> _execution(
   CascadePlan<ArchiveCascadeComposition> plan,
   CascadeChoice choice,
-) => CascadeExecution(
-  choice: choice,
-  expected: switch (choice) {
-    CascadeChoice.withSupporting => plan.withSupporting,
-    CascadeChoice.onlyThis => plan.onlyThis,
-  },
-);
+) => CascadeExecution.of(plan, choice);
 
 int _intentionNumber(IntentionId id) => _numberOf(id.toCanonicalString());
 

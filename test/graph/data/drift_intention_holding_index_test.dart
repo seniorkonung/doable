@@ -376,10 +376,7 @@ void main() {
     final onlyThis = await confirm(
       ArchiveIntention(
         durabilityIntention(2),
-        execution: CascadeExecution(
-          choice: CascadeChoice.onlyThis,
-          expected: plan.onlyThis,
-        ),
+        execution: CascadeExecution.of(plan, CascadeChoice.onlyThis),
       ),
     );
 
@@ -414,10 +411,7 @@ void main() {
     final onlyThis = await confirm(
       RestoreIntention(
         durabilityIntention(2),
-        execution: CascadeExecution(
-          choice: CascadeChoice.onlyThis,
-          expected: plan.onlyThis,
-        ),
+        execution: CascadeExecution.of(plan, CascadeChoice.onlyThis),
       ),
     );
 
@@ -442,10 +436,7 @@ void main() {
     await confirm(
       ArchiveLongTermRelation(
         durabilityRelation(105),
-        execution: CascadeExecution(
-          choice: CascadeChoice.onlyThis,
-          expected: plan.onlyThis,
-        ),
+        execution: CascadeExecution.of(plan, CascadeChoice.onlyThis),
       ),
     );
     expect(await holdings([6]), {6: IntentionHolding.held});

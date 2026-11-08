@@ -135,7 +135,16 @@ final class CascadePlan<C extends CascadeComposition> {
 /// вычисленным заново в своей транзакции. Для операции без вопроса это
 /// состав, вычисленный при её запуске.
 final class CascadeExecution<C extends CascadeComposition> {
-  const CascadeExecution({required this.choice, required this.expected});
+  const CascadeExecution._({required this.choice, required this.expected});
+
+  factory CascadeExecution.of(CascadePlan<C> plan, CascadeChoice choice) =>
+      CascadeExecution._(
+        choice: choice,
+        expected: switch (choice) {
+          CascadeChoice.withSupporting => plan.withSupporting,
+          CascadeChoice.onlyThis => plan.onlyThis,
+        },
+      );
 
   /// Вариант «со вспомогательными» из составов [plan].
   CascadeExecution.withSupporting(CascadePlan<C> plan)

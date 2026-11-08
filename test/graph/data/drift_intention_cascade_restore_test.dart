@@ -696,13 +696,7 @@ Future<CascadePlan<ArchiveCascadeComposition>> _archivePlan(
 CascadeExecution<RestoreCascadeComposition> _execution(
   CascadePlan<RestoreCascadeComposition> plan,
   CascadeChoice choice,
-) => CascadeExecution(
-  choice: choice,
-  expected: switch (choice) {
-    CascadeChoice.withSupporting => plan.withSupporting,
-    CascadeChoice.onlyThis => plan.onlyThis,
-  },
-);
+) => CascadeExecution.of(plan, choice);
 
 ActionId _actionId(int number) =>
     (ActionId.decode(durabilityUuid(number)) as ActionIdDecodingSuccess).id;

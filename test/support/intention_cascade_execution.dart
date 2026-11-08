@@ -140,7 +140,7 @@ DeleteLongTermRelation givenDeleteRelation(LongTermRelationId id) =>
     );
 
 CascadeExecution<C> _execution<C extends CascadeComposition>(C expected) =>
-    CascadeExecution(choice: CascadeChoice.withSupporting, expected: expected);
+    CascadeExecution.of(_plan(expected), CascadeChoice.withSupporting);
 
 /// Состав операции, которая не затрагивает другие намерения.
 ArchiveCascadeComposition _emptyArchiveComposition() =>
