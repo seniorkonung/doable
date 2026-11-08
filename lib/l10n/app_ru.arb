@@ -940,5 +940,20 @@
   "@actionEditorPathBetween": {"placeholders": {"count": {"type": "int"}}},
   "@actionEditorPathThen": {"placeholders": {"previous": {"type": "String"}, "next": {"type": "String"}}},
   "@actionEditorPathLabel": {"placeholders": {"path": {"type": "String"}}},
-  "@actionEditorPriorityLabel": {"placeholders": {"priority": {"type": "String"}}}
+  "@actionEditorPriorityLabel": {"placeholders": {"priority": {"type": "String"}}},
+  "cascadeArchiveIntentionSupporting": "В архиве вместе с {count, plural, one{{count} вспомогательным} few{{count} вспомогательными} many{{count} вспомогательными} other{{count} вспомогательными}}",
+  "cascadeArchiveIntentionPromoted": "В архиве, {count, plural, one{{count} намерение стало главным} few{{count} намерения стали главными} many{{count} намерений стали главными} other{{count} намерения стали главными}}",
+  "cascadeArchiveRelationSupporting": "Связь в архиве вместе с {count, plural, one{{count} вспомогательным} few{{count} вспомогательными} many{{count} вспомогательными} other{{count} вспомогательными}}",
+  "cascadeArchiveRelationPromoted": "Связь в архиве, намерение стало главным",
+  "cascadeDeleteIntentionSupporting": "Намерение удалено вместе с {count, plural, one{{count} вспомогательным} few{{count} вспомогательными} many{{count} вспомогательными} other{{count} вспомогательными}}",
+  "cascadeDeleteIntentionPromoted": "Намерение удалено, {count, plural, one{{count} намерение стало главным} few{{count} намерения стали главными} many{{count} намерений стали главными} other{{count} намерения стали главными}}",
+  "cascadeDeleteRelationSupporting": "Связь удалена вместе с {count, plural, one{{count} вспомогательным} few{{count} вспомогательными} many{{count} вспомогательными} other{{count} вспомогательными}}",
+  "cascadeDeleteRelationPromoted": "Связь удалена, намерение стало главным",
+  "cascadeDeleteArchived": "; в архив {count, plural, one{ушло {count} намерение} few{ушли {count} намерения} many{ушли {count} намерений} other{ушли {count} намерения}}",
+  "cascadeRestoreIntentionSupporting": "Восстановлено вместе с {count, plural, one{{count} вспомогательным} few{{count} вспомогательными} many{{count} вспомогательными} other{{count} вспомогательными}}",
+  "cascadeRestoreIntentionMain": "Восстановлено как главное",
+  "cascadeRestoreIntentionMainSupporting": "Восстановлено как главное вместе с {count, plural, one{{count} вспомогательным} few{{count} вспомогательными} many{{count} вспомогательными} other{{count} вспомогательными}}",
+  "cascadeRestoreRelation": "Связь восстановлена вместе с {count, plural, one{{count} намерением} few{{count} намерениями} many{{count} намерениями} other{{count} намерениями}}",
+  "cascadeRestoreRelationMain": "Связь восстановлена, намерение вернулось главным",
+  "cascadeRestoreRelationMainOthers": "Связь восстановлена вместе с {count, plural, one{{count} намерением} few{{count} намерениями} many{{count} намерениями} other{{count} намерениями}}, одно из них главным"
 }

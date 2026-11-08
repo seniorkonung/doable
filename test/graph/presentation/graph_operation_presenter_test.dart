@@ -48,6 +48,258 @@ void main() {
     );
   });
 
+  for (final (count, suffix) in [
+    (1, '1 вспомогательным'),
+    (2, '2 вспомогательными'),
+    (5, '5 вспомогательными'),
+    (21, '21 вспомогательным'),
+  ]) {
+    testWidgets('число вспомогательных согласуется: $count', (tester) async {
+      final harness = await _pumpPresenterApp(
+        tester,
+        locale: const Locale('ru'),
+      );
+      final accepted = harness.startArchive();
+      harness.completeIntentionCascade(
+        accepted,
+        ArchiveCascadeComposition(
+          departing: [
+            for (var i = 0; i < count; i++) testDetailsIntentionId(i + 2),
+          ],
+          promoted: [],
+          mainsLosingRelation: [],
+          archivedRelationCount: 0,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Архивирование — «Намерение»: В архиве вместе с $suffix'),
+        findsOneWidget,
+      );
+    });
+  }
+
+  testWidgets('архивирование связи объявляет превращение в главное', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final accepted = harness.startRelationArchive();
+    harness.completeRelationArchived(
+      accepted,
+      composition: ArchiveCascadeComposition(
+        departing: [],
+        promoted: [testDetailsIntentionId(2)],
+        mainsLosingRelation: [],
+        archivedRelationCount: 1,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Архивирование — «связь»: Связь в архиве, намерение стало главным',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('удаление объявляет каскад и архивирование одним сообщением', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final accepted = harness.startDelete(index: 1, title: 'Намерение');
+    harness.completeDeleted(
+      accepted,
+      composition: DeleteCascadeComposition(
+        departing: [testDetailsIntentionId(2)],
+        promoted: [],
+        archivedByInvariant: [
+          testDetailsIntentionId(3),
+          testDetailsIntentionId(4),
+        ],
+        mainsLosingRelation: [],
+        deletedRelationCount: 2,
+        archivedRelationCount: 2,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Удаление — «Намерение»: Намерение удалено вместе с 1 вспомогательным; в архив ушли 2 намерения',
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(SnackBar), findsOneWidget);
+  });
+
+  testWidgets('удаление связи объявляет оставленное главным намерение', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final accepted = harness.startRelationDelete();
+    harness.completeRelationDeleted(
+      accepted,
+      composition: DeleteCascadeComposition(
+        departing: [],
+        promoted: [testDetailsIntentionId(2)],
+        archivedByInvariant: [],
+        mainsLosingRelation: [],
+        deletedRelationCount: 1,
+        archivedRelationCount: 0,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Удаление — «связь»: Связь удалена, намерение стало главным'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('восстановление связи объявляет вернувшееся главным намерение', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final accepted = harness.startRelationRestore();
+    harness.completeRelationRestored(
+      accepted,
+      composition: RestoreCascadeComposition(
+        restored: [testDetailsIntentionId(1)],
+        returnedAsMain: testDetailsIntentionId(1),
+        restoredRelationCount: 1,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Восстановление — «связь»: Связь восстановлена, намерение вернулось главным',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+    'восстановление намерения главным с каскадом объявляет оба результата',
+    (tester) async {
+      final harness = await _pumpPresenterApp(
+        tester,
+        locale: const Locale('ru'),
+      );
+      final accepted = harness.startRestore();
+      harness.completeIntentionCascade(
+        accepted,
+        RestoreCascadeComposition(
+          restored: [testDetailsIntentionId(2)],
+          returnedAsMain: testDetailsIntentionId(1),
+          restoredRelationCount: 1,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Восстановление — «Намерение»: Восстановлено как главное вместе с 1 вспомогательным',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('архивирование без других намерений не показывает сообщение', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final accepted = harness.startArchive();
+    harness.completeIntentionCascade(
+      accepted,
+      ArchiveCascadeComposition(
+        departing: [],
+        promoted: [],
+        mainsLosingRelation: [],
+        archivedRelationCount: 0,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
+  for (final (count, promoted, archived) in [
+    (1, '1 намерение стало главным', 'ушло 1 намерение'),
+    (2, '2 намерения стали главными', 'ушли 2 намерения'),
+    (5, '5 намерений стали главными', 'ушли 5 намерений'),
+    (21, '21 намерение стало главным', 'ушло 21 намерение'),
+  ]) {
+    testWidgets('числа ставших главными и архивированных согласуются: $count', (
+      tester,
+    ) async {
+      final harness = await _pumpPresenterApp(
+        tester,
+        locale: const Locale('ru'),
+      );
+      final accepted = harness.startDelete(index: 1, title: 'Намерение');
+      harness.completeDeleted(
+        accepted,
+        composition: DeleteCascadeComposition(
+          departing: [],
+          promoted: [
+            for (var i = 0; i < count; i++) testDetailsIntentionId(i + 2),
+          ],
+          archivedByInvariant: [
+            for (var i = 0; i < count; i++) testDetailsIntentionId(i + 100),
+          ],
+          mainsLosingRelation: [],
+          deletedRelationCount: 1,
+          archivedRelationCount: 0,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Удаление — «Намерение»: Намерение удалено, $promoted; в архив $archived',
+        ),
+        findsOneWidget,
+      );
+    });
+  }
+
+  testWidgets('восстановление связи считает все возвращённые намерения', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final accepted = harness.startRelationRestore();
+    harness.completeRelationRestored(
+      accepted,
+      composition: RestoreCascadeComposition(
+        restored: [testDetailsIntentionId(1), testDetailsIntentionId(2)],
+        returnedAsMain: testDetailsIntentionId(1),
+        restoredRelationCount: 1,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Восстановление — «связь»: Связь восстановлена вместе с 2 намерениями, одно из них главным',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('сообщение каскада локализуется на английский', (tester) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('en'));
+    final accepted = harness.startArchive();
+    harness.completeIntentionCascade(
+      accepted,
+      ArchiveCascadeComposition(
+        departing: [testDetailsIntentionId(2)],
+        promoted: [],
+        mainsLosingRelation: [],
+        archivedRelationCount: 1,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Archive — “Намерение”: Archived with 1 supporting intention'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets(
     'поздний результат ждёт закрытия текущего сообщения без вытеснения',
     (tester) async {
@@ -2195,6 +2447,33 @@ final class _PresenterHarness {
     return accepted;
   }
 
+  IntentionCommandAccepted startRestore() {
+    final commandIndex = repository.commands.length;
+    final accepted = _coordinator.acceptExisting(
+      givenRestoreIntention(testDetailsIntentionId(1)),
+      presentationTitle: 'Намерение',
+    ) as IntentionCommandAccepted;
+    _coordinator.releaseInitiatorPresentation(accepted.token);
+    _commandIndexes[accepted] = commandIndex;
+    return accepted;
+  }
+
+  void completeIntentionCascade(
+    IntentionCommandAccepted accepted,
+    CascadeComposition composition,
+  ) {
+    const revision = TestDetailsRevision(0);
+    repository.completeCommand(
+      _commandIndexes[accepted]!,
+      testDetailsSavedResult(
+        testDetailsIntention(),
+        additionalChanges: [
+          CascadeOutcome(revision: revision, executed: composition),
+        ],
+      ),
+    );
+  }
+
   /// Операция страницы намерения, предпросмотр каскада которой не прочитан.
   void startPreviewFailure(
     CascadeOperation operation,
@@ -2290,13 +2569,30 @@ final class _PresenterHarness {
     ResultFailure(failure),
   );
 
-  void completeDeleted(IntentionCommandAccepted accepted) {
+  void completeDeleted(
+    IntentionCommandAccepted accepted, {
+    DeleteCascadeComposition? composition,
+  }) {
     final (index, title) = _titles[accepted]!;
+    final original = testDetailsDeletedResult(
+      testDetailsIntention(index: index, title: title),
+    ) as ResultSuccess<IntentionCommandSuccess>;
     repository.completeCommand(
       _commandIndexes[accepted]!,
-      testDetailsDeletedResult(
-        testDetailsIntention(index: index, title: title),
-      ),
+      composition == null
+          ? original
+          : ResultSuccess(
+              IntentionDeleted(
+                (original.value as IntentionDeleted).id,
+                catalogMutation: original.value.catalogMutation,
+                additionalChanges: [
+                  CascadeOutcome(
+                    revision: const TestDetailsRevision(0),
+                    executed: composition,
+                  ),
+                ],
+              ),
+            ),
     );
   }
 
@@ -2477,23 +2773,32 @@ final class _PresenterHarness {
     );
   }
 
-  void completeRelationArchived(LongTermRelationCommandAccepted accepted) =>
-      _completeRelationScopeChanged(
-        accepted,
-        beforeScope: RelationScope.active,
-        afterScope: RelationScope.archived,
-        revision: 3,
-      );
+  void completeRelationArchived(
+    LongTermRelationCommandAccepted accepted, {
+    ArchiveCascadeComposition? composition,
+  }) => _completeRelationScopeChanged(
+    accepted,
+    beforeScope: RelationScope.active,
+    afterScope: RelationScope.archived,
+    revision: 3,
+    composition: composition,
+  );
 
-  void completeRelationRestored(LongTermRelationCommandAccepted accepted) =>
-      _completeRelationScopeChanged(
-        accepted,
-        beforeScope: RelationScope.archived,
-        afterScope: RelationScope.active,
-        revision: 4,
-      );
+  void completeRelationRestored(
+    LongTermRelationCommandAccepted accepted, {
+    RestoreCascadeComposition? composition,
+  }) => _completeRelationScopeChanged(
+    accepted,
+    beforeScope: RelationScope.archived,
+    afterScope: RelationScope.active,
+    revision: 4,
+    composition: composition,
+  );
 
-  void completeRelationDeleted(LongTermRelationCommandAccepted accepted) {
+  void completeRelationDeleted(
+    LongTermRelationCommandAccepted accepted, {
+    DeleteCascadeComposition? composition,
+  }) {
     const revision = TestDetailsRevision(5);
     final relation = LongTermRelation(
       id: _relationId,
@@ -2518,6 +2823,8 @@ final class _PresenterHarness {
                 revision: revision,
                 relation: relation,
               ),
+              if (composition != null)
+                CascadeOutcome(revision: revision, executed: composition),
             ],
           ),
         ),
@@ -2530,6 +2837,7 @@ final class _PresenterHarness {
     required RelationScope beforeScope,
     required RelationScope afterScope,
     required int revision,
+    CascadeComposition? composition,
   }) {
     final graphRevision = TestDetailsRevision(revision);
     final before = LongTermRelation(
@@ -2569,6 +2877,8 @@ final class _PresenterHarness {
                 before: before,
                 after: after,
               ),
+              if (composition != null)
+                CascadeOutcome(revision: graphRevision, executed: composition),
             ],
           ),
         ),

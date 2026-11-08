@@ -3221,4 +3221,162 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get actionPriorityLowest => 'Самый низкий';
+
+  @override
+  String cascadeArchiveIntentionSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count вспомогательными',
+      many: '$count вспомогательными',
+      few: '$count вспомогательными',
+      one: '$count вспомогательным',
+    );
+    return 'В архиве вместе с $_temp0';
+  }
+
+  @override
+  String cascadeArchiveIntentionPromoted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count намерения стали главными',
+      many: '$count намерений стали главными',
+      few: '$count намерения стали главными',
+      one: '$count намерение стало главным',
+    );
+    return 'В архиве, $_temp0';
+  }
+
+  @override
+  String cascadeArchiveRelationSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count вспомогательными',
+      many: '$count вспомогательными',
+      few: '$count вспомогательными',
+      one: '$count вспомогательным',
+    );
+    return 'Связь в архиве вместе с $_temp0';
+  }
+
+  @override
+  String get cascadeArchiveRelationPromoted =>
+      'Связь в архиве, намерение стало главным';
+
+  @override
+  String cascadeDeleteIntentionSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count вспомогательными',
+      many: '$count вспомогательными',
+      few: '$count вспомогательными',
+      one: '$count вспомогательным',
+    );
+    return 'Намерение удалено вместе с $_temp0';
+  }
+
+  @override
+  String cascadeDeleteIntentionPromoted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count намерения стали главными',
+      many: '$count намерений стали главными',
+      few: '$count намерения стали главными',
+      one: '$count намерение стало главным',
+    );
+    return 'Намерение удалено, $_temp0';
+  }
+
+  @override
+  String cascadeDeleteRelationSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count вспомогательными',
+      many: '$count вспомогательными',
+      few: '$count вспомогательными',
+      one: '$count вспомогательным',
+    );
+    return 'Связь удалена вместе с $_temp0';
+  }
+
+  @override
+  String get cascadeDeleteRelationPromoted =>
+      'Связь удалена, намерение стало главным';
+
+  @override
+  String cascadeDeleteArchived(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'ушли $count намерения',
+      many: 'ушли $count намерений',
+      few: 'ушли $count намерения',
+      one: 'ушло $count намерение',
+    );
+    return '; в архив $_temp0';
+  }
+
+  @override
+  String cascadeRestoreIntentionSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count вспомогательными',
+      many: '$count вспомогательными',
+      few: '$count вспомогательными',
+      one: '$count вспомогательным',
+    );
+    return 'Восстановлено вместе с $_temp0';
+  }
+
+  @override
+  String get cascadeRestoreIntentionMain => 'Восстановлено как главное';
+
+  @override
+  String cascadeRestoreIntentionMainSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count вспомогательными',
+      many: '$count вспомогательными',
+      few: '$count вспомогательными',
+      one: '$count вспомогательным',
+    );
+    return 'Восстановлено как главное вместе с $_temp0';
+  }
+
+  @override
+  String cascadeRestoreRelation(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count намерениями',
+      many: '$count намерениями',
+      few: '$count намерениями',
+      one: '$count намерением',
+    );
+    return 'Связь восстановлена вместе с $_temp0';
+  }
+
+  @override
+  String get cascadeRestoreRelationMain =>
+      'Связь восстановлена, намерение вернулось главным';
+
+  @override
+  String cascadeRestoreRelationMainOthers(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count намерениями',
+      many: '$count намерениями',
+      few: '$count намерениями',
+      one: '$count намерением',
+    );
+    return 'Связь восстановлена вместе с $_temp0, одно из них главным';
+  }
 }

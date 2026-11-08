@@ -16,6 +16,7 @@ import '../../shared/presentation/presentation_frame_evidence.dart';
 import '../../tag/presentation/tag_failure_message.dart';
 import '../application/graph_command_coordinator.dart';
 import '../application/graph_command_result.dart';
+import '../application/graph_revision.dart';
 import 'graph_operation_message_plan.dart';
 
 /// Единственный владелец общей поверхности сообщений результатов операций.
@@ -482,55 +483,126 @@ String _relationMessage(
 String _relationOutcomeFor(
   AppLocalizations localizations,
   LongTermRelationPresentableCompletion completion,
-) => switch (completion.result) {
-  GraphResultSuccess(:final value) => switch ((completion.kind, value)) {
-    (
-      LongTermRelationCommandKind.add,
-      LongTermRelationsAdded(:final relations),
-    ) =>
-      localizations.relationsAdded(relations.length),
-    (LongTermRelationCommandKind.add, _) =>
-      localizations.relationsAdditionUnexpected,
-    (
-      LongTermRelationCommandKind.update ||
-          LongTermRelationCommandKind.archive ||
-          LongTermRelationCommandKind.restore,
-      _,
-    ) =>
-      throw StateError(
-        'Успех этой операции связи не образует права предъявления.',
-      ),
-    (LongTermRelationCommandKind.delete, LongTermRelationDeleted()) =>
-      localizations.relationDeleted,
-    (LongTermRelationCommandKind.delete, LongTermRelationUpdated()) ||
-    (
-      LongTermRelationCommandKind.delete,
-      LongTermRelationsAdded(),
-    ) => localizations.relationDeleteUnexpected,
-  },
-  GraphResultFailure(:final failure) => longTermRelationCommandFailureMessage(
-    localizations,
-    completion.kind,
-    failure,
-  ),
-};
+) =>
+    _cascadeMessage(
+      localizations,
+      completion.confirmedChange,
+      isRelation: true,
+    ) ??
+    switch (completion.result) {
+      GraphResultSuccess(:final value) => switch ((completion.kind, value)) {
+        (
+          LongTermRelationCommandKind.add,
+          LongTermRelationsAdded(:final relations),
+        ) =>
+          localizations.relationsAdded(relations.length),
+        (LongTermRelationCommandKind.add, _) =>
+          localizations.relationsAdditionUnexpected,
+        (
+          LongTermRelationCommandKind.update ||
+              LongTermRelationCommandKind.archive ||
+              LongTermRelationCommandKind.restore,
+          _,
+        ) =>
+          throw StateError(
+            'Успех этой операции связи не образует права предъявления.',
+          ),
+        (LongTermRelationCommandKind.delete, LongTermRelationDeleted()) =>
+          localizations.relationDeleted,
+        (LongTermRelationCommandKind.delete, LongTermRelationUpdated()) ||
+        (
+          LongTermRelationCommandKind.delete,
+          LongTermRelationsAdded(),
+        ) => localizations.relationDeleteUnexpected,
+      },
+      GraphResultFailure(:final failure) =>
+        longTermRelationCommandFailureMessage(
+          localizations,
+          completion.kind,
+          failure,
+        ),
+    };
 
 String _intentionOutcomeFor(
   AppLocalizations localizations,
   IntentionPresentableCompletion completion,
-) => switch (completion.result) {
-  ResultSuccess(:final value) => _successFor(
-    localizations,
-    completion.kind,
-    value,
-    completion.target,
-  ),
-  ResultFailure(:final failure) => _failureFor(
-    localizations,
-    completion.kind,
-    failure,
-  ),
-};
+) =>
+    _cascadeMessage(
+      localizations,
+      completion.confirmedChange,
+      isRelation: false,
+    ) ??
+    switch (completion.result) {
+      ResultSuccess(:final value) => _successFor(
+        localizations,
+        completion.kind,
+        value,
+        completion.target,
+      ),
+      ResultFailure(:final failure) => _failureFor(
+        localizations,
+        completion.kind,
+        failure,
+      ),
+    };
+
+String? _cascadeMessage(
+  AppLocalizations l,
+  ConfirmedGraphChangePackage? package, {
+  required bool isRelation,
+}) {
+  final outcome = package?.changes.whereType<CascadeOutcome>().firstOrNull;
+  if (outcome == null) return null;
+  return switch (outcome.executed) {
+    ArchiveCascadeComposition(:final departing, :final promoted) =>
+      departing.isNotEmpty
+          ? (isRelation
+                ? l.cascadeArchiveRelationSupporting(departing.length)
+                : l.cascadeArchiveIntentionSupporting(departing.length))
+          : promoted.isNotEmpty
+          ? (isRelation
+                ? l.cascadeArchiveRelationPromoted
+                : l.cascadeArchiveIntentionPromoted(promoted.length))
+          : null,
+    DeleteCascadeComposition(
+      :final departing,
+      :final promoted,
+      :final archivedByInvariant,
+    ) =>
+      () {
+        final message = departing.isNotEmpty
+            ? (isRelation
+                  ? l.cascadeDeleteRelationSupporting(departing.length)
+                  : l.cascadeDeleteIntentionSupporting(departing.length))
+            : promoted.isNotEmpty
+            ? (isRelation
+                  ? l.cascadeDeleteRelationPromoted
+                  : l.cascadeDeleteIntentionPromoted(promoted.length))
+            : (isRelation ? l.relationDeleted : l.detailsDeleted);
+        if (archivedByInvariant.isEmpty) return message;
+        final base = message.endsWith('.')
+            ? message.substring(0, message.length - 1)
+            : message;
+        return '$base${l.cascadeDeleteArchived(archivedByInvariant.length)}';
+      }(),
+    RestoreCascadeComposition(:final restored, :final returnedAsMain) =>
+      isRelation
+          ? returnedAsMain != null
+                ? restored.length > 1
+                      ? l.cascadeRestoreRelationMainOthers(restored.length)
+                      : l.cascadeRestoreRelationMain
+                : restored.isNotEmpty
+                ? l.cascadeRestoreRelation(restored.length)
+                : null
+          : returnedAsMain != null
+          ? restored.isEmpty
+                ? l.cascadeRestoreIntentionMain
+                : l.cascadeRestoreIntentionMainSupporting(restored.length)
+          : restored.isNotEmpty
+          ? l.cascadeRestoreIntentionSupporting(restored.length)
+          : null,
+  };
+}
 
 String _successFor(
   AppLocalizations localizations,

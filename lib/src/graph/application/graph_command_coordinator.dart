@@ -1075,8 +1075,8 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     policy: _PresentationPolicy.silentSuccess,
   );
 
-  /// Принимает архивирование связи с политикой «успех без сообщения» по
-  /// ADR-0046.
+  /// Принимает архивирование связи: успех с каскадом объявляется оболочкой,
+  /// отказ сначала принадлежит инициатору.
   LongTermRelationCommandStart acceptRelationArchive(
     ArchiveLongTermRelation command,
   ) => _acceptRelation(
@@ -1087,8 +1087,8 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
     policy: _PresentationPolicy.silentSuccess,
   );
 
-  /// Принимает восстановление связи с политикой «успех без сообщения» по
-  /// ADR-0046.
+  /// Принимает восстановление связи: успех с каскадом объявляется оболочкой,
+  /// отказ сначала принадлежит инициатору.
   LongTermRelationCommandStart acceptRelationRestore(
     RestoreLongTermRelation command,
   ) => _acceptRelation(
@@ -1273,7 +1273,8 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
                 is GraphCommandSucceeded<
                   LongTermRelationCommandSuccess,
                   LongTermRelationCommandFailure
-                >) {
+                > &&
+            !_announcesCascade(result.value)) {
           return LongTermRelationUnannouncedSuccessCompletion._(
             token: token,
             kind: kind,
@@ -1329,7 +1330,8 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
             result
                 is ResultSuccess<
                   ConfirmedGraphResult<IntentionCommandSuccess>
-                >) {
+                > &&
+            !_announcesCascade(result.value)) {
           return IntentionUnannouncedSuccessCompletion._(
             token: token,
             kind: kind,
@@ -1977,6 +1979,17 @@ enum _PresentationPolicy {
   /// ADR-0046: успех не предъявляется, отказ следует протоколу ADR-0012.
   silentSuccess,
 }
+
+bool _announcesCascade(ConfirmedGraphChangePackage package) =>
+    package.changes.whereType<CascadeOutcome>().any(
+      (outcome) => switch (outcome.executed) {
+        ArchiveCascadeComposition(:final departing, :final promoted) =>
+          departing.isNotEmpty || promoted.isNotEmpty,
+        RestoreCascadeComposition(:final restored, :final returnedAsMain) =>
+          restored.isNotEmpty || returnedAsMain != null,
+        DeleteCascadeComposition() => true,
+      },
+    );
 
 _PresentationPolicy _intentionPresentationPolicyOf(IntentionCommandKind kind) =>
     switch (kind) {

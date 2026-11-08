@@ -3172,4 +3172,140 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get actionPriorityLowest => 'The lowest';
+
+  @override
+  String cascadeArchiveIntentionSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count supporting intentions',
+      one: '$count supporting intention',
+    );
+    return 'Archived with $_temp0';
+  }
+
+  @override
+  String cascadeArchiveIntentionPromoted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions became primary',
+      one: '$count intention became primary',
+    );
+    return 'Archived, $_temp0';
+  }
+
+  @override
+  String cascadeArchiveRelationSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count supporting intentions',
+      one: '$count supporting intention',
+    );
+    return 'Relation archived with $_temp0';
+  }
+
+  @override
+  String get cascadeArchiveRelationPromoted =>
+      'Relation archived, intention became primary';
+
+  @override
+  String cascadeDeleteIntentionSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count supporting intentions',
+      one: '$count supporting intention',
+    );
+    return 'Intention deleted with $_temp0';
+  }
+
+  @override
+  String cascadeDeleteIntentionPromoted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions became primary',
+      one: '$count intention became primary',
+    );
+    return 'Intention deleted, $_temp0';
+  }
+
+  @override
+  String cascadeDeleteRelationSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count supporting intentions',
+      one: '$count supporting intention',
+    );
+    return 'Relation deleted with $_temp0';
+  }
+
+  @override
+  String get cascadeDeleteRelationPromoted =>
+      'Relation deleted, intention became primary';
+
+  @override
+  String cascadeDeleteArchived(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions were archived',
+      one: '$count intention was archived',
+    );
+    return '; $_temp0';
+  }
+
+  @override
+  String cascadeRestoreIntentionSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count supporting intentions',
+      one: '$count supporting intention',
+    );
+    return 'Restored with $_temp0';
+  }
+
+  @override
+  String get cascadeRestoreIntentionMain => 'Restored as primary';
+
+  @override
+  String cascadeRestoreIntentionMainSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count supporting intentions',
+      one: '$count supporting intention',
+    );
+    return 'Restored as primary with $_temp0';
+  }
+
+  @override
+  String cascadeRestoreRelation(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions',
+      one: '$count intention',
+    );
+    return 'Relation restored with $_temp0';
+  }
+
+  @override
+  String get cascadeRestoreRelationMain =>
+      'Relation restored, intention returned as primary';
+
+  @override
+  String cascadeRestoreRelationMainOthers(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions',
+      one: '$count intention',
+    );
+    return 'Relation restored with $_temp0, one as primary';
+  }
 }
