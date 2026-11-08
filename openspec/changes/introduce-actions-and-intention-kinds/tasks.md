@@ -1583,3 +1583,16 @@
   - **Зависимости:** 4.6.
   - **Предполагаемые файлы:** `lib/src/graph/data/drift_personal_graph_repository_cascade_commands.dart`, `test/graph/data/drift_intention_cascade_delete_test.dart`.
   - **Размер:** XS.
+
+- [ ] 4.24 Сообщение об удалении с архивированием по инварианту не зависит от пунктуации другой строки
+  - **Критерии приёмки:**
+    - В `_cascadeMessage` (`lib/src/graph/presentation/graph_operation_presenter.dart`) нет логики `endsWith('.')` и срезания символов из чужих строк: сообщение удаления намерения или связи без других затронутых намерений, но с архивированием K намерений по инварианту берётся из отдельных строк ARB, а не из `detailsDeleted` («Намерение удалено.») или `relationDeleted` («Связь удалена.»).
+    - В `lib/l10n/app_ru.arb` и `app_en.arb` добавлены отдельные строки для удаления намерения и удаления связи без каскада с архивированием K намерений по инварианту, с формами множественного числа; русские тексты — «Намерение удалено; в архив ушло 1 намерение / ушли 2 намерения / ушли 5 намерений» и «Связь удалена; в архив …» в тех же формах, как в требовании «Сообщения об исходе каскадных операций» спеки `intention-cascade`.
+    - Сообщения удаления с уходом вспомогательных или превращением в главные и с архивированием по инварианту собираются без зависимости от пунктуации другой строки; видимые тексты всех вариантов совпадают со спекой `intention-cascade` и не меняются для уже закреплённых тестами случаев.
+    - Локализация перегенерирована (`flutter gen-l10n` из задачи `mise run codegen`), сгенерированные `lib/l10n/app_localizations*.dart` соответствуют ARB.
+    - Тесты в `test/graph/presentation/graph_operation_presenter_test.dart` закрепляют пример спеки «Связь удалена; в архив ушло 1 намерение» и аналог для намерения «Намерение удалено; в архив ушли 2 намерения» при удалении без других затронутых намерений.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/presentation/graph_operation_presenter_test.dart`.
+  - **Зависимости:** 4.8.
+  - **Предполагаемые файлы:** `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`, `app_localizations.dart`, `app_localizations_ru.dart`, `app_localizations_en.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`.
+  - **Размер:** XS.
