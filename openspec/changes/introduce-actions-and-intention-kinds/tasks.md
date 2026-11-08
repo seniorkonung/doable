@@ -1548,3 +1548,14 @@
   - **Зависимости:** 4.11.
   - **Предполагаемые файлы:** `test/intention/presentation/details/intention_details_delete_test.dart`; при необходимости ключа — `lib/src/intention/presentation/details/intention_details_page.dart`.
   - **Размер:** S.
+
+- [ ] 4.21 Конфликт состава при удалении связи предлагает «Повторить», как при архивировании и восстановлении
+  - **Критерии приёмки:**
+    - В `lib/src/long_term_relation/presentation/details/relation_details_state.dart` `canRetry` у `RelationDetailsLifecycleCommandFailed` разрешает повтор при `LongTermRelationCascadeConflictFailure` для любой операции, включая `RelationDetailsLifecycleKind.delete`; остальные условия повтора не меняются.
+    - Повтор удаления идёт существующим путём `_retryLifecycleChange` → `_delete()` в `relation_details_sheet.dart`: заново читает предпросмотр и снова показывает подтверждение удаления с обновлённым составом, как требует сценарий спеки `intention-cascade` «повторное удаление показывает подтверждение с обновлённым составом». Отказ остаётся внутри панели. Спека не меняется.
+    - Тест в `test/long_term_relation/presentation/details/` закрепляет: после конфликта состава при удалении связи в панели видна «Повторить»; её нажатие перечитывает предпросмотр и показывает подтверждение удаления с новым составом, отличным от первого.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/details`.
+  - **Зависимости:** 4.12, 4.13.
+  - **Предполагаемые файлы:** `lib/src/long_term_relation/presentation/details/relation_details_state.dart`, `test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+  - **Размер:** XS.
