@@ -792,6 +792,7 @@ void main() {
             IntentionNotFoundFailure() ||
             IntentionConflictFailure() ||
             IntentionHasBlockingRelationsFailure() ||
+            IntentionCascadePreviewFailure() ||
             IntentionCorruptionFailure() ||
             IntentionUnexpectedFailure() => _Recovery.blocked,
           };

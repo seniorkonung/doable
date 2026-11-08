@@ -2,6 +2,7 @@ import '../../graph/application/graph_command_result.dart';
 import '../../tag/domain/tag_id.dart';
 import '../domain/intention_id.dart';
 import '../domain/intention_text.dart';
+import 'cascade/intention_cascade.dart';
 
 enum IntentionFailureCode {
   validation,
@@ -119,6 +120,25 @@ final class IntentionUnexpectedFailure extends IntentionFailure {
 
   @override
   IntentionFailureCode get code => IntentionFailureCode.unexpected;
+}
+
+/// Архивирование, восстановление или удаление не запущено: предпросмотр
+/// каскада, прочитанный при запуске операции, завершился отказом [cause]
+/// (D7). Хранилище команду не получало.
+final class IntentionCascadePreviewFailure extends IntentionFailure {
+  const IntentionCascadePreviewFailure(this.cause);
+
+  final CascadePreviewFailure cause;
+
+  @override
+  IntentionFailureCode get code => switch (cause) {
+    CascadePreviewSubjectNotFound() => IntentionFailureCode.notFound,
+    CascadePreviewOperationInapplicable() ||
+    CascadePreviewExpired() => IntentionFailureCode.conflict,
+    CascadePreviewUnavailable() => IntentionFailureCode.unavailable,
+    CascadePreviewCorruption() => IntentionFailureCode.corruption,
+    CascadePreviewUnexpected() => IntentionFailureCode.unexpected,
+  };
 }
 
 typedef Result<T> = GraphResult<T, IntentionFailure>;

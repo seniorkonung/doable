@@ -331,6 +331,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
           IntentionNotFoundFailure() ||
           IntentionConflictFailure() ||
           IntentionHasBlockingRelationsFailure() ||
+          IntentionCascadePreviewFailure() ||
           IntentionUnexpectedFailure(),
     ) =>
       IntentionDetailsUnexpected(isOperationRunning: isOperationRunning),

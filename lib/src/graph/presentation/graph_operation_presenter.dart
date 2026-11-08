@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../action/presentation/action_command_failure_message.dart';
 import '../../data_transfer/presentation/graph_import_failure_message.dart';
+import '../../intention/application/cascade/intention_cascade.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
 import '../../long_term_relation/application/long_term_relation_command.dart';
@@ -571,8 +572,8 @@ String _failureFor(
   IntentionCommandKind.create => switch (failure) {
     IntentionValidationFailure() => localizations.editorInvalidInput,
     IntentionConflictFailure() => localizations.editorCreateConflict,
-    IntentionHasBlockingRelationsFailure() =>
-      localizations.editorCreateUnexpected,
+    IntentionHasBlockingRelationsFailure() ||
+    IntentionCascadePreviewFailure() => localizations.editorCreateUnexpected,
     IntentionUnavailableFailure() => localizations.editorCreateUnavailable,
     IntentionCorruptionFailure() => localizations.editorCreateCorruption,
     IntentionNotFoundFailure() ||
@@ -582,8 +583,8 @@ String _failureFor(
     IntentionValidationFailure() => localizations.detailsUpdateInvalidInput,
     IntentionNotFoundFailure() => localizations.detailsUpdateNotFound,
     IntentionConflictFailure() => localizations.detailsUpdateConflict,
-    IntentionHasBlockingRelationsFailure() =>
-      localizations.detailsUpdateUnexpected,
+    IntentionHasBlockingRelationsFailure() ||
+    IntentionCascadePreviewFailure() => localizations.detailsUpdateUnexpected,
     IntentionUnavailableFailure() => localizations.detailsUpdateUnavailable,
     IntentionCorruptionFailure() => localizations.detailsUpdateCorruption,
     IntentionUnexpectedFailure() => localizations.detailsUpdateUnexpected,
@@ -600,6 +601,16 @@ String _failureFor(
       localizations.detailsStateChangeUnavailable,
     IntentionCorruptionFailure() => localizations.detailsStateChangeCorruption,
     IntentionUnexpectedFailure() => localizations.detailsStateChangeUnexpected,
+    IntentionCascadePreviewFailure(:final cause) => switch (cause) {
+      CascadePreviewSubjectNotFound() =>
+        localizations.detailsStateChangeNotFound,
+      CascadePreviewOperationInapplicable() ||
+      CascadePreviewExpired() => localizations.detailsStateChangeConflict,
+      CascadePreviewUnavailable() =>
+        localizations.detailsStateChangeUnavailable,
+      CascadePreviewCorruption() => localizations.detailsStateChangeCorruption,
+      CascadePreviewUnexpected() => localizations.detailsStateChangeUnexpected,
+    },
   },
   IntentionCommandKind.delete => switch (failure) {
     IntentionValidationFailure() => localizations.detailsDeleteInvalid,
@@ -610,5 +621,13 @@ String _failureFor(
     IntentionUnavailableFailure() => localizations.detailsDeleteUnavailable,
     IntentionCorruptionFailure() => localizations.detailsDeleteCorruption,
     IntentionUnexpectedFailure() => localizations.detailsDeleteUnexpected,
+    IntentionCascadePreviewFailure(:final cause) => switch (cause) {
+      CascadePreviewSubjectNotFound() => localizations.detailsDeleteNotFound,
+      CascadePreviewOperationInapplicable() ||
+      CascadePreviewExpired() => localizations.detailsDeleteConflict,
+      CascadePreviewUnavailable() => localizations.detailsDeleteUnavailable,
+      CascadePreviewCorruption() => localizations.detailsDeleteCorruption,
+      CascadePreviewUnexpected() => localizations.detailsDeleteUnexpected,
+    },
   },
 };

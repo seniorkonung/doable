@@ -1979,6 +1979,7 @@ DiagnosticsFailureCode _diagnosticsFailureCode(IntentionFailure failure) =>
       IntentionHasBlockingRelationsFailure() => DiagnosticsFailureCode.conflict,
       IntentionUnavailableFailure() => DiagnosticsFailureCode.unavailable,
       IntentionCorruptionFailure() => DiagnosticsFailureCode.corruption,
+      IntentionCascadePreviewFailure() ||
       IntentionUnexpectedFailure() => DiagnosticsFailureCode.unexpected,
     };
 

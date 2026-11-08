@@ -63,8 +63,8 @@ String? intentionEditGeneralFailureMessage(
       localizations.detailsUpdateInvalidInput,
     IntentionNotFoundFailure() => localizations.detailsUpdateNotFound,
     IntentionConflictFailure() => localizations.detailsUpdateConflict,
-    IntentionHasBlockingRelationsFailure() =>
-      localizations.detailsUpdateUnexpected,
+    IntentionHasBlockingRelationsFailure() ||
+    IntentionCascadePreviewFailure() => localizations.detailsUpdateUnexpected,
     IntentionUnavailableFailure() => localizations.detailsUpdateUnavailable,
     IntentionCorruptionFailure() => localizations.detailsUpdateCorruption,
     IntentionUnexpectedFailure() => localizations.detailsUpdateUnexpected,

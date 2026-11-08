@@ -145,6 +145,7 @@ final class IntentionEditState {
       IntentionNotFoundFailure() ||
       IntentionConflictFailure() ||
       IntentionHasBlockingRelationsFailure() ||
+      IntentionCascadePreviewFailure() ||
       IntentionUnavailableFailure() ||
       IntentionCorruptionFailure() ||
       IntentionUnexpectedFailure() => current,

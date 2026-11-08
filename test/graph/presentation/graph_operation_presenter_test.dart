@@ -17,6 +17,7 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/graph_backups/graph_backups.dart';
+import 'package:doable/src/intention/application/cascade/intention_cascade.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -529,6 +530,87 @@ void main() {
       findsOneWidget,
     );
   });
+
+  for (final scenario in [
+    (
+      operation: CascadeOperation.archive,
+      cause: const CascadePreviewUnavailable(),
+      text:
+          'Архивирование — «Намерение»: Не удалось изменить состояние '
+          'намерения. Повторите попытку.',
+    ),
+    (
+      operation: CascadeOperation.restore,
+      cause: const CascadePreviewSubjectNotFound(),
+      text:
+          'Восстановление — «Намерение»: Намерение больше не существует. '
+          'Его состояние не изменено.',
+    ),
+    (
+      operation: CascadeOperation.delete,
+      cause: const CascadePreviewCorruption(),
+      text:
+          'Удаление — «Намерение»: Сохранённые данные повреждены. Намерение '
+          'не удалено.',
+    ),
+  ]) {
+    testWidgets(
+      'отказ предпросмотра операции ${scenario.operation.name} предъявляется '
+      'общей поверхностью как отказ этой операции один раз',
+      (tester) async {
+        final harness = await _pumpPresenterApp(
+          tester,
+          locale: const Locale('ru'),
+        );
+
+        harness.startPreviewFailure(scenario.operation, scenario.cause);
+        await tester.pumpAndSettle();
+
+        expect(find.text(scenario.text), findsOneWidget);
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+      },
+    );
+  }
+
+  testWidgets(
+    'отказ предпросмотра, принятый без фокуса на странице, после ухода с '
+    'неё ждёт возвращения фокуса и предъявляется один раз',
+    (tester) async {
+      final harness = await _pumpPresenterApp(tester);
+      final navigator = Navigator.of(tester.element(find.byType(Scaffold)));
+      unawaited(
+        navigator.push(
+          MaterialPageRoute<void>(
+            builder: (_) => const Scaffold(body: Text('Страница намерения')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+
+      harness.startPreviewFailure(
+        CascadeOperation.archive,
+        const CascadePreviewUnexpected(),
+      );
+      await tester.pump();
+      navigator.pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Archive — “Намерение”: The intention state couldn’t be changed '
+          'because of an unexpected error.',
+        ),
+        findsOneWidget,
+      );
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    },
+  );
 
   testWidgets(
     'показывает безопасный конфликт блокирующих связей в общей поверхности',
@@ -2130,6 +2212,17 @@ final class _PresenterHarness {
     _commandIndexes[accepted] = commandIndex;
     return accepted;
   }
+
+  /// Операция страницы намерения, предпросмотр каскада которой не прочитан.
+  void startPreviewFailure(
+    CascadeOperation operation,
+    CascadePreviewFailure failure,
+  ) => _coordinator.acceptIntentionPreviewFailure(
+    intentionId: testDetailsIntentionId(1),
+    operation: operation,
+    failure: failure,
+    presentationTitle: 'Намерение',
+  );
 
   IntentionCommandAccepted startDelete({
     required int index,

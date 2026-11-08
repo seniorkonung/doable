@@ -462,6 +462,7 @@ final class IntentionEditorState {
       IntentionNotFoundFailure() ||
       IntentionConflictFailure() ||
       IntentionHasBlockingRelationsFailure() ||
+      IntentionCascadePreviewFailure() ||
       IntentionUnavailableFailure() ||
       IntentionCorruptionFailure() ||
       IntentionUnexpectedFailure() => false,

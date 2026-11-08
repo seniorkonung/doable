@@ -7,6 +7,7 @@ import '../../action/application/action_result.dart';
 import '../../action/domain/action_id.dart';
 import '../../graph_backups/graph_backups.dart';
 import '../../intention/application/intention_command.dart';
+import '../../intention/application/cascade/intention_cascade.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
 import '../../intention/domain/intention_id.dart';
@@ -1007,6 +1008,50 @@ final class GraphCommandCoordinator extends _$GraphCommandCoordinator {
       title: presentationTitle,
     ),
   );
+
+  /// Принимает архивирование, восстановление или удаление намерения
+  /// [intentionId], предпросмотр каскада которого при запуске завершился
+  /// отказом [failure] (D7).
+  ///
+  /// Операция получает новый token и сразу завершается отказом
+  /// [IntentionCascadePreviewFailure]: команда не выполняется. Отказ сразу
+  /// принадлежит оболочке, потому что страница намерения не предъявляет
+  /// отказы этих операций сама.
+  IntentionCommandStart acceptIntentionPreviewFailure({
+    required IntentionId intentionId,
+    required CascadeOperation operation,
+    required CascadePreviewFailure failure,
+    required String presentationTitle,
+  }) {
+    final token = IntentionOperationToken._();
+    final acceptance = _acceptOperation(
+      keys: {ExistingIntentionKey(intentionId)},
+      entry: _PresentationEntry(token)..initiatorReleased = true,
+      execute: () async => IntentionPresentableCompletion._(
+        token: token,
+        kind: switch (operation) {
+          CascadeOperation.archive => IntentionCommandKind.archive,
+          CascadeOperation.restore => IntentionCommandKind.restore,
+          CascadeOperation.delete => IntentionCommandKind.delete,
+        },
+        target: ExistingIntentionOperationTarget(
+          intentionId: intentionId,
+          title: presentationTitle,
+        ),
+        confirmedResult: ResultFailure(IntentionCascadePreviewFailure(failure)),
+      ),
+    );
+    return switch (acceptance) {
+      _GraphCommandAccepted(:final future) => IntentionCommandAccepted(
+        token: token,
+        future: future.then(
+          (completion) => completion as IntentionCommandCompletion,
+        ),
+      ),
+      _GraphCommandAlreadyRunning() => const IntentionCommandAlreadyRunning(),
+      _GraphCommandDraining() => const GraphCommandCoordinatorDraining(),
+    };
+  }
 
   LongTermRelationCommandStart acceptRelationsAddition(
     RelationsAdditionSearchKey searchKey,

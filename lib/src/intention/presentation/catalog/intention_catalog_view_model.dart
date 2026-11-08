@@ -423,7 +423,8 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       selection: selection,
       query: query,
     ),
-    IntentionHasBlockingRelationsFailure() => IntentionCatalogUnexpected(
+    IntentionHasBlockingRelationsFailure() ||
+    IntentionCascadePreviewFailure() => IntentionCatalogUnexpected(
       selection: selection,
       query: query,
     ),
@@ -589,7 +590,8 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     IntentionUnexpectedFailure() ||
     IntentionNotFoundFailure() ||
     IntentionConflictFailure() ||
-    IntentionHasBlockingRelationsFailure() =>
+    IntentionHasBlockingRelationsFailure() ||
+    IntentionCascadePreviewFailure() =>
       const IntentionCatalogContinuationUnexpected(),
   };
 
