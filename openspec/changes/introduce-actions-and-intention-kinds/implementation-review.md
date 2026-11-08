@@ -3,9 +3,9 @@
 ## Assessment
 
 **Format version:** 1
-**Result:** Changes needed
+**Result:** No unresolved findings
 **Coverage status:** Complete
-**Summary:** Задачи 4.19–4.28 по существу выполнены. Удаление больше не исполняется без подтверждения, а выполнение каскада строится только из плана предпросмотра. Основная мутация каталога при удалении выбирается по идентификатору. Сообщения и подсказки собираются без срезания пунктуации. Тексты на английском называют вид словом «main». `mise run check` на `ed4d2350` проходит целиком. Остаётся одна находка низкой важности: в тестах остались пустые строки на месте удалённого аргумента `mainsLosingRelation:` (F3). Принятых остаточных рисков нет.
+**Summary:** Задачи 4.19–4.28 по существу выполнены. Удаление больше не исполняется без подтверждения, а выполнение каскада строится только из плана предпросмотра. Основная мутация каталога при удалении выбирается по идентификатору. Сообщения и подсказки собираются без срезания пунктуации. Тексты на английском называют вид словом «main». `mise run check` на `ed4d2350` проходит целиком. Пустые строки на месте удалённого аргумента `mainsLosingRelation:` в тестах убраны по решению пользователя отдельным коммитом `style(test)` вне проверяемого диапазона. Нерешённых находок и принятых остаточных рисков нет.
 
 ## Review target
 
@@ -43,20 +43,13 @@
 
 | Pass | Status | Evidence or limitation |
 |---|---|---|
-| Independent decision review | Complete | Один свежий рецензент без истории (`implementation-decision-review`) получил общее нейтральное описание намерения для U1 и U2: у них общие задачи 4.27 и 4.28. Цель — `7c861cbb4c96176b05c1a70a9ff98db5bd218351..ed4d2350cfeb77ebb2019a6d56b1f9bf21826c12`, все 32 пути доставки и тестов. Первый ответ покрыл только код приложения, поэтому рецензента возобновили с тем же описанием для 16 путей `test/`. Итоговое покрытие полное. Пустые строки F3 рецензент отметил как наблюдение. |
+| Independent decision review | Complete | Один свежий рецензент без истории (`implementation-decision-review`) получил общее нейтральное описание намерения для U1 и U2: у них общие задачи 4.27 и 4.28. Цель — `7c861cbb4c96176b05c1a70a9ff98db5bd218351..ed4d2350cfeb77ebb2019a6d56b1f9bf21826c12`, все 32 пути доставки и тестов. Первый ответ покрыл только код приложения, поэтому рецензента возобновили с тем же описанием для 16 путей `test/`. Итоговое покрытие полное. Рецензент отметил как наблюдение пустые строки на месте удалённого аргумента в тестах. |
 | OpenSpec conformance | Complete | Критерии задач 4.19–4.28 сверены с диффом. Сценарии, на которые ссылаются задачи, сопоставлены с тестами. `mise exec --no-deps -- openspec validate introduce-actions-and-intention-kinds --strict --json` проходит. Проверки запускались на `ed4d2350` в этом рабочем дереве, результаты — в разделе «Review coverage». |
 | Code quality | Complete | Все 32 изменённых пути доставки и тестов проверены по корректности, читаемости, архитектуре, безопасности и производительности. Неизменённый контекст: `relation_details_sheet.dart`, `confirm_dialog.dart`, `intention_catalog.dart`, `_CascadeWrite.catalogMutations`, сгенерированные `*.g.dart` моделей представления. |
 
 ## Findings
 
-### F3 · Low — В тестах остались пустые строки на месте удалённого аргумента `mainsLosingRelation:`
-
-- **Evidence:** После удаления поля в 4.28 (`d408e314`, `ed4d2350`) внутри 13 вызовов конструкторов составов на месте аргумента осталась пустая строка. Места: `test/graph/presentation/graph_operation_presenter_test.dart:71`, `:93`, `:272`, `:348`; `test/intention/presentation/details/intention_details_options_test.dart:40`, `:46`, `:85`, `:124`, `:309`; `test/intention/presentation/details/intention_options_test.dart:43`; `test/long_term_relation/presentation/details/relation_details_sheet_test.dart:1015`, `:1021`; `test/support/intention_cascade_execution.dart:150`. `dart format` такие строки сохраняет, поэтому статическая проверка их не ловит.
-- **Evidence revisions:** ["ed4d2350cfeb77ebb2019a6d56b1f9bf21826c12"]
-- **Impact:** Разрывы посреди списка аргументов выглядят как незаконченная правка. Читатель ищет пропущенный аргумент, а следующие правки повторяют этот шум.
-- **Required outcome:** В списках аргументов конструкторов составов каскада в тестах нет пустых строк, оставшихся от удалённых аргументов.
-- **Earliest source of truth:** implementation/tests
-- **Affected artifacts:** ["test/graph/presentation/graph_operation_presenter_test.dart", "test/intention/presentation/details/intention_details_options_test.dart", "test/intention/presentation/details/intention_options_test.dart", "test/long_term_relation/presentation/details/relation_details_sheet_test.dart", "test/support/intention_cascade_execution.dart"]
+No unresolved findings remain in the implementation review.
 
 ## Review coverage
 
