@@ -13,6 +13,229 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets(
+    'списки каскада раскрываются независимо и полный список не сокращается',
+    (tester) async {
+      _useScreen(tester);
+      late BuildContext context;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: doableTheme(Brightness.light),
+          home: Builder(
+            builder: (value) {
+              context = value;
+              return const Scaffold();
+            },
+          ),
+        ),
+      );
+      final result = showCascadeConfirmDialog(
+        context: context,
+        title: 'Удалить намерения?',
+        text: 'Намерения уйдут.',
+        lists: [
+          CascadeDialogList(
+            title: 'Первый · 6',
+            items: List.generate(6, (i) => 'Первый $i'),
+            marker: CascadeListMarker.ring,
+            display: const CascadeListExpandable('Показать все 6'),
+          ),
+          CascadeDialogList(
+            title: 'Второй · 5',
+            items: List.generate(5, (i) => 'Второй $i'),
+            marker: CascadeListMarker.ring,
+            display: const CascadeListExpandable('Показать все 5'),
+          ),
+          CascadeDialogList(
+            title: 'Главные · 5',
+            items: List.generate(5, (i) => 'Главный $i'),
+            marker: CascadeListMarker.intention,
+            display: const CascadeListAll(),
+          ),
+          CascadeDialogList(
+            title: 'Архив · 5',
+            items: List.generate(5, (i) => 'Архив $i'),
+            marker: CascadeListMarker.ring,
+            display: const CascadeListSummary('и ещё 1'),
+          ),
+        ],
+        cascadeLabel: 'Удалить все',
+        singleLabel: 'Только это',
+        cancelLabel: 'Отмена',
+        actionStyle: CascadeActionStyle.danger,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Первый 4'), findsNothing);
+      expect(find.text('Второй 4'), findsNothing);
+      expect(find.text('Главный 4'), findsOneWidget);
+      expect(find.text('Архив 4'), findsNothing);
+      expect(find.text('и ещё 1'), findsOneWidget);
+      await tester.tap(find.text('Показать все 6'));
+      await tester.pumpAndSettle();
+      expect(find.text('Первый 5'), findsOneWidget);
+      expect(find.text('Второй 4'), findsNothing);
+      expect(find.text('Показать все 5'), findsOneWidget);
+      await tester.tap(find.text('Отмена'));
+      await tester.pumpAndSettle();
+      expect(await result, CascadeDialogResult.cancel);
+    },
+  );
+
+  testWidgets(
+    'длинные списки прокручиваются внутри диалога высотой не более 700',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      _useScreen(tester);
+      late BuildContext context;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: doableTheme(Brightness.light),
+          home: Builder(
+            builder: (value) {
+              context = value;
+              return const Scaffold();
+            },
+          ),
+        ),
+      );
+      final result = showCascadeConfirmDialog(
+        context: context,
+        title: 'Удалить намерения?',
+        text: 'Намерения уйдут.',
+        lists: [
+          CascadeDialogList(
+            title: 'Главные · 30',
+            items: List.generate(30, (i) => 'Главный $i'),
+            marker: CascadeListMarker.intention,
+            display: const CascadeListAll(),
+          ),
+        ],
+        cascadeLabel: 'Удалить все',
+        singleLabel: 'Только это',
+        cancelLabel: 'Отмена',
+        actionStyle: CascadeActionStyle.danger,
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getRect(_plane).height, lessThanOrEqualTo(700));
+      expect(find.semantics.byLabel('Главные · 30'), findsOne);
+      expect(find.semantics.byLabel('Главный 0'), findsOne);
+      await tester.drag(find.text('Главный 3'), const Offset(0, -1500));
+      await tester.pumpAndSettle();
+      expect(find.text('Главный 29').hitTestable(), findsOneWidget);
+      await tester.tap(find.text('Отмена'));
+      await tester.pumpAndSettle();
+      expect(await result, CascadeDialogResult.cancel);
+      semantics.dispose();
+    },
+  );
+
+  testWidgets(
+    'каскадный диалог доступен при крупном шрифте и длинном описании',
+    (tester) async {
+      _useScreen(tester, textScale: 2);
+      late BuildContext context;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: doableTheme(Brightness.light),
+          home: Builder(
+            builder: (value) {
+              context = value;
+              return const Scaffold();
+            },
+          ),
+        ),
+      );
+      final result = showCascadeConfirmDialog(
+        context: context,
+        title: 'Удалить намерения?',
+        text: 'Удаляются намерения вместе со связями. Удаление нельзя отменить, пути действий сохранят удалённые намерения.',
+        lists: [
+          CascadeDialogList(
+            title: 'Главные · 5',
+            items: List.generate(5, (i) => 'Главный $i'),
+            marker: CascadeListMarker.intention,
+            display: const CascadeListAll(),
+          ),
+        ],
+        cascadeLabel: 'Удалить все',
+        singleLabel: 'Только это',
+        cancelLabel: 'Отмена',
+        actionStyle: CascadeActionStyle.primary,
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.ensureVisible(find.text('Отмена'));
+      await tester.tap(find.text('Отмена'));
+      await tester.pumpAndSettle();
+      expect(await result, CascadeDialogResult.cancel);
+    },
+  );
+
+  for (final (label, answer) in [
+    ('Удалить все', CascadeDialogResult.cascade),
+    ('Только это', CascadeDialogResult.single),
+    ('Отмена', CascadeDialogResult.cancel),
+    ('затемнение', CascadeDialogResult.cancel),
+    ('назад', CascadeDialogResult.cancel),
+  ]) {
+    testWidgets('ответ каскадного диалога: $label', (tester) async {
+      final semantics = tester.ensureSemantics();
+      _useScreen(tester);
+      late BuildContext context;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: doableTheme(Brightness.light),
+          home: Builder(
+            builder: (value) {
+              context = value;
+              return const Scaffold();
+            },
+          ),
+        ),
+      );
+      final result = showCascadeConfirmDialog(
+        context: context,
+        title: 'Удалить намерения?',
+        text: 'Намерения уйдут.',
+        lists: const [],
+        cascadeLabel: 'Удалить все',
+        singleLabel: 'Только это',
+        cancelLabel: 'Отмена',
+        actionStyle: CascadeActionStyle.danger,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.semantics.byPredicate(
+          (node) =>
+              node.label == 'Удалить намерения?' &&
+              node.flagsCollection.scopesRoute &&
+              node.flagsCollection.namesRoute,
+        ),
+        findsOne,
+      );
+      for (final action in ['Удалить все', 'Только это', 'Отмена']) {
+        expect(
+          tester.getSemantics(find.text(action)),
+          isSemantics(label: action, isButton: true, hasTapAction: true),
+        );
+      }
+      final first = tester.getRect(_pillOf('Удалить все'));
+      final second = tester.getRect(_pillOf('Только это'));
+      expect(first.width, second.width);
+      expect(first.bottom, lessThan(second.top));
+      if (label == 'затемнение') {
+        await tester.tapAt(const Offset(10, 10));
+      } else if (label == 'назад') {
+        await tester.binding.handlePopRoute();
+      } else {
+        await tester.tap(find.text(label));
+      }
+      await tester.pumpAndSettle();
+      expect(await result, answer);
+      semantics.dispose();
+    });
+  }
+
   for (final brightness in Brightness.values) {
     final theme = brightness == Brightness.light ? 'светлой' : 'тёмной';
 
