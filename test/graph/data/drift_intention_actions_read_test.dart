@@ -10,7 +10,6 @@ import 'package:doable/src/data/local/app_database.dart' hide Action;
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
@@ -20,6 +19,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/action_seed.dart';
 import '../../support/encoded_diagnostics_log.dart';
 import '../../support/graph_seed.dart';
+import '../../support/intention_cascade_execution.dart';
 
 ActionId _action(int number) =>
     (ActionId.decode(seedUuid(number)) as ActionIdDecodingSuccess).id;
@@ -263,7 +263,9 @@ void main() {
     addAction(12, path: [4, 2, 3]);
     final active = await read(2, IntentionActionRole.terminal);
     expect(
-      await repository.execute(ArchiveIntention(_intention(2))),
+      await repository.execute(
+        await previewedArchiveIntention(repository, _intention(2)),
+      ),
       isA<GraphCommandSucceeded>(),
     );
 

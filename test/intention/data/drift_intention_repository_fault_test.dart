@@ -23,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import '../../support/graph_seed.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/tag_positions.dart';
@@ -271,7 +272,9 @@ void main() {
         }
         interceptor.arm();
 
-        final result = await repository.execute(ArchiveIntention(owner));
+        final result = await repository.execute(
+          await previewedArchiveIntention(repository, owner),
+        );
 
         expect(result, _failure<IntentionUnexpectedFailure>());
         await _expectStoredIntention(
@@ -719,7 +722,9 @@ void main() {
             );
             interceptor.arm();
 
-            final result = await repository.execute(DeleteIntention(id));
+            final result = await repository.execute(
+              await previewedDeleteIntention(repository, id),
+            );
 
             expect(result, _failure<IntentionUnexpectedFailure>());
             await _expectStoredIntention(

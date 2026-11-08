@@ -14,6 +14,7 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/intention/application/cascade/intention_cascade.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
@@ -35,6 +36,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_root_pages.dart';
+import '../support/intention_cascade_execution.dart';
 import '../support/intention_catalog_controls.dart';
 import '../support/intention_kind_counts.dart';
 import '../support/in_memory_diagnostics_sink.dart';
@@ -527,7 +529,7 @@ Future<String> _failOtherIntentionDelete(
   final other = _intention(uuid: uuid, title: title, description: null);
   final index = repository.commands.length;
   final accepted = runtime.commandCoordinator.acceptExisting(
-    DeleteIntention(other.id),
+    givenDeleteIntention(other.id),
     presentationTitle: other.title,
   ) as IntentionCommandAccepted;
   runtime.commandCoordinator.releaseInitiatorPresentation(accepted.token);
@@ -787,6 +789,14 @@ final class _DelayedPersonalGraphRepository
       TagCatalogSuccess(
         TagCatalogSnapshot(items: const [], revision: const _Revision(0)),
       );
+
+  /// Предпросмотр, не затрагивающий другие намерения: запуск операции из
+  /// приложения читает его до принятия команды.
+  @override
+  Future<CascadePreviewResult> previewCascade(
+    CascadeSubject subject,
+    CascadeOperation operation,
+  ) async => givenCascadePreview(subject, operation, const _Revision(0));
 
   bool hasIncoming = false;
 

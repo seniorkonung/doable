@@ -4,7 +4,6 @@ import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
@@ -19,6 +18,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_cascade_execution.dart';
 
 void main() {
   late AppDatabase database;
@@ -114,7 +114,9 @@ void main() {
 
     clock = DateTime.utc(2026, 9, 24);
     await _expectSucceeded(
-      repository.execute(ArchiveLongTermRelation(relationId)),
+      repository.execute(
+        await previewedArchiveRelation(repository, relationId),
+      ),
     );
     var stored = await _timestamps(database, relationId);
     expect(stored.createdAt, createdAt.microsecondsSinceEpoch);
@@ -122,7 +124,9 @@ void main() {
 
     clock = DateTime.utc(2026, 9, 25);
     await _expectSucceeded(
-      repository.execute(RestoreLongTermRelation(relationId)),
+      repository.execute(
+        await previewedRestoreRelation(repository, relationId),
+      ),
     );
     stored = await _timestamps(database, relationId);
     expect(stored.createdAt, createdAt.microsecondsSinceEpoch);
@@ -149,15 +153,17 @@ void main() {
       ),
     );
     await _expectSucceeded(
-      repository.execute(RestoreLongTermRelation(relationId)),
+      repository.execute(givenRestoreRelation(relationId)),
     );
     await _expectSucceeded(
-      repository.execute(ArchiveLongTermRelation(relationId)),
+      repository.execute(
+        await previewedArchiveRelation(repository, relationId),
+      ),
     );
     final archived = await _timestamps(database, relationId);
     clock = DateTime.utc(2026, 9, 25);
     await _expectSucceeded(
-      repository.execute(ArchiveLongTermRelation(relationId)),
+      repository.execute(givenArchiveRelation(relationId)),
     );
 
     expect(archived.createdAt, before.createdAt);
@@ -192,14 +198,18 @@ void main() {
 
     final archivedAt = clock = DateTime.utc(2026, 9, 25, 10);
     final archived = _updatedOf(
-      await repository.execute(ArchiveLongTermRelation(relationId)),
+      await repository.execute(
+        await previewedArchiveRelation(repository, relationId),
+      ),
     );
     expect(archived.relation.createdAt, RelationTimestamp(createdAt));
     expect(archived.relation.updatedAt, RelationTimestamp(archivedAt));
 
     clock = DateTime.utc(2026, 9, 26, 11);
     final restored = _updatedOf(
-      await repository.execute(RestoreLongTermRelation(relationId)),
+      await repository.execute(
+        await previewedRestoreRelation(repository, relationId),
+      ),
     );
     expect(restored.before.updatedAt, RelationTimestamp(archivedAt));
     expect(restored.relation.createdAt, RelationTimestamp(createdAt));
@@ -223,7 +233,7 @@ void main() {
       ),
     );
     final repeatedArchive = _updatedOf(
-      await repository.execute(RestoreLongTermRelation(relationId)),
+      await repository.execute(givenRestoreRelation(relationId)),
     );
 
     for (final result in [repeated, repeatedArchive]) {
@@ -241,7 +251,9 @@ void main() {
 
   test('отклонённая операция показаний не меняет', () async {
     await _create(repository, sourceId, relatedId);
-    await repository.execute(ArchiveLongTermRelation(relationId));
+    await repository.execute(
+      await previewedArchiveRelation(repository, relationId),
+    );
     final before = await _timestamps(database, relationId);
     clock = DateTime.utc(2026, 9, 24);
 
@@ -261,9 +273,11 @@ void main() {
         candidateIds: [relatedId],
       ),
     );
-    await repository.execute(ArchiveIntention(sourceId));
+    await repository.execute(
+      await previewedArchiveIntention(repository, sourceId),
+    );
     final archivedParticipant = await repository.execute(
-      RestoreLongTermRelation(relationId),
+      await previewedRestoreRelation(repository, relationId),
     );
 
     expect(archivedTypeChange, isA<GraphCommandFailed>());
@@ -280,7 +294,9 @@ void main() {
     clock = DateTime.utc(2026, 9, 22, 12);
     await _create(repository, sourceId, thirdId);
     clock = DateTime.utc(2026, 9, 22, 13);
-    await repository.execute(ArchiveLongTermRelation(_relationId(_uuid(103))));
+    await repository.execute(
+      await previewedArchiveRelation(repository, _relationId(_uuid(103))),
+    );
     final alreadyArchived = await _timestamps(
       database,
       _relationId(_uuid(103)),
@@ -288,7 +304,9 @@ void main() {
     final otherRelation = await _timestamps(database, secondRelationId);
 
     clock = DateTime.utc(2026, 9, 25, 7, 45, 12, 345, 678);
-    await _expectSucceeded(repository.execute(ArchiveIntention(sourceId)));
+    await _expectSucceeded(
+      repository.execute(await previewedArchiveIntention(repository, sourceId)),
+    );
 
     final cascaded = await _timestamps(database, relationId);
     expect(cascaded.createdAt, createdAt.microsecondsSinceEpoch);
@@ -306,7 +324,9 @@ void main() {
     await _create(repository, sourceId, relatedId);
 
     clock = DateTime.utc(2026, 9, 25, 7, 45, 12, 345, 678);
-    final result = await repository.execute(ArchiveIntention(sourceId));
+    final result = await repository.execute(
+      await previewedArchiveIntention(repository, sourceId),
+    );
 
     final change = _changesOf(result)
         .whereType<LongTermRelationUpdatedChange>()

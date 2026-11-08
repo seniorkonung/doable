@@ -7,7 +7,6 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -24,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_cascade_execution.dart';
 
 void main() {
   late AppDatabase database;
@@ -373,8 +373,12 @@ void main() {
     );
 
     test('создание перед архивированием попадает в атомарный каскад', () async {
+      final archiveCommand = await previewedArchiveIntention(
+        repository,
+        pageId,
+      );
       final creation = repository.execute(_addCommand(pageId, firstId));
-      final archival = repository.execute(ArchiveIntention(pageId));
+      final archival = repository.execute(archiveCommand);
 
       expect(await creation, isA<GraphCommandSucceeded>());
       expect(await archival, isA<ResultSuccess>());
@@ -391,8 +395,12 @@ void main() {
             .select(database.intentions)
             .get();
 
+        final deleteCommand = await previewedDeleteIntention(
+          repository,
+          pageId,
+        );
         final creation = repository.execute(_addCommand(pageId, firstId));
-        final deletion = repository.execute(DeleteIntention(pageId));
+        final deletion = repository.execute(deleteCommand);
 
         expect(await creation, isA<GraphCommandSucceeded>());
         expect(
@@ -551,7 +559,9 @@ void main() {
     });
 
     test('участник архивирован до сохранения', () async {
-      await repository.execute(ArchiveIntention(pageId));
+      await repository.execute(
+        await previewedArchiveIntention(repository, pageId),
+      );
       final before = await _snapshotOfGraph(database, repository, pageId);
 
       final result = await repository.execute(
@@ -578,7 +588,9 @@ void main() {
     test('участник удалён до сохранения', () async {
       final otherId = _intentionId(_uuid(9));
       await _insertIntention(database, otherId, title: 'Другое');
-      await repository.execute(DeleteIntention(pageId));
+      await repository.execute(
+        await previewedDeleteIntention(repository, pageId),
+      );
       final before = await _snapshotOfGraph(database, repository, otherId);
 
       final result = await repository.execute(

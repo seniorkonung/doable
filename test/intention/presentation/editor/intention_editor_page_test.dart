@@ -45,6 +45,7 @@ import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/tag_positions.dart';
 import '../../../support/intention_description_preview.dart';
 import '../../../support/intention_title_order_key.dart';
+import '../../../support/intention_cascade_execution.dart';
 
 void main() {
   setUp(() {
@@ -893,7 +894,7 @@ void main() {
       ).read(graphCommandCoordinatorProvider.notifier);
       final other = testIntention(index: 40, title: 'Другое намерение');
       final busy = coordinator.acceptExisting(
-        DeleteIntention(other.id),
+        givenDeleteIntention(other.id),
         presentationTitle: other.title,
       ) as IntentionCommandAccepted;
       coordinator.releaseInitiatorPresentation(busy.token);
@@ -2091,7 +2092,7 @@ void _showAppSurfaceFailure(
   ).read(graphCommandCoordinatorProvider.notifier);
   final other = testIntention(index: 40, title: 'Другое намерение');
   final accepted = coordinator.acceptExisting(
-    DeleteIntention(other.id),
+    givenDeleteIntention(other.id),
     presentationTitle: other.title,
   ) as IntentionCommandAccepted;
   coordinator.releaseInitiatorPresentation(accepted.token);

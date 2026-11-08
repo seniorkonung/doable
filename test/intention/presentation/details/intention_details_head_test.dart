@@ -23,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/intention_options.dart';
 import '../../../support/ordinary_page_test_app.dart';
+import '../../../support/intention_cascade_execution.dart';
 import 'details_test_support.dart';
 
 void main() {
@@ -290,7 +291,7 @@ void main() {
       tester.element(find.byType(IntentionDetailsPage)),
     ).read(graphCommandCoordinatorProvider.notifier);
     final busy = coordinator.acceptExisting(
-      DeleteIntention(intention.id),
+      givenDeleteIntention(intention.id),
       presentationTitle: intention.title,
     ) as IntentionCommandAccepted;
     coordinator.releaseInitiatorPresentation(busy.token);

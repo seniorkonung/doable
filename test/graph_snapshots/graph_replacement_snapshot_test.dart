@@ -34,6 +34,7 @@ import '../support/failing_snapshot_temporary_files.dart';
 import '../support/forwarding_graph_fact_log.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/intention_cascade_execution.dart';
 import '../support/local_database_harness.dart';
 
 /// Порог проверок: несколько пакетов вместо производственного значения.
@@ -178,7 +179,7 @@ void main() {
     await createIntention('Плавать', tagIds: {home.id});
     final backupPosition = await repository.readCurrentPosition();
     final expected = await referenceState();
-    await confirm(ArchiveIntention(health.id));
+    await confirm(await previewedArchiveIntention(repository, health.id));
     await createTag('Спорт');
 
     final snapshot = await writeReplacementAt(

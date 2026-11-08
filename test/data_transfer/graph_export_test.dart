@@ -39,6 +39,7 @@ import '../support/file_document_access.dart';
 import '../support/graph_import_files.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/intention_cascade_execution.dart';
 import '../support/local_database_harness.dart';
 import '../support/reference_graph_replacement.dart';
 
@@ -178,7 +179,7 @@ void main() {
         ),
       ),
     );
-    await confirm(ArchiveIntention(running.id));
+    await confirm(await previewedArchiveIntention(repository, running.id));
     final expected = _lines(await referenceGraphRecords(database));
     final container = app();
     final exported = nextExport(container);

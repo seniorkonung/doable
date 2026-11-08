@@ -15,6 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/graph_seed.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -374,11 +375,11 @@ Future<void> _createFirstObjectGraph(
     ),
   );
   for (final command in [
-    ArchiveIntention(archivedId),
-    RestoreIntention(archivedId),
-    ArchiveIntention(archivedId),
+    () => previewedArchiveIntention(repository, archivedId),
+    () => previewedRestoreIntention(repository, archivedId),
+    () => previewedArchiveIntention(repository, archivedId),
   ]) {
-    final saved = _saved(await repository.execute(command));
+    final saved = _saved(await repository.execute(await command()));
     expect(saved.kind, IntentionKind.supporting);
   }
 
@@ -388,7 +389,9 @@ Future<void> _createFirstObjectGraph(
     ),
   );
   expect(
-    await repository.execute(DeleteIntention(deletedId)),
+    await repository.execute(
+      await previewedDeleteIntention(repository, deletedId),
+    ),
     _deleted(deletedId),
   );
 

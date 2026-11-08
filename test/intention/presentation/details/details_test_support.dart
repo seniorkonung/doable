@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/intention/application/cascade/intention_cascade.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
@@ -30,6 +31,7 @@ import '../../../support/intention_description_preview.dart';
 import '../../../support/intention_title_order_key.dart';
 import '../../../support/intention_kind_counts.dart';
 import '../../../support/intention_holding_read_contract_test_fallback.dart';
+import '../../../support/intention_cascade_execution.dart';
 
 final class ControlledDetailRequest {
   ControlledDetailRequest({bool broadcast = false}) {
@@ -149,6 +151,22 @@ final class ControlledDetailsRepository
     return onStatisticsSection?.call(query) ??
         super.getIntentionStatisticsSection(query);
   }
+
+  /// Ответ на предпросмотр каскада; по умолчанию операция не затрагивает
+  /// другие намерения.
+  CascadePreviewResult Function(
+    CascadeSubject subject,
+    CascadeOperation operation,
+  )?
+  onPreviewCascade;
+
+  @override
+  Future<CascadePreviewResult> previewCascade(
+    CascadeSubject subject,
+    CascadeOperation operation,
+  ) async =>
+      onPreviewCascade?.call(subject, operation) ??
+      givenCascadePreview(subject, operation, const TestDetailsRevision(0));
 
   /// Ответ на запрос порции группы связей; по умолчанию группа пуста.
   RelationGroupPageResult Function(RelationGroupQuery query)?

@@ -38,6 +38,7 @@ import '../../support/file_document_access.dart';
 import '../../support/graph_log_completeness_reference.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/local_database_harness.dart';
 
 void main() {
@@ -233,7 +234,7 @@ void main() {
         ),
       ),
     );
-    await confirm(ArchiveIntention(running.id));
+    await confirm(await previewedArchiveIntention(repository, running.id));
     final expected = _lines(await referenceGraphRecords(database));
     await harness.closePersistenceObjectGraph();
 

@@ -16,6 +16,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/tagged_intention_ids.dart';
 
@@ -212,7 +213,7 @@ void main() {
         directRelationArchive: 0,
       );
       await expectStep(
-        ArchiveIntention(_intention(1)),
+        await previewedArchiveIntention(repository, _intention(1)),
         minute: 3,
         title: 'Новое название',
         description: 'Новое описание',
@@ -220,7 +221,7 @@ void main() {
         directRelationArchive: 1,
       );
       await expectStep(
-        RestoreIntention(_intention(1)),
+        await previewedRestoreIntention(repository, _intention(1)),
         minute: 4,
         title: 'Новое название',
         description: 'Новое описание',
@@ -353,12 +354,14 @@ void main() {
         ),
         {'priority': 4},
       );
-      await expectRelationStep(ArchiveLongTermRelation(_relation(103)), {
-        'is_archived': 1,
-      });
-      await expectRelationStep(RestoreLongTermRelation(_relation(103)), {
-        'is_archived': 0,
-      });
+      await expectRelationStep(
+        await previewedArchiveRelation(repository, _relation(103)),
+        {'is_archived': 1},
+      );
+      await expectRelationStep(
+        await previewedRestoreRelation(repository, _relation(103)),
+        {'is_archived': 0},
+      );
     },
   );
 

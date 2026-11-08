@@ -19,6 +19,8 @@ import 'package:doable/src/design_system/components/list_state.dart';
 import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/design_system/doable_metrics.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
@@ -37,6 +39,7 @@ import '../../support/app_root_pages.dart';
 import '../../support/controlled_local_date.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/intention_catalog_controls.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
@@ -379,7 +382,7 @@ void main() {
         final app = await _start(tester, insets: _safeArea);
         await _select(tester, destination);
 
-        _acceptDelete(app, intention: 3);
+        await _acceptDelete(tester, app, intention: 3);
         await _until(tester, _messageOf(3));
         await tester.pumpAndSettle();
 
@@ -416,8 +419,8 @@ void main() {
       final app = await _start(tester, insets: _safeArea);
       await _buildEveryTab(tester);
 
-      _acceptDelete(app, intention: 3);
-      _acceptDelete(app, intention: 4);
+      await _acceptDelete(tester, app, intention: 3);
+      await _acceptDelete(tester, app, intention: 4);
       await _until(tester, _messageOf(3));
       await tester.pumpAndSettle();
 
@@ -453,7 +456,7 @@ void main() {
       final app = await _start(tester, insets: _safeArea);
       await _buildEveryTab(tester);
       await _select(tester, AppDestination.intentionGraph);
-      _acceptDelete(app, intention: 3);
+      await _acceptDelete(tester, app, intention: 3);
       await _until(tester, _messageOf(3));
       await tester.pumpAndSettle();
 
@@ -540,9 +543,10 @@ final class _ReadFaults extends LocalDatabaseConnectionObserver {
 
 /// Запущенное приложение.
 final class _App {
-  _App(this.coordinator, this.router);
+  _App(this.coordinator, this.router, this.repository);
 
   final GraphCommandCoordinator coordinator;
+  final PersonalGraphRepository repository;
   final AppRouter router;
 }
 
@@ -616,6 +620,7 @@ Future<_App> _start(
   return _App(
     runtime.commandCoordinator,
     ready.container.read(appRouterProvider),
+    ready.container.read(personalGraphRepositoryProvider),
   );
 }
 
@@ -660,13 +665,26 @@ void _seed(
 
 /// Принимает удаление намерения без связей: его успех предъявляет общая
 /// поверхность на той странице, которая открыта в момент результата.
-void _acceptDelete(_App app, {required int intention}) {
+Future<void> _acceptDelete(
+  WidgetTester tester,
+  _App app, {
+  required int intention,
+}) async {
   final id = (IntentionId.decode(
     tagFixtureId(intention),
   ) as IntentionIdDecodingSuccess).id;
+  // Предпросмотр читается при работающих экранах, как при запуске операции.
+  DeleteIntention? deletion;
+  unawaited(
+    previewedDeleteIntention(
+      app.repository,
+      id,
+    ).then((read) => deletion = read),
+  );
+  await _waitFor(tester, () => deletion != null);
   expect(
     app.coordinator.acceptExisting(
-      DeleteIntention(id),
+      deletion!,
       presentationTitle: _intentionTitle(intention),
     ),
     isA<IntentionCommandAccepted>(),

@@ -6,7 +6,6 @@ import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -24,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_cascade_execution.dart';
 
 void main() {
   late AppDatabase database;
@@ -78,7 +78,9 @@ void main() {
       expect(await events.moveNext(), isTrue);
 
       final confirmed = _confirmedUpdated(
-        await repository.execute(ArchiveLongTermRelation(relationId)),
+        await repository.execute(
+          await previewedArchiveRelation(repository, relationId),
+        ),
       );
 
       expect(confirmed.value.before.scope, RelationScope.active);
@@ -141,11 +143,15 @@ void main() {
     () async {
       await _create(repository, sourceId, relatedId);
       final archived = _confirmedUpdated(
-        await repository.execute(ArchiveLongTermRelation(relationId)),
+        await repository.execute(
+          await previewedArchiveRelation(repository, relationId),
+        ),
       );
 
       final restored = _confirmedUpdated(
-        await repository.execute(RestoreLongTermRelation(relationId)),
+        await repository.execute(
+          await previewedRestoreRelation(repository, relationId),
+        ),
       );
 
       expect(
@@ -193,7 +199,7 @@ void main() {
     final activeRevision = await _revision(repository, sourceId);
 
     final alreadyActive = _confirmedUpdated(
-      await repository.execute(RestoreLongTermRelation(relationId)),
+      await repository.execute(givenRestoreRelation(relationId)),
     );
 
     expect(alreadyActive.value.changes, [
@@ -205,7 +211,9 @@ void main() {
     );
 
     await database.customStatement('DROP TRIGGER canary_relation_state_write');
-    await repository.execute(ArchiveLongTermRelation(relationId));
+    await repository.execute(
+      await previewedArchiveRelation(repository, relationId),
+    );
     await database.customStatement('''
       CREATE TEMP TRIGGER canary_relation_state_write
       BEFORE UPDATE ON long_term_relations
@@ -216,7 +224,7 @@ void main() {
     final archivedRevision = await _revision(repository, sourceId);
 
     final alreadyArchived = _confirmedUpdated(
-      await repository.execute(ArchiveLongTermRelation(relationId)),
+      await repository.execute(givenArchiveRelation(relationId)),
     );
 
     expect(alreadyArchived.value.changes, [
@@ -231,10 +239,10 @@ void main() {
   test('отсутствие связи отличается от конфликта участника', () async {
     final missingId = _relationId(_uuid(999));
     final archiveFailure = _failure(
-      await repository.execute(ArchiveLongTermRelation(missingId)),
+      await repository.execute(givenArchiveRelation(missingId)),
     );
     final restoreFailure = _failure(
-      await repository.execute(RestoreLongTermRelation(missingId)),
+      await repository.execute(givenRestoreRelation(missingId)),
     );
 
     expect(
@@ -248,9 +256,13 @@ void main() {
     expect(restoreFailure, isA<LongTermRelationNotFoundFailure>());
 
     await _create(repository, sourceId, relatedId);
-    await repository.execute(ArchiveIntention(sourceId));
+    await repository.execute(
+      await previewedArchiveIntention(repository, sourceId),
+    );
     final participantFailure = _failure(
-      await repository.execute(RestoreLongTermRelation(relationId)),
+      await repository.execute(
+        await previewedRestoreRelation(repository, relationId),
+      ),
     );
     expect(
       participantFailure,
@@ -268,37 +280,61 @@ void main() {
     'каскад требует восстановить участника раньше связи для обеих ролей',
     () async {
       await _create(repository, sourceId, relatedId);
-      await repository.execute(ArchiveIntention(sourceId));
+      await repository.execute(
+        await previewedArchiveIntention(repository, sourceId),
+      );
 
       expect(
-        _failure(await repository.execute(RestoreLongTermRelation(relationId))),
+        _failure(
+          await repository.execute(
+            await previewedRestoreRelation(repository, relationId),
+          ),
+        ),
         isA<LongTermRelationParticipantArchivedFailure>().having(
           (failure) => failure.role,
           'роль',
           RelationParticipantRole.source,
         ),
       );
-      await repository.execute(RestoreIntention(sourceId));
+      await repository.execute(
+        await previewedRestoreIntention(repository, sourceId),
+      );
       expect(
         _confirmedUpdated(
-          await repository.execute(RestoreLongTermRelation(relationId)),
+          await repository.execute(
+            await previewedRestoreRelation(repository, relationId),
+          ),
         ).value.relation.scope,
         RelationScope.active,
       );
 
-      await repository.execute(ArchiveIntention(relatedId));
-      await repository.execute(RestoreIntention(relatedId));
+      await repository.execute(
+        await previewedArchiveIntention(repository, relatedId),
+      );
+      await repository.execute(
+        await previewedRestoreIntention(repository, relatedId),
+      );
       expect(
         _confirmedUpdated(
-          await repository.execute(RestoreLongTermRelation(relationId)),
+          await repository.execute(
+            await previewedRestoreRelation(repository, relationId),
+          ),
         ).value.relation.scope,
         RelationScope.active,
       );
 
-      await repository.execute(ArchiveLongTermRelation(relationId));
-      await repository.execute(ArchiveIntention(relatedId));
+      await repository.execute(
+        await previewedArchiveRelation(repository, relationId),
+      );
+      await repository.execute(
+        await previewedArchiveIntention(repository, relatedId),
+      );
       expect(
-        _failure(await repository.execute(RestoreLongTermRelation(relationId))),
+        _failure(
+          await repository.execute(
+            await previewedRestoreRelation(repository, relationId),
+          ),
+        ),
         isA<LongTermRelationParticipantArchivedFailure>().having(
           (failure) => failure.role,
           'роль',
@@ -310,7 +346,9 @@ void main() {
 
   test('архивная связь продолжает занимать направленную пару', () async {
     await _create(repository, sourceId, relatedId);
-    await repository.execute(ArchiveLongTermRelation(relationId));
+    await repository.execute(
+      await previewedArchiveRelation(repository, relationId),
+    );
 
     final failure = _failure(
       await repository.execute(_addCommand(sourceId, relatedId)),
@@ -348,7 +386,9 @@ void main() {
     ''');
 
     final failure = _failure(
-      await repository.execute(ArchiveLongTermRelation(relationId)),
+      await repository.execute(
+        await previewedArchiveRelation(repository, relationId),
+      ),
     );
     await pumpEventQueue(times: 10);
 

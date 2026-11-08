@@ -12,6 +12,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'details_test_support.dart';
 
+import '../../../support/intention_cascade_execution.dart';
+
 void main() {
   test('повтор недоступного чтения игнорирует позднее старое чтение и не затрагивает другое намерение', () async {
     final repository = ControlledDetailsRepository();
@@ -137,6 +139,7 @@ void main() {
 
     container.read(firstProvider.notifier).archive();
     container.read(secondProvider.notifier).archive();
+    await pumpEventQueue();
     expect(repository.commands, hasLength(2));
     expect(repository.commands[0], isA<ChangeIntentionKind>());
     expect(repository.commands[1], isA<ArchiveIntention>());
@@ -187,6 +190,7 @@ void main() {
       await pumpEventQueue();
 
       container.read(provider.notifier).archive();
+      await pumpEventQueue();
       repository.completeCommand(
         0,
         testDetailsSavedResult(
@@ -438,7 +442,7 @@ void main() {
           container
                   .read(graphCommandCoordinatorProvider.notifier)
                   .acceptExisting(
-                    ArchiveIntention(first.id),
+                    givenArchiveIntention(first.id),
                     presentationTitle: first.title,
                   )
               as IntentionCommandAccepted;
@@ -585,7 +589,7 @@ void main() {
     final start = container
         .read(graphCommandCoordinatorProvider.notifier)
         .acceptExisting(
-          DeleteIntention(intention.id),
+          givenDeleteIntention(intention.id),
           presentationTitle: intention.title,
         );
     repository.completeCommand(
@@ -631,6 +635,7 @@ void main() {
       container
           .read(intentionDetailsViewModelProvider(intention.id).notifier)
           .delete();
+      await pumpEventQueue();
       repository.completeCommand(0, testDetailsDeletedResult(intention));
       await pumpEventQueue();
 
@@ -724,6 +729,7 @@ void main() {
         presenter.nextClaim().then((value) => claim = value);
 
         start(container.read(provider.notifier));
+        await pumpEventQueue();
         expect(
           (container.read(
             provider,
@@ -783,7 +789,7 @@ void main() {
       container
           .read(graphCommandCoordinatorProvider.notifier)
           .acceptExisting(
-            ArchiveIntention(intention.id),
+            givenArchiveIntention(intention.id),
             presentationTitle: intention.title,
           );
       expect(

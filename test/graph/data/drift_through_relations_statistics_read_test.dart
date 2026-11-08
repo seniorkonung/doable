@@ -7,7 +7,6 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/data/contribution_reachability.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
@@ -20,6 +19,7 @@ import '../../support/action_seed.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
+import '../../support/intention_cascade_execution.dart';
 
 void main() {
   late LocalDatabaseHarness harness;
@@ -97,7 +97,9 @@ void main() {
     'первая и поздняя порции дают точные числа и архивные отметки',
     () async {
       expect(
-        await repository.execute(ArchiveIntention(seedIntentionId(2))),
+        await repository.execute(
+          await previewedArchiveIntention(repository, seedIntentionId(2)),
+        ),
         isA<GraphCommandSucceeded>(),
       );
       final PersonalGraphRepository publicRepository = repository;
@@ -274,10 +276,13 @@ void main() {
     'подтверждённая команда отклоняет продолжение до чтения названий',
     () async {
       final first = _page(await repository.getStatisticsPage(query()));
-      expect(
-        await repository.execute(ArchiveIntention(seedIntentionId(2))),
-        isA<GraphCommandSucceeded>(),
+      final archive = await previewedArchiveIntention(
+        repository,
+        seedIntentionId(2),
       );
+      // Чтения предпросмотра не относятся к чтениям страниц статистики.
+      final snapshotReadsBeforeStatistics = probe.snapshotReads;
+      expect(await repository.execute(archive), isA<GraphCommandSucceeded>());
       _expectExpired(
         await repository.getStatisticsPage(query(cursor: first.nextCursor)),
       );
@@ -290,7 +295,7 @@ void main() {
       expect(fresh.totalItems, 3);
       expect(fresh.items.last.archiveState, IntentionArchiveState.archived);
       expect(probe.sourceReads, 2);
-      expect(probe.snapshotReads, 2);
+      expect(probe.snapshotReads - snapshotReadsBeforeStatistics, 1);
       expect(_computations(diagnostics), 2);
     },
   );

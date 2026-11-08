@@ -1,11 +1,9 @@
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -18,6 +16,7 @@ import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/tag_positions.dart';
+import '../../support/intention_cascade_execution.dart';
 
 IntentionId _intention(int number) =>
     (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id;
@@ -141,7 +140,9 @@ void main() {
 
     await expectCompleteAssignments(_intention(4));
     expect(
-      await repository.execute(DeleteIntention(_intention(4))),
+      await repository.execute(
+        await previewedDeleteIntention(repository, _intention(4)),
+      ),
       isA<ResultSuccess>(),
     );
     expect(
@@ -161,7 +162,9 @@ void main() {
     ], otherGraph);
 
     expect(
-      await repository.execute(DeleteIntention(_intention(5))),
+      await repository.execute(
+        await previewedDeleteIntention(repository, _intention(5)),
+      ),
       isA<ResultSuccess>(),
     );
     expect(
@@ -193,7 +196,9 @@ void main() {
 
       await expectCompleteAssignments(_intention(4));
       expect(
-        await repository.execute(DeleteLongTermRelation(_relation(103))),
+        await repository.execute(
+          await previewedDeleteRelation(repository, _relation(103)),
+        ),
         isA<GraphCommandSucceeded>(),
       );
       expect(
@@ -210,7 +215,9 @@ void main() {
 
       await expectCompleteAssignments(_intention(2));
       expect(
-        await repository.execute(DeleteLongTermRelation(_relation(102))),
+        await repository.execute(
+          await previewedDeleteRelation(repository, _relation(102)),
+        ),
         isA<GraphCommandSucceeded>(),
       );
       expect(
@@ -233,14 +240,18 @@ void main() {
     () async {
       final before = graph();
 
-      final active = await repository.execute(DeleteIntention(_intention(1)));
+      final active = await repository.execute(
+        await previewedDeleteIntention(repository, _intention(1)),
+      );
       expect(
         (active as ResultFailure).failure,
         isA<IntentionHasBlockingRelationsFailure>(),
       );
       expect(graph(), before);
 
-      final archived = await repository.execute(DeleteIntention(_intention(2)));
+      final archived = await repository.execute(
+        await previewedDeleteIntention(repository, _intention(2)),
+      );
       expect(
         (archived as ResultFailure).failure,
         isA<IntentionHasBlockingRelationsFailure>(),
@@ -262,7 +273,9 @@ void main() {
     addRelation(103, 4, 3);
     final before = graph();
 
-    final result = await repository.execute(DeleteIntention(_intention(4)));
+    final result = await repository.execute(
+      await previewedDeleteIntention(repository, _intention(4)),
+    );
 
     expect(
       (result as ResultFailure).failure,

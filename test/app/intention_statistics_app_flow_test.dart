@@ -19,13 +19,14 @@ import 'package:doable/src/action/presentation/day/action_day_date_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/data/contribution_reachability.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention.dart'
     show IntentionArchiveState;
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart'
     show RelationScope;
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
@@ -56,6 +57,7 @@ import '../support/app_root_pages.dart';
 import '../support/graph_durability_fixture.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/intention_cascade_execution.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 
 part 'intention_statistics_catalog_scenarios.dart';
@@ -97,12 +99,23 @@ void main() {
       await app.ready(tester, other);
       await tester.runAsync(() async {
         final start = app.runtime.commandCoordinator.acceptRelationArchive(
-          ArchiveLongTermRelation(durabilityRelation(6000)),
+          await previewedArchiveRelation(
+            app.repository,
+            durabilityRelation(6000),
+          ),
         ) as LongTermRelationCommandAccepted;
         expect((await start.future).isFailure, isFalse);
       });
       await app.ready(tester, other);
-      await app.intention(tester, ArchiveIntention(durabilityIntention(2120)));
+      await app.intention(
+        tester,
+        (await tester.runAsync(
+          () => previewedArchiveIntention(
+            app.repository,
+            durabilityIntention(2120),
+          ),
+        ))!,
+      );
       await app.ready(tester, other);
       await app.intention(
         tester,
@@ -457,6 +470,9 @@ final class _App {
   final AppDatabase database;
   final _StatisticsProbe probe;
   final InMemoryDiagnosticsSink diagnostics;
+
+  PersonalGraphRepository get repository =>
+      container.read(personalGraphRepositoryProvider);
   Iterable<StatisticsReadDiagnosticsEvent> get _sectionResults =>
       diagnostics.events.whereType<StatisticsReadDiagnosticsEvent>().where(
         (event) =>

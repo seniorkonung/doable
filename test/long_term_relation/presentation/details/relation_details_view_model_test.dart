@@ -408,12 +408,14 @@ void main() {
     await pumpEventQueue();
 
     harness.viewModel.restore();
+    await pumpEventQueue();
     harness.repository.failRelationCommand(
       0,
       const LongTermRelationUnavailableFailure(),
     );
     await pumpEventQueue();
     harness.viewModel.retryLifecycleChange();
+    await pumpEventQueue();
 
     expect(harness.repository.relationCommands, hasLength(2));
     expect(
@@ -728,6 +730,7 @@ void main() {
       await pumpEventQueue();
 
       harness.viewModel.archive();
+      await pumpEventQueue();
 
       expect(harness.loaded.editFailure, isNull);
     });

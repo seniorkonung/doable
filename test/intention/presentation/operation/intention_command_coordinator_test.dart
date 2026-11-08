@@ -30,6 +30,7 @@ import '../../../support/intention_title_order_key.dart';
 import '../details/details_test_support.dart'
     show testDetailsIntention, testDetailsSavedResult;
 import '../../../support/intention_holding_read_contract_test_fallback.dart';
+import '../../../support/intention_cascade_execution.dart';
 
 void main() {
   group('GraphCommandCoordinator', () {
@@ -85,11 +86,11 @@ void main() {
       final secondId = _id(_secondUuid);
 
       final first = coordinator.acceptExisting(
-        DeleteIntention(firstId),
+        givenDeleteIntention(firstId),
         presentationTitle: 'Первое намерение',
       ) as IntentionCommandAccepted;
       final second = coordinator.acceptExisting(
-        DeleteIntention(secondId),
+        givenDeleteIntention(secondId),
         presentationTitle: 'Второе намерение',
       ) as IntentionCommandAccepted;
 
@@ -340,11 +341,11 @@ void main() {
         );
         final repeated = _acceptExisting(
           coordinator,
-          ArchiveIntention(firstId),
+          givenArchiveIntention(firstId),
         );
         final independent = _acceptExisting(
           coordinator,
-          ArchiveIntention(secondId),
+          givenArchiveIntention(secondId),
         );
 
         expect(first, isA<IntentionCommandAccepted>());
@@ -367,7 +368,10 @@ void main() {
           isA<ResultFailure<IntentionCommandSuccess>>(),
         );
 
-        final next = _acceptExisting(coordinator, ArchiveIntention(firstId));
+        final next = _acceptExisting(
+          coordinator,
+          givenArchiveIntention(firstId),
+        );
         expect(next, isA<IntentionCommandAccepted>());
         expect(repository.commands.last, isA<ArchiveIntention>());
 
@@ -402,7 +406,7 @@ void main() {
 
         final accepted = _acceptExisting(
           coordinator,
-          ArchiveIntention(_id(_firstUuid)),
+          givenArchiveIntention(_id(_firstUuid)),
         ) as IntentionCommandAccepted;
         repository.complete(
           0,
@@ -437,7 +441,7 @@ void main() {
 
         final accepted = _acceptExisting(
           coordinator,
-          ArchiveIntention(_id(_firstUuid)),
+          givenArchiveIntention(_id(_firstUuid)),
         ) as IntentionCommandAccepted;
         final completion = await accepted.future;
 
@@ -450,7 +454,7 @@ void main() {
           ),
         );
         expect(
-          _acceptExisting(coordinator, RestoreIntention(_id(_firstUuid))),
+          _acceptExisting(coordinator, givenRestoreIntention(_id(_firstUuid))),
           isA<IntentionCommandAccepted>(),
         );
         repository.complete(
@@ -471,7 +475,7 @@ void main() {
 
         final accepted = _acceptExisting(
           coordinator,
-          DeleteIntention(id),
+          givenDeleteIntention(id),
         ) as IntentionCommandAccepted;
         repository.complete(0, _deletedResult(id));
         final completion = await accepted.future;
@@ -599,8 +603,8 @@ void main() {
         'изменение вида',
         (IntentionId id) => ChangeIntentionKind(id, IntentionKind.supporting),
       ),
-      ('архивирование', ArchiveIntention.new),
-      ('восстановление', RestoreIntention.new),
+      ('архивирование', givenArchiveIntention),
+      ('восстановление', givenRestoreIntention),
     ]) {
       test('$name: успех не предъявляется никому, а отказ при открытой '
           'странице сразу предъявляет оболочка один раз', () async {
@@ -656,11 +660,11 @@ void main() {
 
       final failed = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_firstUuid)),
+        givenDeleteIntention(_id(_firstUuid)),
       ) as IntentionCommandAccepted;
       final succeeded = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_secondUuid)),
+        givenDeleteIntention(_id(_secondUuid)),
       ) as IntentionCommandAccepted;
       repository.complete(0, const ResultFailure(IntentionConflictFailure()));
       repository.complete(1, _deletedResult(_id(_secondUuid)));
@@ -704,15 +708,15 @@ void main() {
 
       final failed = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_firstUuid)),
+        givenDeleteIntention(_id(_firstUuid)),
       ) as IntentionCommandAccepted;
       final firstSuccess = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_secondUuid)),
+        givenDeleteIntention(_id(_secondUuid)),
       ) as IntentionCommandAccepted;
       final secondSuccess = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_thirdUuid)),
+        givenDeleteIntention(_id(_thirdUuid)),
       ) as IntentionCommandAccepted;
       repository.complete(
         0,
@@ -765,11 +769,11 @@ void main() {
 
         final first = _acceptExisting(
           coordinator,
-          DeleteIntention(_id(_firstUuid)),
+          givenDeleteIntention(_id(_firstUuid)),
         ) as IntentionCommandAccepted;
         final second = _acceptExisting(
           coordinator,
-          DeleteIntention(_id(_secondUuid)),
+          givenDeleteIntention(_id(_secondUuid)),
         ) as IntentionCommandAccepted;
         repository.complete(1, _deletedResult(_id(_secondUuid)));
         repository.complete(0, _deletedResult(_id(_firstUuid)));
@@ -802,15 +806,15 @@ void main() {
       final registration = coordinator.registerAppPresentation();
       final first = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_firstUuid)),
+        givenDeleteIntention(_id(_firstUuid)),
       ) as IntentionCommandAccepted;
       final second = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_secondUuid)),
+        givenDeleteIntention(_id(_secondUuid)),
       ) as IntentionCommandAccepted;
       final late = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_thirdUuid)),
+        givenDeleteIntention(_id(_thirdUuid)),
       ) as IntentionCommandAccepted;
       repository.complete(0, _deletedResult(_id(_firstUuid)));
       repository.complete(1, _deletedResult(_id(_secondUuid)));
@@ -860,11 +864,11 @@ void main() {
 
       final accepted = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_firstUuid)),
+        givenDeleteIntention(_id(_firstUuid)),
       ) as IntentionCommandAccepted;
       final second = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_secondUuid)),
+        givenDeleteIntention(_id(_secondUuid)),
       ) as IntentionCommandAccepted;
       repository.complete(0, _deletedResult(_id(_firstUuid)));
       repository.complete(1, _deletedResult(_id(_secondUuid)));
@@ -920,11 +924,11 @@ void main() {
 
       final withoutSubscriber = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_firstUuid)),
+        givenDeleteIntention(_id(_firstUuid)),
       ) as IntentionCommandAccepted;
       final duringRegistration = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_secondUuid)),
+        givenDeleteIntention(_id(_secondUuid)),
       ) as IntentionCommandAccepted;
       firstPresenter.release();
       expect(await idleRequest, isNull);
@@ -961,7 +965,7 @@ void main() {
 
       final accepted = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_firstUuid)),
+        givenDeleteIntention(_id(_firstUuid)),
       ) as IntentionCommandAccepted;
       repository.complete(0, _deletedResult(_id(_firstUuid)));
       await accepted.future;
@@ -983,12 +987,12 @@ void main() {
 
       final accepted = _acceptExisting(
         coordinator,
-        DeleteIntention(intentionId),
+        givenDeleteIntention(intentionId),
       ) as IntentionCommandAccepted;
       coordinator.releaseInitiatorPresentation(accepted.token);
       expect(coordinator.isRunning(intentionId), isTrue);
       expect(
-        _acceptExisting(coordinator, ArchiveIntention(intentionId)),
+        _acceptExisting(coordinator, givenArchiveIntention(intentionId)),
         isA<IntentionCommandAlreadyRunning>(),
       );
       repository.complete(0, const ResultFailure(IntentionConflictFailure()));
@@ -1029,7 +1033,7 @@ void main() {
         ) {
           acceptedFromCompletion = _acceptExisting(
             coordinator,
-            ArchiveIntention(intentionId),
+            givenArchiveIntention(intentionId),
           ) as IntentionCommandAccepted;
         });
 
@@ -1045,7 +1049,7 @@ void main() {
 
         expect(acceptedFromCompletion, isNotNull);
         expect(
-          _acceptExisting(coordinator, RestoreIntention(intentionId)),
+          _acceptExisting(coordinator, givenRestoreIntention(intentionId)),
           isA<IntentionCommandAlreadyRunning>(),
         );
 
@@ -1068,11 +1072,11 @@ void main() {
         final coordinator = _graphCoordinator(repository);
         final first = _acceptExisting(
           coordinator,
-          ArchiveIntention(_id(_firstUuid)),
+          givenArchiveIntention(_id(_firstUuid)),
         ) as IntentionCommandAccepted;
         final second = _acceptExisting(
           coordinator,
-          ArchiveIntention(_id(_secondUuid)),
+          givenArchiveIntention(_id(_secondUuid)),
         ) as IntentionCommandAccepted;
 
         final shutdown = coordinator.shutdown();
@@ -1081,7 +1085,7 @@ void main() {
 
         expect(coordinator.shutdown(), same(shutdown));
         expect(
-          _acceptExisting(coordinator, RestoreIntention(_id(_thirdUuid))),
+          _acceptExisting(coordinator, givenRestoreIntention(_id(_thirdUuid))),
           isA<GraphCommandCoordinatorDraining>(),
         );
         expect(repository.commands, hasLength(2));

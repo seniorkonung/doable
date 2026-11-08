@@ -33,6 +33,7 @@ import '../support/forwarding_graph_fact_log.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/intention_cascade_execution.dart';
 import '../support/local_database_harness.dart';
 
 /// Порог проверок: несколько пакетов вместо производственного значения.
@@ -200,7 +201,7 @@ void main() {
         RemoveTagAssignment(tagId: home.id, intentionId: health.id),
       );
       await confirm(AssignTag(tagId: home.id, intentionId: health.id));
-      await confirm(ArchiveIntention(swimming.id));
+      await confirm(await previewedArchiveIntention(repository, swimming.id));
       await createIntention('Читать', tagIds: {sport.id});
       final expected = await referenceState();
 
@@ -237,7 +238,9 @@ void main() {
       await packagesReached.future;
 
       expect(
-        await repository.execute(ArchiveIntention(health.id)),
+        await repository.execute(
+          await previewedArchiveIntention(repository, health.id),
+        ),
         isA<GraphCommandSucceeded>(),
       );
 

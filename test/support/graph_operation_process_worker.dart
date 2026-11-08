@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -16,6 +15,8 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_descript
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'intention_cascade_execution.dart';
 
 const _operationEnvironment = 'DOABLE_GRAPH_OPERATION';
 const _stopPointEnvironment = 'DOABLE_GRAPH_STOP_POINT';
@@ -71,7 +72,10 @@ void main() {
             ),
           ),
           _GraphOperation.cascade => await repository.execute(
-            ArchiveIntention(_intentionId(_sourceIdValue)),
+            await previewedArchiveIntention(
+              repository,
+              _intentionId(_sourceIdValue),
+            ),
           ),
           _GraphOperation.update => await repository.execute(
             UpdateLongTermRelation(
@@ -88,13 +92,22 @@ void main() {
             ),
           ),
           _GraphOperation.archive => await repository.execute(
-            ArchiveLongTermRelation(_relationId(_workerRelationIdValue)),
+            await previewedArchiveRelation(
+              repository,
+              _relationId(_workerRelationIdValue),
+            ),
           ),
           _GraphOperation.restore => await repository.execute(
-            RestoreLongTermRelation(_relationId(_workerRelationIdValue)),
+            await previewedRestoreRelation(
+              repository,
+              _relationId(_workerRelationIdValue),
+            ),
           ),
           _GraphOperation.delete => await repository.execute(
-            DeleteLongTermRelation(_relationId(_workerRelationIdValue)),
+            await previewedDeleteRelation(
+              repository,
+              _relationId(_workerRelationIdValue),
+            ),
           ),
         };
         final succeeded = switch (operation) {

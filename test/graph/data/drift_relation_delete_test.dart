@@ -6,7 +6,6 @@ import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -25,6 +24,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/action_seed.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_cascade_execution.dart';
 
 void main() {
   late sqlite.Database raw;
@@ -82,7 +82,9 @@ void main() {
       expect(await events.moveNext(), isTrue);
 
       final confirmed = _confirmedDeleted(
-        await repository.execute(DeleteLongTermRelation(relationId)),
+        await repository.execute(
+          await previewedDeleteRelation(repository, relationId),
+        ),
       );
 
       expect(confirmed.value.relation.id, relationId);
@@ -141,12 +143,16 @@ void main() {
         relatedId,
         group: IntentionRelationGroup.canUse,
       );
-      await repository.execute(ArchiveIntention(sourceId));
+      await repository.execute(
+        await previewedArchiveIntention(repository, sourceId),
+      );
       expect((await _storedRelation(database, relationId))['is_archived'], 1);
       expect((await _storedIntention(database, sourceId))['is_archived'], 1);
 
       final deleted = _confirmedDeleted(
-        await repository.execute(DeleteLongTermRelation(relationId)),
+        await repository.execute(
+          await previewedDeleteRelation(repository, relationId),
+        ),
       );
 
       expect(deleted.value.relation.scope, RelationScope.archived);
@@ -187,7 +193,9 @@ void main() {
     );
 
     final deleted = _confirmedDeleted(
-      await repository.execute(DeleteLongTermRelation(relationId)),
+      await repository.execute(
+        await previewedDeleteRelation(repository, relationId),
+      ),
     );
 
     expect(deleted.value.relation.id, relationId);
@@ -211,11 +219,13 @@ void main() {
     'повтор и устаревшее изменение не восстанавливают удалённую связь',
     () async {
       await _create(repository, sourceId, relatedId);
-      await repository.execute(DeleteLongTermRelation(relationId));
+      await repository.execute(
+        await previewedDeleteRelation(repository, relationId),
+      );
       final revisionAfterDelete = await _revision(repository, sourceId);
 
       final repeatedDelete = _failure(
-        await repository.execute(DeleteLongTermRelation(relationId)),
+        await repository.execute(givenDeleteRelation(relationId)),
       );
       final staleUpdate = _failure(
         await repository.execute(
@@ -250,7 +260,9 @@ void main() {
     () async {
       final original = await _create(repository, sourceId, relatedId);
 
-      await repository.execute(DeleteLongTermRelation(relationId));
+      await repository.execute(
+        await previewedDeleteRelation(repository, relationId),
+      );
       final replacement = await _create(repository, sourceId, relatedId);
 
       expect(replacement.id, secondRelationId);
@@ -270,7 +282,9 @@ void main() {
       await _create(repository, sourceId, relatedId);
       await _create(repository, thirdId, fourthId);
 
-      final blocked = await repository.execute(DeleteIntention(sourceId));
+      final blocked = await repository.execute(
+        await previewedDeleteIntention(repository, sourceId),
+      );
       expect(
         blocked,
         isA<GraphCommandFailed>().having(
@@ -282,12 +296,16 @@ void main() {
       expect(await _storedRelationOrNull(database, relationId), isNotNull);
       expect(await _storedIntentionOrNull(database, sourceId), isNotNull);
 
-      await repository.execute(DeleteLongTermRelation(relationId));
+      await repository.execute(
+        await previewedDeleteRelation(repository, relationId),
+      );
       expect(await _storedIntentionOrNull(database, sourceId), isNotNull);
 
-      await repository.execute(DeleteLongTermRelation(secondRelationId));
+      await repository.execute(
+        await previewedDeleteRelation(repository, secondRelationId),
+      );
       final intentionDeleted = await repository.execute(
-        DeleteIntention(thirdId),
+        await previewedDeleteIntention(repository, thirdId),
       );
       expect(intentionDeleted, isA<GraphCommandSucceeded>());
       expect(await _storedIntentionOrNull(database, thirdId), isNull);

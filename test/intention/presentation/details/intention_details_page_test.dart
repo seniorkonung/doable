@@ -43,6 +43,7 @@ import '../../../support/tag_positions.dart';
 import 'details_test_support.dart';
 
 import '../../../support/in_memory_quick_creation_mode_store.dart';
+import '../../../support/intention_cascade_execution.dart';
 
 void main() {
   setUp(() {
@@ -281,7 +282,7 @@ void main() {
       graphCommandCoordinatorProvider.notifier,
     );
     final start = coordinator.acceptExisting(
-      DeleteIntention(intention.id),
+      givenDeleteIntention(intention.id),
       presentationTitle: intention.title,
     );
     expect(start, isA<IntentionCommandAccepted>());
@@ -446,7 +447,7 @@ void main() {
       ).read(graphCommandCoordinatorProvider.notifier);
       final other = testDetailsIntention(index: 91, title: 'Другое намерение');
       final busy = coordinator.acceptExisting(
-        DeleteIntention(other.id),
+        givenDeleteIntention(other.id),
         presentationTitle: other.title,
       ) as IntentionCommandAccepted;
       coordinator.releaseInitiatorPresentation(busy.token);
@@ -525,7 +526,7 @@ void main() {
       );
       final other = testDetailsIntention(index: 93, title: 'Другое намерение');
       final busy = coordinator.acceptExisting(
-        DeleteIntention(other.id),
+        givenDeleteIntention(other.id),
         presentationTitle: other.title,
       ) as IntentionCommandAccepted;
       coordinator.releaseInitiatorPresentation(busy.token);

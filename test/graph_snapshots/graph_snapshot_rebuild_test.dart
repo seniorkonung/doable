@@ -38,6 +38,7 @@ import '../support/graph_history_rows.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/intention_cascade_execution.dart';
 import '../support/local_database_harness.dart';
 
 /// Порог проверок: несколько пакетов вместо производственного значения.
@@ -215,7 +216,7 @@ void main() {
       expect(rebuilt?.fileName, isNot(damaged.fileName));
       expect(await repository.readSnapshotFileNames(), {rebuilt?.fileName});
       expect(await _fileNamesIn(snapshots), {rebuilt?.fileName});
-      await confirm(ArchiveIntention(health.id));
+      await confirm(await previewedArchiveIntention(repository, health.id));
       await expectStateMatchesDatabase();
     });
   }
@@ -260,7 +261,7 @@ void main() {
         }
       }
     });
-    await confirm(DeleteLongTermRelation(healthRunning.id));
+    await confirm(await previewedDeleteRelation(repository, healthRunning.id));
     final damaged = await storeOver(repository)
         .writeSnapshot(await repository.readCurrentPosition());
     await snapshotFile(damaged).delete();
@@ -275,8 +276,8 @@ void main() {
         patch: const ActionFieldsPatch(isCompleted: ActionFieldSet(true)),
       ),
     );
-    await confirm(DeleteLongTermRelation(runningMorning.id));
-    await confirm(DeleteIntention(running.id));
+    await confirm(await previewedDeleteRelation(repository, runningMorning.id));
+    await confirm(await previewedDeleteIntention(repository, running.id));
     await confirm(DeleteAction(_actionId(2)));
 
     final records = await referenceGraphRecords(database);
@@ -328,7 +329,9 @@ void main() {
         description: null,
       ),
     );
-    await confirm(DeleteIntention(intentions[10].id));
+    await confirm(
+      await previewedDeleteIntention(repository, intentions[10].id),
+    );
     await confirm(
       RemoveTagAssignment(tagId: home.id, intentionId: intentions[5].id),
     );

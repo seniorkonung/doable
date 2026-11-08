@@ -137,6 +137,11 @@ final class CascadePlan<C extends CascadeComposition> {
 final class CascadeExecution<C extends CascadeComposition> {
   const CascadeExecution({required this.choice, required this.expected});
 
+  /// Вариант «со вспомогательными» из составов [plan].
+  CascadeExecution.withSupporting(CascadePlan<C> plan)
+    : choice = CascadeChoice.withSupporting,
+      expected = plan.withSupporting;
+
   final CascadeChoice choice;
   final C expected;
 }
@@ -254,4 +259,22 @@ final class CascadePreviewCorruption extends CascadePreviewFailure {
 /// Непредвиденный отказ хранилища или подсчёта удержания.
 final class CascadePreviewUnexpected extends CascadePreviewFailure {
   const CascadePreviewUnexpected();
+}
+
+/// Чтение предпросмотра при запуске операции.
+extension CurrentCascadePreviewRead on IntentionCascadePreviewReadContract {
+  /// Читает предпросмотр заново, пока он устаревает из-за подтверждённой
+  /// команды: каждое устаревание означает новую ревизию графа, поэтому повтор
+  /// конечен.
+  Future<CascadePreviewResult> previewCurrentCascade(
+    CascadeSubject subject,
+    CascadeOperation operation,
+  ) async {
+    while (true) {
+      final preview = await previewCascade(subject, operation);
+      if (preview is! CascadePreviewExpired) {
+        return preview;
+      }
+    }
+  }
 }

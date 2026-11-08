@@ -20,6 +20,7 @@ import '../../../design_system/doable_priority.dart';
 import '../../../design_system/doable_type.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
+import '../../../intention/application/cascade/intention_cascade.dart';
 import '../../../intention/domain/intention.dart';
 import '../../../shared/presentation/local_day/local_date_provider.dart';
 import '../../../shared/presentation/timestamp_dates_line.dart';
@@ -628,24 +629,36 @@ final class _LoadedRelation extends ConsumerWidget {
             ),
           ),
         ],
-        if (state.lifecycleChange case RelationDetailsLifecycleFailed(
-          :final kind,
-          :final failure,
-          :final failurePresentation,
-          :final canRetry,
-        )) ...[
+        if (state.lifecycleChange
+            case final RelationDetailsLifecycleFailed lifecycleFailure) ...[
           const SizedBox(height: DoableMetrics.space2),
           Notice.content(
-            message: OperationFailurePresentation(
-              claim: failurePresentation,
-              message: longTermRelationCommandFailureMessage(
-                localizations,
-                _commandKind(kind),
-                failure,
-              ),
-              inheritsColor: true,
-            ),
-            action: canRetry && !isOperationRunning
+            message: switch (lifecycleFailure) {
+              RelationDetailsLifecycleCommandFailed(
+                :final kind,
+                :final failure,
+                :final failurePresentation,
+              ) =>
+                OperationFailurePresentation(
+                  claim: failurePresentation,
+                  message: longTermRelationCommandFailureMessage(
+                    localizations,
+                    _commandKind(kind),
+                    failure,
+                  ),
+                  inheritsColor: true,
+                ),
+              RelationDetailsLifecyclePreviewFailed(
+                :final kind,
+                :final failure,
+              ) =>
+                OperationFailurePresentation(
+                  claim: null,
+                  message: _previewFailureMessage(localizations, kind, failure),
+                  inheritsColor: true,
+                ),
+            },
+            action: lifecycleFailure.canRetry && !isOperationRunning
                 ? (
                     label: localizations.commonRetry,
                     onPressed: onRetryLifecycleChange,
@@ -707,6 +720,39 @@ LongTermRelationCommandKind _commandKind(
   RelationDetailsLifecycleKind.archive => LongTermRelationCommandKind.archive,
   RelationDetailsLifecycleKind.restore => LongTermRelationCommandKind.restore,
   RelationDetailsLifecycleKind.delete => LongTermRelationCommandKind.delete,
+};
+
+/// Текст отказа операции, предпросмотр каскада которой не прочитан при
+/// запуске (D7).
+String _previewFailureMessage(
+  AppLocalizations localizations,
+  RelationDetailsLifecycleKind kind,
+  CascadePreviewFailure failure,
+) => switch (kind) {
+  RelationDetailsLifecycleKind.archive => switch (failure) {
+    CascadePreviewSubjectNotFound() => localizations.relationArchiveNotFound,
+    CascadePreviewOperationInapplicable() ||
+    CascadePreviewExpired() => localizations.relationArchiveConflict,
+    CascadePreviewUnavailable() => localizations.relationArchiveUnavailable,
+    CascadePreviewCorruption() => localizations.relationArchiveCorruption,
+    CascadePreviewUnexpected() => localizations.relationArchiveUnexpected,
+  },
+  RelationDetailsLifecycleKind.restore => switch (failure) {
+    CascadePreviewSubjectNotFound() => localizations.relationRestoreNotFound,
+    CascadePreviewOperationInapplicable() ||
+    CascadePreviewExpired() => localizations.relationRestoreConflict,
+    CascadePreviewUnavailable() => localizations.relationRestoreUnavailable,
+    CascadePreviewCorruption() => localizations.relationRestoreCorruption,
+    CascadePreviewUnexpected() => localizations.relationRestoreUnexpected,
+  },
+  RelationDetailsLifecycleKind.delete => switch (failure) {
+    CascadePreviewSubjectNotFound() => localizations.relationDeleteNotFound,
+    CascadePreviewOperationInapplicable() ||
+    CascadePreviewExpired() => localizations.relationDeleteConflict,
+    CascadePreviewUnavailable() => localizations.relationDeleteUnavailable,
+    CascadePreviewCorruption() => localizations.relationDeleteCorruption,
+    CascadePreviewUnexpected() => localizations.relationDeleteUnexpected,
+  },
 };
 
 LongTermRelationType _relationType(RelationHeadKind kind) => switch (kind) {

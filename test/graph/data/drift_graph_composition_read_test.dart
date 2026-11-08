@@ -29,6 +29,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/action_seed.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/local_database_harness.dart';
 
 void main() {
@@ -138,8 +139,8 @@ void main() {
     final needRunning = await relate(health, running);
     await relate(swimming, health, group: IntentionRelationGroup.canUse);
     seedPathAction(seedUuid(11), [health, running]);
-    await confirm(ArchiveIntention(swimming.id));
-    await confirm(ArchiveLongTermRelation(needRunning.id));
+    await confirm(await previewedArchiveIntention(repository, swimming.id));
+    await confirm(await previewedArchiveRelation(repository, needRunning.id));
 
     final composition = await currentComposition();
 
@@ -153,7 +154,7 @@ void main() {
     final health = await createIntention('Здоровье');
     seedPathAction(seedUuid(11), [health]);
     seedPathAction(seedUuid(12), [health]);
-    await confirm(DeleteIntention(health.id));
+    await confirm(await previewedDeleteIntention(repository, health.id));
 
     final composition = await currentComposition();
 
@@ -195,9 +196,9 @@ void main() {
       ),
     );
     expect(await next(), _composition(2, 1, 0, 1));
-    await confirm(DeleteLongTermRelation(needRunning.id));
+    await confirm(await previewedDeleteRelation(repository, needRunning.id));
     expect(await next(), _composition(2, 0, 0, 1));
-    await confirm(DeleteIntention(running.id));
+    await confirm(await previewedDeleteIntention(repository, running.id));
     expect(await next(), _composition(1, 0, 0, 1));
     await confirm(DeleteTag(home.id));
     expect(await next(), _composition(1, 0, 0, 0));

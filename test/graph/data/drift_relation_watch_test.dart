@@ -18,6 +18,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_cascade_execution.dart';
 
 void main() {
   late AppDatabase database;
@@ -146,7 +147,9 @@ void main() {
     addTearDown(events.cancel);
     expect(await events.moveNext(), isTrue);
 
-    await repository.execute(ArchiveIntention(sourceId));
+    await repository.execute(
+      await previewedArchiveIntention(repository, sourceId),
+    );
 
     expect(await events.moveNext(), isTrue);
     final details = _snapshot(events.current).value!;
@@ -206,15 +209,21 @@ void main() {
     expect(retyped.source.id, sourceId);
     expect(retyped.related.id, relatedId);
 
-    await repository.execute(ArchiveLongTermRelation(relationId));
+    await repository.execute(
+      await previewedArchiveRelation(repository, relationId),
+    );
     final archived = (await _nextDetails(relationEvents))!;
     expect(archived.relation.scope, RelationScope.archived);
 
-    await repository.execute(RestoreLongTermRelation(relationId));
+    await repository.execute(
+      await previewedRestoreRelation(repository, relationId),
+    );
     final restored = (await _nextDetails(relationEvents))!;
     expect(restored.relation.scope, RelationScope.active);
 
-    await repository.execute(DeleteLongTermRelation(relationId));
+    await repository.execute(
+      await previewedDeleteRelation(repository, relationId),
+    );
     expect(await _nextDetails(relationEvents), isNull);
     await Future<void>.delayed(Duration.zero);
     expect(unrelatedEvents, hasLength(1));

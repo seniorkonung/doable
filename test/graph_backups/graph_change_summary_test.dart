@@ -32,6 +32,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/action_seed.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/intention_cascade_execution.dart';
 import '../support/local_database_harness.dart';
 import '../support/tag_positions.dart';
 
@@ -414,7 +415,9 @@ void main() {
 
       final intention =
           (IntentionId.decode(seedUuid(1)) as IntentionIdDecodingSuccess).id;
-      await confirm<IntentionDeleted>(DeleteIntention(intention));
+      await confirm<IntentionDeleted>(
+        await previewedDeleteIntention(repository, intention),
+      );
 
       expect(_shown(await summaryAfter(previous)), (
         added: 0,

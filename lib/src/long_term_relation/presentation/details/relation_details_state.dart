@@ -1,5 +1,6 @@
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
+import '../../../intention/application/cascade/intention_cascade.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../domain/long_term_relation_description.dart';
@@ -124,10 +125,19 @@ final class RelationDetailsLifecycleRunning
   const RelationDetailsLifecycleRunning(super.kind);
 }
 
-/// Команда завершилась безопасно классифицированным отказом.
-final class RelationDetailsLifecycleFailed
+/// Архивирование, восстановление или удаление завершилось отказом, который
+/// панель показывает внутри себя.
+sealed class RelationDetailsLifecycleFailed
     extends RelationDetailsLifecycleChange {
-  const RelationDetailsLifecycleFailed(
+  const RelationDetailsLifecycleFailed(super.kind);
+
+  bool get canRetry;
+}
+
+/// Команда завершилась безопасно классифицированным отказом.
+final class RelationDetailsLifecycleCommandFailed
+    extends RelationDetailsLifecycleFailed {
+  const RelationDetailsLifecycleCommandFailed(
     super.kind,
     this.failure, {
     this.failurePresentation,
@@ -138,7 +148,20 @@ final class RelationDetailsLifecycleFailed
   /// Право открытого просмотра предъявить ошибку по видимому кадру.
   final GraphInitiatorPresentationClaim? failurePresentation;
 
+  @override
   bool get canRetry => failure is LongTermRelationUnavailableFailure;
+}
+
+/// Предпросмотр каскада, прочитанный при запуске операции, завершился
+/// отказом [failure], поэтому команда не запускалась (D7).
+final class RelationDetailsLifecyclePreviewFailed
+    extends RelationDetailsLifecycleFailed {
+  const RelationDetailsLifecyclePreviewFailed(super.kind, this.failure);
+
+  final CascadePreviewFailure failure;
+
+  @override
+  bool get canRetry => failure is CascadePreviewUnavailable;
 }
 
 /// Чтение подтвердило, что связи больше нет.

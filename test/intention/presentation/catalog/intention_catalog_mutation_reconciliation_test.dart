@@ -23,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'catalog_reconciliation_test_support.dart';
 import 'catalog_test_support.dart';
 import '../../../support/tag_positions.dart';
+import '../../../support/intention_cascade_execution.dart';
 
 void main() {
   test('применяет пакет каталожных изменений одной ревизии целиком', () async {
@@ -168,7 +169,7 @@ void main() {
     await completeCatalogCommand(
       container,
       repository,
-      ArchiveIntention(third.id),
+      givenArchiveIntention(third.id),
       IntentionSaved(
         testIntention(index: 3),
         catalogMutation: IntentionCatalogUpdated(
@@ -182,7 +183,7 @@ void main() {
     await completeCatalogCommand(
       container,
       repository,
-      RestoreIntention(third.id),
+      givenRestoreIntention(third.id),
       IntentionSaved(
         testIntention(index: 3),
         catalogMutation: IntentionCatalogUpdated(
@@ -196,7 +197,7 @@ void main() {
     await completeCatalogCommand(
       container,
       repository,
-      DeleteIntention(insertedBeforeBoundary.id),
+      givenDeleteIntention(insertedBeforeBoundary.id),
       IntentionDeleted(
         insertedBeforeBoundary.id,
         catalogMutation: IntentionCatalogDeleted(
@@ -729,7 +730,7 @@ void main() {
 
     final beforeFailure = current;
     final failed = coordinator.acceptExisting(
-      ArchiveIntention(created.id),
+      givenArchiveIntention(created.id),
       presentationTitle: created.title,
     ) as IntentionCommandAccepted;
     repository.completeCommand(
@@ -927,7 +928,7 @@ void main() {
       await completeCatalogCommand(
         container,
         repository,
-        ArchiveIntention(supporting.id),
+        givenArchiveIntention(supporting.id),
         IntentionSaved(
           testIntention(index: 2),
           catalogMutation: IntentionCatalogUpdated(
@@ -948,7 +949,7 @@ void main() {
       await completeCatalogCommand(
         container,
         repository,
-        DeleteIntention(created.id),
+        givenDeleteIntention(created.id),
         IntentionDeleted(
           created.id,
           catalogMutation: IntentionCatalogDeleted(
@@ -1118,7 +1119,7 @@ void main() {
       await completeCatalogCommand(
         container,
         repository,
-        ArchiveIntention(otherMain.id),
+        givenArchiveIntention(otherMain.id),
         IntentionSaved(
           testIntention(index: 2),
           catalogMutation: IntentionCatalogUpdated(
@@ -1143,7 +1144,7 @@ void main() {
       await completeCatalogCommand(
         container,
         repository,
-        RestoreIntention(archivedSupporting.id),
+        givenRestoreIntention(archivedSupporting.id),
         IntentionSaved(
           testIntention(index: 5),
           catalogMutation: IntentionCatalogUpdated(
@@ -1165,7 +1166,7 @@ void main() {
       await completeCatalogCommand(
         container,
         repository,
-        DeleteIntention(createdSupporting.id),
+        givenDeleteIntention(createdSupporting.id),
         IntentionDeleted(
           createdSupporting.id,
           catalogMutation: IntentionCatalogDeleted(
@@ -1374,7 +1375,7 @@ void main() {
         await completeCatalogCommand(
           container,
           repository,
-          ArchiveIntention(outsideFilter.id),
+          givenArchiveIntention(outsideFilter.id),
           IntentionSaved(
             testIntention(index: 2, title: 'Читать'),
             catalogMutation: IntentionCatalogUpdated(
@@ -1445,7 +1446,7 @@ void main() {
         await completeCatalogCommand(
           container,
           repository,
-          DeleteIntention(entry.id),
+          givenDeleteIntention(entry.id),
           IntentionDeleted(
             entry.id,
             catalogMutation: IntentionCatalogDeleted(
@@ -1627,7 +1628,7 @@ void main() {
         await completeCatalogCommand(
           container,
           repository,
-          ArchiveIntention(exact.id),
+          givenArchiveIntention(exact.id),
           IntentionSaved(
             testIntention(index: 1),
             catalogMutation: IntentionCatalogUpdated(
@@ -1642,7 +1643,7 @@ void main() {
         await completeCatalogCommand(
           container,
           repository,
-          DeleteIntention(second.id),
+          givenDeleteIntention(second.id),
           IntentionDeleted(
             second.id,
             catalogMutation: IntentionCatalogDeleted(
@@ -1898,7 +1899,7 @@ void main() {
         await completeRelationCommand(
           search.container,
           search.repository,
-          DeleteLongTermRelation(occupyingThird.id),
+          givenDeleteRelation(occupyingThird.id),
           _relationSuccess(
             const TestCatalogRevision(2),
             LongTermRelationDeleted(
@@ -1969,7 +1970,7 @@ void main() {
         await completeCatalogCommand(
           search.container,
           search.repository,
-          ArchiveIntention(counterpart.id),
+          givenArchiveIntention(counterpart.id),
           IntentionSaved(
             testIntention(index: 9),
             catalogMutation: IntentionCatalogUpdated(
@@ -2027,7 +2028,7 @@ void main() {
       await completeCatalogCommand(
         search.container,
         search.repository,
-        ArchiveIntention(fourth.id),
+        givenArchiveIntention(fourth.id),
         IntentionSaved(
           testIntention(index: 4),
           catalogMutation: IntentionCatalogUpdated(
@@ -2086,7 +2087,7 @@ void main() {
         await completeCatalogCommand(
           search.container,
           search.repository,
-          RestoreIntention(fourth.id),
+          givenRestoreIntention(fourth.id),
           IntentionSaved(
             testIntention(index: 4),
             catalogMutation: IntentionCatalogUpdated(
@@ -2167,7 +2168,7 @@ void main() {
       await completeCatalogCommand(
         search.container,
         search.repository,
-        RestoreIntention(later.id),
+        givenRestoreIntention(later.id),
         IntentionSaved(
           testIntention(index: 1),
           catalogMutation: IntentionCatalogUpdated(

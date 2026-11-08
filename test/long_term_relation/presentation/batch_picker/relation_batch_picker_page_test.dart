@@ -51,6 +51,7 @@ import '../../../intention/presentation/picker/intention_picker_test_support.dar
 import '../../../support/app_root_pages.dart';
 import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
+import '../../../support/intention_cascade_execution.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/tag_condition_cycles.dart';
 import '../../../support/tag_positions.dart';
@@ -780,15 +781,20 @@ void main() {
     final container = ProviderScope.containerOf(
       tester.element(find.byType(RelationBatchPickerPage)),
     );
-    final accepted =
-        container
-                .read(graphCommandCoordinatorProvider.notifier)
-                .acceptExisting(
-                  ArchiveIntention(_id(3)),
-                  presentationTitle: 'Бегать',
-                )
-            as IntentionCommandAccepted;
-    await tester.runAsync(() => accepted.future);
+    final archive = (await tester.runAsync(
+      () => previewedArchiveIntention(
+        container.read(personalGraphRepositoryProvider),
+        _id(3),
+      ),
+    ))!;
+    await tester.runAsync(() async {
+      final accepted =
+          container
+                  .read(graphCommandCoordinatorProvider.notifier)
+                  .acceptExisting(archive, presentationTitle: 'Бегать')
+              as IntentionCommandAccepted;
+      await accepted.future;
+    });
     await tester.pumpAndSettle();
 
     expect(find.byType(Notice), findsNothing);
@@ -1613,14 +1619,21 @@ void main() {
   ) async {
     await open(tester, IntentionRelationGroup.needs);
     await openRowPage(tester, 'Гулять');
-    final coordinator = ProviderScope.containerOf(
+    final container = ProviderScope.containerOf(
       tester.element(find.byType(IntentionDetailsPage)),
-    ).read(graphCommandCoordinatorProvider.notifier);
-    final result = coordinator.acceptExisting(
-      ArchiveIntention(_id(5)),
-      presentationTitle: 'Гулять',
     );
-    await tester.runAsync(() => (result as IntentionCommandAccepted).future);
+    final archive = (await tester.runAsync(
+      () => previewedArchiveIntention(
+        container.read(personalGraphRepositoryProvider),
+        _id(5),
+      ),
+    ))!;
+    await tester.runAsync(() async {
+      final result = container
+          .read(graphCommandCoordinatorProvider.notifier)
+          .acceptExisting(archive, presentationTitle: 'Гулять');
+      await (result as IntentionCommandAccepted).future;
+    });
     await tester.pumpAndSettle();
 
     expect(find.byType(DockedFooter), findsNothing);

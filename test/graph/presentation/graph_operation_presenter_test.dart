@@ -39,6 +39,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../intention/presentation/details/details_test_support.dart';
+import '../../support/intention_cascade_execution.dart';
 
 void main() {
   setUp(() {
@@ -2232,7 +2233,7 @@ final class _PresenterHarness {
     final intention = testDetailsIntention(index: index, title: title);
     final commandIndex = repository.commands.length;
     final accepted = _coordinator.acceptExisting(
-      DeleteIntention(intention.id),
+      givenDeleteIntention(intention.id),
       presentationTitle: title,
     ) as IntentionCommandAccepted;
     if (releaseInitiator) {
@@ -2402,21 +2403,21 @@ final class _PresenterHarness {
   LongTermRelationCommandAccepted startRelationArchive({
     bool releaseInitiator = true,
   }) => _startExistingRelationCommand(
-    ArchiveLongTermRelation(_relationId),
+    givenArchiveRelation(_relationId),
     releaseInitiator: releaseInitiator,
   );
 
   LongTermRelationCommandAccepted startRelationRestore({
     bool releaseInitiator = true,
   }) => _startExistingRelationCommand(
-    RestoreLongTermRelation(_relationId),
+    givenRestoreRelation(_relationId),
     releaseInitiator: releaseInitiator,
   );
 
   LongTermRelationCommandAccepted startRelationDelete({
     bool releaseInitiator = true,
   }) => _startExistingRelationCommand(
-    DeleteLongTermRelation(_relationId),
+    givenDeleteRelation(_relationId),
     releaseInitiator: releaseInitiator,
   );
 

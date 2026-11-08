@@ -30,6 +30,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../../support/action_seed.dart';
 import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
+import '../../../support/intention_cascade_execution.dart';
 import '../../../support/path_screen_controls.dart';
 import '../../../support/path_candidates_controlled_repository.dart';
 
@@ -162,15 +163,20 @@ void main() {
   testWidgets('архивная связь сокращает открытый путь и исключает кандидата', (
     tester,
   ) async {
+    // Индекс удержания строится до открытия экрана: построение, начатое
+    // внутри его кадров, не завершается под runAsync.
+    final command = (await tester.runAsync(
+      () => previewedArchiveRelation(repository, relationId(102)),
+    ))!;
     await openPathScreen(
       tester,
       router: router,
       repository: repository,
       purpose: NewActionPathPurpose(_path([1, 2, 3])),
     );
-    final start = coordinator(tester).acceptRelationArchive(
-      ArchiveLongTermRelation(relationId(102)),
-    ) as LongTermRelationCommandAccepted;
+    final start = coordinator(
+      tester,
+    ).acceptRelationArchive(command) as LongTermRelationCommandAccepted;
     final completion = await tester.runAsync(() => start.future);
     expect(completion!.isFailure, isFalse);
     await settlePathScreen(tester);
@@ -182,6 +188,9 @@ void main() {
   });
 
   testWidgets('архивирование корня очищает путь', (tester) async {
+    final command = (await tester.runAsync(
+      () => previewedArchiveIntention(repository, seedIntentionId(1)),
+    ))!;
     await openPathScreen(
       tester,
       router: router,
@@ -189,7 +198,7 @@ void main() {
       purpose: NewActionPathPurpose(_path([1, 2])),
     );
     final start = coordinator(tester).acceptExisting(
-      ArchiveIntention(seedIntentionId(1)),
+      command,
       presentationTitle: 'Быть здоровым',
     ) as IntentionCommandAccepted;
     final completion = await tester.runAsync(() => start.future);

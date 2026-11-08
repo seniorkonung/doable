@@ -19,6 +19,7 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../test/support/intention_cascade_execution.dart';
 import '../../test/support/graph_seed.dart';
 import '../../test/support/in_memory_diagnostics_sink.dart';
 import '../support/benchmark.dart';
@@ -397,7 +398,10 @@ final class _Commands {
           isCompleted: ActionFieldSet((5 * entity + 4).isEven),
         ),
       ),
-      _CommandKind.cascadeArchive => ArchiveIntention(fixture.hubIntentionId),
+      _CommandKind.cascadeArchive => await previewedArchiveIntention(
+        repository,
+        fixture.hubIntentionId,
+      ),
     };
     final stopwatch = Stopwatch();
     final result = await Zone.root.run(() async {

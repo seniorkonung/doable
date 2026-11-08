@@ -26,6 +26,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart';
+import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
@@ -49,6 +50,7 @@ import '../support/graph_durability_fixture.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/intention_cascade_execution.dart';
 import '../support/intention_catalog_controls.dart';
 import '../support/local_database_harness.dart';
 import '../support/temporary_graph_files.dart';
@@ -420,7 +422,7 @@ void main() {
     final backupState = await app.graphState();
     app.now = DateTime(2026, 10, 6, 8, 40);
     for (final intention in long) {
-      await app.execute(DeleteIntention(intention.id));
+      await app.execute(await app.previewedDelete(intention.id));
     }
     await app.execute(
       CreateTag(
@@ -573,6 +575,16 @@ final class _RestoreApp {
   /// Выбор Главной: вкладка, период и вид статистики.
   HomeStatisticsSelection get homeSelection =>
       _container.read(homeStatisticsViewModelProvider).selection;
+
+  /// Удаление намерения [id] с выполнением из предпросмотра, прочитанного
+  /// в хранилище приложения непосредственно перед выполнением.
+  Future<DeleteIntention> previewedDelete(IntentionId id) async =>
+      (await _tester.runAsync(
+        () => previewedDeleteIntention(
+          _container.read(personalGraphRepositoryProvider),
+          id,
+        ),
+      ))!;
 
   /// Подтверждает команду графа [command] в хранилище приложения, минуя
   /// экраны, поэтому её результат не занимает общую поверхность сообщений.

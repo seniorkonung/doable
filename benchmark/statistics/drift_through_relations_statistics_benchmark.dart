@@ -11,7 +11,6 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
@@ -21,6 +20,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/contribution_statistics_fixture.dart';
 import '../support/benchmark.dart';
+import '../../test/support/intention_cascade_execution.dart';
 import '../../test/support/graph_seed.dart';
 import '../../test/support/local_database_harness.dart';
 
@@ -199,10 +199,10 @@ void main() {
                 case _Series.rebuilt:
                   final result = cycleArchived
                       ? await repository.execute(
-                          RestoreLongTermRelation(cycleId),
+                          await previewedRestoreRelation(repository, cycleId),
                         )
                       : await repository.execute(
-                          ArchiveLongTermRelation(cycleId),
+                          await previewedArchiveRelation(repository, cycleId),
                         );
                   expect(result, isA<GraphCommandSucceeded>());
                   cycleArchived = !cycleArchived;
@@ -371,8 +371,8 @@ void main() {
               expect(
                 await repository.execute(
                   originalCycleArchived
-                      ? ArchiveLongTermRelation(cycleId)
-                      : RestoreLongTermRelation(cycleId),
+                      ? await previewedArchiveRelation(repository, cycleId)
+                      : await previewedRestoreRelation(repository, cycleId),
                 ),
                 isA<GraphCommandSucceeded>(),
               );

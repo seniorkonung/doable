@@ -19,15 +19,15 @@ import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     show IntentionCatalogOrder, IntentionScope;
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_row.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
@@ -43,6 +43,7 @@ import '../support/action_editor_controls.dart';
 import '../support/action_seed.dart';
 import '../support/graph_durability_fixture.dart';
 import '../support/graph_seed.dart';
+import '../support/intention_cascade_execution.dart';
 import '../support/intention_catalog_controls.dart';
 import '../support/intention_creation_origin.dart';
 import '../support/intention_actions_tab.dart';
@@ -342,22 +343,23 @@ void main() {
     );
 
     final repository = app.container.read(personalGraphRepositoryProvider);
-    var deleted = false;
-    unawaited(() async {
-      for (final command in [
-        DeleteLongTermRelation(durabilityRelation(101)),
-        DeleteLongTermRelation(durabilityRelation(103)),
-        DeleteLongTermRelation(durabilityRelation(104)),
-      ]) {
-        expect(await repository.execute(command), isA<GraphCommandSucceeded>());
-      }
-      expect(
-        await repository.execute(DeleteIntention(durabilityIntention(1))),
-        isA<GraphCommandSucceeded>(),
+    for (final relation in [101, 103, 104]) {
+      await _executeWhilePumping(
+        tester,
+        repository,
+        (await tester.runAsync(
+          () =>
+              previewedDeleteRelation(repository, durabilityRelation(relation)),
+        ))!,
       );
-      deleted = true;
-    }());
-    await _until(tester, () => deleted);
+    }
+    await _executeWhilePumping(
+      tester,
+      repository,
+      (await tester.runAsync(
+        () => previewedDeleteIntention(repository, durabilityIntention(1)),
+      ))!,
+    );
     await _until(
       tester,
       () => actionEditorValue('Удалено').evaluate().isNotEmpty,
@@ -416,17 +418,13 @@ void main() {
     );
 
     final repository = app.container.read(personalGraphRepositoryProvider);
-    var deleted = false;
-    unawaited(() async {
-      expect(
-        await repository.execute(
-          DeleteLongTermRelation(durabilityRelation(101)),
-        ),
-        isA<GraphCommandSucceeded>(),
-      );
-      deleted = true;
-    }());
-    await _until(tester, () => deleted);
+    await _executeWhilePumping(
+      tester,
+      repository,
+      (await tester.runAsync(
+        () => previewedDeleteRelation(repository, durabilityRelation(101)),
+      ))!,
+    );
     await _until(
       tester,
       () => actionEditorValue('Удалено').evaluate().isNotEmpty,
@@ -608,9 +606,13 @@ void main() {
     final completions = <GraphCommandCompletion>[];
     final subscription = coordinator.completions.listen(completions.add);
     addTearDown(subscription.cancel);
-    coordinator.acceptRelationDelete(
-      DeleteLongTermRelation(durabilityRelation(104)),
-    );
+    final deletion = (await tester.runAsync(
+      () => previewedDeleteRelation(
+        app.container.read(personalGraphRepositoryProvider),
+        durabilityRelation(104),
+      ),
+    ))!;
+    coordinator.acceptRelationDelete(deletion);
     await _until(tester, () => completions.length == 1);
     await tester.pumpAndSettle();
     final first = app.l10n.graphOperationMessage(
@@ -774,4 +776,17 @@ void main() {
       });
     }
   }
+}
+
+/// Выполняет [command] в хранилище, пока экраны получают кадры, и проверяет
+/// успех: результат читается после ожидания, а не внутри колбэка.
+Future<void> _executeWhilePumping(
+  WidgetTester tester,
+  PersonalGraphRepository repository,
+  GraphCommand<GraphCommandOutcome, GraphCommandFailure> command,
+) async {
+  Object? result;
+  unawaited(repository.execute(command).then((value) => result = value));
+  await _until(tester, () => result != null);
+  expect(result, isA<GraphCommandSucceeded>());
 }

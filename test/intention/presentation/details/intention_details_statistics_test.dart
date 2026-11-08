@@ -8,7 +8,6 @@ import 'package:doable/src/design_system/components/tabs.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
@@ -33,6 +32,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../statistics/presentation/intention_statistics_test_support.dart';
+import '../../../support/intention_cascade_execution.dart';
 import 'details_test_support.dart';
 
 void main() {
@@ -125,7 +125,7 @@ void main() {
           archiveState: IntentionArchiveState.archived,
         );
         final accepted = coordinator.acceptExisting(
-          ArchiveIntention(before.id),
+          givenArchiveIntention(before.id),
           presentationTitle: before.title,
         ) as IntentionCommandAccepted;
         repository.completeCommand(
@@ -383,7 +383,7 @@ void main() {
           archiveState: IntentionArchiveState.archived,
         );
         final accepted = coordinator.acceptExisting(
-          ArchiveIntention(before.id),
+          givenArchiveIntention(before.id),
           presentationTitle: before.title,
         ) as IntentionCommandAccepted;
         repository.completeCommand(

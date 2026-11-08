@@ -6,6 +6,7 @@ import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
+import 'package:doable/src/intention/application/cascade/intention_cascade.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -16,6 +17,7 @@ import 'package:flutter/material.dart' hide Badge;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/intention_cascade_execution.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import 'details_test_support.dart';
 
@@ -65,6 +67,12 @@ void main() {
       title: 'Бегать',
       archiveState: IntentionArchiveState.archived,
     );
+    final preview = givenCascadePreview(
+      IntentionCascadeSubject(intention.id),
+      CascadeOperation.archive,
+      const TestDetailsRevision(0),
+    ) as ArchiveCascadePreview;
+    repository.onPreviewCascade = (_, _) => preview;
     await _openLoaded(
       tester,
       repository,
@@ -86,7 +94,10 @@ void main() {
     await _choose(tester, 'Архивировать');
     expect(find.byType(Sheet), findsNothing);
     expect(find.byType(Dialog), findsNothing);
-    expect(repository.commands.single, isA<ArchiveIntention>());
+    final execution =
+        (repository.commands.single as ArchiveIntention).execution;
+    expect(execution.choice, CascadeChoice.withSupporting);
+    expect(execution.expected, same(preview.plan.withSupporting));
 
     repository.completeCommand(
       0,
@@ -129,6 +140,34 @@ void main() {
       findsOneWidget,
     );
     expect(tester.widget<PageHead>(find.byType(PageHead)).badge, isNull);
+  });
+
+  testWidgets('отказ чтения предпросмотра при «Архивировать» показан общим '
+      'сообщением ровно один раз, а команда архивирования не выполнена', (
+    tester,
+  ) async {
+    final repository = ControlledDetailsRepository()
+      ..onPreviewCascade = (_, _) => const CascadePreviewUnavailable();
+    final intention = testDetailsIntention(title: 'Бегать');
+    await _openLoaded(
+      tester,
+      repository,
+      intention,
+      locale: const Locale('en'),
+    );
+
+    await _openOptions(tester, label: 'Options of the intention');
+    await _choose(tester, 'Archive');
+    await tester.pumpAndSettle();
+
+    expect(repository.commands, isEmpty);
+    expect(
+      find.text(
+        'Archive — “Бегать”: The intention state couldn’t be changed. '
+        'Try again.',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('восстановление из параметров сразу восстанавливает '

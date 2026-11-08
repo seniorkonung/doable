@@ -7,10 +7,8 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
@@ -23,6 +21,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'in_memory_diagnostics_sink.dart';
+import 'intention_cascade_execution.dart';
 import 'tag_storage_fixture.dart';
 import 'tagged_intention_ids.dart';
 
@@ -77,7 +76,7 @@ void main() {
     );
     try {
       if (operation == 'assignments_mutate') {
-        await _mutateAssignments(coordinator);
+        await _mutateAssignments(coordinator, repository);
       } else if (operation == 'assignment_before_commit_verify' ||
           operation == 'assignment_after_commit_verify') {
         await _verifyAssignments(
@@ -128,7 +127,10 @@ LongTermRelationId _relation(int number) => (LongTermRelationId.decode(
   tagFixtureId(number),
 ) as LongTermRelationIdDecodingSuccess).id;
 
-Future<void> _mutateAssignments(GraphCommandCoordinator coordinator) async {
+Future<void> _mutateAssignments(
+  GraphCommandCoordinator coordinator,
+  DriftPersonalGraphRepository repository,
+) async {
   for (final (number, name) in [
     (301, 'Дом'),
     (302, 'Временный'),
@@ -178,14 +180,14 @@ Future<void> _mutateAssignments(GraphCommandCoordinator coordinator) async {
   await _expectSuccess(coordinator.acceptTagDelete(DeleteTag(_tag(302))));
 
   final relationDelete = coordinator.acceptRelationDelete(
-    DeleteLongTermRelation(_relation(103)),
+    await previewedDeleteRelation(repository, _relation(103)),
   );
   if (relationDelete is! LongTermRelationCommandAccepted ||
       (await relationDelete.future).isFailure) {
     throw StateError('Удаление долговременной связи не подтверждено.');
   }
   final intentionDelete = coordinator.acceptExisting(
-    DeleteIntention(_intention(4)),
+    await previewedDeleteIntention(repository, _intention(4)),
     presentationTitle: 'Удаляемое намерение',
   );
   if (intentionDelete is! IntentionCommandAccepted ||

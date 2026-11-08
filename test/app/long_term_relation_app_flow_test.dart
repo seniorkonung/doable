@@ -19,6 +19,7 @@ import 'package:doable/src/design_system/components/archived_fold.dart';
 import 'package:doable/src/design_system/components/catalog_header.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/components/option_row.dart';
+import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:doable/src/design_system/components/priority_picker.dart';
 import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/design_system/components/relation_row.dart';
@@ -202,7 +203,7 @@ void main() {
       await _pumpUntilFound(tester, _relationRow(renamedPhrase));
 
       await _chooseIntentionOption(tester, IntentionOption.restore);
-      await _pumpUntilAbsent(tester, intentionHeadRestore);
+      await _pumpUntilHeadActive(tester);
       await _dismissOperationMessage(tester);
       expect(_relationRow(renamedPhrase), findsOneWidget);
       expect(
@@ -1676,7 +1677,7 @@ Future<void> _pumpUntilFound(
       await tester.pump();
       return;
     }
-    await tester.pump(const Duration(milliseconds: 1));
+    await _pumpPollStep(tester);
   }
   fail('App-level поток не показал ожидаемый элемент: $finder');
 }
@@ -1691,9 +1692,16 @@ Future<void> _pumpUntilAbsent(
       await tester.pump();
       return;
     }
-    await tester.pump(const Duration(milliseconds: 1));
+    await _pumpPollStep(tester);
   }
   fail('App-level поток не закрыл ожидаемый элемент: $finder');
+}
+
+/// Шаг ожидания: предпросмотр каскада считает удержание в отдельном
+/// изоляте, ответ которого приходит только в настоящем цикле событий.
+Future<void> _pumpPollStep(WidgetTester tester) async {
+  await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+  await tester.pump(const Duration(milliseconds: 1));
 }
 
 Future<void> _tapWhenFound(
@@ -1720,6 +1728,25 @@ Finder _relationRow(String phrase) => find.byWidgetPredicate(
 );
 
 /// Раскрывает свёрнутый архив выбранной группы, когда его строка появится.
+/// Ждёт восстановления открытого намерения: страница прокручивается к шапке,
+/// и та перестаёт показывать архивное состояние.
+Future<void> _pumpUntilHeadActive(WidgetTester tester) async {
+  await tester.scrollUntilVisible(
+    find.byKey(const ValueKey('intention-details-title')),
+    -500,
+    scrollable: find
+        .ancestor(
+          of: find.byType(ArchivedFold),
+          matching: find.byType(Scrollable),
+        )
+        .first,
+  );
+  await _pumpUntilFound(
+    tester,
+    find.byWidgetPredicate((widget) => widget is PageHead && !widget.muted),
+  );
+}
+
 Future<void> _expandArchive(WidgetTester tester) async {
   final fold = find.descendant(
     of: find.byType(ArchivedFold),

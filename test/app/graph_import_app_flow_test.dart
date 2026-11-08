@@ -38,6 +38,7 @@ import '../support/app_root_pages.dart';
 import '../support/graph_import_app_harness.dart';
 import '../support/graph_import_files.dart';
 import '../support/graph_seed.dart';
+import '../support/intention_cascade_execution.dart';
 import '../support/intention_catalog_controls.dart';
 import '../support/temporary_import_document.dart';
 
@@ -305,7 +306,7 @@ Future<_ExportedGraph> _seedExportedGraph(
   final swimming = await _createIntention(graph, 'Плавать');
   final running = await _createIntention(graph, 'Бегать');
   final reading = await _createIntention(graph, 'Читать');
-  await _execute(graph, ArchiveIntention(reading.id));
+  await _execute(graph, await previewedArchiveIntention(graph, reading.id));
   final needsRunning = await _createNeed(graph, health, running);
   await _createNeed(graph, health, swimming);
   await recordGraphChange(
@@ -318,7 +319,7 @@ Future<_ExportedGraph> _seedExportedGraph(
     ),
     recordedAt: DateTime.utc(2026, 10, 3, 9),
   );
-  await _execute(graph, ArchiveLongTermRelation(needsRunning.id));
+  await _execute(graph, await previewedArchiveRelation(graph, needsRunning.id));
   final morning = await _createTag(graph, 'Утро', color: TagColor.blue);
   await _execute(graph, AssignTag(tagId: morning.id, intentionId: running.id));
   await _execute(graph, AssignTag(tagId: morning.id, intentionId: swimming.id));

@@ -4,6 +4,7 @@ import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/intention/application/cascade/intention_cascade.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -22,6 +23,7 @@ import '../../../support/tag_read_contract_test_fallback.dart';
 import '../../../support/action_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
 import '../../../support/intention_holding_read_contract_test_fallback.dart';
+import '../../../support/intention_cascade_execution.dart';
 
 /// Одно наблюдение подробных данных связи, которым управляет тест.
 final class ControlledRelationWatch {
@@ -75,6 +77,22 @@ final class ControlledRelationDetailsRepository
   final _groupRequests = <Completer<RelationGroupPageResult>>[];
   final relationCommands = <LongTermRelationCommand>[];
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
+
+  /// Ответ на предпросмотр каскада; по умолчанию операция не затрагивает
+  /// другие намерения.
+  CascadePreviewResult Function(
+    CascadeSubject subject,
+    CascadeOperation operation,
+  )?
+  onPreviewCascade;
+
+  @override
+  Future<CascadePreviewResult> previewCascade(
+    CascadeSubject subject,
+    CascadeOperation operation,
+  ) async =>
+      onPreviewCascade?.call(subject, operation) ??
+      givenCascadePreview(subject, operation, const TestGraphRevision(0));
 
   ControlledRelationWatch watchAt(int index) => relationWatches[index];
 

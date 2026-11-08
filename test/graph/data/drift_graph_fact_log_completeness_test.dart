@@ -32,6 +32,7 @@ import '../../support/action_seed.dart';
 import '../../support/graph_log_completeness_reference.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/local_database_harness.dart';
 
 /// Состояние графа по выгрузке базы на позиции последнего пакета лога.
@@ -232,9 +233,9 @@ void main() {
         description: 'Пять километров\nв парке',
       ),
     );
-    await confirm(ArchiveIntention(health.id));
-    await confirm(RestoreIntention(health.id));
-    await confirm(DeleteIntention(reading.id));
+    await confirm(await previewedArchiveIntention(repository, health.id));
+    await confirm(await previewedRestoreIntention(repository, health.id));
+    await confirm(await previewedDeleteIntention(repository, reading.id));
   });
 
   test('намерения, созданные после перевода часов назад, собираются из лога '
@@ -284,9 +285,9 @@ void main() {
         ),
       ),
     );
-    await confirm(ArchiveLongTermRelation(relation.id));
-    await confirm(RestoreLongTermRelation(relation.id));
-    await confirm(DeleteLongTermRelation(relation.id));
+    await confirm(await previewedArchiveRelation(repository, relation.id));
+    await confirm(await previewedRestoreRelation(repository, relation.id));
+    await confirm(await previewedDeleteRelation(repository, relation.id));
   });
 
   test('команды действий и удаления в путях: изменение и удаление действий, '
@@ -322,13 +323,13 @@ void main() {
         ),
       ),
     );
-    await confirm(DeleteLongTermRelation(healthRunning.id));
+    await confirm(await previewedDeleteRelation(repository, healthRunning.id));
     final restored = await relate(health, running);
     // Удаление намерения со связями запрещено, поэтому связи удаляются
     // раньше.
-    await confirm(DeleteLongTermRelation(restored.id));
-    await confirm(DeleteLongTermRelation(runningMorning.id));
-    await confirm(DeleteIntention(running.id));
+    await confirm(await previewedDeleteRelation(repository, restored.id));
+    await confirm(await previewedDeleteRelation(repository, runningMorning.id));
+    await confirm(await previewedDeleteIntention(repository, running.id));
     final deletion = _factKinds(await _lastPackageFacts(database));
     expect(
       deletion.where((kind) => kind == 'created DeletedIntentionRecord'),

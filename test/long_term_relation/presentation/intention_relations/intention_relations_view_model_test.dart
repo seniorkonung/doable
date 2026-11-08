@@ -27,6 +27,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../relation_graph_test_support.dart';
+import '../../../support/intention_cascade_execution.dart';
 
 void main() {
   for (final (scenario, counts, expected) in [
@@ -924,7 +925,7 @@ void main() {
     harness.viewModel.rememberVisibleRelation(testRelationId(2));
 
     await harness.completeRelationCommand(
-      ArchiveLongTermRelation(testRelationId(2)),
+      givenArchiveRelation(testRelationId(2)),
       _relationUpdateSuccess(
         revision: const TestGraphRevision(9),
         before: active(2).relation,
@@ -949,7 +950,7 @@ void main() {
     expect(harness.confirmed.scrollAnchor?.id, testRelationId(2));
 
     await harness.completeRelationCommand(
-      RestoreLongTermRelation(testRelationId(2)),
+      givenRestoreRelation(testRelationId(2)),
       _relationUpdateSuccess(
         revision: const TestGraphRevision(11),
         before: archived(2).relation,
@@ -974,7 +975,7 @@ void main() {
 
     final owner = _intention(ownerId);
     final start = harness.coordinator.acceptExisting(
-      ArchiveIntention(ownerId),
+      givenArchiveIntention(ownerId),
       presentationTitle: owner.title,
     ) as IntentionCommandAccepted;
     repository.completeIntentionCommand(

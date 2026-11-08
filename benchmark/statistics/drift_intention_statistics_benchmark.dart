@@ -13,7 +13,6 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
@@ -29,6 +28,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../support/contribution_statistics_fixture.dart';
 import '../support/benchmark.dart';
 import '../support/intention_statistics_fixture.dart';
+import '../../test/support/intention_cascade_execution.dart';
 import '../../test/support/graph_seed.dart';
 import '../../test/support/local_database_harness.dart';
 
@@ -266,10 +266,16 @@ void main() {
                   case _SectionState.rebuilt:
                     final result = relationArchived
                         ? await repository.execute(
-                            RestoreLongTermRelation(changedRelationId),
+                            await previewedRestoreRelation(
+                              repository,
+                              changedRelationId,
+                            ),
                           )
                         : await repository.execute(
-                            ArchiveLongTermRelation(changedRelationId),
+                            await previewedArchiveRelation(
+                              repository,
+                              changedRelationId,
+                            ),
                           );
                     expect(result, isA<GraphCommandSucceeded>());
                     relationArchived = !relationArchived;
@@ -405,8 +411,14 @@ void main() {
                 expect(
                   await repository.execute(
                     originalRelationArchived
-                        ? ArchiveLongTermRelation(changedRelationId)
-                        : RestoreLongTermRelation(changedRelationId),
+                        ? await previewedArchiveRelation(
+                            repository,
+                            changedRelationId,
+                          )
+                        : await previewedRestoreRelation(
+                            repository,
+                            changedRelationId,
+                          ),
                   ),
                   isA<GraphCommandSucceeded>(),
                 );

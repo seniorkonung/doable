@@ -46,6 +46,7 @@ import 'catalog_test_support.dart';
 import 'catalog_reconciliation_test_support.dart';
 import '../../../support/tag_condition_cycles.dart';
 import '../../../support/tag_positions.dart';
+import '../../../support/intention_cascade_execution.dart';
 
 void main() {
   testWidgets('показывает загрузку до подтверждённой первой страницы', (
@@ -575,7 +576,7 @@ void main() {
       tester,
       container,
       repository,
-      DeleteIntention(movedBeforeAnchor.id),
+      givenDeleteIntention(movedBeforeAnchor.id),
       IntentionDeleted(
         movedBeforeAnchor.id,
         catalogMutation: IntentionCatalogDeleted(
@@ -594,7 +595,7 @@ void main() {
       tester,
       container,
       repository,
-      DeleteIntention(anchorSummary.id),
+      givenDeleteIntention(anchorSummary.id),
       IntentionDeleted(
         anchorSummary.id,
         catalogMutation: IntentionCatalogDeleted(

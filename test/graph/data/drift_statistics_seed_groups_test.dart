@@ -6,7 +6,6 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/contribution_reachability.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
@@ -18,6 +17,7 @@ import '../../support/contribution_reachability_reference.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
+import '../../support/intention_cascade_execution.dart';
 
 /// Связи (номер, источник, связанное, архивирована).
 const _relations = [
@@ -115,11 +115,15 @@ void main() {
       addAction(201 + i, '2026-10-12', paths[i], completed: i.isEven);
     }
     expect(
-      await repository.execute(ArchiveIntention(seedIntentionId(6))),
+      await repository.execute(
+        await previewedArchiveIntention(repository, seedIntentionId(6)),
+      ),
       isA<GraphCommandSucceeded>(),
     );
     expect(
-      await repository.execute(DeleteIntention(seedIntentionId(8))),
+      await repository.execute(
+        await previewedDeleteIntention(repository, seedIntentionId(8)),
+      ),
       isA<GraphCommandSucceeded>(),
     );
 

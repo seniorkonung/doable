@@ -11,7 +11,6 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -29,6 +28,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
+import '../../support/intention_cascade_execution.dart';
 
 const _sourceIdValue = '018f0b5d-6b2e-7c80-8000-000000000901';
 const _firstNeighborIdValue = '018f0b5d-6b2e-7c80-8000-000000000902';
@@ -229,7 +229,9 @@ void main() {
       isA<GraphCommandSucceeded>(),
     );
     expect(
-      await repository.execute(ArchiveIntention(_sourceId)),
+      await repository.execute(
+        await previewedArchiveIntention(repository, _sourceId),
+      ),
       isA<ResultSuccess>(),
     );
     await harness.closePersistenceObjectGraph();
@@ -303,7 +305,7 @@ void main() {
     observer.arm();
 
     expect(
-      await repository.execute(ArchiveIntention(_sourceId)),
+      await repository.execute(givenArchiveIntention(_sourceId)),
       isA<ResultFailure>(),
     );
     expect(observer.didFail, isTrue);

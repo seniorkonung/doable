@@ -24,6 +24,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/action_seed.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/tag_positions.dart';
 
@@ -176,7 +177,9 @@ void main() {
       ['удаление действия'],
     );
     await expectOnePackage<LongTermRelationDeleted>(
-      repository.execute(DeleteLongTermRelation(relation.id)),
+      repository.execute(
+        await previewedDeleteRelation(repository, relation.id),
+      ),
       ['удаление связи'],
     );
   });

@@ -19,6 +19,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/action_seed.dart';
 import '../../support/graph_seed.dart';
 import '../../support/encoded_diagnostics_log.dart';
+import '../../support/intention_cascade_execution.dart';
 
 IntentionId _intention(int number) =>
     (IntentionId.decode(seedUuid(number)) as IntentionIdDecodingSuccess).id;
@@ -193,13 +194,13 @@ void main() {
     );
     expect((await next()).root.title, 'Быть здоровым');
 
-    await confirm(DeleteLongTermRelation(_relation(101)));
+    await confirm(await previewedDeleteRelation(repository, _relation(101)));
     final withoutLink = await next();
     final link = withoutLink.steps.first.link;
     expect(link, isA<DeletedActionPathLink>());
     expect(link.type, LongTermRelationType.need);
 
-    await confirm(ArchiveIntention(_intention(3)));
+    await confirm(await previewedArchiveIntention(repository, _intention(3)));
     final archived = await next();
     expect(
       (archived.steps.last.intention as ExistingActionPathIntention)
@@ -208,7 +209,7 @@ void main() {
       IntentionArchiveState.archived,
     );
 
-    await confirm(DeleteIntention(_intention(1)));
+    await confirm(await previewedDeleteIntention(repository, _intention(1)));
     final withoutRoot = await next();
     expect(withoutRoot.root, isA<DeletedActionPathIntention>());
     expect(withoutRoot.root.title, 'Быть здоровым');

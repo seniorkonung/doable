@@ -21,6 +21,7 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/intention_cascade_execution.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
 import '../../support/action_read_contract_test_fallback.dart';
 import '../../support/statistics_read_contract_test_fallback.dart';
@@ -33,22 +34,22 @@ void main() {
       final coordinator = _coordinator(repository);
 
       final deletion = coordinator.acceptRelationDelete(
-        DeleteLongTermRelation(_relationId),
+        givenDeleteRelation(_relationId),
       );
       final repeatedDeletion = coordinator.acceptRelationDelete(
-        DeleteLongTermRelation(_relationId),
+        givenDeleteRelation(_relationId),
       );
       final competingUpdate = coordinator.acceptRelationUpdate(
         _updateRelation(_relationId),
       );
       final competingArchive = coordinator.acceptRelationArchive(
-        ArchiveLongTermRelation(_relationId),
+        givenArchiveRelation(_relationId),
       );
       final competingRestore = coordinator.acceptRelationRestore(
-        RestoreLongTermRelation(_relationId),
+        givenRestoreRelation(_relationId),
       );
       final independentDeletion = coordinator.acceptRelationDelete(
-        DeleteLongTermRelation(_otherRelationId),
+        givenDeleteRelation(_otherRelationId),
       );
 
       expect(deletion, isA<LongTermRelationCommandAccepted>());
@@ -150,13 +151,13 @@ void main() {
             (
               name: 'архивирование',
               start: (coordinator) => coordinator.acceptRelationArchive(
-                ArchiveLongTermRelation(_relationId),
+                givenArchiveRelation(_relationId),
               ),
             ),
             (
               name: 'восстановление',
               start: (coordinator) => coordinator.acceptRelationRestore(
-                RestoreLongTermRelation(_relationId),
+                givenRestoreRelation(_relationId),
               ),
             ),
           ];
@@ -190,7 +191,7 @@ void main() {
             expect(coordinator.claimInitiatorFailure(accepted.token), isNull);
 
             final failed = coordinator.acceptRelationDelete(
-              DeleteLongTermRelation(_otherRelationId),
+              givenDeleteRelation(_otherRelationId),
             ) as LongTermRelationCommandAccepted;
             coordinator.releaseInitiatorPresentation(failed.token);
             repository.completeRelationFailure(1);
@@ -251,7 +252,7 @@ void main() {
         coordinator.confirmAppPresentation(claims.single!, [created.token]);
 
         final deletion = coordinator.acceptRelationDelete(
-          DeleteLongTermRelation(_otherRelationId),
+          givenDeleteRelation(_otherRelationId),
         ) as LongTermRelationCommandAccepted;
         repository.completeRelationDeleted(1, _otherRelationId, revision: 2);
         final deleted = await deletion.future;

@@ -8,6 +8,7 @@ import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
+import '../../../intention/application/cascade/intention_cascade.dart';
 import '../../../intention/application/intention_catalog.dart';
 import '../../../intention/domain/intention.dart';
 import '../../../intention/domain/intention_id.dart';
@@ -70,6 +71,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
   /// Право отказа правки, которое публикует текущее состояние.
   GraphInitiatorPresentationClaim? _publishedEditFailureClaim;
   var _isTerminated = false;
+  var _isReadingCascadePreview = false;
 
   @override
   RelationDetailsState build(LongTermRelationId relationId) {
@@ -177,12 +179,14 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
   }
 
   /// Архивирует активную связь независимо от состояния её участников.
-  void archive() =>
-      _startLifecycleChange(RelationDetailsLifecycleKind.archive, _Change.new);
+  void archive() => unawaited(
+    _startLifecycleChange(RelationDetailsLifecycleKind.archive, _Change.new),
+  );
 
   /// Восстанавливает архивную связь, только если оба участника активны.
-  void restore() =>
-      _startLifecycleChange(RelationDetailsLifecycleKind.restore, _Change.new);
+  void restore() => unawaited(
+    _startLifecycleChange(RelationDetailsLifecycleKind.restore, _Change.new),
+  );
 
   /// Возвращает успех только собственной принятой команды удаления.
   /// Общее состояние данных по ID не передаёт право закрытия другим страницам.
@@ -225,7 +229,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     switch (change.kind) {
       case RelationDetailsLifecycleKind.archive ||
           RelationDetailsLifecycleKind.restore:
-        _startLifecycleChange(change.kind, _Change.new);
+        unawaited(_startLifecycleChange(change.kind, _Change.new));
       case RelationDetailsLifecycleKind.delete:
         break;
     }
@@ -308,30 +312,83 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     }
   }
 
-  Future<LongTermRelationCommandCompletion>? _startLifecycleChange(
+  /// Читает предпросмотр каскада при запуске операции и передаёт вариант
+  /// «со вспомогательными» с его составом (D7). Отказ чтения панель
+  /// показывает внутри себя, и команда не запускается.
+  Future<LongTermRelationCommandCompletion?> _startLifecycleChange(
     RelationDetailsLifecycleKind kind,
     _Command Function(LongTermRelationOperationToken token) command,
-  ) {
-    final current = state;
-    if (current is! RelationDetailsLoaded ||
+  ) async {
+    final initial = state;
+    if (initial is! RelationDetailsLoaded ||
         _isOperationRunning ||
-        !_isLifecycleChangeApplicable(current, kind)) {
+        _isReadingCascadePreview ||
+        !_isLifecycleChangeApplicable(initial, kind)) {
       return null;
     }
 
-    final start = switch (kind) {
-      RelationDetailsLifecycleKind.archive =>
-        _coordinator.acceptRelationArchive(
-          ArchiveLongTermRelation(_relationId),
-        ),
-      RelationDetailsLifecycleKind.restore =>
-        _coordinator.acceptRelationRestore(
-          RestoreLongTermRelation(_relationId),
-        ),
-      RelationDetailsLifecycleKind.delete => _coordinator.acceptRelationDelete(
-        DeleteLongTermRelation(_relationId),
-      ),
-    };
+    final relationId = _relationId;
+    final CascadePreviewResult preview;
+    _isReadingCascadePreview = true;
+    try {
+      preview = await ref
+          .read(personalGraphRepositoryProvider)
+          .previewCurrentCascade(
+            RelationCascadeSubject(relationId),
+            switch (kind) {
+              RelationDetailsLifecycleKind.archive => CascadeOperation.archive,
+              RelationDetailsLifecycleKind.restore => CascadeOperation.restore,
+              RelationDetailsLifecycleKind.delete => CascadeOperation.delete,
+            },
+          );
+    } finally {
+      _isReadingCascadePreview = false;
+    }
+    // Отказ операции панели принадлежит самой панели, поэтому без неё
+    // операция не начинается.
+    final current = ref.mounted && !_isTerminated ? state : null;
+    if (current is! RelationDetailsLoaded) {
+      return null;
+    }
+
+    final LongTermRelationCommandStart start;
+    switch (preview) {
+      case ArchiveCascadePreview(:final plan):
+        start = _coordinator.acceptRelationArchive(
+          ArchiveLongTermRelation(
+            relationId,
+            execution: CascadeExecution.withSupporting(plan),
+          ),
+        );
+      case RestoreCascadePreview(:final plan):
+        start = _coordinator.acceptRelationRestore(
+          RestoreLongTermRelation(
+            relationId,
+            execution: CascadeExecution.withSupporting(plan),
+          ),
+        );
+      case RelationDeleteCascadePreview(:final plan):
+        start = _coordinator.acceptRelationDelete(
+          DeleteLongTermRelation(
+            relationId,
+            execution: CascadeExecution.withSupporting(plan),
+          ),
+        );
+      // Предпросмотр связи не бывает предпросмотром удаления намерения.
+      case IntentionDeleteCascadePreview():
+        state = current.copyWith(
+          lifecycleChange: RelationDetailsLifecyclePreviewFailed(
+            kind,
+            const CascadePreviewUnexpected(),
+          ),
+        );
+        return null;
+      case CascadePreviewFailure():
+        state = current.copyWith(
+          lifecycleChange: RelationDetailsLifecyclePreviewFailed(kind, preview),
+        );
+        return null;
+    }
     switch (start) {
       case LongTermRelationCommandAccepted(:final token, :final future):
         _command = command(token);
@@ -346,7 +403,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
         state = current.copyWith(isOperationRunning: true);
       case GraphCommandCoordinatorDraining():
         state = current.copyWith(
-          lifecycleChange: RelationDetailsLifecycleFailed(
+          lifecycleChange: RelationDetailsLifecycleCommandFailed(
             kind,
             const LongTermRelationUnexpectedFailure(),
           ),
@@ -417,13 +474,13 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
                 _scopeMatchesLifecycleKind(relation.scope, kind) =>
           current.copyWith(clearLifecycleChange: true),
         GraphResultSuccess() => current.copyWith(
-          lifecycleChange: RelationDetailsLifecycleFailed(
+          lifecycleChange: RelationDetailsLifecycleCommandFailed(
             kind,
             const LongTermRelationUnexpectedFailure(),
           ),
         ),
         GraphResultFailure(:final failure) => current.copyWith(
-          lifecycleChange: RelationDetailsLifecycleFailed(
+          lifecycleChange: RelationDetailsLifecycleCommandFailed(
             kind,
             failure,
             failurePresentation: _coordinator.claimInitiatorFailure(
@@ -445,7 +502,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
       final current = state;
       if (current is RelationDetailsLoaded) {
         state = current.copyWith(
-          lifecycleChange: RelationDetailsLifecycleFailed(
+          lifecycleChange: RelationDetailsLifecycleCommandFailed(
             kind,
             const LongTermRelationUnexpectedFailure(),
           ),

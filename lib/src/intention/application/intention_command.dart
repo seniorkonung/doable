@@ -2,6 +2,7 @@ import '../../graph/application/graph_command_result.dart';
 import '../../tag/domain/tag_id.dart';
 import '../domain/intention.dart';
 import '../domain/intention_id.dart';
+import 'cascade/intention_cascade.dart';
 import 'intention_catalog.dart';
 import 'intention_result.dart';
 
@@ -71,14 +72,23 @@ final class ChangeIntentionKind extends ExistingIntentionCommand {
   final IntentionKind kind;
 }
 
+/// Архивирует намерение по варианту [execution] (D7, ADR-0057).
 final class ArchiveIntention extends ExistingIntentionCommand {
-  const ArchiveIntention(super.id);
+  const ArchiveIntention(super.id, {required this.execution});
+
+  final CascadeExecution<ArchiveCascadeComposition> execution;
 }
 
+/// Восстанавливает намерение по варианту [execution] (D7, ADR-0057).
 final class RestoreIntention extends ExistingIntentionCommand {
-  const RestoreIntention(super.id);
+  const RestoreIntention(super.id, {required this.execution});
+
+  final CascadeExecution<RestoreCascadeComposition> execution;
 }
 
+/// Удаляет намерение по варианту [execution] (D7, ADR-0057).
 final class DeleteIntention extends ExistingIntentionCommand {
-  const DeleteIntention(super.id);
+  const DeleteIntention(super.id, {required this.execution});
+
+  final CascadeExecution<DeleteCascadeComposition> execution;
 }

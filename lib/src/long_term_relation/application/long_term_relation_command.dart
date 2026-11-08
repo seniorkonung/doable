@@ -1,5 +1,6 @@
 import '../../graph/application/graph_command_result.dart';
 import '../../graph/application/graph_revision.dart';
+import '../../intention/application/cascade/intention_cascade.dart';
 import '../../intention/domain/intention_id.dart';
 import '../domain/long_term_relation.dart';
 import '../domain/long_term_relation_description.dart';
@@ -185,22 +186,28 @@ final class UpdateLongTermRelation extends LongTermRelationCommand {
   final LongTermRelationPatch patch;
 }
 
+/// Архивирует связь по варианту [execution] (D7, ADR-0057).
 final class ArchiveLongTermRelation extends LongTermRelationCommand {
-  const ArchiveLongTermRelation(this.relationId);
+  const ArchiveLongTermRelation(this.relationId, {required this.execution});
 
   final LongTermRelationId relationId;
+  final CascadeExecution<ArchiveCascadeComposition> execution;
 }
 
+/// Восстанавливает связь по варианту [execution] (D7, ADR-0057).
 final class RestoreLongTermRelation extends LongTermRelationCommand {
-  const RestoreLongTermRelation(this.relationId);
+  const RestoreLongTermRelation(this.relationId, {required this.execution});
 
   final LongTermRelationId relationId;
+  final CascadeExecution<RestoreCascadeComposition> execution;
 }
 
+/// Удаляет связь по варианту [execution] (D7, ADR-0057).
 final class DeleteLongTermRelation extends LongTermRelationCommand {
-  const DeleteLongTermRelation(this.relationId);
+  const DeleteLongTermRelation(this.relationId, {required this.execution});
 
   final LongTermRelationId relationId;
+  final CascadeExecution<DeleteCascadeComposition> execution;
 }
 
 enum RelationParticipantRole { source, related }

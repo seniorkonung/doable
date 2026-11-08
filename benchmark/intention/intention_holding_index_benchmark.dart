@@ -11,7 +11,6 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
@@ -20,6 +19,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../support/benchmark.dart';
 import '../support/contribution_statistics_fixture.dart';
+import '../../test/support/intention_cascade_execution.dart';
 import '../../test/support/graph_seed.dart';
 import '../../test/support/intention_holding_reference.dart';
 import '../../test/support/local_database_harness.dart';
@@ -180,8 +180,8 @@ void main() {
             expect(
               await repository.execute(
                 archived
-                    ? RestoreLongTermRelation(relationId)
-                    : ArchiveLongTermRelation(relationId),
+                    ? await previewedRestoreRelation(repository, relationId)
+                    : await previewedArchiveRelation(repository, relationId),
               ),
               isA<GraphCommandSucceeded>(),
             );
@@ -272,8 +272,8 @@ void main() {
         expect(
           await repository.execute(
             relationArchived
-                ? ArchiveLongTermRelation(relationId)
-                : RestoreLongTermRelation(relationId),
+                ? await previewedArchiveRelation(repository, relationId)
+                : await previewedRestoreRelation(repository, relationId),
           ),
           isA<GraphCommandSucceeded>(),
         );

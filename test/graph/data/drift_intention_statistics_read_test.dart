@@ -8,11 +8,9 @@ import 'package:doable/src/graph/data/contribution_reachability.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/shared/domain/calendar_date.dart';
@@ -28,6 +26,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/action_seed.dart';
 import '../../support/graph_durability_fixture.dart';
 import '../../support/graph_seed.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
@@ -287,12 +286,14 @@ void main() {
     await addAction(202, [101, 108]);
     expect(
       await repository.execute(
-        ArchiveLongTermRelation(durabilityRelation(102)),
+        await previewedArchiveRelation(repository, durabilityRelation(102)),
       ),
       isA<GraphCommandSucceeded>(),
     );
     expect(
-      await repository.execute(ArchiveIntention(durabilityIntention(4))),
+      await repository.execute(
+        await previewedArchiveIntention(repository, durabilityIntention(4)),
+      ),
       isA<GraphCommandSucceeded>(),
     );
     final section = _value(
@@ -462,7 +463,9 @@ void main() {
         completion(_readFailure(isA<StatisticsSnapshotExpired>())),
       );
       expect(
-        await repository.execute(ArchiveIntention(durabilityIntention(4))),
+        await repository.execute(
+          await previewedArchiveIntention(repository, durabilityIntention(4)),
+        ),
         isA<GraphCommandSucceeded>(),
       );
       await expectLater(

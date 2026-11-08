@@ -28,6 +28,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../support/action_seed.dart';
 import '../../support/encoded_diagnostics_log.dart';
 import '../../support/graph_seed.dart';
+import '../../support/intention_cascade_execution.dart';
 
 ActionId _action(int number) =>
     (ActionId.decode(seedUuid(number)) as ActionIdDecodingSuccess).id;
@@ -287,13 +288,13 @@ void main() {
     final events = watch(11);
     await next(events);
 
-    await confirm(DeleteLongTermRelation(_relation(102)));
+    await confirm(await previewedDeleteRelation(repository, _relation(102)));
     final withoutRelation = await next(events);
     final deletedLink = withoutRelation.path.steps.last.link;
     expect(deletedLink, isA<DeletedActionPathLink>());
     expect(deletedLink.type, LongTermRelationType.need);
 
-    await confirm(DeleteIntention(_intention(3)));
+    await confirm(await previewedDeleteIntention(repository, _intention(3)));
     final withoutIntention = await next(events);
     final deletedIntention = withoutIntention.path.steps.last.intention;
     expect(deletedIntention, isA<DeletedActionPathIntention>());
@@ -306,7 +307,7 @@ void main() {
       'звено показывает её данные', () async {
     final events = watch(11);
     await next(events);
-    await confirm(DeleteLongTermRelation(_relation(101)));
+    await confirm(await previewedDeleteRelation(repository, _relation(101)));
     expect(
       (await next(events)).path.steps.first.link,
       isA<DeletedActionPathLink>(),
@@ -325,7 +326,7 @@ void main() {
     expect(restored.priority, RelationPriority.p4);
     expect(restored.scope, RelationScope.active);
 
-    await confirm(ArchiveLongTermRelation(restored.id));
+    await confirm(await previewedArchiveRelation(repository, restored.id));
     final archived = _relationOf((await next(events)).path.steps.first.link);
     expect(archived.id, restored.id);
     expect(archived.type, LongTermRelationType.can);

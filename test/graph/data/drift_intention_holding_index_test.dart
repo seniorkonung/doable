@@ -28,6 +28,7 @@ import '../../support/action_seed.dart';
 import '../../support/graph_durability_fixture.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/local_database_harness.dart';
 
 /// Граф проверок: главные 1 и 4, цепочка вспомогательных 1 → 2 → 3,
@@ -41,6 +42,7 @@ void main() {
   late InMemoryDiagnosticsSink diagnostics;
   late _ControlledRunner runner;
   late DriftPersonalGraphRepository repository;
+  late DriftPersonalGraphRepository previews;
 
   setUp(() async {
     harness = LocalDatabaseHarness.inMemory();
@@ -85,6 +87,14 @@ void main() {
     });
     diagnostics = InMemoryDiagnosticsSink();
     runner = _ControlledRunner();
+    // Отдельный репозиторий читает предпросмотр команд, не прогревая индекс
+    // удержания и не обращаясь к счётчику проверяемого репозитория.
+    previews = DriftPersonalGraphRepository(
+      database,
+      UuidV7IntentionIdGenerator(),
+      () => DateTime.utc(2026, 11, 7),
+      diagnostics,
+    );
     repository = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),
@@ -275,13 +285,14 @@ void main() {
       in <
         (
           String,
-          GraphCommand<GraphCommandOutcome, GraphCommandFailure>,
+          Future<GraphCommand<GraphCommandOutcome, GraphCommandFailure>>
+          Function(),
           Map<int, IntentionHolding>,
         )
       >[
         (
           'создание связи',
-          AddLongTermRelations(
+          () async => AddLongTermRelations(
             pageIntentionId: durabilityIntention(4),
             group: IntentionRelationGroup.needs,
             candidateIds: [durabilityIntention(6)],
@@ -290,7 +301,7 @@ void main() {
         ),
         (
           'изменение связи',
-          UpdateLongTermRelation(
+          () async => UpdateLongTermRelation(
             relationId: durabilityRelation(101),
             patch: const LongTermRelationPatch(
               priority: LongTermRelationFieldSet(RelationPriority.p4),
@@ -300,22 +311,23 @@ void main() {
         ),
         (
           'архивирование связи',
-          ArchiveLongTermRelation(durabilityRelation(101)),
+          () => previewedArchiveRelation(previews, durabilityRelation(101)),
           {2: IntentionHolding.notHeld, 3: IntentionHolding.notHeld},
         ),
         (
           'удаление связи',
-          DeleteLongTermRelation(durabilityRelation(102)),
+          () => previewedDeleteRelation(previews, durabilityRelation(102)),
           {2: IntentionHolding.held, 3: IntentionHolding.notHeld},
         ),
         (
           'смена вида',
-          ChangeIntentionKind(durabilityIntention(6), IntentionKind.main),
+          () async =>
+              ChangeIntentionKind(durabilityIntention(6), IntentionKind.main),
           {6: IntentionHolding.held, 7: IntentionHolding.held},
         ),
         (
           'архивирование намерения',
-          ArchiveIntention(durabilityIntention(2)),
+          () => previewedArchiveIntention(previews, durabilityIntention(2)),
           {2: IntentionHolding.notHeld, 3: IntentionHolding.notHeld},
         ),
       ]) {
@@ -323,7 +335,7 @@ void main() {
       '$name сбрасывает индекс, и пакет несёт изменение удержания',
       () async {
         await holdings(expected.keys);
-        final confirmed = await confirm(command);
+        final confirmed = await confirm(await command());
 
         expect(
           confirmed.changes
@@ -340,18 +352,22 @@ void main() {
   }
 
   test('восстановление связи и намерения сбрасывает индекс', () async {
-    await confirm(ArchiveLongTermRelation(durabilityRelation(101)));
+    await confirm(
+      await previewedArchiveRelation(previews, durabilityRelation(101)),
+    );
     expect(await holdings([2]), {2: IntentionHolding.notHeld});
     final restored = await confirm(
-      RestoreLongTermRelation(durabilityRelation(101)),
+      await previewedRestoreRelation(previews, durabilityRelation(101)),
     );
     expect(restored.changes, contains(isA<IntentionHoldingChanged>()));
     expect(await holdings([2]), {2: IntentionHolding.held});
 
-    await confirm(ArchiveIntention(durabilityIntention(4)));
+    await confirm(
+      await previewedArchiveIntention(previews, durabilityIntention(4)),
+    );
     expect(await holdings([4]), {4: IntentionHolding.notHeld});
     final restoredIntention = await confirm(
-      RestoreIntention(durabilityIntention(4)),
+      await previewedRestoreIntention(previews, durabilityIntention(4)),
     );
     expect(restoredIntention.changes, contains(isA<IntentionHoldingChanged>()));
     expect(await holdings([4]), {4: IntentionHolding.held});
@@ -364,7 +380,10 @@ void main() {
     );
     await holdings([2]);
     final deleted = await confirm(
-      DeleteIntention((created.value as IntentionSaved).intention.id),
+      await previewedDeleteIntention(
+        previews,
+        (created.value as IntentionSaved).intention.id,
+      ),
     );
 
     expect(deleted.changes, contains(isA<IntentionHoldingChanged>()));
@@ -375,16 +394,22 @@ void main() {
   test('команда без изменений не сбрасывает индекс', () async {
     await holdings([2]);
     for (final command
-        in <GraphCommand<GraphCommandOutcome, GraphCommandFailure>>[
-          UpdateLongTermRelation(
+        in <
+          Future<GraphCommand<GraphCommandOutcome, GraphCommandFailure>>
+          Function()
+        >[
+          () async => UpdateLongTermRelation(
             relationId: durabilityRelation(101),
             patch: const LongTermRelationPatch(),
           ),
-          ChangeIntentionKind(durabilityIntention(2), IntentionKind.supporting),
-          ArchiveIntention(durabilityIntention(8)),
+          () async => ChangeIntentionKind(
+            durabilityIntention(2),
+            IntentionKind.supporting,
+          ),
+          () async => givenArchiveIntention(durabilityIntention(8)),
         ]) {
       expect(
-        (await confirm(command)).changes,
+        (await confirm(await command())).changes,
         isNot(contains(isA<IntentionHoldingChanged>())),
       );
     }
@@ -393,10 +418,15 @@ void main() {
   });
 
   test('построенный для устаревшей ревизии результат отбрасывается', () async {
+    // Предпросмотр команды читается до удержания построения индекса.
+    final archival = await previewedArchiveRelation(
+      previews,
+      durabilityRelation(101),
+    );
     runner.hold();
     final reading = repository.getIntentionHolding({durabilityIntention(2)});
     await runner.entered.future;
-    await confirm(ArchiveLongTermRelation(durabilityRelation(101)));
+    await confirm(archival);
     runner.release();
 
     expect(await reading, isA<IntentionHoldingExpired>());

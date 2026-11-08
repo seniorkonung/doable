@@ -26,6 +26,7 @@ import '../support/controlled_local_date.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
+import '../support/intention_cascade_execution.dart';
 import '../support/local_database_harness.dart';
 
 /// Дата действий, которые сценарий готовит в хранилище. Она же — локальное
@@ -308,7 +309,11 @@ void main() {
       );
       await _until(tester, find.textContaining('Новое промежуточное'));
       expect(
-        await repository.execute(ArchiveIntention(intentionIdOf(2))),
+        await tester.runAsync(
+          () async => repository.execute(
+            await previewedArchiveIntention(repository, intentionIdOf(2)),
+          ),
+        ),
         isA<ResultSuccess>(),
       );
       await _until(

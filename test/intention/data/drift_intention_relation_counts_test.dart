@@ -13,6 +13,7 @@ import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/graph_seed.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 void main() {
@@ -76,7 +77,9 @@ void main() {
         await repository.watchIntention(owner).first,
       ).revision;
 
-      final result = await repository.execute(DeleteIntention(owner));
+      final result = await repository.execute(
+        await previewedDeleteIntention(repository, owner),
+      );
 
       expect(
         result,
@@ -147,7 +150,9 @@ void main() {
         );
       }
 
-      final result = await repository.execute(DeleteIntention(owner));
+      final result = await repository.execute(
+        await previewedDeleteIntention(repository, owner),
+      );
 
       expect(
         result,
@@ -321,7 +326,9 @@ void main() {
       isArchived: false,
     );
 
-    final result = await repository.execute(ArchiveIntention(owner));
+    final result = await repository.execute(
+      await previewedArchiveIntention(repository, owner),
+    );
 
     final confirmed = _confirmedCommand(result);
     final countChanges = {
@@ -370,7 +377,9 @@ void main() {
     );
 
     final restore = _confirmedCommand(
-      await repository.execute(RestoreIntention(owner)),
+      await repository.execute(
+        await previewedRestoreIntention(repository, owner),
+      ),
     );
 
     expect(
@@ -448,7 +457,9 @@ void main() {
       }
 
       final archived = _confirmedCommand(
-        await repository.execute(ArchiveIntention(owner)),
+        await repository.execute(
+          await previewedArchiveIntention(repository, owner),
+        ),
       );
       await untilPublished(owner, 2);
       await untilPublished(activeNeighbor, 2);
@@ -478,7 +489,9 @@ void main() {
 
       // Восстановление не возвращает связи: меняется только владелец.
       final restored = _confirmedCommand(
-        await repository.execute(RestoreIntention(owner)),
+        await repository.execute(
+          await previewedRestoreIntention(repository, owner),
+        ),
       );
       await untilPublished(owner, 3);
       await pumpEventQueue();
@@ -491,7 +504,9 @@ void main() {
 
       // Повторное архивирование без активных связей меняет только владельца.
       final archivedWithoutActiveRelations = _confirmedCommand(
-        await repository.execute(ArchiveIntention(owner)),
+        await repository.execute(
+          await previewedArchiveIntention(repository, owner),
+        ),
       );
       await untilPublished(owner, 4);
       await pumpEventQueue();
@@ -499,7 +514,7 @@ void main() {
 
       // Повтор без изменений ничего не публикует.
       final noOp = _confirmedCommand(
-        await repository.execute(ArchiveIntention(owner)),
+        await repository.execute(givenArchiveIntention(owner)),
       );
       await pumpEventQueue();
       expect(

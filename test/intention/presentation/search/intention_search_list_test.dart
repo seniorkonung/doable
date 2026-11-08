@@ -38,6 +38,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../catalog/catalog_reconciliation_test_support.dart';
 import '../catalog/catalog_test_support.dart';
 import '../../../support/tag_positions.dart';
+import '../../../support/intention_cascade_execution.dart';
 
 /// Высота строки-образца выдачи.
 const _rowExtent = 48.0;
@@ -1266,7 +1267,7 @@ Future<void> _deleteOccupyingRelation(
   await acceptRelationCommand(
     h.container,
     h.repository,
-    DeleteLongTermRelation(relation.id),
+    givenDeleteRelation(relation.id),
     _confirmedRelation(
       LongTermRelationDeleted(
         relation: relation,

@@ -34,6 +34,7 @@ import '../support/forwarding_graph_fact_log.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/intention_cascade_execution.dart';
 import '../support/local_database_harness.dart';
 
 void main() {
@@ -172,7 +173,7 @@ void main() {
     await confirm(RemoveTagAssignment(tagId: home.id, intentionId: health.id));
     await confirm(AssignTag(tagId: home.id, intentionId: health.id));
     await confirm(DeleteAction(action));
-    await confirm(ArchiveIntention(swimming.id));
+    await confirm(await previewedArchiveIntention(repository, swimming.id));
     await createIntention('Читать');
     final position = await repository.readCurrentPosition();
     await store.writeSnapshot(position);

@@ -25,6 +25,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import '../../support/graph_seed.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/tag_positions.dart';
@@ -303,9 +304,17 @@ void main() {
       );
 
       for (final (name, command, isArchived)
-          in <(String, IntentionCommand Function(IntentionId), int)>[
-            ('архивирования', ArchiveIntention.new, 0),
-            ('восстановления из архива', RestoreIntention.new, 1),
+          in <(String, Future<IntentionCommand> Function(IntentionId), int)>[
+            (
+              'архивирования',
+              (id) => previewedArchiveIntention(repository, id),
+              0,
+            ),
+            (
+              'восстановления из архива',
+              (id) => previewedRestoreIntention(repository, id),
+              1,
+            ),
           ]) {
         test('снимки $name сохраняют полные собственные теги', () async {
           seedRawGraph(raw, () {
@@ -318,7 +327,7 @@ void main() {
             ]);
           });
           final saved = _commandSuccess(
-            await repository.execute(command(id)),
+            await repository.execute(await command(id)),
           ) as IntentionSaved;
           final mutation = saved.catalogMutation as IntentionCatalogUpdated;
 
@@ -359,18 +368,22 @@ void main() {
       }
 
       for (final (name, command, isArchived)
-          in <(String, IntentionCommand Function(IntentionId), int)>[
+          in <(String, Future<IntentionCommand> Function(IntentionId), int)>[
             (
               'изменения полей',
-              (id) => UpdateIntention(
+              (id) async => UpdateIntention(
                 id: id,
                 title: 'Намерение 1',
                 description: 'Описание 1',
               ),
               0,
             ),
-            ('архивирования', ArchiveIntention.new, 1),
-            ('восстановления из архива', RestoreIntention.new, 0),
+            ('архивирования', (id) async => givenArchiveIntention(id), 1),
+            (
+              'восстановления из архива',
+              (id) async => givenRestoreIntention(id),
+              0,
+            ),
           ]) {
         test('повтор $name сохраняет проверенные теги без записи', () async {
           seedRawGraph(raw, () {
@@ -384,7 +397,7 @@ void main() {
           });
 
           final saved = _commandSuccess(
-            await repository.execute(command(id)),
+            await repository.execute(await command(id)),
           ) as IntentionSaved;
           final mutation = saved.catalogMutation as IntentionCatalogUnchanged;
 
@@ -409,7 +422,9 @@ void main() {
           });
 
           final deleted = _commandSuccess(
-            await repository.execute(DeleteIntention(id)),
+            await repository.execute(
+              await previewedDeleteIntention(repository, id),
+            ),
           ) as IntentionDeleted;
           final mutation = deleted.catalogMutation as IntentionCatalogDeleted;
 
@@ -819,7 +834,9 @@ void main() {
       expect(updatedMutation.after.summary.title, 'Позвонить врачу');
 
       final deleted = _commandSuccess(
-        await repository.execute(DeleteIntention(created.intention.id)),
+        await repository.execute(
+          await previewedDeleteIntention(repository, created.intention.id),
+        ),
       ) as IntentionDeleted;
       final deletedMutation =
           deleted.catalogMutation as IntentionCatalogDeleted;
@@ -833,7 +850,7 @@ void main() {
       expect(deletedMutation.entry.matches(doctorQuery), isTrue);
 
       final failed = await repository.execute(
-        DeleteIntention(created.intention.id),
+        givenDeleteIntention(created.intention.id),
       );
       expect(failed, _failure<IntentionNotFoundFailure>());
       final pageAfterFailure = _firstCatalogPage(
@@ -1140,10 +1157,14 @@ void main() {
           ),
         );
         final archiveUpdated = _saved(
-          await repository.execute(ArchiveIntention(id)),
+          await repository.execute(
+            await previewedArchiveIntention(repository, id),
+          ),
         );
         final restoreUpdated = _saved(
-          await repository.execute(RestoreIntention(id)),
+          await repository.execute(
+            await previewedRestoreIntention(repository, id),
+          ),
         );
 
         expect(titleUpdated.updatedAt.value, previouslyUpdatedAt);
@@ -1232,7 +1253,9 @@ void main() {
             createdAt: DateTime.utc(2026, 9, 2, 10),
           );
 
-          final result = await repository.execute(DeleteIntention(fixture.id));
+          final result = await repository.execute(
+            await previewedDeleteIntention(repository, fixture.id),
+          );
 
           expect(result, _deleted(fixture.id));
           expect(
@@ -1269,7 +1292,7 @@ void main() {
       'возвращает not-found при удалении отсутствующего намерения',
       () async {
         final result = await repository.execute(
-          DeleteIntention(_id(_firstUuid)),
+          givenDeleteIntention(_id(_firstUuid)),
         );
 
         expect(result, _failure<IntentionNotFoundFailure>());
@@ -1289,14 +1312,17 @@ void main() {
         final transitions =
             <
               ({
-                IntentionCommand Function(IntentionId) command,
+                Future<IntentionCommand> Function(IntentionId) previewed,
+                IntentionCommand Function(IntentionId) given,
                 IntentionCommandDiagnosticsType commandType,
                 IntentionArchiveState archiveState,
                 List<IntentionArchiveState> fixtures,
               })
             >[
               (
-                command: (IntentionId id) => ArchiveIntention(id),
+                previewed: (IntentionId id) =>
+                    previewedArchiveIntention(repository, id),
+                given: givenArchiveIntention,
                 commandType: IntentionCommandDiagnosticsType.archive,
                 archiveState: IntentionArchiveState.archived,
                 fixtures: [
@@ -1305,7 +1331,9 @@ void main() {
                 ],
               ),
               (
-                command: (IntentionId id) => RestoreIntention(id),
+                previewed: (IntentionId id) =>
+                    previewedRestoreIntention(repository, id),
+                given: givenRestoreIntention,
                 commandType: IntentionCommandDiagnosticsType.restore,
                 archiveState: IntentionArchiveState.active,
                 fixtures: [
@@ -1344,9 +1372,11 @@ void main() {
             final expectedArchiveState = transition.archiveState;
             final changesState = expectedArchiveState != initialArchiveState;
 
-            final saved = _saved(
-              await repository.execute(transition.command(id)),
-            );
+            // Неприменимая операция не имеет предпросмотра.
+            final command = changesState
+                ? await transition.previewed(id)
+                : transition.given(id);
+            final saved = _saved(await repository.execute(command));
 
             expect(saved.id, id);
             expect(saved.title, title);
@@ -1376,7 +1406,7 @@ void main() {
 
         expect(transitionCount, transitionTimes.length);
         expect(
-          diagnostics.events,
+          diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>(),
           everyElement(
             isA<IntentionCommandDiagnosticsEvent>().having(
               (event) => event.status,
@@ -1514,7 +1544,9 @@ void main() {
       expect(walkKey.compareTo(readKey), isNegative);
 
       final archived = _commandSuccess(
-        await repository.execute(ArchiveIntention(walkId)),
+        await repository.execute(
+          await previewedArchiveIntention(repository, walkId),
+        ),
       ) as IntentionSaved;
       final archivedMutation =
           archived.catalogMutation as IntentionCatalogUpdated;
@@ -1533,7 +1565,9 @@ void main() {
         'title_search_key': 'читать',
       }, column: 'title_search_key');
       final restored = _commandSuccess(
-        await repository.execute(RestoreIntention(walkId)),
+        await repository.execute(
+          await previewedRestoreIntention(repository, walkId),
+        ),
       ) as IntentionSaved;
       final restoredMutation =
           restored.catalogMutation as IntentionCatalogUpdated;
@@ -1560,11 +1594,11 @@ void main() {
               })
             >[
               (
-                command: (IntentionId id) => ArchiveIntention(id),
+                command: givenArchiveIntention,
                 commandType: IntentionCommandDiagnosticsType.archive,
               ),
               (
-                command: (IntentionId id) => RestoreIntention(id),
+                command: givenRestoreIntention,
                 commandType: IntentionCommandDiagnosticsType.restore,
               ),
             ];
@@ -1705,14 +1739,14 @@ void main() {
         final fixtures =
             <
               ({
-                IntentionCommand Function(IntentionId) command,
+                Future<IntentionCommand> Function(IntentionId) command,
                 IntentionCommandDiagnosticsType commandType,
                 bool isArchived,
                 Map<String, Object?> overrides,
               })
             >[
               (
-                command: (id) => UpdateIntention(
+                command: (id) async => UpdateIntention(
                   id: id,
                   title: 'Обновлённое название',
                   description: 'Обновлённое описание',
@@ -1724,25 +1758,25 @@ void main() {
                 },
               ),
               (
-                command: ArchiveIntention.new,
+                command: (id) => previewedArchiveIntention(repository, id),
                 commandType: IntentionCommandDiagnosticsType.archive,
                 isArchived: false,
                 overrides: const {'kind': 'unknown'},
               ),
               (
-                command: ArchiveIntention.new,
+                command: (id) => previewedArchiveIntention(repository, id),
                 commandType: IntentionCommandDiagnosticsType.archive,
                 isArchived: false,
                 overrides: const {'title_search_key': ''},
               ),
               (
-                command: RestoreIntention.new,
+                command: (id) => previewedRestoreIntention(repository, id),
                 commandType: IntentionCommandDiagnosticsType.restore,
                 isArchived: true,
                 overrides: const {'title_search_key': 'ключ\u0000поиска'},
               ),
               (
-                command: DeleteIntention.new,
+                command: (id) => previewedDeleteIntention(repository, id),
                 commandType: IntentionCommandDiagnosticsType.delete,
                 isArchived: false,
                 overrides: const {'created_at': 1.5},
@@ -1770,9 +1804,11 @@ void main() {
           final revisionBefore = _firstCatalogPage(
             await repository.getCatalogPage(query),
           ).revision;
+          // Предпросмотр читается до подмены строк, как при запуске операции.
+          final command = await fixture.command(id);
           rawOverride.overrideSelect(fixture.overrides);
 
-          final result = await repository.execute(fixture.command(id));
+          final result = await repository.execute(command);
 
           expect(result, _failure<IntentionCorruptionFailure>());
           expect(

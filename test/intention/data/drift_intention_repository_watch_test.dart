@@ -16,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import '../../support/graph_seed.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 void main() {
@@ -32,62 +33,58 @@ void main() {
 
   tearDown(() => database.close());
 
-  test(
-    'сериализует начальное чтение и команду одним исполнителем графа',
-    () async {
-      final gate = _BlockingSelectObserver();
-      await database.close();
-      database = AppDatabase(
-        observeConfiguredLocalDatabaseConnection(
-          openInMemoryLocalDatabase(),
-          gate,
-        ),
-      );
-      await database.open();
-      final id = _id(_uuidV7);
-      await _insertIntention(
-        database,
-        id: id.toCanonicalString(),
-        title: 'Прочитать книгу',
-      );
-      repository = _repository(database, diagnostics);
-      gate.blockNextSelect();
-      final events = StreamIterator(repository.watchIntention(id));
-      addTearDown(events.cancel);
+  test('сериализует начальное чтение и команду одним исполнителем графа', () async {
+    final gate = _BlockingSelectObserver();
+    await database.close();
+    database = AppDatabase(
+      observeConfiguredLocalDatabaseConnection(
+        openInMemoryLocalDatabase(),
+        gate,
+      ),
+    );
+    await database.open();
+    final id = _id(_uuidV7);
+    await _insertIntention(
+      database,
+      id: id.toCanonicalString(),
+      title: 'Прочитать книгу',
+    );
+    repository = _repository(database, diagnostics);
+    // Предпросмотр читается до блокировки: он стоял бы в очереди графа за ней.
+    final archive = await previewedArchiveIntention(repository, id);
+    gate.blockNextSelect();
+    final events = StreamIterator(repository.watchIntention(id));
+    addTearDown(events.cancel);
 
-      final initialFuture = events.moveNext();
-      await gate.selectBlocked;
-      var commandCompleted = false;
-      final commandFuture = repository
-          .execute(ArchiveIntention(id))
-          .whenComplete(() => commandCompleted = true);
-      await pumpEventQueue(times: 20);
+    final initialFuture = events.moveNext();
+    await gate.selectBlocked;
+    var commandCompleted = false;
+    final commandFuture = repository
+        .execute(archive)
+        .whenComplete(() => commandCompleted = true);
+    await pumpEventQueue(times: 20);
 
-      expect(commandCompleted, isFalse);
-      gate.releaseSelect();
-      expect(await initialFuture, isTrue);
-      final initial = _graphSnapshot(events.current);
-      final result = await commandFuture;
-      final confirmed =
-          (result
-                  as ResultSuccess<
-                    ConfirmedGraphResult<IntentionCommandSuccess>
-                  >)
-              .value;
+    expect(commandCompleted, isFalse);
+    gate.releaseSelect();
+    expect(await initialFuture, isTrue);
+    final initial = _graphSnapshot(events.current);
+    final result = await commandFuture;
+    final confirmed =
+        (result as ResultSuccess<ConfirmedGraphResult<IntentionCommandSuccess>>)
+            .value;
 
-      expect(
-        initial.revision.compareTo(confirmed.revision),
-        GraphRevisionOrder.older,
-      );
-      expect(await events.moveNext(), isTrue);
-      final updated = _graphSnapshot(events.current);
-      expect(updated.value?.archiveState, IntentionArchiveState.archived);
-      expect(
-        updated.revision.compareTo(confirmed.revision),
-        GraphRevisionOrder.same,
-      );
-    },
-  );
+    expect(
+      initial.revision.compareTo(confirmed.revision),
+      GraphRevisionOrder.older,
+    );
+    expect(await events.moveNext(), isTrue);
+    final updated = _graphSnapshot(events.current);
+    expect(updated.value?.archiveState, IntentionArchiveState.archived);
+    expect(
+      updated.revision.compareTo(confirmed.revision),
+      GraphRevisionOrder.same,
+    );
+  });
 
   group('DriftPersonalGraphRepository.watchIntention', () {
     test('публикует начальное подтверждённое отсутствие', () async {
@@ -179,7 +176,9 @@ void main() {
           ),
         );
 
-        final result = await repository.execute(ArchiveIntention(id));
+        final result = await repository.execute(
+          await previewedArchiveIntention(repository, id),
+        );
 
         expect(
           result,
@@ -216,7 +215,9 @@ void main() {
         _isSuccessfulIntention(id: id, title: 'Прочитать книгу'),
       );
 
-      final result = await repository.execute(DeleteIntention(id));
+      final result = await repository.execute(
+        await previewedDeleteIntention(repository, id),
+      );
 
       expect(
         result,

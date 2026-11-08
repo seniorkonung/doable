@@ -23,6 +23,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../intention/presentation/details/details_test_support.dart';
+import '../../support/intention_cascade_execution.dart';
 
 void main() {
   setUp(() {
@@ -657,7 +658,7 @@ final class _FailureHarness {
   }) async {
     final intention = testDetailsIntention(index: index, title: title);
     final accepted = coordinator.acceptExisting(
-      DeleteIntention(intention.id),
+      givenDeleteIntention(intention.id),
       presentationTitle: intention.title,
     ) as IntentionCommandAccepted;
     repository.completeCommand(

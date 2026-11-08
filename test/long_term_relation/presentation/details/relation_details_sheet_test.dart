@@ -8,6 +8,7 @@ import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/doable_priority.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
+import 'package:doable/src/intention/application/cascade/intention_cascade.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
@@ -1404,6 +1405,37 @@ void main() {
       expect(
         repository.relationCommands,
         everyElement(isA<ArchiveLongTermRelation>()),
+      );
+      expect(
+        find.text('Не удалось архивировать связь. Повторите попытку.'),
+        findsNothing,
+      );
+      semantics.dispose();
+    });
+
+    testWidgets('отказ чтения предпросмотра при архивировании остаётся в '
+        'панели без команды, а повтор читает предпросмотр заново и '
+        'архивирует', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = await openPanel(tester, relation());
+      repository.onPreviewCascade = (_, _) => const CascadePreviewUnavailable();
+
+      await choose(tester, 'Архивировать');
+      await tester.pumpAndSettle();
+
+      expect(repository.relationCommands, isEmpty);
+      expect(
+        find.text('Не удалось архивировать связь. Повторите попытку.'),
+        findsOneWidget,
+      );
+
+      repository.onPreviewCascade = null;
+      await tester.tap(find.text('Повторить'));
+      await tester.pump();
+
+      expect(
+        repository.relationCommands.single,
+        isA<ArchiveLongTermRelation>(),
       );
       expect(
         find.text('Не удалось архивировать связь. Повторите попытку.'),

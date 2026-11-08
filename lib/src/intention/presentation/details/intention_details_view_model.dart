@@ -7,6 +7,7 @@ import '../../../graph/application/graph_change.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
+import '../../application/cascade/intention_cascade.dart';
 import '../../application/intention_command.dart';
 import '../../application/intention_catalog.dart';
 import '../../application/intention_details.dart' as application;
@@ -17,7 +18,24 @@ import 'intention_details_state.dart';
 
 part 'intention_details_view_model.g.dart';
 
-enum _StateChangeKind { makeMain, makeSupporting, archive, restore, delete }
+/// Принимаемая координатором операция: готовая команда или отказ
+/// предпросмотра каскада, прочитанного при её запуске.
+sealed class _OperationStart {
+  const _OperationStart();
+}
+
+final class _CommandStart extends _OperationStart {
+  const _CommandStart(this.command);
+
+  final ExistingIntentionCommand command;
+}
+
+final class _PreviewFailureStart extends _OperationStart {
+  const _PreviewFailureStart(this.operation, this.failure);
+
+  final CascadeOperation operation;
+  final CascadePreviewFailure failure;
+}
 
 final class _DetailObservationGeneration {
   const _DetailObservationGeneration(this.value);
@@ -58,6 +76,7 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
   GraphRevision? _acceptedRevision;
   var _preserveAuthoritativeStateWhileLoading = false;
   var _isDeleted = false;
+  var _isReadingCascadePreview = false;
 
   @override
   IntentionDetailsState build(IntentionId intentionId) {
@@ -98,20 +117,27 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     }
   }
 
-  void changeKind(IntentionKind kind) => _startStateChange(switch (kind) {
-    IntentionKind.main => _StateChangeKind.makeMain,
-    IntentionKind.supporting => _StateChangeKind.makeSupporting,
-  });
+  void changeKind(IntentionKind kind) {
+    final current = state;
+    if (current is! IntentionDetailsLoaded || current.intention.kind == kind) {
+      return;
+    }
+    _accept(
+      current.intention.title,
+      _CommandStart(ChangeIntentionKind(_intentionId, kind)),
+      releasesInitiator: false,
+    );
+  }
 
-  void archive() => _startStateChange(_StateChangeKind.archive);
+  void archive() => unawaited(_startCascadeOperation(CascadeOperation.archive));
 
-  void restore() => _startStateChange(_StateChangeKind.restore);
+  void restore() => unawaited(_startCascadeOperation(CascadeOperation.restore));
 
   /// Возвращает успех только собственной принятой команды удаления.
   /// Общее состояние данных по ID не передаёт право закрытия другим страницам.
   Future<bool> delete() async {
     final intentionId = _intentionId;
-    final completion = await _startStateChange(_StateChangeKind.delete);
+    final completion = await _startCascadeOperation(CascadeOperation.delete);
     return switch (completion?.result) {
       ResultSuccess(value: IntentionDeleted(:final id)) => id == intentionId,
       _ => false,
@@ -210,29 +236,101 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     }
   }
 
-  /// Отказ перехода предъявляет общая поверхность. У изменения вида,
-  /// архивирования и восстановления права инициатора нет, а право удаления
-  /// страница освобождает сразу при принятии: renderer отказа она не держит.
-  Future<IntentionCommandCompletion>? _startStateChange(_StateChangeKind kind) {
+  /// Читает предпросмотр каскада при запуске операции и передаёт вариант
+  /// «со вспомогательными» с его составом (D7). Отказ чтения координатор
+  /// принимает как отказ самой операции.
+  Future<IntentionCommandCompletion?> _startCascadeOperation(
+    CascadeOperation operation,
+  ) async {
     final current = state;
     if (current is! IntentionDetailsLoaded ||
-        !_isStateChangeApplicable(current, kind)) {
+        _isReadingCascadePreview ||
+        !_isCascadeOperationApplicable(current, operation)) {
       return null;
     }
-
-    final start = _coordinator.acceptExisting(
-      _commandForStateChange(kind),
-      presentationTitle: current.intention.title,
+    final intentionId = _intentionId;
+    final CascadePreviewResult preview;
+    _isReadingCascadePreview = true;
+    try {
+      preview = await ref
+          .read(personalGraphRepositoryProvider)
+          .previewCurrentCascade(
+            IntentionCascadeSubject(intentionId),
+            operation,
+          );
+    } finally {
+      _isReadingCascadePreview = false;
+    }
+    final start = switch (preview) {
+      ArchiveCascadePreview(:final plan) => _CommandStart(
+        ArchiveIntention(
+          intentionId,
+          execution: CascadeExecution.withSupporting(plan),
+        ),
+      ),
+      RestoreCascadePreview(:final plan) => _CommandStart(
+        RestoreIntention(
+          intentionId,
+          execution: CascadeExecution.withSupporting(plan),
+        ),
+      ),
+      IntentionDeleteCascadePreview(:final plan) => _CommandStart(
+        DeleteIntention(
+          intentionId,
+          execution: CascadeExecution.withSupporting(plan),
+        ),
+      ),
+      // Предпросмотр намерения не бывает предпросмотром удаления связи.
+      RelationDeleteCascadePreview() => _PreviewFailureStart(
+        operation,
+        const CascadePreviewUnexpected(),
+      ),
+      CascadePreviewFailure() => _PreviewFailureStart(operation, preview),
+    };
+    // Выбор уже сделан, поэтому уход со страницы во время чтения не отменяет
+    // операцию.
+    return _accept(
+      current.intention.title,
+      start,
+      releasesInitiator: operation == CascadeOperation.delete,
     );
-    switch (start) {
+  }
+
+  /// Отказ операции предъявляет общая поверхность. У изменения вида,
+  /// архивирования и восстановления права инициатора нет, а право удаления
+  /// страница освобождает сразу при принятии: renderer отказа она не держит.
+  Future<IntentionCommandCompletion>? _accept(
+    String presentationTitle,
+    _OperationStart start, {
+    required bool releasesInitiator,
+  }) {
+    final acceptance = switch (start) {
+      _CommandStart(:final command) => _coordinator.acceptExisting(
+        command,
+        presentationTitle: presentationTitle,
+      ),
+      _PreviewFailureStart(:final operation, :final failure) =>
+        _coordinator.acceptIntentionPreviewFailure(
+          intentionId: _intentionId,
+          operation: operation,
+          failure: failure,
+          presentationTitle: presentationTitle,
+        ),
+    };
+    final isShown = ref.mounted && !_isDeleted;
+    switch (acceptance) {
       case IntentionCommandAccepted(:final token, :final future):
-        if (kind == _StateChangeKind.delete) {
+        if (releasesInitiator) {
           _coordinator.releaseInitiatorPresentation(token);
         }
-        state = current.copyWith(isOperationRunning: true);
+        if (isShown) {
+          state = _withOperationRunning(state, true);
+        }
         return future;
       case IntentionCommandAlreadyRunning():
-        state = current.copyWith(isOperationRunning: true);
+        if (isShown) {
+          state = _withOperationRunning(state, true);
+        }
       case GraphCommandCoordinatorDraining():
         // Замена графа ничего не начинает; повтор — новое действие.
         break;
@@ -240,37 +338,16 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     return null;
   }
 
-  ExistingIntentionCommand _commandForStateChange(_StateChangeKind kind) =>
-      switch (kind) {
-        _StateChangeKind.makeMain => ChangeIntentionKind(
-          _intentionId,
-          IntentionKind.main,
-        ),
-        _StateChangeKind.makeSupporting => ChangeIntentionKind(
-          _intentionId,
-          IntentionKind.supporting,
-        ),
-        _StateChangeKind.archive => ArchiveIntention(_intentionId),
-        _StateChangeKind.restore => RestoreIntention(_intentionId),
-        _StateChangeKind.delete => DeleteIntention(_intentionId),
-      };
-
-  bool _isStateChangeApplicable(
+  bool _isCascadeOperationApplicable(
     IntentionDetailsLoaded loaded,
-    _StateChangeKind kind,
-  ) {
-    final details = loaded.details;
-    return switch (kind) {
-      _StateChangeKind.makeMain => details.intention.kind != IntentionKind.main,
-      _StateChangeKind.makeSupporting =>
-        details.intention.kind != IntentionKind.supporting,
-      _StateChangeKind.archive =>
-        details.intention.archiveState == IntentionArchiveState.active,
-      _StateChangeKind.restore =>
-        details.intention.archiveState == IntentionArchiveState.archived,
-      _StateChangeKind.delete => true,
-    };
-  }
+    CascadeOperation operation,
+  ) => switch (operation) {
+    CascadeOperation.archive =>
+      loaded.intention.archiveState == IntentionArchiveState.active,
+    CascadeOperation.restore =>
+      loaded.intention.archiveState == IntentionArchiveState.archived,
+    CascadeOperation.delete => true,
+  };
 
   void _scheduleGateRefresh() {
     unawaited(

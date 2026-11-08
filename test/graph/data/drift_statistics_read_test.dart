@@ -17,6 +17,7 @@ import '../../support/action_seed.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
+import '../../support/intention_cascade_execution.dart';
 
 void main() {
   late LocalDatabaseHarness harness;
@@ -132,7 +133,9 @@ void main() {
     addAction(202, '2026-10-12', [8], completed: true);
     for (final number in [7, 8]) {
       expect(
-        await repository.execute(DeleteIntention(seedIntentionId(number))),
+        await repository.execute(
+          await previewedDeleteIntention(repository, seedIntentionId(number)),
+        ),
         isA<GraphCommandSucceeded>(),
       );
     }
@@ -209,7 +212,12 @@ void main() {
           isA<GraphCommandSucceeded>(),
         );
         expect(
-          await repository.execute(ArchiveIntention(seedIntentionId(number))),
+          await repository.execute(
+            await previewedArchiveIntention(
+              repository,
+              seedIntentionId(number),
+            ),
+          ),
           isA<GraphCommandSucceeded>(),
         );
       }

@@ -13,13 +13,13 @@ import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/action_seed.dart';
 import '../../support/graph_durability_fixture.dart';
 import '../../support/graph_seed.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/local_database_harness.dart';
 
 /// Граф проверок: главные «Быть здоровым» (1), «Высыпаться» (4) и «Сходить в
@@ -33,6 +33,7 @@ void main() {
   late _HookedDiagnosticsSink diagnostics;
   late _ControlledRunner runner;
   late DriftPersonalGraphRepository repository;
+  late DriftPersonalGraphRepository previews;
 
   const titles = {
     1: 'Быть здоровым',
@@ -103,6 +104,14 @@ void main() {
     });
     diagnostics = _HookedDiagnosticsSink();
     runner = _ControlledRunner();
+    // Отдельный репозиторий читает предпросмотр команд, не прогревая индекс
+    // удержания и не обращаясь к счётчику проверяемого репозитория.
+    previews = DriftPersonalGraphRepository(
+      database,
+      UuidV7IntentionIdGenerator(),
+      () => DateTime.utc(2026, 11, 8),
+      diagnostics,
+    );
     repository = DriftPersonalGraphRepository(
       database,
       UuidV7IntentionIdGenerator(),
@@ -322,10 +331,15 @@ void main() {
 
   test('изменение удержания во время построения индекса даёт устаревший '
       'предпросмотр', () async {
+    // Предпросмотр команды читается до удержания построения индекса.
+    final archival = await previewedArchiveRelation(
+      previews,
+      durabilityRelation(104),
+    );
     runner.hold();
     final reading = previewIntention(1, CascadeOperation.archive);
     await runner.entered.future;
-    await confirm(ArchiveLongTermRelation(durabilityRelation(104)));
+    await confirm(archival);
     runner.release();
 
     expect(await reading, isA<CascadePreviewExpired>());

@@ -63,6 +63,7 @@ import '../../support/action_seed.dart';
 import '../../support/graph_durability_fixture.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/intention_kind_counts.dart';
 import '../../long_term_relation/presentation/relation_graph_test_support.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
@@ -502,7 +503,9 @@ void main() {
         LongTermRelationType.can,
       );
       expect(
-        await repository.execute(ArchiveLongTermRelation(selectedArchived)),
+        await repository.execute(
+          await previewedArchiveRelation(repository, selectedArchived),
+        ),
         isA<GraphCommandSucceeded>(),
       );
       final untouchedOwner = await create(
@@ -631,7 +634,7 @@ void main() {
       late ConfirmedGraphResult<LongTermRelationCommandSuccess> confirmed;
       for (final relationId in [selectedActive, selectedArchived]) {
         final start = coordinator.acceptRelationDelete(
-          DeleteLongTermRelation(relationId),
+          await previewedDeleteRelation(repository, relationId),
         ) as LongTermRelationCommandAccepted;
         final completion = await start.future;
         confirmed =

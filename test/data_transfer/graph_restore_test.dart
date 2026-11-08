@@ -41,6 +41,7 @@ import '../support/forwarding_graph_fact_log.dart';
 import '../support/graph_import_files.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/intention_cascade_execution.dart';
 import '../support/local_database_harness.dart';
 import '../support/reference_graph_replacement.dart';
 import '../support/transaction_storage_exhaustion.dart';
@@ -249,7 +250,7 @@ void main() {
     await createTag('Сад');
     final manual = await makeManualBackup();
     final manualState = await graphState();
-    await confirm(ArchiveIntention(health.id));
+    await confirm(await previewedArchiveIntention(repository, health.id));
     final beforeRestore = await graphState();
 
     expect(await restore(daily), isA<GraphBackupRestored>());
@@ -422,7 +423,7 @@ void main() {
 
       await createIntention('Бегать');
       await createIntention('Плавать');
-      await confirm(ArchiveIntention(health.id));
+      await confirm(await previewedArchiveIntention(repository, health.id));
 
       expect(_shown(await controller().countChangesSince(backup)), (
         added: 2,
@@ -438,7 +439,7 @@ void main() {
       final health = await createIntention('Здоровье');
       final backup = await makeManualBackup();
       await createIntention('Бегать');
-      await confirm(ArchiveIntention(health.id));
+      await confirm(await previewedArchiveIntention(repository, health.id));
       final hold = log.holdNextRead();
       final counted = controller().countChangesSince(backup);
       await hold.reached;
@@ -690,7 +691,7 @@ void main() {
       ];
       final backup = await makeManualBackup();
       for (final intention in long) {
-        await confirm(DeleteIntention(intention.id));
+        await confirm(await previewedDeleteIntention(repository, intention.id));
       }
       await createTag('Дом');
       await database.customStatement('VACUUM');

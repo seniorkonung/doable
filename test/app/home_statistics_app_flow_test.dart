@@ -14,6 +14,8 @@ import 'package:doable/src/data/local/bootstrap/local_data_bootstrap.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/contribution_reachability.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
@@ -36,6 +38,7 @@ import '../support/controlled_local_date.dart';
 import '../support/graph_durability_fixture.dart';
 import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/intention_cascade_execution.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/local_database_harness.dart';
 
@@ -79,14 +82,32 @@ void main() {
       findsNWidgets(4),
     );
 
-    await app.relation(tester, ArchiveLongTermRelation(relation.id));
+    await app.relation(
+      tester,
+      await app.previewed(
+        tester,
+        (r) => previewedArchiveRelation(r, relation.id),
+      ),
+    );
     await _until(tester, find.text(app.texts.statisticsTotalItems(3)));
     expect(find.text('Намерение 5'), findsNothing);
-    await app.relation(tester, RestoreLongTermRelation(relation.id));
+    await app.relation(
+      tester,
+      await app.previewed(
+        tester,
+        (r) => previewedRestoreRelation(r, relation.id),
+      ),
+    );
     await _until(tester, find.text(app.texts.statisticsTotalItems(4)));
     expect(find.text('Намерение 5'), findsOneWidget);
 
-    await app.relation(tester, DeleteLongTermRelation(relation.id));
+    await app.relation(
+      tester,
+      await app.previewed(
+        tester,
+        (r) => previewedDeleteRelation(r, relation.id),
+      ),
+    );
     await _until(tester, find.text(app.texts.statisticsTotalItems(3)));
     expect(find.text('Намерение 5'), findsNothing);
     final otherPair = await app.relation(
@@ -99,7 +120,13 @@ void main() {
     );
     await _until(tester, find.text(app.texts.statisticsTotalItems(4)));
     expect(find.text('Намерение 4'), findsOneWidget);
-    await app.relation(tester, DeleteLongTermRelation(otherPair.id));
+    await app.relation(
+      tester,
+      await app.previewed(
+        tester,
+        (r) => previewedDeleteRelation(r, otherPair.id),
+      ),
+    );
     await _until(tester, find.text(app.texts.statisticsTotalItems(3)));
     expect(find.text('Намерение 4'), findsNothing);
     await app.relation(
@@ -111,7 +138,13 @@ void main() {
       ),
     );
     await _until(tester, find.text(app.texts.statisticsTotalItems(4)));
-    await app.intention(tester, ArchiveIntention(durabilityIntention(2)));
+    await app.intention(
+      tester,
+      await app.previewed(
+        tester,
+        (r) => previewedArchiveIntention(r, durabilityIntention(2)),
+      ),
+    );
     await _until(tester, find.text(app.texts.statisticsTotalItems(3)));
     for (final number in [1, 2, 3]) {
       expect(find.text('Намерение $number'), findsOneWidget);
@@ -368,7 +401,10 @@ void main() {
       );
       await app.relation(
         tester,
-        ArchiveLongTermRelation(durabilityRelation(2143)),
+        await app.previewed(
+          tester,
+          (r) => previewedArchiveRelation(r, durabilityRelation(2143)),
+        ),
       );
       expect(gate.computationFinished.isCompleted, isFalse);
       gate.releaseComputation();
@@ -671,7 +707,13 @@ void main() {
           completed: true,
         ),
       );
-      await app.intention(tester, ArchiveIntention(durabilityIntention(4)));
+      await app.intention(
+        tester,
+        await app.previewed(
+          tester,
+          (r) => previewedArchiveIntention(r, durabilityIntention(4)),
+        ),
+      );
       expect(app.reads, recreatingReads);
       await openHome(tester);
       await _until(tester, find.text(app.texts.statisticsPeriodActions(1)));
@@ -802,6 +844,15 @@ final class _App {
             event.stage == StatisticsReadDiagnosticsStage.sourceData,
       )
       .length;
+
+  /// Команда с выполнением из предпросмотра, прочитанного в хранилище
+  /// приложения непосредственно перед её принятием.
+  Future<C> previewed<C>(
+    WidgetTester tester,
+    Future<C> Function(PersonalGraphRepository repository) build,
+  ) async => (await tester.runAsync(
+    () => build(container.read(personalGraphRepositoryProvider)),
+  ))!;
 
   Future<void> action(WidgetTester tester, ActionCommand command) async {
     await tester.runAsync(() async {

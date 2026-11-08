@@ -57,7 +57,7 @@ void _registerOrdinaryLayoutTests() {
         screen: screen,
         insets: insets,
       );
-      _acceptDelete(app, intention: 3);
+      await _acceptDelete(tester, app, intention: 3);
       await _until(tester, _messageOf(3));
       await tester.pumpAndSettle();
       _expectLayoutMessage(tester, insets);
@@ -70,7 +70,7 @@ void _registerOrdinaryLayoutTests() {
       await tester.pumpAndSettle();
       _expectLayoutMessage(tester, insets);
       await _closeMessage(tester);
-      _acceptDelete(app, intention: 4);
+      await _acceptDelete(tester, app, intention: 4);
       await _until(tester, _messageOf(4));
       await tester.pumpAndSettle();
       _expectLayoutMessage(tester, insets);

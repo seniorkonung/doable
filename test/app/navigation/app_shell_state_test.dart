@@ -30,6 +30,7 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
+import 'package:doable/src/intention/application/cascade/intention_cascade.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
@@ -1426,6 +1427,12 @@ final class _ObservedRepository
     final gate = _gate;
     if (gate != null && !gate.isCompleted) gate.complete();
   }
+
+  @override
+  Future<CascadePreviewResult> previewCascade(
+    CascadeSubject subject,
+    CascadeOperation operation,
+  ) => _delegate.previewCascade(subject, operation);
 
   @override
   Future<ActionDayStatusesReadResult> getActionDayStatuses(
