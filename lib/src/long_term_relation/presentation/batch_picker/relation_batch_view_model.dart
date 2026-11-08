@@ -41,6 +41,7 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
   late IntentionRelationGroup _group;
   final _searchKey = RelationsAdditionSearchKey();
   final _selected = <IntentionId, _BatchMark>{};
+  final _createdKinds = <IntentionId, IntentionKind>{};
   bool _hasCreatedIntentions = false;
   late String _pageTitle;
   RelationBatchOperation _operation = const RelationBatchIdle();
@@ -72,17 +73,21 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
     if (_selected.containsKey(id)) {
       _selected.remove(id);
     } else {
-      _selected[id] = _BatchMark(title);
+      _selected[id] = _BatchMark(
+        title,
+        becomesSupporting: _createdKinds[id] == IntentionKind.supporting,
+      );
     }
     _publish(const RelationBatchIdle());
   }
 
   /// Принимает результат живой панели создания для этого поиска.
   ///
-  /// Выбранный в панели [kind] отметка помнит, пока она стоит: вспомогательным
-  /// намерение становится только вместе со связью.
+  /// Выбранный в панели [kind] сохраняется на всю сессию поиска;
+  /// вспомогательным намерение становится только вместе со связью.
   void acceptCreated(IntentionId id, String title, IntentionKind kind) {
     if (!ref.mounted || !state.canEdit) return;
+    _createdKinds[id] = kind;
     _selected.remove(id);
     _selected[id] = _BatchMark(
       title,

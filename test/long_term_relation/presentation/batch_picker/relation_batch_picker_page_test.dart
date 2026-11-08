@@ -329,6 +329,25 @@ void main() {
     },
   );
 
+  testWidgets('повторная отметка сохраняет выбранный при создании вид', (
+    tester,
+  ) async {
+    await open(tester, IntentionRelationGroup.needs);
+    await createFromSearch(tester, 'Ходить на работу');
+    await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+    await settleCommand(tester);
+    await tester.tap(find.text('Ходить на работу'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ходить на работу'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(addButton);
+    await settleCommand(tester);
+
+    expect(await tester.runAsync(relations), hasLength(5));
+    expect(await storedKind(tester, 'Ходить на работу'), 'supporting');
+  });
+
   testWidgets('снятая отметка оставляет созданное намерение главным', (
     tester,
   ) async {
