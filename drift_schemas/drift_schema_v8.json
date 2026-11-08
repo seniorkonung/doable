@@ -2244,7 +2244,7 @@
           67
         ],
         "name": "intentions_fts_after_update_search_content",
-        "sql": "CREATE TRIGGER intentions_fts_after_update_search_content\nAFTER UPDATE ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(\n    intention_titles_fts, rowid, title_search_key\n  ) VALUES ('delete', old.rowid, old.title_search_key);\n  INSERT INTO intention_titles_fts(rowid, title_search_key)\n  VALUES (new.rowid, new.title_search_key);\nEND;"
+        "sql": "CREATE TRIGGER intentions_fts_after_update_search_content\nAFTER UPDATE OF title ON intentions\nBEGIN\n  INSERT INTO intention_titles_fts(\n    intention_titles_fts, rowid, title_search_key\n  ) VALUES ('delete', old.rowid, old.title_search_key);\n  INSERT INTO intention_titles_fts(rowid, title_search_key)\n  VALUES (new.rowid, new.title_search_key);\nEND;"
       }
     },
     {
@@ -3188,7 +3188,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TRIGGER intentions_fts_after_update_search_content AFTER UPDATE ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, \"rowid\", title_search_key) VALUES ('delete', old.\"rowid\", old.title_search_key);INSERT INTO intention_titles_fts (\"rowid\", title_search_key) VALUES (new.\"rowid\", new.title_search_key);END"
+          "sql": "CREATE TRIGGER intentions_fts_after_update_search_content AFTER UPDATE OF title ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, \"rowid\", title_search_key) VALUES ('delete', old.\"rowid\", old.title_search_key);INSERT INTO intention_titles_fts (\"rowid\", title_search_key) VALUES (new.\"rowid\", new.title_search_key);END"
         }
       ]
     },

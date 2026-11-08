@@ -7256,7 +7256,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'intentions_fts_after_insert',
   );
   late final Trigger intentionsFtsAfterUpdateSearchContent = Trigger(
-    'CREATE TRIGGER intentions_fts_after_update_search_content AFTER UPDATE ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, "rowid", title_search_key) VALUES (\'delete\', old."rowid", old.title_search_key);INSERT INTO intention_titles_fts ("rowid", title_search_key) VALUES (new."rowid", new.title_search_key);END',
+    'CREATE TRIGGER intentions_fts_after_update_search_content AFTER UPDATE OF title ON intentions BEGIN INSERT INTO intention_titles_fts (intention_titles_fts, "rowid", title_search_key) VALUES (\'delete\', old."rowid", old.title_search_key);INSERT INTO intention_titles_fts ("rowid", title_search_key) VALUES (new."rowid", new.title_search_key);END',
     'intentions_fts_after_update_search_content',
   );
   late final Trigger intentionsFtsAfterDelete = Trigger(

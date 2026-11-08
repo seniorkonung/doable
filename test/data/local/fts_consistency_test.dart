@@ -18,6 +18,29 @@ void main() {
   tearDown(() => database.close());
 
   group('полнотекстовый индекс названий намерений', () {
+    test('изменение вида и архива не записывает в индекс названий', () async {
+      const id = '018f0b5d-6b2e-7c80-8000-000000000106';
+      await _insertIntention(database, id: id, title: 'Купить молоко');
+
+      await seedGraph(database, () async {
+        final before = await database
+            .customSelect('SELECT total_changes() AS count')
+            .getSingle();
+        await database.customStatement(
+          "UPDATE intentions SET kind = 'supporting', is_archived = 1 WHERE id = ?",
+          [id],
+        );
+        final after = await database
+            .customSelect('SELECT total_changes() AS count')
+            .getSingle();
+
+        expect(after.read<int>('count') - before.read<int>('count'), 1);
+      });
+
+      expect(await _findByTitleFilter(database, 'молоко'), [id]);
+      await expectLater(verifyIntentionTitlesFtsIntegrity(database), completes);
+    });
+
     test(
       'согласованно отражает вставку, изменение и удаление основной строки',
       () async {

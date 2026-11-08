@@ -39,7 +39,7 @@ BEGIN
 END;
 
 CREATE TRIGGER intentions_fts_after_update_search_content
-AFTER UPDATE ON intentions
+AFTER UPDATE OF title ON intentions
 BEGIN
   INSERT INTO intention_titles_fts(
     intention_titles_fts, rowid, title_search_key

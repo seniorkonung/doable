@@ -1481,7 +1481,7 @@
   - **Предполагаемые файлы:** добавляется `test/app/intention_cascade_app_flow_test.dart`; при расхождениях меняются `lib/src/intention/presentation/catalog/intention_catalog_view_model.dart`, `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/src/long_term_relation/presentation/details/relation_details_view_model.dart`, `lib/src/long_term_relation/presentation/intention_relations/intention_relations_view_model.dart`, `lib/src/action/presentation/path/path_view_model.dart`.
   - **Размер:** M.
 
-- [ ] 4.15 Полнотекстовый индекс названий намерений переиндексируется только при изменении названия
+- [x] 4.15 Полнотекстовый индекс названий намерений переиндексируется только при изменении названия
   - **Критерии приёмки:**
     - Триггер обновления `intention_titles_fts` в `intention_schema.drift` срабатывает только при изменении названия, поэтому каскадная смена архивного состояния и вида многих намерений не переиндексирует их названия (D8). Схема меняется внутри базовой версии 8 без миграции (D14), снимок `drift_schemas/drift_schema_v8.json` перегенерирован.
     - Поиск по названию находит новое название после переименования и не находит прежнее, как и раньше.
