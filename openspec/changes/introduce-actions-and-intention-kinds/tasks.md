@@ -1525,3 +1525,14 @@
   - **Зависимости:** 4.1–4.17.
   - **Предполагаемые файлы:** нет, только проверка.
   - **Размер:** XS.
+
+- [ ] 4.19 Код параметров связи проходит статический анализ, и полные проверки проекта проходят
+  - **Критерии приёмки:**
+    - В `lib/src/long_term_relation/presentation/details/relation_details_options.dart` оба условия `if (mounted && current == generation) setState(...)` в обработчиках предпросмотров каскада записаны с фигурными скобками, как та же логика в `lib/src/intention/presentation/details/intention_details_page.dart`; поведение приложения не меняется.
+    - Если `flutter analyze` находит другие замечания в коде изменения, они устранены без изменения поведения.
+    - `mise run check` на голове изменения завершается успешно целиком, включая `flutter analyze` без замечаний, что восстанавливает условие «Ready to advance» фазы 4 из `plan.md` о полных проверках проекта.
+  - **Проверка:**
+    - `mise run check`.
+  - **Зависимости:** 4.12, 4.18.
+  - **Предполагаемые файлы:** `lib/src/long_term_relation/presentation/details/relation_details_options.dart`.
+  - **Размер:** XS.
