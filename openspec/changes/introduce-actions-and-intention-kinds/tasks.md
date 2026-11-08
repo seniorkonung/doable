@@ -1611,7 +1611,7 @@
   - **Предполагаемые файлы:** `lib/l10n/app_en.arb`, `app_ru.arb`, `app_localizations.dart`, `app_localizations_en.dart`, `app_localizations_ru.dart`, `lib/src/intention/presentation/details/intention_options.dart`, `lib/src/long_term_relation/presentation/details/relation_details_options.dart`, `test/intention/presentation/details/intention_options_test.dart`, тесты в `test/long_term_relation/presentation/details/`.
   - **Размер:** S.
 
-- [ ] 4.26 Проверка участника связи не содержит параметра, который не меняет поведение
+- [x] 4.26 Проверка участника связи не содержит параметра, который не меняет поведение
   - **Критерии приёмки:**
     - В `lib/src/graph/data/drift_personal_graph_repository_relation_commands.dart` у `_requireRelationParticipant` нет параметра `mustBeActive`, а его вызовы при добавлении связи не передают этот аргумент.
     - Отказ `_LongTermRelationParticipantArchived` для архивного участника проверяется безусловно; поведение добавления связей не меняется.

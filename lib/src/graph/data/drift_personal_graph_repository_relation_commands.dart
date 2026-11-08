@@ -85,19 +85,11 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
     final (pageRole, candidateRole) = pageIsSource
         ? (RelationParticipantRole.source, RelationParticipantRole.related)
         : (RelationParticipantRole.related, RelationParticipantRole.source);
-    await _requireRelationParticipant(
-      command.pageIntentionId,
-      pageRole,
-      mustBeActive: true,
-    );
+    await _requireRelationParticipant(command.pageIntentionId, pageRole);
 
     final pairs = <({IntentionId source, IntentionId related})>[];
     for (final candidateId in command.candidateIds) {
-      await _requireRelationParticipant(
-        candidateId,
-        candidateRole,
-        mustBeActive: true,
-      );
+      await _requireRelationParticipant(candidateId, candidateRole);
       final pair = pageIsSource
           ? (source: command.pageIntentionId, related: candidateId)
           : (source: candidateId, related: command.pageIntentionId);
@@ -326,9 +318,8 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
 
   Future<void> _requireRelationParticipant(
     IntentionId id,
-    RelationParticipantRole role, {
-    required bool mustBeActive,
-  }) async {
+    RelationParticipantRole role,
+  ) async {
     final row = await _database
         .customSelect(
           'SELECT is_archived FROM intentions WHERE id = ?',
@@ -341,7 +332,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
       row.data,
       'is_archived',
     );
-    if (mustBeActive && archiveState == domain.IntentionArchiveState.archived) {
+    if (archiveState == domain.IntentionArchiveState.archived) {
       throw _LongTermRelationParticipantArchived(role, id);
     }
   }
