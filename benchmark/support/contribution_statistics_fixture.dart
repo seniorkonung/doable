@@ -195,6 +195,62 @@ final class ContributionStatisticsFixture {
     }
   }
 
+  /// Число вспомогательных намерений подграфа каскада.
+  static const cascadeSupportingIntentions = 1000;
+
+  /// Связи подграфа каскада: по три от каждого вспомогательного, связь
+  /// главного подграфа к первому вспомогательному и связь к главному
+  /// подграфа от [firstMainIntention].
+  static const cascadeRelations = 3 * cascadeSupportingIntentions + 2;
+
+  /// Подвешивает под новое главное намерение подграф из
+  /// [cascadeSupportingIntentions] вспомогательных. Каждое вспомогательное
+  /// связано с тремя следующими по кругу, поэтому подграф состоит из циклов,
+  /// а удерживает его только главное подграфа через связь к первому
+  /// вспомогательному. Главное подграфа связано с главным
+  /// [firstMainIntention] профиля, поэтому вызывается после
+  /// [assignIntentionKinds]. Подграф каждого [generation] получает свои
+  /// номера намерений и связей, не пересекающиеся с остальной фикстурой.
+  /// Возвращает идентификатор главного намерения подграфа.
+  static String hangCascadeSubgraph(sqlite.Database database, int generation) {
+    final intentionBase = 1000000 + generation * 10000;
+    final relationBase = 2000000 + generation * 10000;
+    String supporting(int index) =>
+        id(intentionBase + 1 + index % cascadeSupportingIntentions);
+    final main = id(intentionBase);
+    final insertIntention = database.prepare('''INSERT INTO intentions
+      (id, title, kind, created_at, updated_at) VALUES (?, ?, ?, 0, 0)''');
+    final insertRelation = database.prepare('''INSERT INTO long_term_relations
+      (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at)
+      VALUES (?, ?, ?, 'need', 2, 0, 0)''');
+    try {
+      seedRawGraph(database, () {
+        insertIntention.execute([main, 'Каскад $generation', 'main']);
+        for (var index = 0; index < cascadeSupportingIntentions; index++) {
+          insertIntention.execute([
+            supporting(index),
+            'Каскад $generation: $index',
+            'supporting',
+          ]);
+        }
+        var relation = relationBase;
+        void relate(String source, String related) =>
+            insertRelation.execute([id(relation++), source, related]);
+        relate(id(firstMainIntention + 1), main);
+        relate(main, supporting(0));
+        for (var index = 0; index < cascadeSupportingIntentions; index++) {
+          for (var offset = 1; offset <= 3; offset++) {
+            relate(supporting(index), supporting(index + offset));
+          }
+        }
+      });
+    } finally {
+      insertIntention.close();
+      insertRelation.close();
+    }
+    return main;
+  }
+
   void archivePathParts(sqlite.Database database) {
     seedRawGraph(database, () {
       database.execute('''UPDATE long_term_relations SET is_archived = 1
