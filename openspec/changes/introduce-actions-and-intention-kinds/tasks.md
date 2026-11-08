@@ -1635,3 +1635,19 @@
   - **Зависимости:** 4.11, 4.13, 4.22.
   - **Предполагаемые файлы:** `lib/src/intention/application/cascade/intention_cascade.dart`, `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/src/long_term_relation/presentation/details/relation_details_view_model.dart`, `test/support/intention_cascade_execution.dart`, затронутые тесты в `test/graph/data/`, `test/intention/` и `test/long_term_relation/presentation/details/`.
   - **Размер:** S.
+
+- [ ] 4.28 Состав каскада не несёт полей, которые никто не показывает
+  - **Критерии приёмки:**
+    - В `lib/src/intention/application/cascade/intention_cascade.dart` у `ArchiveCascadeComposition` нет поля `mainsLosingRelation`, а у `DeleteCascadeComposition` нет поля `archivedRelationCount`; их параметры конструкторов удалены.
+    - `DeleteCascadeComposition.mainsLosingRelation` (список «Главные, теряют только связь · M» подтверждения удаления намерения) и `ArchiveCascadeComposition.archivedRelationCount` (подсказка архивирования в `lib/src/intention/presentation/details/intention_options.dart`) остаются без изменений.
+    - `lib/src/graph/data/intention_cascade_planner.dart` не вычисляет удалённые поля: составы архивирования не получают главных, теряющих только связь, а составы удаления — число связей, архивируемых по инварианту.
+    - В `lib/src/graph/data/drift_intention_cascade_preview.dart` `_listedIntentions` для `ArchiveCascadeComposition` перечисляет только `departing` и `promoted`: предпросмотр архивирования не читает названия главных намерений, теряющих только связь.
+    - Поведение не меняется: вопрос, подтверждения, сверка состава в транзакции, конфликт и сообщения об исходе остаются прежними; удалённые поля не участвуют в сверке состава (D7).
+    - Эталон `test/support/intention_cascade_reference.dart` не строит удалённые поля, а тест планировщика сравнивает с эталоном только оставшиеся. Проверки удалённых полей в `test/graph/data/drift_intention_cascade_preview_test.dart` и тесте планировщика удалены; остальные ожидания не меняются. Конструкторы составов в тестах и `test/support/intention_cascade_execution.dart` не передают удалённые аргументы. Новые тесты не добавляются.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/intention_cascade_planner_test.dart test/graph/data/drift_intention_cascade_preview_test.dart test/graph/data/drift_intention_cascade_archive_test.dart test/graph/data/drift_intention_cascade_delete_test.dart test/graph/data/drift_intention_cascade_restore_test.dart`.
+    - `mise exec --no-deps -- flutter test test/intention/presentation/details`.
+    - `mise exec --no-deps -- flutter test test/graph/presentation/graph_operation_presenter_test.dart test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
+  - **Зависимости:** 4.1, 4.2, 4.27.
+  - **Предполагаемые файлы:** `lib/src/intention/application/cascade/intention_cascade.dart`, `lib/src/graph/data/intention_cascade_planner.dart`, `lib/src/graph/data/drift_intention_cascade_preview.dart`, `test/support/intention_cascade_reference.dart`, `test/support/intention_cascade_execution.dart`, `test/graph/data/intention_cascade_planner_test.dart`, `test/graph/data/drift_intention_cascade_preview_test.dart`, тесты в `test/graph/presentation/`, `test/intention/presentation/details/` и `test/long_term_relation/presentation/details/`, которые создают составы каскада.
+  - **Размер:** S.
