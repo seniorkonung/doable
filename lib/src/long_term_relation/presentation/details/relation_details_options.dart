@@ -143,14 +143,16 @@ final class _RelationOptionsSheetState
         ? CascadeOperation.archive
         : CascadeOperation.restore;
     repository.previewCurrentCascade(subject, operation).then((value) {
-      if (mounted && current == generation)
+      if (mounted && current == generation) {
         setState(() => statePreview = value);
+      }
     });
     repository.previewCurrentCascade(subject, CascadeOperation.delete).then((
       value,
     ) {
-      if (mounted && current == generation)
+      if (mounted && current == generation) {
         setState(() => deletePreview = value);
+      }
     });
   }
 
