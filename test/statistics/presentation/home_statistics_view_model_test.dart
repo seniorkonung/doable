@@ -1,12 +1,12 @@
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:doable/src/statistics/application/contribution_counts.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
@@ -14,6 +14,8 @@ import 'package:doable/src/statistics/presentation/home_statistics_state.dart';
 import 'package:doable/src/statistics/presentation/home_statistics_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../support/intention_holding_read_contract_test_fallback.dart';
 
 void main() {
   test('новый экземпляр выбирает местные месяц и год до первого чтения', () {
@@ -23,14 +25,13 @@ void main() {
     expect(harness.state.selection.tab, HomeStatisticsTab.month);
     expect(harness.state.selection.month, StatisticsMonth(2026, 10));
     expect(harness.state.selection.year, StatisticsYear(2026));
-    expect(harness.state.selection.view, StatisticsView.sourceIntentions);
+    expect(harness.state.selection.view, StatisticsView.rootIntentions);
     expect(harness.state.selection.isCurrentPeriod, isTrue);
     expect(harness.state.selection.isPeriodSelectorExpanded, isFalse);
     expect(harness.state.read, isA<HomeStatisticsInitialLoad>());
     final query = harness.reader.queries.single;
     expect(query.period, StatisticsMonth(2026, 10));
-    expect(query.view, StatisticsView.sourceIntentions);
-    expect(query.localDate, _today);
+    expect(query.view, StatisticsView.rootIntentions);
     expect(query.pageSize, 100);
     expect(query.cursor, isNull);
   });
@@ -143,7 +144,7 @@ void main() {
       harness.model.selectPeriod(StatisticsMonth(2025, 3));
       expect(harness.state.read, isA<HomeStatisticsInitialLoad>());
       harness.model.selectTab(HomeStatisticsTab.year);
-      harness.model.selectView(StatisticsView.selectedActions);
+      harness.model.selectView(StatisticsView.terminalIntentions);
       harness.reader.first(3, [_item(4)]);
       await pumpEventQueue();
       harness.reader.first(1, [_item(2)]);
@@ -152,7 +153,7 @@ void main() {
 
       expect(harness.loaded.items.single.id, _id(4));
       expect(harness.state.selection.period, StatisticsYear(2026));
-      expect(harness.state.selection.view, StatisticsView.selectedActions);
+      expect(harness.state.selection.view, StatisticsView.terminalIntentions);
     },
   );
 
@@ -163,17 +164,23 @@ void main() {
     harness.reader.first(
       1,
       [],
-      summary: StatisticsPeriodSummary(
-        counts: ContributionCounts(planned: 21, contribution: 4),
-        uncompleted: UncompletedSplit(missed: 10, upcoming: 7),
-      ),
+      summary: ContributionCounts(planned: 21, contribution: 4),
     );
     await pumpEventQueue();
 
-    expect(harness.state.read, isA<HomeStatisticsEmpty>());
-    expect(harness.loaded.summary.counts.planned, 21);
-    expect(harness.loaded.summary.counts.contribution, 4);
+    expect(harness.state.read, isA<HomeStatisticsViewEmpty>());
+    expect(harness.loaded.summary.planned, 21);
+    expect(harness.loaded.summary.contribution, 4);
     expect(harness.loaded.totalItems, 0);
+  });
+
+  test('период без действий не получает сводки вида', () async {
+    final harness = _Harness();
+    addTearDown(harness.dispose);
+    harness.reader.first(0, []);
+    await pumpEventQueue();
+
+    expect(harness.state.read, isA<HomeStatisticsPeriodEmpty>());
   });
 
   test('подгрузка за 30 элементов получает последовательные порции по 100 без дублей', () async {
@@ -222,7 +229,7 @@ void main() {
       List.generate(205, (i) => _id(205 - i)),
     );
     expect(harness.loaded.totalItems, 205);
-    expect(harness.loaded.summary.counts.planned, 205);
+    expect(harness.loaded.summary.planned, 205);
     expect(harness.loaded.pageStatus, isA<HomeStatisticsPageIdle>());
   });
 
@@ -274,8 +281,7 @@ void main() {
           expect(harness.reader.queries, hasLength(2));
           final query = harness.reader.queries.last;
           expect(query.period, StatisticsMonth(2026, 10));
-          expect(query.view, StatisticsView.sourceIntentions);
-          expect(query.localDate, _today);
+          expect(query.view, StatisticsView.rootIntentions);
           expect(query.cursor, isNull);
           harness.reader.first(1, [_item(1)]);
           await retry;
@@ -301,7 +307,7 @@ void main() {
         await load;
         expect(harness.loaded.items.map((item) => item.id), [_id(2)]);
         expect(harness.loaded.totalItems, 2);
-        expect(harness.loaded.summary.counts.contribution, 2);
+        expect(harness.loaded.summary.contribution, 2);
         final status = harness.loaded.pageStatus as HomeStatisticsPageFailure;
         expect(status.failure, failure);
         expect(status.canRetry, canRetry);
@@ -368,11 +374,9 @@ final class _Harness {
     container = ProviderContainer(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(reader),
-        dailyChoiceLocalDateSourceProvider.overrideWithValue(
-          () => DailyChoiceLocalDay(
-            date: _today,
-            untilNextDate: const Duration(hours: 12),
-          ),
+        localDateSourceProvider.overrideWithValue(
+          () =>
+              LocalDay(date: _today, untilNextDate: const Duration(hours: 12)),
         ),
       ],
     );
@@ -396,7 +400,9 @@ final class _Harness {
   }
 }
 
-final class _Reader implements PersonalGraphRepository {
+final class _Reader
+    with IntentionHoldingReadContractTestFallback
+    implements PersonalGraphRepository {
   final queries = <StatisticsQuery>[];
   final responses = <Completer<StatisticsPageResult>>[];
 
@@ -413,19 +419,16 @@ final class _Reader implements PersonalGraphRepository {
     List<StatisticsItem> items, {
     int? total,
     StatisticsCursor? cursor,
-    StatisticsPeriodSummary? summary,
+    ContributionCounts? summary,
   }) {
     responses[index].complete(
       StatisticsPageSuccess(
         StatisticsFirstPage(
           summary:
               summary ??
-              StatisticsPeriodSummary(
-                counts: ContributionCounts(
-                  planned: total ?? items.length,
-                  contribution: total ?? items.length,
-                ),
-                uncompleted: UncompletedSplit(missed: 0, upcoming: 0),
+              ContributionCounts(
+                planned: total ?? items.length,
+                contribution: total ?? items.length,
               ),
           totalItems: total ?? items.length,
           items: items,

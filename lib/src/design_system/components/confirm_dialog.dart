@@ -3,6 +3,7 @@ import 'package:flutter/semantics.dart';
 
 import '../doable_colors.dart';
 import '../doable_metrics.dart';
+import '../doable_icon.dart';
 import '../doable_shadows.dart';
 import '../doable_type.dart';
 import 'button.dart';
@@ -268,6 +269,291 @@ final class _ConfirmDialog extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Ответ на вопрос о составе каскадной операции.
+enum CascadeDialogResult { cascade, single, cancel }
+
+/// Оформление первого ответа: необратимое удаление или сохранение данных.
+enum CascadeActionStyle { danger, primary }
+
+/// Знак перед названием намерения в списке.
+enum CascadeListMarker { ring, intention }
+
+/// Способ показа длинного списка; подписи задаёт потребитель.
+sealed class CascadeListDisplay {
+  const CascadeListDisplay();
+}
+
+final class CascadeListAll extends CascadeListDisplay {
+  const CascadeListAll();
+}
+
+final class CascadeListExpandable extends CascadeListDisplay {
+  const CascadeListExpandable(this.label);
+  final String label;
+}
+
+final class CascadeListSummary extends CascadeListDisplay {
+  const CascadeListSummary(this.label);
+  final String label;
+}
+
+/// Заголовок и упорядоченные названия намерений для вопроса о каскаде.
+final class CascadeDialogList {
+  const CascadeDialogList({
+    required this.title,
+    required this.items,
+    required this.marker,
+    required this.display,
+  });
+
+  final String title;
+  final List<String> items;
+  final CascadeListMarker marker;
+  final CascadeListDisplay display;
+}
+
+/// Спрашивает о составе операции. Затемнение и системное «назад» отменяют её.
+/// [footer] поясняет второй вариант под списками; все подписи задаёт вызывающий.
+Future<CascadeDialogResult> showCascadeConfirmDialog({
+  required BuildContext context,
+  required String title,
+  required String text,
+  required List<CascadeDialogList> lists,
+  required String cascadeLabel,
+  String? singleLabel,
+  required String cancelLabel,
+  required CascadeActionStyle actionStyle,
+  String? footer,
+}) async {
+  final colors = Theme.of(context).extension<DoableColors>()!;
+  final result = await showDialog<CascadeDialogResult>(
+    context: context,
+    useRootNavigator: true,
+    barrierColor: colors.scrim,
+    barrierLabel: cancelLabel,
+    builder: (context) => _CascadeDialog(
+      title: title,
+      text: text,
+      lists: lists,
+      footer: footer,
+      cascadeLabel: cascadeLabel,
+      singleLabel: singleLabel,
+      cancelLabel: cancelLabel,
+      actionStyle: actionStyle,
+    ),
+  );
+  return result ?? CascadeDialogResult.cancel;
+}
+
+final class _CascadeDialog extends StatelessWidget {
+  const _CascadeDialog({
+    required this.title,
+    required this.text,
+    required this.lists,
+    required this.footer,
+    required this.cascadeLabel,
+    required this.singleLabel,
+    required this.cancelLabel,
+    required this.actionStyle,
+  });
+
+  final String title;
+  final String text;
+  final List<CascadeDialogList> lists;
+  final String? footer;
+  final String cascadeLabel;
+  final String? singleLabel;
+  final String cancelLabel;
+  final CascadeActionStyle actionStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DoableColors>()!;
+    final shadows = Theme.of(context).extension<DoableShadows>()!;
+    void answer(CascadeDialogResult result) => Navigator.pop(context, result);
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: DoableMetrics.space8,
+        vertical: DoableMetrics.space6,
+      ),
+      semanticsRole: SemanticsRole.alertDialog,
+      child: Semantics(
+        scopesRoute: true,
+        namesRoute: true,
+        explicitChildNodes: true,
+        label: title,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.raised,
+            borderRadius: BorderRadius.circular(DoableMetrics.radiusXl),
+            boxShadow: shadows.shadowFloat,
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 700),
+            child: Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                DoableMetrics.space6,
+                22,
+                DoableMetrics.space6,
+                DoableMetrics.space4,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            title,
+                            style: DoableType.title.copyWith(color: colors.ink),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            text,
+                            style: DoableType.body.copyWith(
+                              color: colors.muted,
+                            ),
+                          ),
+                          for (final list in lists) ...[
+                            const SizedBox(height: DoableMetrics.space3),
+                            _CascadeList(list: list),
+                          ],
+                          if (footer case final footer?) ...[
+                            const SizedBox(height: DoableMetrics.space3),
+                            Text(
+                              footer,
+                              style: DoableType.body.copyWith(
+                                color: colors.ink,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: DoableMetrics.space4),
+                  if (singleLabel == null) ...[
+                    Button.textMedium(
+                      label: cancelLabel,
+                      onPressed: () => answer(CascadeDialogResult.cancel),
+                    ),
+                    const SizedBox(height: DoableMetrics.space1),
+                  ],
+                  switch (actionStyle) {
+                    CascadeActionStyle.danger => Button.danger(
+                      label: cascadeLabel,
+                      onPressed: () => answer(CascadeDialogResult.cascade),
+                    ),
+                    CascadeActionStyle.primary => Button.primary(
+                      label: cascadeLabel,
+                      onPressed: () => answer(CascadeDialogResult.cascade),
+                    ),
+                  },
+                  if (singleLabel case final label?) ...[
+                    const SizedBox(height: DoableMetrics.space1),
+                    Button.quietBlock(
+                      label: label,
+                      onPressed: () => answer(CascadeDialogResult.single),
+                    ),
+                  ],
+                  if (singleLabel != null) ...[
+                    const SizedBox(height: DoableMetrics.space1),
+                    Button.textMedium(
+                      label: cancelLabel,
+                      onPressed: () => answer(CascadeDialogResult.cancel),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+final class _CascadeList extends StatefulWidget {
+  const _CascadeList({required this.list});
+  final CascadeDialogList list;
+
+  @override
+  State<_CascadeList> createState() => _CascadeListState();
+}
+
+final class _CascadeListState extends State<_CascadeList> {
+  bool expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<DoableColors>()!;
+    final list = widget.list;
+    final truncated =
+        list.items.length > 4 && !expanded && list.display is! CascadeListAll;
+    final items = truncated ? list.items.take(4) : list.items;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(list.title, style: DoableType.label.copyWith(color: colors.muted)),
+        for (final item in items)
+          Padding(
+            padding: const EdgeInsetsDirectional.only(
+              top: DoableMetrics.space1,
+            ),
+            child: Row(
+              children: [
+                switch (list.marker) {
+                  CascadeListMarker.ring => Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: colors.accent, width: 2),
+                    ),
+                  ),
+                  CascadeListMarker.intention => DoableIcon(
+                    DoableIconData.intention,
+                    size: 16,
+                    color: colors.ink,
+                  ),
+                },
+                const SizedBox(width: DoableMetrics.space2),
+                Expanded(
+                  child: Text(
+                    item,
+                    style: DoableType.row.copyWith(color: colors.ink),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (truncated)
+          switch (list.display) {
+            CascadeListExpandable(:final label) => Button.text(
+              label: label,
+              semanticLabel: label,
+              onPressed: () => setState(() => expanded = true),
+            ),
+            CascadeListSummary(:final label) => Text(
+              label,
+              style: DoableType.hint.copyWith(color: colors.muted),
+            ),
+            CascadeListAll() => const SizedBox.shrink(),
+          },
+      ],
     );
   }
 }

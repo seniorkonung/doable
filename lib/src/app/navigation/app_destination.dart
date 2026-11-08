@@ -10,13 +10,13 @@ import 'package:doable/src/design_system/doable_icon.dart';
 /// поэтому новый пункт нельзя добавить, не определив их.
 enum AppDestination {
   home,
-  dailyChoices,
+  actions,
   intentionGraph;
 
   /// Название пункта, общее для панели и заголовка его корневой страницы.
   String title(AppLocalizations localizations) => switch (this) {
     AppDestination.home => localizations.appDestinationHome,
-    AppDestination.dailyChoices => localizations.appDestinationDailyChoices,
+    AppDestination.actions => localizations.appDestinationActions,
     AppDestination.intentionGraph => localizations.appDestinationIntentionGraph,
   };
 
@@ -26,14 +26,14 @@ enum AppDestination {
   /// вкладки совпадает с индексом пункта и используется сборкой навигации.
   PageInfo get page => switch (this) {
     AppDestination.home => HomeRoute.page,
-    AppDestination.dailyChoices => DailyChoiceCatalogRoute.page,
+    AppDestination.actions => ActionDayRootRoute.page,
     AppDestination.intentionGraph => IntentionCatalogRoute.page,
   };
 
   /// Контурный значок невыбранного пункта.
   DoableIconData get icon => switch (this) {
     AppDestination.home => DoableIconData.home,
-    AppDestination.dailyChoices => DoableIconData.calendarDays,
+    AppDestination.actions => DoableIconData.calendarDays,
     // Центральный узел соединён с внешними во все стороны: значок изображает
     // граф, а не иерархию уровней.
     AppDestination.intentionGraph => DoableIconData.graph,
@@ -42,7 +42,7 @@ enum AppDestination {
   /// Залитый значок выбранного пункта: выбор различим не только цветом.
   DoableIconData get selectedIcon => switch (this) {
     AppDestination.home => DoableIconData.homeFilled,
-    AppDestination.dailyChoices => DoableIconData.calendarDaysFilled,
+    AppDestination.actions => DoableIconData.calendarDaysFilled,
     AppDestination.intentionGraph => DoableIconData.graphFilled,
   };
 }

@@ -11,13 +11,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'catalog_reconciliation_test_support.dart';
 import 'catalog_test_support.dart';
 
-final _actionSearchPurpose = SelectDailyChoiceAction(
-  session: IntentionSearchSession(),
-);
-final _sourceSearchPurpose = SelectDailyChoiceSource(
-  session: IntentionSearchSession(),
-);
-
 void main() {
   test(
     'поиск только по тегам начинает первую порцию и заменяет прежний префикс',
@@ -302,7 +295,7 @@ void main() {
   );
 
   test(
-    'четыре назначения сохраняют независимые условия тегов и свои ограничения',
+    'два назначения сохраняют независимые условия тегов и свои ограничения',
     () async {
       final repository = ControlledCatalogRepository();
       final container = reconciliationCatalogContainer(repository);
@@ -313,8 +306,6 @@ void main() {
       );
       final purposes = <IntentionCatalogPurpose>[
         const BrowseIntentionCatalog(),
-        _actionSearchPurpose,
-        _sourceSearchPurpose,
         SelectRelationParticipant(
           session: IntentionSearchSession(),
           pairProbe: probe,
@@ -350,12 +341,12 @@ void main() {
         expect(query.titleFilter?.map((value) => value), 'свой $index');
         expect(query.scope, IntentionScope.active);
         expect(
-          query.readinessFilter,
-          index == 1
-              ? IntentionReadinessFilter.readyOnly
-              : IntentionReadinessFilter.all,
+          query.kindFilter,
+          index == 0
+              ? IntentionKindFilter.mainOnly
+              : IntentionKindFilter.mainAndSupporting,
         );
-        expect(query.pairProbe, index >= 3 ? probe : null);
+        expect(query.pairProbe, index == 1 ? probe : null);
         _completeEmptyPage(repository, purposes.length + index);
         await container.read(provider.future);
       }
@@ -363,8 +354,8 @@ void main() {
         intentionCatalogViewModelProvider(purposes.first).notifier,
       );
       browse.changeTagFilter(IntentionTagFilter.empty);
-      await waitForCatalogQueries(repository, 9);
-      _completeEmptyPage(repository, 8);
+      await waitForCatalogQueries(repository, 5);
+      _completeEmptyPage(repository, 4);
       await container.read(
         intentionCatalogViewModelProvider(purposes.first).future,
       );
@@ -375,19 +366,16 @@ void main() {
         expect(notifier.selection.tagFilter, filters[index]);
         expect(notifier.selection.titleFilterText, '  свой $index  ');
         notifier.changeScope(IntentionScope.archived);
-        expect(
-          notifier.selection.scope,
-          const IntentionScopeFixed(IntentionScope.active),
-        );
+        expect(notifier.selection.show, const IntentionShowFixed());
       }
-      expect(repository.queries, hasLength(9));
+      expect(repository.queries, hasLength(5));
     },
   );
 
-  // Ограничения назначений, отличные от умолчаний: готовность у действия и
-  // исключённый участник у участника связи.
+  // Ограничения назначений: каталог без ограничений и исключённый участник у
+  // участника связи.
   for (final purpose in <IntentionCatalogPurpose>[
-    _actionSearchPurpose,
+    const BrowseIntentionCatalog(),
     SelectRelationParticipant(
       session: IntentionSearchSession(),
       pairProbe: RelationPairProbe(
@@ -395,12 +383,12 @@ void main() {
         candidateRole: RelationParticipantRole.related,
       ),
     ),
+    SelectPathStart(session: IntentionSearchSession()),
   ]) {
     final context = switch (purpose) {
       BrowseIntentionCatalog() => 'каталог',
-      SelectDailyChoiceAction() => 'действие',
-      SelectDailyChoiceSource() => 'исходное намерение',
       SelectRelationParticipant() => 'участник связи',
+      SelectPathStart() => 'начало пути',
     };
     test(
       'продолжение и его повтор сохраняют совместный запрос: $context',
@@ -459,7 +447,7 @@ void main() {
         for (final query in repository.queries.skip(2)) {
           expect(query.tagFilter, filter);
           expect(query.scope, first.query.scope);
-          expect(query.readinessFilter, first.query.readinessFilter);
+          expect(query.kindFilter, first.query.kindFilter);
           expect(
             query.pairProbe,
             purpose is SelectRelationParticipant ? purpose.pairProbe : null,

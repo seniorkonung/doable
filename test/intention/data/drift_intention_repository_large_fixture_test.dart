@@ -71,7 +71,7 @@ void main() {
       final (:repository, raw: _, :trace) = await _openJointFixture();
 
       // Без фильтра названия совпадение отсекают только теги среди
-      // 2 500 готовых активных кандидатов; «Другое название» проходит.
+      // 2 500 вспомогательных активных кандидатов; «Другое название» проходит.
       final tagOnlyMatchCount = _jointMatchCount + 1;
       for (final (pageSize, titleFilter, matchCount) in [
         (1, 'редкое %_', _jointMatchCount),
@@ -122,7 +122,7 @@ void main() {
 
       // Каждый из 2 500 активных кандидатов имеет несколько собственных
       // назначений. Оба набора условий читаются из параметра один раз на
-      // запрос. Без фильтра названия из 2 497 готовых активных кандидатов,
+      // запрос. Без фильтра названия из 2 497 вспомогательных активных кандидатов,
       // кроме исключённого намерения, все 1201 исключённых тегов отсекают
       // трёх кандидатов, а все 1201 обязательных тегов есть у 27 совместных
       // кандидатов.
@@ -156,7 +156,7 @@ void main() {
     final (:repository, raw: _, :trace) = await _openJointFixture();
 
     // Популярный тег назначен 1 999 из 2 499 активных намерений. Среди них
-    // один кандидат не готов и один исключён из выдачи, поэтому один
+    // один кандидат главный и один исключён из выдачи, поэтому один
     // популярный тег оставляет 1 997 совпадений. Все 1201 исключённых тегов
     // отсекают ещё трёх кандидатов.
     // С редкими обязательными тегами совпадения сужаются до совместных
@@ -315,8 +315,8 @@ void _populateJointTagFixture(sqlite.Database database) {
   database.execute('BEGIN');
   try {
     seedRawGraph(database, () {
-      // Все намерения готовы: редкость совпадений задают теги, а не готовность.
-      database.execute('UPDATE intentions SET is_action_ready = 1');
+      // Все намерения вспомогательные: редкость совпадений задают теги, а не вид.
+      database.execute("UPDATE intentions SET kind = 'supporting'");
       for (final (base, count) in [
         (_requiredTagBase, _conditionCount),
         (_excludedTagBase, _conditionCount),
@@ -335,13 +335,13 @@ void _populateJointTagFixture(sqlite.Database database) {
       for (var index = 0; index < _jointCandidateCount; index++) {
         final id = _fixtureId(_jointIntentionIndex(index));
         database.execute(
-          'UPDATE intentions SET title = ?, is_action_ready = ?, '
+          'UPDATE intentions SET title = ?, kind = ?, '
           'is_archived = ? WHERE id = ?',
           [
             index == _otherTitleCandidate
                 ? 'Другое название'
                 : 'Редкое %_ совпадение',
-            index == _notReadyCandidate ? 0 : 1,
+            index == _mainCandidate ? 'main' : 'supporting',
             index == _archivedCandidate ? 1 : 0,
             id,
           ],
@@ -394,7 +394,7 @@ const _jointCandidateCount = _jointMatchCount + 10;
 /// Номера кандидатов за совпадениями: каждый отсекает одна часть запроса.
 const _otherTitleCandidate = _jointMatchCount + 6;
 const _archivedCandidate = _jointMatchCount + 7;
-const _notReadyCandidate = _jointMatchCount + 8;
+const _mainCandidate = _jointMatchCount + 8;
 const _excludedCandidate = _jointMatchCount + 9;
 
 const _jointFirstIndex = 100;
@@ -498,10 +498,10 @@ List<int> _expectedTagOnlyMatches(_Conditions conditions) => [
 bool _matchesTagOnlyQuery(int fixtureIndex, _Conditions conditions) {
   final joint = _jointIndexOf(fixtureIndex);
   // Активны чётные намерения, кроме переведённого в архив кандидата;
-  // ещё один кандидат не готов, а другой исключён из выдачи запросом.
+  // ещё один кандидат главный, а другой исключён из выдачи запросом.
   if (fixtureIndex.isOdd ||
       joint == _archivedCandidate ||
-      joint == _notReadyCandidate ||
+      joint == _mainCandidate ||
       joint == _excludedCandidate) {
     return false;
   }
@@ -559,7 +559,7 @@ IntentionCatalogQuery _jointQuery({
   IntentionCatalogCursor? cursor,
 }) => IntentionCatalogQuery(
   scope: IntentionScope.active,
-  readinessFilter: IntentionReadinessFilter.readyOnly,
+  kindFilter: IntentionKindFilter.supportingOnly,
   titleFilter: titleFilter,
   tagFilter: IntentionTagFilter(
     requiredTagIds: [

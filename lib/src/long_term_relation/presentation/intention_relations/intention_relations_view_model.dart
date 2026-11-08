@@ -128,16 +128,16 @@ final class IntentionRelationsViewModel extends _$IntentionRelationsViewModel {
   }
 
   /// Первая модель экземпляра выбирает группу из цели, а без неё — по
-  /// готовности: неготовому намерению нужны другие, действие нужно другим.
+  /// сводке связей: сначала активные, затем архивированные.
   /// Архивы всех групп раскрыты только у архивированного намерения.
   IntentionRelationsSettings _initialSettings(
     IntentionId intentionId,
     IntentionPageTarget target,
   ) {
-    final intention = switch (ref.read(
+    final details = switch (ref.read(
       intentionDetailsViewModelProvider(intentionId),
     )) {
-      IntentionDetailsLoaded(:final intention) => intention,
+      IntentionDetailsLoaded(:final details) => details,
       IntentionDetailsLoading() ||
       IntentionDetailsNotFound() ||
       IntentionDetailsUnavailable() ||
@@ -153,17 +153,30 @@ final class IntentionRelationsViewModel extends _$IntentionRelationsViewModel {
         RelationsTarget(:final group?) => group,
         RelationsTarget() ||
         OverviewTarget() ||
-        ChoicesTarget() ||
-        StatisticsTarget() => switch (intention.readiness) {
-          IntentionReadiness.notReady => IntentionRelationGroup.needs,
-          IntentionReadiness.ready => IntentionRelationGroup.neededFor,
-        },
+        ActionsTarget() ||
+        StatisticsTarget() => _defaultGroup(details.relationCounts),
       },
-      expandedArchives: switch (intention.archiveState) {
+      expandedArchives: switch (details.intention.archiveState) {
         IntentionArchiveState.archived => IntentionRelationGroup.values.toSet(),
         IntentionArchiveState.active => const {},
       },
     );
+  }
+
+  IntentionRelationGroup _defaultGroup(RelationCounts counts) {
+    for (final scope in [RelationScope.active, RelationScope.archived]) {
+      for (final group in IntentionRelationGroup.values) {
+        if (counts.forGroup(
+              scope: scope,
+              type: group.type,
+              direction: group.direction,
+            ) >
+            0) {
+          return group;
+        }
+      }
+    }
+    return IntentionRelationGroup.needs;
   }
 
   IntentionRelationsState _project(
@@ -304,9 +317,6 @@ final class IntentionRelationsViewModel extends _$IntentionRelationsViewModel {
                 nextCursor: page.nextCursor,
               ),
             ),
-          GraphResultSuccess() => const GraphResultFailure(
-            RelationGroupUnexpectedFailure(),
-          ),
           GraphResultFailure(:final failure) => GraphResultFailure(failure),
         },
   );
@@ -352,9 +362,6 @@ final class IntentionRelationsViewModel extends _$IntentionRelationsViewModel {
       case IntentionRelationCountsChanged(:final intentionId, :final counts)
           when intentionId == _intentionId:
         return differsFromPublished(counts);
-      case DailyChoiceChange(:final intentionCounts):
-        final counts = intentionCounts[_intentionId];
-        return counts != null && differsFromPublished(counts);
       case LongTermRelationChange(:final id, :final before, :final after):
         final partBefore = before == null
             ? null

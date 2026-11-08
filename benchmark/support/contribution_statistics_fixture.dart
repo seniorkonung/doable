@@ -1,40 +1,78 @@
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../test/support/action_seed.dart';
 import '../../test/support/graph_seed.dart';
 
 enum ContributionStatisticsProfile { shortPaths, longPaths }
 
 typedef FixtureContribution = ({String id, int planned, int contribution});
-typedef _Choice = ({String date, int source, int length, bool completed});
+typedef _Action = ({String date, int chain, bool completed});
 
-/// Сохраняет настоящие цепочки с отдельными шагами каждого дубликата.
-/// Ожидаемые вклады вычисляются из заданных цепочек, без чтения SQL-агрегата.
+/// Число действий каждого дня фикстур статистики.
+const statisticsActionsPerDay = 60;
+
+/// Сохраняет настоящие пути из намерений цепочки первой полосы связей.
+/// Некоторые цепочки начинаются или заканчиваются удалённым намерением: его
+/// данные и разорванное звено хранят надгробия. Ожидаемые вклады вычисляются
+/// из заданных путей, без чтения SQL-агрегата.
 final class ContributionStatisticsFixture {
   ContributionStatisticsFixture(this.profile);
 
   final ContributionStatisticsProfile profile;
-  final _choices = <_Choice>[];
+  final _actions = <_Action>[];
   late final int graphBytes;
 
   static String id(int value) =>
       '018f0b5d-6b2e-7c80-8000-${value.toRadixString(16).padLeft(12, '0')}';
 
+  /// Номера удалённых намерений начинаются здесь и не пересекаются с
+  /// номерами существующих намерений, связей и действий.
+  static const deletedIntentionBase = 60000;
+
+  bool get _short => profile == ContributionStatisticsProfile.shortPaths;
+  int get _chains => _short ? 500 : 5;
+
+  /// Узлы пути цепочки [chain]; узел с номером n — намерение `id(n + 1)`.
+  /// Пять длинных цепочек дают 145 промежуточных намерений: проверка
+  /// охватывает продолжение, а не только первую порцию.
+  List<int> _path(int chain) {
+    final source = _short ? chain * 8 : chain * 100;
+    final length = _short ? chain % 6 + 1 : 30;
+    return [
+      if (_deletedRoot(chain)) deletedIntentionBase + 2 * chain,
+      for (var node = source; node <= source + length; node++) node,
+      if (_deletedTail(chain)) deletedIntentionBase + 2 * chain + 1,
+    ];
+  }
+
+  // Цепочки с удалёнными намерениями не содержат намерений, статистику
+  // которых проверяет бенчмарк раздела намерения.
+  bool _deletedRoot(int chain) => _short ? chain % 25 == 19 : chain == 2;
+  bool _deletedTail(int chain) => _short ? chain % 25 == 7 : chain == 4;
+
+  static bool _deleted(int node) => node >= deletedIntentionBase;
+
   void populate(sqlite.Database database) {
     final insertIntention = database.prepare('''INSERT INTO intentions
-      (id, title, is_action_ready, created_at, updated_at)
-      VALUES (?, ?, 1, 0, 0)''');
+      (id, title, kind, created_at, updated_at)
+      VALUES (?, ?, 'main', 0, 0)''');
     final insertRelation = database.prepare('''INSERT INTO long_term_relations
       (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at)
       VALUES (?, ?, ?, 'need', 2, 0, 0)''');
-    final insertChoice = database.prepare('''INSERT INTO daily_choices
-      (id, source_intention_id, selected_intention_id, choice_date, is_completed)
-      VALUES (?, ?, ?, ?, ?)''');
-    final insertStep = database.prepare('''INSERT INTO daily_choice_path_steps
-      (id, daily_choice_id, long_term_relation_id, previous_step_id)
-      VALUES (?, ?, ?, ?)''');
+    final insertDeletedIntention = database.prepare(
+      'INSERT INTO deleted_intentions (intention_id, title) VALUES (?, ?)',
+    );
+    final insertDeletedPair = database.prepare(
+      '''INSERT INTO deleted_relation_pairs
+      (source_intention_id, related_intention_id, type) VALUES (?, ?, 'need')''',
+    );
+    final insertAction = database.prepare('''INSERT INTO actions
+      (id, title, date, priority, is_completed, created_at, updated_at)
+      VALUES (?, ?, ?, 4, ?, 0, 0)''');
+    final insertItem = database.prepare(insertActionPathItem);
     try {
       seedRawGraph(database, () {
         for (var node = 0; node < 50000; node++) {
@@ -55,7 +93,22 @@ final class ContributionStatisticsFixture {
         graphBytes =
             (database.select('PRAGMA page_count').single.values.single as int) *
             (database.select('PRAGMA page_size').single.values.single as int);
-        var stepNumber = 0;
+        final paths = [
+          for (var chain = 0; chain < _chains; chain++) _path(chain),
+        ];
+        // Удалённое намерение было связано с соседом по пути: надгробия
+        // хранят и намерение, и пару его звена.
+        for (final path in paths) {
+          for (var position = 0; position < path.length; position++) {
+            final node = path[position];
+            if (!_deleted(node)) continue;
+            insertDeletedIntention.execute([id(node + 1), 'Удалённое $node']);
+            final (source, related) = position == 0
+                ? (node, path[1])
+                : (path[position - 1], node);
+            insertDeletedPair.execute([id(source + 1), id(related + 1)]);
+          }
+        }
         for (
           var day = DateTime.utc(2025);
           day.year <= 2027;
@@ -66,39 +119,28 @@ final class ContributionStatisticsFixture {
             day.month,
             day.day,
           ).toCanonicalString();
-          for (var slot = 0; slot < 100; slot++) {
-            final short = profile == ContributionStatisticsProfile.shortPaths;
-            final bucket = (_choices.length ~/ 2) % (short ? 500 : 5);
-            // Пять длинных цепочек дают 145 промежуточных намерений:
-            // проверка охватывает продолжение, а не только первую порцию.
-            final source = short ? bucket * 8 : bucket * 100;
-            final length = short ? bucket % 6 + 1 : 30;
-            final choiceId = id(300000 + _choices.length);
-            final completed = slot < 50;
-            insertChoice.execute([
-              choiceId,
-              id(source + 1),
-              id(source + length + 1),
+          for (var slot = 0; slot < statisticsActionsPerDay; slot++) {
+            // Соседние действия повторяют цепочку целиком.
+            final chain = (_actions.length ~/ 2) % _chains;
+            final actionId = id(300000 + _actions.length);
+            final completed = slot < statisticsActionsPerDay ~/ 2;
+            insertAction.execute([
+              actionId,
+              'Действие ${_actions.length}',
               date,
               completed ? 1 : 0,
             ]);
-            String? previous;
-            for (var step = 0; step < length; step++) {
-              final stepId = id(1000000 + stepNumber++);
-              insertStep.execute([
-                stepId,
-                choiceId,
-                id(100000 + source + step),
-                previous,
+            final path = paths[chain];
+            for (var position = 0; position < path.length; position++) {
+              insertItem.execute([
+                actionId,
+                position,
+                id(path[position] + 1),
+                position == 0 ? null : id(path[position - 1] + 1),
+                actionPathRole(position, path.length),
               ]);
-              previous = stepId;
             }
-            _choices.add((
-              date: date,
-              source: source,
-              length: length,
-              completed: completed,
-            ));
+            _actions.add((date: date, chain: chain, completed: completed));
           }
         }
         database.execute(
@@ -110,9 +152,9 @@ final class ContributionStatisticsFixture {
           'UPDATE intentions SET is_archived = 1 WHERE id >= ?',
           [id(45001)],
         );
-        if (profile == ContributionStatisticsProfile.shortPaths) {
-          // Первые шаги ровно 5% из 500 коротких цепочек архивированы
-          // после сохранения выборов; ограничения схемы остаются включены.
+        if (_short) {
+          // Первые звенья ровно 5% из 500 коротких цепочек архивированы
+          // после сохранения действий; ограничения схемы остаются включены.
           database.execute('''UPDATE long_term_relations SET is_archived = 1
             WHERE creation_sequence <= 4000
             AND (creation_sequence - 1) % 160 = 0''');
@@ -121,9 +163,92 @@ final class ContributionStatisticsFixture {
     } finally {
       insertIntention.close();
       insertRelation.close();
-      insertChoice.close();
-      insertStep.close();
+      insertDeletedIntention.close();
+      insertDeletedPair.close();
+      insertAction.close();
+      insertItem.close();
     }
+  }
+
+  /// Номер первого главного намерения: узлы до него — вспомогательные,
+  /// которые связи первой полосы и замыкание 999 → 0 соединяют в цикл без
+  /// входящих активных связей от главных, поэтому они не удерживаются.
+  static const firstMainIntention = 1000;
+
+  /// Делит граф на главные и вспомогательные намерения: начиная с
+  /// [firstMainIntention] главное каждое десятое, остальные вспомогательные.
+  /// Связи ведут только вперёд по номерам, кроме замыкающих цикл, поэтому
+  /// активные узлы от [firstMainIntention] удерживаются, а цикл до него — нет.
+  void assignIntentionKinds(sqlite.Database database) {
+    final markMain = database.prepare(
+      "UPDATE intentions SET kind = 'main' WHERE id = ?",
+    );
+    try {
+      seedRawGraph(database, () {
+        database.execute("UPDATE intentions SET kind = 'supporting'");
+        for (var node = firstMainIntention; node < 50000; node += 10) {
+          markMain.execute([id(node + 1)]);
+        }
+      });
+    } finally {
+      markMain.close();
+    }
+  }
+
+  /// Число вспомогательных намерений подграфа каскада.
+  static const cascadeSupportingIntentions = 1000;
+
+  /// Связи подграфа каскада: по три от каждого вспомогательного, связь
+  /// главного подграфа к первому вспомогательному и связь к главному
+  /// подграфа от [firstMainIntention].
+  static const cascadeRelations = 3 * cascadeSupportingIntentions + 2;
+
+  /// Подвешивает под новое главное намерение подграф из
+  /// [cascadeSupportingIntentions] вспомогательных. Каждое вспомогательное
+  /// связано с тремя следующими по кругу, поэтому подграф состоит из циклов,
+  /// а удерживает его только главное подграфа через связь к первому
+  /// вспомогательному. Главное подграфа связано с главным
+  /// [firstMainIntention] профиля, поэтому вызывается после
+  /// [assignIntentionKinds]. Подграф каждого [generation] получает свои
+  /// номера намерений и связей, не пересекающиеся с остальной фикстурой.
+  /// Возвращает идентификатор главного намерения подграфа.
+  static String hangCascadeSubgraph(sqlite.Database database, int generation) {
+    final intentionBase = 1000000 + generation * 10000;
+    final relationBase = 2000000 + generation * 10000;
+    String supporting(int index) =>
+        id(intentionBase + 1 + index % cascadeSupportingIntentions);
+    final main = id(intentionBase);
+    final insertIntention = database.prepare('''INSERT INTO intentions
+      (id, title, kind, created_at, updated_at) VALUES (?, ?, ?, 0, 0)''');
+    final insertRelation = database.prepare('''INSERT INTO long_term_relations
+      (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at)
+      VALUES (?, ?, ?, 'need', 2, 0, 0)''');
+    try {
+      seedRawGraph(database, () {
+        insertIntention.execute([main, 'Каскад $generation', 'main']);
+        for (var index = 0; index < cascadeSupportingIntentions; index++) {
+          insertIntention.execute([
+            supporting(index),
+            'Каскад $generation: $index',
+            'supporting',
+          ]);
+        }
+        var relation = relationBase;
+        void relate(String source, String related) =>
+            insertRelation.execute([id(relation++), source, related]);
+        relate(id(firstMainIntention + 1), main);
+        relate(main, supporting(0));
+        for (var index = 0; index < cascadeSupportingIntentions; index++) {
+          for (var offset = 1; offset <= 3; offset++) {
+            relate(supporting(index), supporting(index + offset));
+          }
+        }
+      });
+    } finally {
+      insertIntention.close();
+      insertRelation.close();
+    }
+    return main;
   }
 
   void archivePathParts(sqlite.Database database) {
@@ -135,79 +260,61 @@ final class ContributionStatisticsFixture {
 
   Map<String, Object> distribution(StatisticsPeriod? period) {
     final lengths = <String, int>{};
-    final chains = <(int, int), int>{};
-    for (final choice in _inPeriod(period)) {
+    final chains = <int, int>{};
+    for (final action in _inPeriod(period)) {
       lengths.update(
-        '${choice.length}',
+        '${_path(action.chain).length}',
         (count) => count + 1,
         ifAbsent: () => 1,
       );
-      chains.update(
-        (choice.source, choice.length),
-        (count) => count + 1,
-        ifAbsent: () => 1,
-      );
+      chains.update(action.chain, (count) => count + 1, ifAbsent: () => 1);
     }
     return {
-      'lengths': lengths,
+      'pathLengths': lengths,
       'distinctChains': chains.length,
       'maximumRepeats': chains.values.fold<int>(0, (a, b) => a > b ? a : b),
+      'deletedPathIntentions': [
+        for (var chain = 0; chain < _chains; chain++) ..._path(chain),
+      ].where(_deleted).length,
     };
   }
 
-  ({int choices, int steps, int completed, int missed, int upcoming}) volume(
+  ({int actions, int pathItems, int completed}) volume(
     StatisticsPeriod? period,
   ) {
-    var choices = 0, steps = 0, completed = 0, missed = 0, upcoming = 0;
-    for (final choice in _inPeriod(period)) {
-      choices++;
-      steps += choice.length;
-      if (choice.completed) {
-        completed++;
-      } else if (choice.date.compareTo('2026-06-15') < 0) {
-        missed++;
-      } else {
-        upcoming++;
-      }
+    var actions = 0, pathItems = 0, completed = 0;
+    for (final action in _inPeriod(period)) {
+      actions++;
+      pathItems += _path(action.chain).length;
+      if (action.completed) completed++;
     }
-    return (
-      choices: choices,
-      steps: steps,
-      completed: completed,
-      missed: missed,
-      upcoming: upcoming,
-    );
+    return (actions: actions, pathItems: pathItems, completed: completed);
   }
 
   List<FixtureContribution> expected(
     StatisticsPeriod period,
     StatisticsView view,
   ) {
-    final chains = <(int, int), ({int planned, int contribution})>{};
-    for (final choice in _inPeriod(period)) {
-      final key = (choice.source, choice.length);
-      final previous = chains[key] ?? (planned: 0, contribution: 0);
-      chains[key] = (
-        planned: previous.planned + 1,
-        contribution: previous.contribution + (choice.completed ? 1 : 0),
-      );
-    }
     final counts = <int, ({int planned, int contribution})>{};
-    for (final MapEntry(key: (source, length), value: weight)
-        in chains.entries) {
+    for (final MapEntry(key: chain, value: weight) in _chainWeights(
+      period,
+    ).entries) {
+      final path = _path(chain);
       final nodes = switch (view) {
         StatisticsView.throughRelations => throw ArgumentError.value(
           view,
           'view',
           'Для вида через связи используется отдельный эталон обхода графа',
         ),
-        StatisticsView.sourceIntentions => [source],
-        StatisticsView.selectedActions => [source + length],
-        StatisticsView.intermediateIntentions => [
-          for (var node = source + 1; node < source + length; node++) node,
-        ],
+        StatisticsView.rootIntentions => [path.first],
+        StatisticsView.terminalIntentions => [path.last],
+        StatisticsView.intermediateIntentions => path.sublist(
+          1,
+          path.length - 1,
+        ),
       };
-      for (final node in nodes) {
+      // Удалённое намерение не передаёт свою роль соседям.
+      for (final node in nodes.where((node) => !_deleted(node))) {
         final previous = counts[node] ?? (planned: 0, contribution: 0);
         counts[node] = (
           planned: previous.planned + weight.planned,
@@ -215,24 +322,16 @@ final class ContributionStatisticsFixture {
         );
       }
     }
-    return [
+    return _sorted({
       for (final MapEntry(key: node, value: weight) in counts.entries)
-        (
-          id: id(node + 1),
-          planned: weight.planned,
-          contribution: weight.contribution,
-        ),
-    ]..sort((a, b) {
-      final contribution = b.contribution.compareTo(a.contribution);
-      if (contribution != 0) return contribution;
-      final planned = b.planned.compareTo(a.planned);
-      return planned != 0 ? planned : b.id.compareTo(a.id);
+        node + 1: weight,
     });
   }
 
-  /// Эталон обходит активные входящие связи от полного сохранённого пути.
-  /// Повторные цепочки переиспользуют обход, сохраняя вес каждого выбора;
-  /// опорные наборы и сжатие компонент производственного подсчёта не нужны.
+  /// Эталон обходит активные входящие связи от существующих намерений
+  /// полного сохранённого пути. Повторные цепочки переиспользуют обход,
+  /// сохраняя вес каждого действия; опорные наборы и сжатие компонент
+  /// производственного подсчёта не нужны.
   List<FixtureContribution> expectedThroughRelations(
     StatisticsPeriod period,
     sqlite.Database database,
@@ -248,19 +347,14 @@ final class ContributionStatisticsFixture {
         node(row['source_intention_id']),
       );
     }
-    final weights = <(int, int), ({int planned, int contribution})>{};
-    for (final choice in _inPeriod(period)) {
-      final key = (choice.source, choice.length);
-      final previous = weights[key] ?? (planned: 0, contribution: 0);
-      weights[key] = (
-        planned: previous.planned + 1,
-        contribution: previous.contribution + (choice.completed ? 1 : 0),
-      );
-    }
     final counts = <int, ({int planned, int contribution})>{};
-    for (final MapEntry(key: (source, length), value: weight)
-        in weights.entries) {
-      final pending = [for (var i = 0; i <= length; i++) source + i + 1];
+    for (final MapEntry(key: chain, value: weight) in _chainWeights(
+      period,
+    ).entries) {
+      final pending = [
+        for (final step in _path(chain))
+          if (!_deleted(step)) step + 1,
+      ];
       final visited = <int>{};
       while (pending.isNotEmpty) {
         final current = pending.removeLast();
@@ -275,25 +369,45 @@ final class ContributionStatisticsFixture {
         );
       }
     }
-    return [
-      for (final MapEntry(key: current, value: weight) in counts.entries)
-        (
-          id: id(current),
-          planned: weight.planned,
-          contribution: weight.contribution,
-        ),
-    ]..sort((a, b) {
-      final contribution = b.contribution.compareTo(a.contribution);
-      if (contribution != 0) return contribution;
-      final planned = b.planned.compareTo(a.planned);
-      return planned != 0 ? planned : b.id.compareTo(a.id);
-    });
+    return _sorted(counts);
   }
 
-  Iterable<_Choice> _inPeriod(StatisticsPeriod? period) => _choices.where(
-    (choice) =>
+  Map<int, ({int planned, int contribution})> _chainWeights(
+    StatisticsPeriod period,
+  ) {
+    final weights = <int, ({int planned, int contribution})>{};
+    for (final action in _inPeriod(period)) {
+      final previous = weights[action.chain] ?? (planned: 0, contribution: 0);
+      weights[action.chain] = (
+        planned: previous.planned + 1,
+        contribution: previous.contribution + (action.completed ? 1 : 0),
+      );
+    }
+    return weights;
+  }
+
+  /// Порядок элементов вида по номерам их намерений.
+  static List<FixtureContribution> _sorted(
+    Map<int, ({int planned, int contribution})> counts,
+  ) =>
+      [
+        for (final MapEntry(key: number, value: weight) in counts.entries)
+          (
+            id: id(number),
+            planned: weight.planned,
+            contribution: weight.contribution,
+          ),
+      ]..sort((a, b) {
+        final planned = b.planned.compareTo(a.planned);
+        if (planned != 0) return planned;
+        final contribution = b.contribution.compareTo(a.contribution);
+        return contribution != 0 ? contribution : b.id.compareTo(a.id);
+      });
+
+  Iterable<_Action> _inPeriod(StatisticsPeriod? period) => _actions.where(
+    (action) =>
         period == null ||
-        (choice.date.compareTo(period.firstDate.toCanonicalString()) >= 0 &&
-            choice.date.compareTo(period.lastDate.toCanonicalString()) <= 0),
+        (action.date.compareTo(period.firstDate.toCanonicalString()) >= 0 &&
+            action.date.compareTo(period.lastDate.toCanonicalString()) <= 0),
   );
 }

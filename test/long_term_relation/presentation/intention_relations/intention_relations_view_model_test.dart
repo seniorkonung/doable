@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -27,37 +26,51 @@ import 'package:doable/src/shared/domain/text_preview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../../support/daily_choice_reconciliation_fixture.dart';
 import '../relation_graph_test_support.dart';
+import '../../../support/intention_cascade_execution.dart';
 
 void main() {
-  for (final (readiness, expected) in [
-    (IntentionReadiness.notReady, IntentionRelationGroup.needs),
-    (IntentionReadiness.ready, IntentionRelationGroup.neededFor),
+  for (final (scenario, counts, expected) in [
+    ('без связей', testRelationCounts(), IntentionRelationGroup.needs),
+    (
+      'первую активную прежде архивной',
+      testRelationCounts(archivedNeedOutgoing: 1, activeCanIncoming: 1),
+      IntentionRelationGroup.canBeUsedFor,
+    ),
+    (
+      'первую активную в порядке групп',
+      testRelationCounts(activeCanOutgoing: 1, activeNeedIncoming: 1),
+      IntentionRelationGroup.canUse,
+    ),
+    (
+      'входящую при пустых исходящих',
+      testRelationCounts(activeNeedIncoming: 1),
+      IntentionRelationGroup.neededFor,
+    ),
+    (
+      'первую архивную при отсутствии активных',
+      testRelationCounts(archivedCanOutgoing: 1, archivedNeedIncoming: 1),
+      IntentionRelationGroup.canUse,
+    ),
   ]) {
-    test('без группы в цели ${readiness.name} открывает первую порцию '
-        'группы ${expected.name}', () async {
+    test('без группы в цели выбирает $scenario', () async {
       final repository = ControlledRelationGraphRepository();
-      final harness = await _RelationsHarness.open(
-        repository,
-        readiness: readiness,
-      );
+      final harness = await _RelationsHarness.open(repository, counts: counts);
       addTearDown(harness.dispose);
 
-      expect(harness.state, isA<IntentionRelationsInitialLoad>());
       expect(harness.state.group, expected);
       expect(harness.pageInstance.relations?.group, expected);
-      expect(harness.pageInstance.relations?.expandedArchives, isEmpty);
       expect(repository.requestCount, 1);
       _expectFirstPageOf(repository.queryAt(0), expected);
     });
   }
 
-  test('группа цели открывается вместо группы по готовности', () async {
+  test('группа цели имеет приоритет над сводкой', () async {
     final repository = ControlledRelationGraphRepository();
     final harness = await _RelationsHarness.open(
       repository,
       target: const RelationsTarget(IntentionRelationGroup.canBeUsedFor),
+      counts: testRelationCounts(activeNeedOutgoing: 1),
     );
     addTearDown(harness.dispose);
 
@@ -70,7 +83,7 @@ void main() {
   });
 
   test(
-    'новая модель экземпляра сохраняет группу после смены готовности',
+    'новая модель экземпляра сохраняет группу после изменения связей',
     () async {
       final repository = ControlledRelationGraphRepository();
       final harness = await _RelationsHarness.open(repository);
@@ -79,13 +92,11 @@ void main() {
 
       await harness.release();
       repository.emitIntention(
-        _intention(harness.intentionId, IntentionReadiness.ready),
-        counts: testRelationCounts(),
+        _intention(harness.intentionId),
+        counts: testRelationCounts(activeCanIncoming: 1),
         revision: const TestGraphRevision(2),
       );
       await pumpEventQueue();
-      final details = harness.details as IntentionDetailsLoaded;
-      expect(details.intention.readiness, IntentionReadiness.ready);
       harness.retain();
 
       expect(harness.state.group, IntentionRelationGroup.needs);
@@ -182,7 +193,7 @@ void main() {
     await harness.release();
 
     repository.emitIntention(
-      _intention(harness.intentionId, IntentionReadiness.notReady),
+      _intention(harness.intentionId),
       counts: testRelationCounts(activeNeedOutgoing: 2),
       revision: const TestGraphRevision(9),
     );
@@ -527,64 +538,6 @@ void main() {
   });
 
   test(
-    'дневной выбор владельца обновляет сводку при выбранной группе',
-    () async {
-      final repository = ControlledRelationGraphRepository();
-      final harness = await _RelationsHarness.open(repository);
-      addTearDown(harness.dispose);
-      final ownerId = harness.intentionId;
-      repository.completePage(
-        0,
-        RelationGroupFirstPage(
-          items: testGroupRows(ownerId: ownerId, from: 1, count: 1),
-          counts: testRelationCounts(activeNeedOutgoing: 1, dailySource: 1),
-          nextCursor: null,
-          revision: const TestGraphRevision(4),
-        ),
-      );
-      await pumpEventQueue();
-      final choice = reconciliationChoice(
-        source: ownerId,
-        selected: testIntentionId(2),
-      );
-      final start = harness.coordinator.acceptDailyChoiceDelete(
-        DeleteDailyChoice(choice.id),
-      ) as DailyChoiceCommandAccepted;
-      repository.completeDailyChoiceCommand(
-        0,
-        reconciliationChoiceDeleted(
-          choice: choice,
-          pathRelationId: testRelationId(1),
-          revision: const TestGraphRevision(9),
-          counts: {
-            ownerId: testRelationCounts(activeNeedOutgoing: 1),
-            testIntentionId(2): testRelationCounts(),
-          },
-        ),
-      );
-      await start.future;
-      await pumpEventQueue();
-      expect(
-        harness.loaded.summaryStatus,
-        isA<RelationListSummaryRefreshing>(),
-      );
-
-      repository.completePage(
-        1,
-        RelationGroupFirstPage(
-          items: testGroupRows(ownerId: ownerId, from: 1, count: 1),
-          counts: testRelationCounts(activeNeedOutgoing: 1),
-          nextCursor: null,
-          revision: const TestGraphRevision(9),
-        ),
-      );
-      await pumpEventQueue();
-      expect(harness.loaded.counts.dailySource, 0);
-      expect(harness.loaded.summaryStatus, isA<RelationListSummaryCurrent>());
-    },
-  );
-
-  test(
     'замена на новой ревизии возвращает прокрутку к видимой связи',
     () async {
       final repository = ControlledRelationGraphRepository();
@@ -595,7 +548,7 @@ void main() {
       harness.viewModel.rememberVisibleRelation(testRelationId(2));
 
       repository.emitIntention(
-        _intention(harness.intentionId, IntentionReadiness.notReady),
+        _intention(harness.intentionId),
         counts: testRelationCounts(activeNeedOutgoing: 2),
         revision: const TestGraphRevision(9),
       );
@@ -833,11 +786,7 @@ void main() {
 
     await harness.release();
     repository.emitIntention(
-      _intention(
-        ownerId,
-        IntentionReadiness.notReady,
-        archiveState: IntentionArchiveState.archived,
-      ),
+      _intention(ownerId, archiveState: IntentionArchiveState.archived),
       counts: counts,
       revision: const TestGraphRevision(9),
     );
@@ -976,7 +925,7 @@ void main() {
     harness.viewModel.rememberVisibleRelation(testRelationId(2));
 
     await harness.completeRelationCommand(
-      ArchiveLongTermRelation(testRelationId(2)),
+      givenArchiveRelation(testRelationId(2)),
       _relationUpdateSuccess(
         revision: const TestGraphRevision(9),
         before: active(2).relation,
@@ -1001,7 +950,7 @@ void main() {
     expect(harness.confirmed.scrollAnchor?.id, testRelationId(2));
 
     await harness.completeRelationCommand(
-      RestoreLongTermRelation(testRelationId(2)),
+      givenRestoreRelation(testRelationId(2)),
       _relationUpdateSuccess(
         revision: const TestGraphRevision(11),
         before: archived(2).relation,
@@ -1024,9 +973,9 @@ void main() {
     expect(harness.relationIds, [testRelationId(1), testRelationId(2)]);
     expect(harness.archivedIds, [testRelationId(10)]);
 
-    final owner = _intention(ownerId, IntentionReadiness.notReady);
+    final owner = _intention(ownerId);
     final start = harness.coordinator.acceptExisting(
-      ArchiveIntention(ownerId),
+      givenArchiveIntention(ownerId),
       presentationTitle: owner.title,
     ) as IntentionCommandAccepted;
     repository.completeIntentionCommand(
@@ -1035,7 +984,6 @@ void main() {
         before: owner,
         after: _intention(
           ownerId,
-          IntentionReadiness.notReady,
           archiveState: IntentionArchiveState.archived,
         ),
         revision: const TestGraphRevision(13),
@@ -1085,8 +1033,7 @@ void _expectFirstPageOf(
 }
 
 Intention _intention(
-  IntentionId id,
-  IntentionReadiness readiness, {
+  IntentionId id, {
   IntentionArchiveState archiveState = IntentionArchiveState.active,
 }) {
   final timestamp = IntentionTimestamp(DateTime.utc(2026, 9, 20));
@@ -1094,7 +1041,7 @@ Intention _intention(
     id: id,
     title: 'Намерение',
     description: null,
-    readiness: readiness,
+    kind: IntentionKind.main,
     archiveState: archiveState,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -1128,7 +1075,6 @@ RelationGroupEntry _entryForRelation(
         : relation.sourceIntentionId,
     title: 'Намерение',
     archiveState: IntentionArchiveState.active,
-    readiness: IntentionReadiness.notReady,
   ),
 );
 
@@ -1170,9 +1116,9 @@ final class _RelationsHarness {
   static Future<_RelationsHarness> open(
     ControlledRelationGraphRepository repository, {
     IntentionPageTarget target = const OverviewTarget(),
-    IntentionReadiness readiness = IntentionReadiness.notReady,
     IntentionArchiveState archiveState = IntentionArchiveState.active,
     int pageSize = 50,
+    RelationCounts? counts,
     bool retain = true,
   }) async {
     final harness = _RelationsHarness._(
@@ -1196,8 +1142,8 @@ final class _RelationsHarness {
       (_, _) {},
     );
     repository.emitIntention(
-      _intention(harness.intentionId, readiness, archiveState: archiveState),
-      counts: testRelationCounts(),
+      _intention(harness.intentionId, archiveState: archiveState),
+      counts: counts ?? testRelationCounts(),
       revision: const TestGraphRevision(1),
     );
     await pumpEventQueue();

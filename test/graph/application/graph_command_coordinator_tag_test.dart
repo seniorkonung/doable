@@ -5,7 +5,6 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
@@ -17,7 +16,9 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/intention_cascade_execution.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
+import '../../support/intention_holding_read_contract_test_fallback.dart';
 
 void main() {
   test('редактирование и удаление одного тега разделяют ключ', () async {
@@ -142,7 +143,7 @@ void main() {
     expect(coordinator.isRunning(_otherIntentionId), isFalse);
     expect(
       coordinator.acceptExisting(
-        DeleteIntention(_intentionId),
+        givenDeleteIntention(_intentionId),
         presentationTitle: 'Намерение',
       ),
       isA<IntentionCommandAlreadyRunning>(),
@@ -172,7 +173,7 @@ void main() {
         tagId: _tagId,
         intentionId: _intentionId,
       );
-      final delete = DeleteIntention(_intentionId);
+      final delete = givenDeleteIntention(_intentionId);
       final assignment =
           coordinator.acceptTagRemoveAssignment(command) as TagCommandAccepted;
       expect(coordinator.isTagRunning(_tagId), isTrue);
@@ -318,7 +319,7 @@ final _deletedSuccess = TagCommandSucceeded(
 );
 
 final class _ControlledRepository
-    with TagReadContractTestFallback
+    with IntentionHoldingReadContractTestFallback, TagReadContractTestFallback
     implements PersonalGraphRepository {
   final commands = <Object>[];
   final _results = <Completer<Object>>[];

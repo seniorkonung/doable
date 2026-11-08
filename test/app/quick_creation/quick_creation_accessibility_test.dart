@@ -11,10 +11,10 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,8 +24,8 @@ import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/app_root_pages.dart';
 
 const _titles = {
-  'ru': ['Новое намерение', 'Новый дневной выбор'],
-  'en': ['New intention', 'New daily choice'],
+  'ru': ['Новое намерение', 'Новое действие'],
+  'en': ['New intention', 'New action'],
 };
 
 // Размер экрана не меняет ветвление кода, поэтому берём телефонную ширину.
@@ -45,7 +45,7 @@ void main() {
         '${variant.size}, '
         'отступы ${variant.safe ? "24/32" : "0/0"}, '
         'клавиатура ${variant.keyboard}, '
-        '${variant.deep ? "дата дневных выборов" : "корень"}', (tester) async {
+        '${variant.deep ? "дата действий" : "корень"}', (tester) async {
       final semantics = tester.ensureSemantics();
       tester.view.physicalSize = variant.size;
       tester.view.devicePixelRatio = 1;
@@ -86,9 +86,7 @@ void main() {
       if (variant.deep) {
         unawaited(
           router.push<void>(
-            DailyChoiceDateCatalogRoute(
-              date: CalendarDate.fromParts(2026, 9, 25),
-            ),
+            ActionDayDateRoute(date: CalendarDate.fromParts(2026, 9, 25)),
           ),
         );
         await tester.pumpAndSettle();
@@ -120,22 +118,31 @@ void main() {
           action,
         );
         await tester.pumpAndSettle();
-        expect(find.byType(BottomSheet), findsOneWidget);
+        final sheet = find.byType(BottomSheet);
+        expect(sheet, findsOneWidget);
         expect(
           tester
-              .widgetList<OptionRow>(find.byType(OptionRow))
+              .widgetList<OptionRow>(
+                find.descendant(of: sheet, matching: find.byType(OptionRow)),
+              )
               .map((row) => row.name),
           titles,
         );
         expect(appNavigationDestinations().hitTestable(), findsNothing);
         expect(find.semantics.byLabel(node.label), findsNothing);
-        final title = find.text(titles[mode.index]);
-        final row = find.widgetWithText(OptionRow, titles[mode.index]);
+        final title = find.descendant(
+          of: sheet,
+          matching: find.text(titles[mode.index]),
+        );
+        final row = find.descendant(
+          of: sheet,
+          matching: find.widgetWithText(OptionRow, titles[mode.index]),
+        );
         await tester.ensureVisible(row);
         await tester.pumpAndSettle();
         final viewport = tester.getRect(
           find.descendant(
-            of: find.byType(BottomSheet),
+            of: sheet,
             matching: find.byType(SingleChildScrollView),
           ),
         );

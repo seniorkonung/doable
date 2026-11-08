@@ -1,10 +1,10 @@
 import 'dart:ui' show Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:doable/src/statistics/presentation/home_statistics_period_selector.dart';
@@ -14,6 +14,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../support/intention_holding_read_contract_test_fallback.dart';
 
 void main() {
   testWidgets(
@@ -385,8 +387,8 @@ final class _Harness {
     container = ProviderContainer(
       overrides: [
         personalGraphRepositoryProvider.overrideWithValue(reader),
-        dailyChoiceLocalDateSourceProvider.overrideWithValue(
-          () => DailyChoiceLocalDay(
+        localDateSourceProvider.overrideWithValue(
+          () => LocalDay(
             date: CalendarDate.fromParts(2026, 10, 12),
             untilNextDate: const Duration(hours: 12),
           ),
@@ -451,7 +453,9 @@ final class _Harness {
   }
 }
 
-final class _Reader implements PersonalGraphRepository {
+final class _Reader
+    with IntentionHoldingReadContractTestFallback
+    implements PersonalGraphRepository {
   final queries = <StatisticsQuery>[];
 
   @override

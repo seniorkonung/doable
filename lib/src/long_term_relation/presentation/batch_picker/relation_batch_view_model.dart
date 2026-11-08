@@ -15,6 +15,7 @@ import '../../../intention/presentation/catalog/pair_occupant_reconciliation.dar
 import '../../application/intention_relation_group.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/relation_pair_probe.dart';
+import '../../domain/long_term_relation.dart';
 import 'relation_batch_state.dart';
 
 part 'relation_batch_view_model.g.dart';
@@ -39,7 +40,8 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
   late IntentionId _pageId;
   late IntentionRelationGroup _group;
   final _searchKey = RelationsAdditionSearchKey();
-  final _selected = <IntentionId, String>{};
+  final _selected = <IntentionId, _BatchMark>{};
+  final _createdKinds = <IntentionId, IntentionKind>{};
   bool _hasCreatedIntentions = false;
   late String _pageTitle;
   RelationBatchOperation _operation = const RelationBatchIdle();
@@ -71,16 +73,20 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
     if (_selected.containsKey(id)) {
       _selected.remove(id);
     } else {
-      _selected[id] = title;
+      _selected[id] = _BatchMark(title);
     }
     _publish(const RelationBatchIdle());
   }
 
   /// Принимает результат живой панели создания для этого поиска.
-  void acceptCreated(IntentionId id, String title) {
+  ///
+  /// Выбранный в панели [kind] сохраняется на всю сессию поиска;
+  /// вспомогательным намерение становится только вместе со связью.
+  void acceptCreated(IntentionId id, String title, IntentionKind kind) {
     if (!ref.mounted || !state.canEdit) return;
+    _createdKinds[id] = kind;
     _selected.remove(id);
-    _selected[id] = title;
+    _selected[id] = _BatchMark(title);
     _hasCreatedIntentions = true;
     _publish(const RelationBatchIdle());
   }
@@ -92,23 +98,40 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
   }
 
   /// Отправляет одну команду со всеми отметками в порядке их установки.
-  void submit() {
-    if (!state.canSubmit) return;
+  ///
+  /// Завершается связями подтверждённого добавления и после ухода поиска;
+  /// отказ и непринятая команда завершают её `null`.
+  Future<List<LongTermRelation>?> submit() {
+    if (!state.canSubmit) return Future.value();
     final start = _coordinator.acceptRelationsAddition(
       _searchKey,
-      AddLongTermRelations(
-        pageIntentionId: _pageId,
-        group: _group,
-        candidateIds: _selected.keys,
-      ),
+      switch (_group.direction) {
+        RelationDirection.outgoing => AddLongTermRelations.outgoing(
+          pageIntentionId: _pageId,
+          type: _group.type,
+          candidates: [
+            for (final id in _selected.keys)
+              OutgoingRelationCandidate(
+                id,
+                becomesSupporting:
+                    _createdKinds[id] == IntentionKind.supporting,
+              ),
+          ],
+        ),
+        RelationDirection.incoming => AddLongTermRelations(
+          pageIntentionId: _pageId,
+          group: _group,
+          candidateIds: _selected.keys,
+        ),
+      },
     );
     switch (start) {
       case LongTermRelationCommandAccepted(:final token, :final future):
         _activeToken = token;
         _publish(const RelationBatchSubmitting());
-        unawaited(_finish(future));
+        return _finish(future);
       case LongTermRelationCommandAlreadyRunning():
-        return;
+        return Future.value();
       case GraphCommandCoordinatorDraining():
         _publish(
           const RelationBatchFailed(
@@ -116,6 +139,7 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
             claim: null,
           ),
         );
+        return Future.value();
     }
   }
 
@@ -128,17 +152,32 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
     if (token != null) _coordinator.releaseInitiatorPresentation(token);
   }
 
-  Future<void> _finish(Future<LongTermRelationCommandCompletion> future) async {
+  Future<List<LongTermRelation>?> _finish(
+    Future<LongTermRelationCommandCompletion> future,
+  ) async {
     final completion = await future;
-    if (!ref.mounted || !identical(_activeToken, completion.token)) return;
-    _activeToken = null;
-    _publish(switch (completion.result) {
-      GraphResultSuccess() => const RelationBatchAdded(),
-      GraphResultFailure(:final failure) => RelationBatchFailed(
-        failure: failure,
-        claim: _coordinator.claimInitiatorFailure(completion.token),
-      ),
-    });
+    final canPublish = ref.mounted && identical(_activeToken, completion.token);
+    if (canPublish) _activeToken = null;
+    switch (completion.result) {
+      case GraphResultSuccess(value: LongTermRelationsAdded(:final relations)):
+        if (canPublish) _publish(const RelationBatchAdded());
+        return relations;
+      // Добавление другим успехом не завершается; оболочка назовёт его
+      // непредвиденным.
+      case GraphResultSuccess():
+        if (canPublish) _publish(const RelationBatchAdded());
+        return null;
+      case GraphResultFailure(:final failure):
+        if (canPublish) {
+          _publish(
+            RelationBatchFailed(
+              failure: failure,
+              claim: _coordinator.claimInitiatorFailure(completion.token),
+            ),
+          );
+        }
+        return null;
+    }
   }
 
   void _publish(RelationBatchOperation operation) {
@@ -173,8 +212,8 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
               _selected.remove(current.id);
               changed = true;
             } else if (previous.title != current.title &&
-                _selected[current.id] != current.title) {
-              _selected[current.id] = current.title;
+                _selected[current.id]!.title != current.title) {
+              _selected[current.id] = _BatchMark(current.title);
               changed = true;
             }
           }
@@ -207,7 +246,14 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
     hasCreatedIntentions: _hasCreatedIntentions,
     selected: [
       for (final entry in _selected.entries)
-        RelationBatchSelection(id: entry.key, title: entry.value),
+        RelationBatchSelection(id: entry.key, title: entry.value.title),
     ],
   );
+}
+
+/// Отметка поиска с актуальным названием намерения.
+final class _BatchMark {
+  const _BatchMark(this.title);
+
+  final String title;
 }

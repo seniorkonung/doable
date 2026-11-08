@@ -248,7 +248,7 @@ void main() {
       );
       final query = IntentionCatalogQuery(
         scope: IntentionScope.active,
-        readinessFilter: IntentionReadinessFilter.readyOnly,
+        kindFilter: IntentionKindFilter.mainOnly,
         titleFilter: 'ХОДИТЬ',
         tagFilter: filter,
         pairProbe: RelationPairProbe(
@@ -261,12 +261,12 @@ void main() {
 
       expect(query.tagFilter, filter);
       expect(query.pairProbe?.counterpartId, otherParticipant);
-      for (final (id, title, tags, readiness, archiveState, expected) in [
+      for (final (id, title, tags, kind, archiveState, expected) in [
         (
           candidateId,
           'Ходить в парк',
           [health, rest],
-          IntentionReadiness.ready,
+          IntentionKind.main,
           IntentionArchiveState.active,
           true,
         ),
@@ -274,7 +274,7 @@ void main() {
           candidateId,
           'Читать',
           [health, rest],
-          IntentionReadiness.ready,
+          IntentionKind.main,
           IntentionArchiveState.active,
           false,
         ),
@@ -282,7 +282,7 @@ void main() {
           candidateId,
           'Ходить в парк',
           [health],
-          IntentionReadiness.ready,
+          IntentionKind.main,
           IntentionArchiveState.active,
           false,
         ),
@@ -290,7 +290,7 @@ void main() {
           candidateId,
           'Ходить в парк',
           [health, rest, sport],
-          IntentionReadiness.ready,
+          IntentionKind.main,
           IntentionArchiveState.active,
           false,
         ),
@@ -298,7 +298,7 @@ void main() {
           candidateId,
           'Ходить в парк',
           [health, rest],
-          IntentionReadiness.notReady,
+          IntentionKind.supporting,
           IntentionArchiveState.active,
           false,
         ),
@@ -306,7 +306,7 @@ void main() {
           candidateId,
           'Ходить в парк',
           [health, rest],
-          IntentionReadiness.ready,
+          IntentionKind.main,
           IntentionArchiveState.archived,
           false,
         ),
@@ -314,7 +314,7 @@ void main() {
           otherParticipant.toCanonicalString(),
           'Ходить в парк',
           [health, rest],
-          IntentionReadiness.ready,
+          IntentionKind.main,
           IntentionArchiveState.active,
           false,
         ),
@@ -325,7 +325,7 @@ void main() {
               id: id,
               title: title,
               tags: tags,
-              readiness: readiness,
+              kind: kind,
               archiveState: archiveState,
             ),
           ),
@@ -336,15 +336,15 @@ void main() {
       expect(_query().pairProbe, isNull);
     });
 
-    test('условие готовности допускает оба типа, только действия или только намерения без готовности', () {
-      for (final (filter, acceptsReady, acceptsNotReady) in [
-        (IntentionReadinessFilter.all, true, true),
-        (IntentionReadinessFilter.readyOnly, true, false),
-        (IntentionReadinessFilter.notReadyOnly, false, true),
+    test('условие вида допускает оба вида, только главные или только вспомогательные', () {
+      for (final (filter, acceptsMain, acceptsSupporting) in [
+        (IntentionKindFilter.mainAndSupporting, true, true),
+        (IntentionKindFilter.mainOnly, true, false),
+        (IntentionKindFilter.supportingOnly, false, true),
       ]) {
         final query = IntentionCatalogQuery(
           scope: IntentionScope.active,
-          readinessFilter: filter,
+          kindFilter: filter,
           titleFilter: null,
           order: IntentionCatalogOrder.createdAtAscending,
           pageSize: 1,
@@ -353,26 +353,26 @@ void main() {
           query.includes(
             _summary(
               id: '00000000-0000-4000-8000-000000000001',
-              readiness: IntentionReadiness.ready,
+              kind: IntentionKind.main,
             ),
           ),
-          acceptsReady,
+          acceptsMain,
         );
         expect(
           query.includes(
             _summary(
               id: '00000000-0000-4000-8000-000000000001',
-              readiness: IntentionReadiness.notReady,
+              kind: IntentionKind.supporting,
             ),
           ),
-          acceptsNotReady,
+          acceptsSupporting,
         );
       }
     });
 
-    test('запрос без условия готовности допускает оба типа и сохраняет остальные условия', () {
+    test('запрос без охвата и вида сохраняет название, теги и исключение', () {
       final health = Tag(
-        id: _tagId('00000000-0000-4000-8000-000000000101'),
+        id: _tagId('00000000-0000-4000-8000-000000000102'),
         name: TagName.fromStored('Здоровье'),
         color: null,
         position: tagPositionAt(1002),
@@ -387,9 +387,9 @@ void main() {
       final otherParticipant = _intentionId(
         '00000000-0000-4000-8000-000000000002',
       );
-      final anyReadinessQuery = IntentionCatalogQuery(
+      final anyCellQuery = IntentionCatalogQuery(
         scope: IntentionScope.active,
-        readinessFilter: IntentionReadinessFilter.notReadyOnly,
+        kindFilter: IntentionKindFilter.mainOnly,
         titleFilter: 'ХОДИТЬ',
         tagFilter: IntentionTagFilter(
           requiredTagIds: [health.id],
@@ -401,146 +401,38 @@ void main() {
         ),
         order: IntentionCatalogOrder.titleAscending,
         pageSize: 1,
-        counting: IntentionCatalogCounting.byType,
-      ).withAnyReadiness();
+        counting: IntentionCatalogCounting.byScopeAndKind,
+      ).withAnyScopeAndKind();
 
-      expect(anyReadinessQuery.readinessFilter, IntentionReadinessFilter.all);
-      for (final (id, title, tags, readiness, archiveState, expected) in [
-        (
-          candidateId,
-          'Ходить в парк',
-          [health],
-          IntentionReadiness.ready,
-          IntentionArchiveState.active,
-          true,
-        ),
-        (
-          candidateId,
-          'Ходить в парк',
-          [health],
-          IntentionReadiness.notReady,
-          IntentionArchiveState.active,
-          true,
-        ),
-        (
-          candidateId,
-          'Ходить в парк',
-          [health],
-          IntentionReadiness.ready,
-          IntentionArchiveState.archived,
-          false,
-        ),
-        (
-          candidateId,
-          'Читать',
-          [health],
-          IntentionReadiness.ready,
-          IntentionArchiveState.active,
-          false,
-        ),
-        (
-          candidateId,
-          'Ходить в парк',
-          <Tag>[],
-          IntentionReadiness.ready,
-          IntentionArchiveState.active,
-          false,
-        ),
-        (
-          candidateId,
-          'Ходить в парк',
-          [health, sport],
-          IntentionReadiness.ready,
-          IntentionArchiveState.active,
-          false,
-        ),
+      expect(anyCellQuery.scope, IntentionScope.all);
+      expect(anyCellQuery.kindFilter, IntentionKindFilter.mainAndSupporting);
+
+      for (final (id, title, tags, expected) in [
+        (candidateId, 'Ходить в парк', [health], true),
+        (candidateId, 'Читать', [health], false),
+        (candidateId, 'Ходить в парк', <Tag>[], false),
+        (candidateId, 'Ходить в парк', [health, sport], false),
         (
           otherParticipant.toCanonicalString(),
           'Ходить в парк',
           [health],
-          IntentionReadiness.ready,
-          IntentionArchiveState.active,
           false,
         ),
       ]) {
         expect(
-          anyReadinessQuery.includes(
+          anyCellQuery.includes(
             _summary(
               id: id,
               title: title,
               tags: tags,
-              readiness: readiness,
-              archiveState: archiveState,
+              kind: IntentionKind.supporting,
+              archiveState: IntentionArchiveState.archived,
             ),
           ),
           expected,
         );
       }
     });
-
-    test(
-      'запрос без охвата и готовности сохраняет название, теги и исключение',
-      () {
-        final health = Tag(
-          id: _tagId('00000000-0000-4000-8000-000000000102'),
-          name: TagName.fromStored('Здоровье'),
-          color: null,
-          position: tagPositionAt(1002),
-        );
-        final sport = Tag(
-          id: _tagId('00000000-0000-4000-8000-000000000103'),
-          name: TagName.fromStored('Спорт'),
-          color: null,
-          position: tagPositionAt(1004),
-        );
-        const candidateId = '00000000-0000-4000-8000-000000000001';
-        final otherParticipant = _intentionId(
-          '00000000-0000-4000-8000-000000000002',
-        );
-        final anyCellQuery = IntentionCatalogQuery(
-          scope: IntentionScope.active,
-          readinessFilter: IntentionReadinessFilter.notReadyOnly,
-          titleFilter: 'ХОДИТЬ',
-          tagFilter: IntentionTagFilter(
-            requiredTagIds: [health.id],
-            excludedTagIds: [sport.id],
-          ),
-          pairProbe: RelationPairProbe(
-            counterpartId: otherParticipant,
-            candidateRole: RelationParticipantRole.related,
-          ),
-          order: IntentionCatalogOrder.titleAscending,
-          pageSize: 1,
-          counting: IntentionCatalogCounting.byScopeAndType,
-        ).withAnyScopeAndReadiness();
-
-        for (final (id, title, tags, expected) in [
-          (candidateId, 'Ходить в парк', [health], true),
-          (candidateId, 'Читать', [health], false),
-          (candidateId, 'Ходить в парк', <Tag>[], false),
-          (candidateId, 'Ходить в парк', [health, sport], false),
-          (
-            otherParticipant.toCanonicalString(),
-            'Ходить в парк',
-            [health],
-            false,
-          ),
-        ]) {
-          expect(
-            anyCellQuery.includes(
-              _summary(
-                id: id,
-                title: title,
-                tags: tags,
-                readiness: IntentionReadiness.ready,
-                archiveState: IntentionArchiveState.archived,
-              ),
-            ),
-            expected,
-          );
-        }
-      },
-    );
 
     test('изменение только цвета тега заменяет его состояние в сводке', () {
       final firstId = _tagId('00000000-0000-4000-8000-000000000002');
@@ -549,7 +441,7 @@ void main() {
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
         descriptionPreview: TextPreview.fromText('Описание'),
-        readiness: IntentionReadiness.ready,
+        kind: IntentionKind.main,
         archiveState: IntentionArchiveState.archived,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
@@ -589,7 +481,7 @@ void main() {
       expect(copy.id, summary.id);
       expect(copy.title, summary.title);
       expect(copy.descriptionPreview?.text, summary.descriptionPreview?.text);
-      expect(copy.readiness, summary.readiness);
+      expect(copy.kind, summary.kind);
       expect(copy.archiveState, summary.archiveState);
       expect(copy.createdAt, summary.createdAt);
       expect(copy.updatedAt, summary.updatedAt);
@@ -602,7 +494,7 @@ void main() {
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
         descriptionPreview: TextPreview.fromText('Описание'),
-        readiness: IntentionReadiness.ready,
+        kind: IntentionKind.main,
         archiveState: IntentionArchiveState.archived,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
@@ -640,7 +532,7 @@ void main() {
       expect(copy.id, summary.id);
       expect(copy.title, summary.title);
       expect(copy.descriptionPreview?.text, summary.descriptionPreview?.text);
-      expect(copy.readiness, summary.readiness);
+      expect(copy.kind, summary.kind);
       expect(copy.archiveState, summary.archiveState);
       expect(copy.createdAt, summary.createdAt);
       expect(copy.updatedAt, summary.updatedAt);
@@ -651,7 +543,7 @@ void main() {
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
         descriptionPreview: null,
-        readiness: IntentionReadiness.notReady,
+        kind: IntentionKind.main,
         archiveState: IntentionArchiveState.active,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
@@ -688,7 +580,7 @@ void main() {
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
         descriptionPreview: TextPreview.fromText('Описание'),
-        readiness: IntentionReadiness.ready,
+        kind: IntentionKind.main,
         archiveState: IntentionArchiveState.archived,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),
@@ -717,7 +609,7 @@ void main() {
       expect(copy.id, summary.id);
       expect(copy.title, summary.title);
       expect(copy.descriptionPreview?.text, summary.descriptionPreview?.text);
-      expect(copy.readiness, summary.readiness);
+      expect(copy.kind, summary.kind);
       expect(copy.archiveState, summary.archiveState);
       expect(copy.createdAt, summary.createdAt);
       expect(copy.updatedAt, summary.updatedAt);
@@ -728,7 +620,7 @@ void main() {
         id: _intentionId('00000000-0000-4000-8000-000000000003'),
         title: 'Гулять',
         descriptionPreview: null,
-        readiness: IntentionReadiness.notReady,
+        kind: IntentionKind.main,
         archiveState: IntentionArchiveState.active,
         createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
@@ -811,32 +703,33 @@ void main() {
     });
 
     test(
-      'по умолчанию охватывает любую готовность и отбирает только действия',
+      'по умолчанию охватывает оба вида и отбирает только выбранный вид',
       () {
-        final action = _summary(
-          id: '00000000-0000-4000-8000-000000000011',
-          readiness: IntentionReadiness.ready,
+        final main = _summary(id: '00000000-0000-4000-8000-000000000011');
+        final supporting = _summary(
+          id: '00000000-0000-4000-8000-000000000012',
+          kind: IntentionKind.supporting,
         );
-        final ordinary = _summary(id: '00000000-0000-4000-8000-000000000012');
-        final archivedAction = _summary(
+        final archivedSupporting = _summary(
           id: '00000000-0000-4000-8000-000000000013',
-          readiness: IntentionReadiness.ready,
+          kind: IntentionKind.supporting,
           archiveState: IntentionArchiveState.archived,
         );
         final usualQuery = _query();
-        final actionQuery = IntentionCatalogQuery(
+        final supportingQuery = IntentionCatalogQuery(
           scope: IntentionScope.active,
-          readinessFilter: IntentionReadinessFilter.readyOnly,
+          kindFilter: IntentionKindFilter.supportingOnly,
           titleFilter: null,
           order: IntentionCatalogOrder.createdAtDescending,
           pageSize: 1,
         );
 
-        expect(usualQuery.readinessFilter, IntentionReadinessFilter.all);
-        expect(usualQuery.includes(ordinary), isTrue);
-        expect(actionQuery.includes(action), isTrue);
-        expect(actionQuery.includes(ordinary), isFalse);
-        expect(actionQuery.includes(archivedAction), isFalse);
+        expect(usualQuery.kindFilter, IntentionKindFilter.mainAndSupporting);
+        expect(usualQuery.includes(main), isTrue);
+        expect(usualQuery.includes(supporting), isTrue);
+        expect(supportingQuery.includes(supporting), isTrue);
+        expect(supportingQuery.includes(main), isFalse);
+        expect(supportingQuery.includes(archivedSupporting), isFalse);
       },
     );
 
@@ -1043,46 +936,48 @@ void main() {
       );
     });
 
-    test('первая страница отклоняет противоречивые числа типов', () {
-      const revision = _TestGraphRevision(epoch: 'первая', sequence: 0);
+    test(
+      'числа видов отклоняют отрицательные значения и считают по условию вида',
+      () {
+        expect(
+          () => IntentionKindCounts(main: -1, supporting: 0),
+          throwsA(isA<IntentionCatalogPageValidationException>()),
+        );
+        expect(
+          () => IntentionKindCounts(main: 0, supporting: -1),
+          throwsA(isA<IntentionCatalogPageValidationException>()),
+        );
 
-      expect(
-        () => IntentionTypeCounts(all: 1, actions: 2),
-        throwsA(isA<IntentionCatalogPageValidationException>()),
-      );
-      expect(
-        () => IntentionCatalogFirstPage(
-          items: const [],
-          totalCount: 2,
-          counts: IntentionCountsByType(
-            IntentionTypeCounts(all: 1, actions: 1),
-          ),
-          nextCursor: null,
-          revision: revision,
-        ),
-        throwsA(isA<IntentionCatalogPageValidationException>()),
+        final counts = IntentionKindCounts(main: 3, supporting: 2);
+        expect(counts.all, 5);
+        expect(counts.matching(IntentionKindFilter.mainOnly), 3);
+        expect(counts.matching(IntentionKindFilter.supportingOnly), 2);
+        expect(counts.matching(IntentionKindFilter.mainAndSupporting), 5);
+      },
+    );
+
+    test('числа по охватам и видам дают числа вида в охвате «все» как сумму обоих охватов', () {
+      final counts = IntentionCountsByScopeAndKind(
+        active: IntentionKindCounts(main: 2, supporting: 1),
+        archived: IntentionKindCounts(main: 0, supporting: 3),
       );
 
-      final page = IntentionCatalogFirstPage(
-        items: const [],
-        totalCount: 2,
-        counts: IntentionCountsByType(IntentionTypeCounts(all: 2, actions: 2)),
-        nextCursor: null,
-        revision: revision,
-      );
-      final counts = (page.counts as IntentionCountsByType).counts;
-      expect(counts.actions, 2);
-      expect(counts.intentions, 0);
+      expect(counts.inScope(IntentionScope.active), same(counts.active));
+      expect(counts.inScope(IntentionScope.archived), same(counts.archived));
+      final all = counts.inScope(IntentionScope.all);
+      expect(all.main, 2);
+      expect(all.supporting, 4);
+      expect(all.all, 6);
     });
 
-    test('первая страница с числами по охватам сверяет количество с суммой охватов', () {
+    test('первая страница с числами по охватам и видам сверяет количество с суммой охватов', () {
       const revision = _TestGraphRevision(epoch: 'первая', sequence: 0);
-      final counts = IntentionCountsByScopeAndType(
-        active: IntentionTypeCounts(all: 2, actions: 1),
-        archived: IntentionTypeCounts(all: 1, actions: 0),
+      final counts = IntentionCountsByScopeAndKind(
+        active: IntentionKindCounts(main: 1, supporting: 1),
+        archived: IntentionKindCounts(main: 1, supporting: 0),
       );
 
-      expect(counts.all, 3);
+      expect(counts.inScope(IntentionScope.all).all, 3);
       expect(
         () => IntentionCatalogFirstPage(
           items: const [],
@@ -1149,7 +1044,6 @@ void main() {
       final command = CreateIntention.withInitialState(
         title: 'Прогулка',
         description: null,
-        readiness: IntentionReadiness.notReady,
         tagIds: [home, weekend, _tagId(home.toCanonicalString()), home],
       );
 
@@ -1268,7 +1162,7 @@ IntentionCatalogQuery _order(
 IntentionSummary _summary({
   required String id,
   String title = 'Здоровье',
-  IntentionReadiness readiness = IntentionReadiness.notReady,
+  IntentionKind kind = IntentionKind.main,
   IntentionArchiveState archiveState = IntentionArchiveState.active,
   DateTime? createdAt,
   DateTime? updatedAt,
@@ -1281,7 +1175,7 @@ IntentionSummary _summary({
     id: _intentionId(id),
     title: title,
     descriptionPreview: null,
-    readiness: readiness,
+    kind: kind,
     archiveState: archiveState,
     createdAt: created,
     updatedAt: IntentionTimestamp(updatedAt ?? created.value),
@@ -1296,7 +1190,7 @@ Intention _intention() {
     id: _intentionId('00000000-0000-4000-8000-000000000001'),
     title: 'Здоровье',
     description: null,
-    readiness: IntentionReadiness.notReady,
+    kind: IntentionKind.main,
     archiveState: IntentionArchiveState.active,
     createdAt: timestamp,
     updatedAt: timestamp,

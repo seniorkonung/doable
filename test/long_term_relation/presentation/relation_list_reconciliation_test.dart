@@ -24,6 +24,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../intention/presentation/details/details_test_support.dart';
 import '../../support/tag_positions.dart';
+import '../../support/intention_cascade_execution.dart';
 
 void main() {
   test(
@@ -809,7 +810,7 @@ final class _ListHarness {
 
   Future<void> completeOwnerDeletion({required int revision}) async {
     final start = _coordinator.acceptExisting(
-      DeleteIntention(owner.id),
+      givenDeleteIntention(owner.id),
       presentationTitle: owner.title,
     ) as IntentionCommandAccepted;
     repository.completeCommand(
@@ -825,7 +826,7 @@ final class _ListHarness {
       id: owner.id,
       title: 'Новое название',
       description: owner.description,
-      readiness: owner.readiness,
+      kind: owner.kind,
       archiveState: owner.archiveState,
       createdAt: owner.createdAt,
       updatedAt: owner.updatedAt,

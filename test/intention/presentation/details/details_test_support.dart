@@ -1,17 +1,13 @@
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
+import 'package:doable/src/action/application/action_command.dart';
+import 'package:doable/src/action/application/action_result.dart';
+import 'package:doable/src/action/application/intention_actions.dart';
 
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
-
-import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/intention/application/cascade/intention_cascade.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
@@ -29,10 +25,13 @@ import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/statistics/application/intention_statistics_read_contract.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
+import '../../../support/action_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
 import '../../../support/intention_description_preview.dart';
 import '../../../support/intention_title_order_key.dart';
-import '../../../support/intention_type_counts.dart';
+import '../../../support/intention_kind_counts.dart';
+import '../../../support/intention_holding_read_contract_test_fallback.dart';
+import '../../../support/intention_cascade_execution.dart';
 
 final class ControlledDetailRequest {
   ControlledDetailRequest({bool broadcast = false}) {
@@ -81,32 +80,12 @@ final class ControlledDetailRequest {
 }
 
 final class ControlledDetailsRepository
-    with StatisticsReadContractTestFallback, TagReadContractTestFallback
+    with
+        IntentionHoldingReadContractTestFallback,
+        ActionReadContractTestFallback,
+        StatisticsReadContractTestFallback,
+        TagReadContractTestFallback
     implements PersonalGraphRepository {
-  @override
-  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
-    DailyChoiceDayStatusQuery query,
-  ) => throw UnsupportedError(
-    'Чтение состояний дней не используется в этом тесте.',
-  );
-
-  @override
-  Future<ChoicePathContinuationResult> getChoicePathContinuations(
-    ChoicePathContinuationQuery query,
-  ) => throw UnimplementedError();
-
-  @override
-  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Чтение дневного выбора не используется этим тестом.',
-      );
-
-  @override
-  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Наблюдение дневного выбора не используется этим тестом.',
-      );
-
   ControlledDetailsRepository({this.shareSecondWatch = false});
 
   /// Страница подробностей и вкладка «Связи» наблюдают одно намерение
@@ -117,12 +96,12 @@ final class ControlledDetailsRepository
   final catalogQueries = <IntentionCatalogQuery>[];
   final commands = <IntentionCommand>[];
   final relationCommands = <LongTermRelationCommand>[];
-  final dailyChoiceCommands = <DailyChoiceCommand>[];
+  final actionCommands = <ActionCommand>[];
   final tagCommands = <TagCommand>[];
   final _commandRequests =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
   final _relationCommandRequests = <Completer<LongTermRelationCommandResult>>[];
-  final _dailyChoiceCommandRequests = <Completer<DailyChoiceCommandResult>>[];
+  final _actionCommandRequests = <Completer<ActionCommandResult>>[];
   final _tagCommandRequests = <Completer<TagCommandResult>>[];
   var _watchCallCount = 0;
 
@@ -133,7 +112,30 @@ final class ControlledDetailsRepository
 
   /// Запросы порций групп связей в порядке их поступления.
   final relationGroupQueries = <RelationGroupQuery>[];
-  final dailyChoiceGroupQueries = <DailyChoiceGroupQuery>[];
+
+  /// Запросы порций действий намерения в порядке их поступления.
+  final intentionActionsQueries = <IntentionActionsQuery>[];
+
+  /// Запросы, читающие строки списка, а не только числа вкладки.
+  Iterable<IntentionActionsQuery> get intentionActionsListQueries =>
+      intentionActionsQueries.where(
+        (query) => query.pageSize > IntentionActionsQuery.minPageSize,
+      );
+
+  /// Ответ на запрос порции действий; по умолчанию чтение действий
+  /// отклоняется, как в графах, не читающих действия.
+  IntentionActionsPageResult Function(IntentionActionsQuery query)?
+  onIntentionActionsPage;
+
+  @override
+  Future<IntentionActionsPageResult> getIntentionActionsPage(
+    IntentionActionsQuery query,
+  ) {
+    intentionActionsQueries.add(query);
+    return onIntentionActionsPage == null
+        ? super.getIntentionActionsPage(query)
+        : Future.value(onIntentionActionsPage!(query));
+  }
 
   final statisticsQueries = <IntentionStatisticsQuery>[];
   FutureOr<IntentionStatisticsSectionResult> Function(
@@ -150,11 +152,25 @@ final class ControlledDetailsRepository
         super.getIntentionStatisticsSection(query);
   }
 
+  /// Ответ на предпросмотр каскада; по умолчанию операция не затрагивает
+  /// другие намерения.
+  FutureOr<CascadePreviewResult> Function(
+    CascadeSubject subject,
+    CascadeOperation operation,
+  )?
+  onPreviewCascade;
+
+  @override
+  Future<CascadePreviewResult> previewCascade(
+    CascadeSubject subject,
+    CascadeOperation operation,
+  ) async =>
+      onPreviewCascade?.call(subject, operation) ??
+      givenCascadePreview(subject, operation, const TestDetailsRevision(0));
+
   /// Ответ на запрос порции группы связей; по умолчанию группа пуста.
   RelationGroupPageResult Function(RelationGroupQuery query)?
   onRelationGroupPage;
-  RelationGroupPageResult Function(DailyChoiceGroupQuery query)?
-  onDailyChoiceGroupPage;
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -169,33 +185,11 @@ final class ControlledDetailsRepository
   }
 
   @override
-  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
-    DailyChoiceCatalogQuery query,
-  ) => throw UnsupportedError(
-    'Каталог дневных выборов не используется в этом тесте.',
-  );
-
-  @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) {
-    if (query is DailyChoiceGroupQuery) {
-      dailyChoiceGroupQueries.add(query);
-      return Future.value(
-        onDailyChoiceGroupPage?.call(query) ??
-            GraphResultSuccess(
-              DailyChoiceGroupFirstPage(
-                items: const [],
-                counts: testRelationCounts(),
-                nextCursor: null,
-                revision: const TestDetailsRevision(0),
-              ),
-            ),
-      );
-    }
-    final relationQuery = query as RelationGroupQuery;
-    relationGroupQueries.add(relationQuery);
-    final result = onRelationGroupPage?.call(relationQuery);
+    relationGroupQueries.add(query);
+    final result = onRelationGroupPage?.call(query);
     return Future.value(
       result ??
           GraphResultSuccess(
@@ -240,7 +234,7 @@ final class ControlledDetailsRepository
       final LongTermRelationCommand relation => await _executeRelation(
         relation,
       ),
-      final DailyChoiceCommand choice => await _executeDailyChoice(choice),
+      final ActionCommand action => await _executeAction(action),
       final TagCommand tag => await _executeTag(tag),
       _ => throw UnsupportedError('Неизвестная команда графа в тесте.'),
     };
@@ -256,17 +250,15 @@ final class ControlledDetailsRepository
     return request.future;
   }
 
-  Future<DailyChoiceCommandResult> _executeDailyChoice(
-    DailyChoiceCommand command,
-  ) {
-    dailyChoiceCommands.add(command);
-    final request = Completer<DailyChoiceCommandResult>();
-    _dailyChoiceCommandRequests.add(request);
+  Future<ActionCommandResult> _executeAction(ActionCommand command) {
+    actionCommands.add(command);
+    final request = Completer<ActionCommandResult>();
+    _actionCommandRequests.add(request);
     return request.future;
   }
 
-  void completeDailyChoiceCommand(int index, DailyChoiceCommandResult result) =>
-      _dailyChoiceCommandRequests[index].complete(result);
+  void completeActionCommand(int index, ActionCommandResult result) =>
+      _actionCommandRequests[index].complete(result);
 
   Future<TagCommandResult> _executeTag(TagCommand command) {
     tagCommands.add(command);
@@ -330,7 +322,7 @@ Intention testDetailsIntention({
   int index = 1,
   String title = 'Намерение',
   String? description = 'Описание',
-  IntentionReadiness readiness = IntentionReadiness.notReady,
+  IntentionKind kind = IntentionKind.main,
   IntentionArchiveState archiveState = IntentionArchiveState.active,
 }) {
   final id = testDetailsIntentionId(index);
@@ -339,7 +331,7 @@ Intention testDetailsIntention({
     id: id,
     title: title,
     description: description,
-    readiness: readiness,
+    kind: kind,
     archiveState: archiveState,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -361,7 +353,7 @@ IntentionSummary testDetailsSummary(Intention intention) => IntentionSummary(
   id: intention.id,
   title: intention.title,
   descriptionPreview: testDescriptionPreview(intention.description),
-  readiness: intention.readiness,
+  kind: intention.kind,
   archiveState: intention.archiveState,
   createdAt: intention.createdAt,
   updatedAt: intention.updatedAt,
@@ -377,8 +369,6 @@ RelationCounts testRelationCounts({
   int archivedNeedOutgoing = 0,
   int archivedCanIncoming = 0,
   int archivedCanOutgoing = 0,
-  int dailySource = 0,
-  int dailySelected = 0,
 }) => RelationCounts(
   activeNeedIncoming: activeNeedIncoming,
   activeNeedOutgoing: activeNeedOutgoing,
@@ -388,8 +378,6 @@ RelationCounts testRelationCounts({
   archivedNeedOutgoing: archivedNeedOutgoing,
   archivedCanIncoming: archivedCanIncoming,
   archivedCanOutgoing: archivedCanOutgoing,
-  dailySource: dailySource,
-  dailySelected: dailySelected,
 );
 
 Future<void> waitForDetailRequests(
@@ -462,7 +450,6 @@ RelationGroupEntry testDetailsRelationRow({
   RelationScope scope = RelationScope.active,
   IntentionId? neighborId,
   String? neighborTitle,
-  IntentionReadiness neighborReadiness = IntentionReadiness.notReady,
 }) {
   neighborId ??= testDetailsIntentionId(900 + index);
   final isOutgoing = direction == RelationDirection.outgoing;
@@ -484,7 +471,6 @@ RelationGroupEntry testDetailsRelationRow({
           neighborTitle ??
           (isOutgoing ? 'Связанное $index' : 'Исходное $index'),
       archiveState: IntentionArchiveState.active,
-      readiness: neighborReadiness,
     ),
   );
 }

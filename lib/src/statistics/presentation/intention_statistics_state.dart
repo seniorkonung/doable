@@ -1,4 +1,4 @@
-import '../../daily_choice/domain/calendar_date.dart';
+import '../../shared/domain/calendar_date.dart';
 import '../application/intention_statistics_breakdown.dart';
 import '../application/intention_statistics_read_contract.dart';
 import '../application/intention_statistics_target.dart';
@@ -13,7 +13,7 @@ final class IntentionStatisticsSelection {
     required this.month,
     required this.year,
     this.mode = IntentionStatisticsMode.month,
-    this.view = StatisticsView.throughRelations,
+    this.view,
   });
 
   factory IntentionStatisticsSelection.initial(
@@ -24,7 +24,7 @@ final class IntentionStatisticsSelection {
       localDate: localDate,
       month: StatisticsMonth(localDate.year, localDate.month),
       year: StatisticsYear(localDate.year),
-      view: target?.view ?? StatisticsView.throughRelations,
+      view: target?.view,
     );
     return target == null ? selection : selection.withPeriod(target.period);
   }
@@ -33,7 +33,10 @@ final class IntentionStatisticsSelection {
   final IntentionStatisticsMode mode;
   final StatisticsMonth month;
   final StatisticsYear year;
-  final StatisticsView view;
+
+  /// null до первого раздела, если цель открытия не задала вид: его выбирает
+  /// чтение, и дальше раздел остаётся на выбранном виде.
+  final StatisticsView? view;
 
   StatisticsPeriod get period => switch (mode) {
     IntentionStatisticsMode.month => month,
@@ -142,6 +145,9 @@ final class IntentionStatisticsBreakdownState<T> {
   final StatisticsBreakdownCursor<T>? nextCursor;
   final IntentionStatisticsPageStatus pageStatus;
 
+  /// Разбивка без элементов в разделе не показывается.
+  bool get hasItems => totalItems > 0;
+
   IntentionStatisticsBreakdownState<T> withPageStatus(
     IntentionStatisticsPageStatus pageStatus,
   ) => IntentionStatisticsBreakdownState(
@@ -167,103 +173,102 @@ sealed class IntentionStatisticsBreakdowns {
   factory IntentionStatisticsBreakdowns.first(
     IntentionStatisticsViewDetails details,
   ) => switch (details) {
-    IntentionStatisticsSourceDetails(:final selectedActions) =>
-      IntentionStatisticsSourceBreakdowns(
-        IntentionStatisticsBreakdownState.first(selectedActions),
+    IntentionStatisticsRootDetails(:final terminalIntentions) =>
+      IntentionStatisticsRootBreakdowns(
+        IntentionStatisticsBreakdownState.first(terminalIntentions),
       ),
     IntentionStatisticsIntermediateDetails(
-      :final sourceIntentions,
-      :final selectedActions,
+      :final rootIntentions,
+      :final terminalIntentions,
     ) =>
       IntentionStatisticsIntermediateBreakdowns(
-        IntentionStatisticsBreakdownState.first(sourceIntentions),
-        IntentionStatisticsBreakdownState.first(selectedActions),
+        IntentionStatisticsBreakdownState.first(rootIntentions),
+        IntentionStatisticsBreakdownState.first(terminalIntentions),
       ),
-    IntentionStatisticsSelectedDetails(:final sourceIntentions) =>
-      IntentionStatisticsSelectedBreakdowns(
-        IntentionStatisticsBreakdownState.first(sourceIntentions),
+    IntentionStatisticsTerminalDetails(:final rootIntentions) =>
+      IntentionStatisticsTerminalBreakdowns(
+        IntentionStatisticsBreakdownState.first(rootIntentions),
       ),
     IntentionStatisticsThroughRelationsDetails(
       :final relations,
-      :final selectedActions,
+      :final terminalIntentions,
     ) =>
       IntentionStatisticsThroughRelationsBreakdowns(
         IntentionStatisticsBreakdownState.first(relations),
-        IntentionStatisticsBreakdownState.first(selectedActions),
+        IntentionStatisticsBreakdownState.first(terminalIntentions),
       ),
   };
 
-  IntentionStatisticsBreakdownState<StatisticsItem>? get sourceIntentions =>
-      null;
-  IntentionStatisticsBreakdownState<StatisticsItem>? get selectedActions =>
+  IntentionStatisticsBreakdownState<StatisticsItem>? get rootIntentions => null;
+  IntentionStatisticsBreakdownState<StatisticsItem>? get terminalIntentions =>
       null;
   IntentionStatisticsBreakdownState<StatisticsRelationItem>? get relations =>
       null;
 
   IntentionStatisticsBreakdowns copyWith({
-    IntentionStatisticsBreakdownState<StatisticsItem>? sourceIntentions,
-    IntentionStatisticsBreakdownState<StatisticsItem>? selectedActions,
+    IntentionStatisticsBreakdownState<StatisticsItem>? rootIntentions,
+    IntentionStatisticsBreakdownState<StatisticsItem>? terminalIntentions,
     IntentionStatisticsBreakdownState<StatisticsRelationItem>? relations,
   }) => switch (this) {
-    IntentionStatisticsSourceBreakdowns(selectedActions: final actions) =>
-      IntentionStatisticsSourceBreakdowns(selectedActions ?? actions),
+    IntentionStatisticsRootBreakdowns(terminalIntentions: final terminals) =>
+      IntentionStatisticsRootBreakdowns(terminalIntentions ?? terminals),
     IntentionStatisticsIntermediateBreakdowns(
-      sourceIntentions: final sources,
-      selectedActions: final actions,
+      rootIntentions: final roots,
+      terminalIntentions: final terminals,
     ) =>
       IntentionStatisticsIntermediateBreakdowns(
-        sourceIntentions ?? sources,
-        selectedActions ?? actions,
+        rootIntentions ?? roots,
+        terminalIntentions ?? terminals,
       ),
-    IntentionStatisticsSelectedBreakdowns(sourceIntentions: final sources) =>
-      IntentionStatisticsSelectedBreakdowns(sourceIntentions ?? sources),
+    IntentionStatisticsTerminalBreakdowns(rootIntentions: final roots) =>
+      IntentionStatisticsTerminalBreakdowns(rootIntentions ?? roots),
     IntentionStatisticsThroughRelationsBreakdowns(
       relations: final links,
-      selectedActions: final actions,
+      terminalIntentions: final terminals,
     ) =>
       IntentionStatisticsThroughRelationsBreakdowns(
         relations ?? links,
-        selectedActions ?? actions,
+        terminalIntentions ?? terminals,
       ),
   };
 }
 
-final class IntentionStatisticsSourceBreakdowns
+final class IntentionStatisticsRootBreakdowns
     extends IntentionStatisticsBreakdowns {
-  const IntentionStatisticsSourceBreakdowns(this.selectedActions);
+  const IntentionStatisticsRootBreakdowns(this.terminalIntentions);
   @override
-  final IntentionStatisticsBreakdownState<StatisticsItem> selectedActions;
+  final IntentionStatisticsBreakdownState<StatisticsItem> terminalIntentions;
 }
 
 final class IntentionStatisticsIntermediateBreakdowns
     extends IntentionStatisticsBreakdowns {
   const IntentionStatisticsIntermediateBreakdowns(
-    this.sourceIntentions,
-    this.selectedActions,
+    this.rootIntentions,
+    this.terminalIntentions,
   );
   @override
-  final IntentionStatisticsBreakdownState<StatisticsItem> sourceIntentions;
+  final IntentionStatisticsBreakdownState<StatisticsItem> rootIntentions;
   @override
-  final IntentionStatisticsBreakdownState<StatisticsItem> selectedActions;
+  final IntentionStatisticsBreakdownState<StatisticsItem> terminalIntentions;
 }
 
-final class IntentionStatisticsSelectedBreakdowns
+final class IntentionStatisticsTerminalBreakdowns
     extends IntentionStatisticsBreakdowns {
-  const IntentionStatisticsSelectedBreakdowns(this.sourceIntentions);
+  const IntentionStatisticsTerminalBreakdowns(this.rootIntentions);
   @override
-  final IntentionStatisticsBreakdownState<StatisticsItem> sourceIntentions;
+  final IntentionStatisticsBreakdownState<StatisticsItem> rootIntentions;
 }
 
 final class IntentionStatisticsThroughRelationsBreakdowns
     extends IntentionStatisticsBreakdowns {
   const IntentionStatisticsThroughRelationsBreakdowns(
     this.relations,
-    this.selectedActions,
+    this.terminalIntentions,
   );
   @override
   final IntentionStatisticsBreakdownState<StatisticsRelationItem> relations;
   @override
-  final IntentionStatisticsBreakdownState<StatisticsItem> selectedActions;
+  final IntentionStatisticsBreakdownState<StatisticsItem> terminalIntentions;
 }
 
 sealed class IntentionStatisticsLoaded extends IntentionStatisticsReadState {

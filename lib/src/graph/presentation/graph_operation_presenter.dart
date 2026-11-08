@@ -5,8 +5,9 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
-import '../../daily_choice/presentation/daily_choice_command_failure_message.dart';
+import '../../action/presentation/action_command_failure_message.dart';
 import '../../data_transfer/presentation/graph_import_failure_message.dart';
+import '../../intention/application/cascade/intention_cascade.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_result.dart';
 import '../../long_term_relation/application/long_term_relation_command.dart';
@@ -15,6 +16,7 @@ import '../../shared/presentation/presentation_frame_evidence.dart';
 import '../../tag/presentation/tag_failure_message.dart';
 import '../application/graph_command_coordinator.dart';
 import '../application/graph_command_result.dart';
+import '../application/graph_revision.dart';
 import 'graph_operation_message_plan.dart';
 
 /// Единственный владелец общей поверхности сообщений результатов операций.
@@ -313,8 +315,8 @@ GraphOperationMessage _messageFor(
   LongTermRelationPresentableCompletion() => GraphOperationMessage(
     _relationMessage(localizations, completion),
   ),
-  DailyChoicePresentableCompletion() => GraphOperationMessage(
-    _dailyChoiceMessage(localizations, completion),
+  ActionPresentableCompletion() => GraphOperationMessage(
+    _actionMessage(localizations, completion),
   ),
   TagCommandFailedCompletion() => GraphOperationMessage(
     _tagFailureMessage(localizations, completion),
@@ -400,25 +402,25 @@ String _tagFailureMessage(
   },
 );
 
-String _dailyChoiceMessage(
+String _actionMessage(
   AppLocalizations localizations,
-  DailyChoicePresentableCompletion completion,
+  ActionPresentableCompletion completion,
 ) => localizations.graphOperationMessage(
   switch (completion.kind) {
-    DailyChoiceCommandKind.create => localizations.graphOperationCreate,
-    DailyChoiceCommandKind.update => localizations.graphOperationUpdate,
-    DailyChoiceCommandKind.delete => localizations.graphOperationDelete,
+    ActionCommandKind.create => localizations.graphOperationCreate,
+    ActionCommandKind.update => localizations.graphOperationUpdate,
+    ActionCommandKind.delete => localizations.graphOperationDelete,
   },
-  localizations.graphOperationDailyChoice,
+  localizations.graphOperationAction,
   switch (completion.result) {
     GraphResultSuccess() => switch (completion.kind) {
-      DailyChoiceCommandKind.create => localizations.dailyChoiceCreated,
-      DailyChoiceCommandKind.update => throw StateError(
-        'Успех изменения дневного выбора не образует права предъявления.',
+      ActionCommandKind.update => throw StateError(
+        'Успех изменения действия не образует права предъявления.',
       ),
-      DailyChoiceCommandKind.delete => localizations.dailyChoiceDeleted,
+      ActionCommandKind.create => localizations.actionCreated,
+      ActionCommandKind.delete => localizations.actionDeleted,
     },
-    GraphResultFailure(:final failure) => dailyChoiceCommandFailureMessage(
+    GraphResultFailure(:final failure) => actionCommandFailureMessage(
       localizations,
       failure,
     ),
@@ -432,10 +434,7 @@ String _intentionMessage(
   final operation = switch (completion.kind) {
     IntentionCommandKind.create => localizations.graphOperationCreate,
     IntentionCommandKind.update => localizations.graphOperationUpdate,
-    IntentionCommandKind.enableReadiness =>
-      localizations.graphOperationEnableReadiness,
-    IntentionCommandKind.disableReadiness =>
-      localizations.graphOperationDisableReadiness,
+    IntentionCommandKind.changeKind => localizations.graphOperationChangeKind,
     IntentionCommandKind.archive => localizations.graphOperationArchive,
     IntentionCommandKind.restore => localizations.graphOperationRestore,
     IntentionCommandKind.delete => localizations.graphOperationDelete,
@@ -484,55 +483,130 @@ String _relationMessage(
 String _relationOutcomeFor(
   AppLocalizations localizations,
   LongTermRelationPresentableCompletion completion,
-) => switch (completion.result) {
-  GraphResultSuccess(:final value) => switch ((completion.kind, value)) {
-    (
-      LongTermRelationCommandKind.add,
-      LongTermRelationsAdded(:final relations),
-    ) =>
-      localizations.relationsAdded(relations.length),
-    (LongTermRelationCommandKind.add, _) =>
-      localizations.relationsAdditionUnexpected,
-    (
-      LongTermRelationCommandKind.update ||
-          LongTermRelationCommandKind.archive ||
-          LongTermRelationCommandKind.restore,
-      _,
-    ) =>
-      throw StateError(
-        'Успех этой операции связи не образует права предъявления.',
-      ),
-    (LongTermRelationCommandKind.delete, LongTermRelationDeleted()) =>
-      localizations.relationDeleted,
-    (LongTermRelationCommandKind.delete, LongTermRelationUpdated()) ||
-    (
-      LongTermRelationCommandKind.delete,
-      LongTermRelationsAdded(),
-    ) => localizations.relationDeleteUnexpected,
-  },
-  GraphResultFailure(:final failure) => longTermRelationCommandFailureMessage(
-    localizations,
-    completion.kind,
-    failure,
-  ),
-};
+) =>
+    _cascadeMessage(
+      localizations,
+      completion.confirmedChange,
+      isRelation: true,
+    ) ??
+    switch (completion.result) {
+      GraphResultSuccess(:final value) => switch ((completion.kind, value)) {
+        (
+          LongTermRelationCommandKind.add,
+          LongTermRelationsAdded(:final relations),
+        ) =>
+          localizations.relationsAdded(relations.length),
+        (LongTermRelationCommandKind.add, _) =>
+          localizations.relationsAdditionUnexpected,
+        (
+          LongTermRelationCommandKind.update ||
+              LongTermRelationCommandKind.archive ||
+              LongTermRelationCommandKind.restore,
+          _,
+        ) =>
+          throw StateError(
+            'Успех этой операции связи не образует права предъявления.',
+          ),
+        (LongTermRelationCommandKind.delete, LongTermRelationDeleted()) =>
+          localizations.relationDeleted,
+        (LongTermRelationCommandKind.delete, LongTermRelationUpdated()) ||
+        (
+          LongTermRelationCommandKind.delete,
+          LongTermRelationsAdded(),
+        ) => localizations.relationDeleteUnexpected,
+      },
+      GraphResultFailure(:final failure) =>
+        longTermRelationCommandFailureMessage(
+          localizations,
+          completion.kind,
+          failure,
+        ),
+    };
 
 String _intentionOutcomeFor(
   AppLocalizations localizations,
   IntentionPresentableCompletion completion,
-) => switch (completion.result) {
-  ResultSuccess(:final value) => _successFor(
-    localizations,
-    completion.kind,
-    value,
-    completion.target,
-  ),
-  ResultFailure(:final failure) => _failureFor(
-    localizations,
-    completion.kind,
-    failure,
-  ),
-};
+) =>
+    _cascadeMessage(
+      localizations,
+      completion.confirmedChange,
+      isRelation: false,
+    ) ??
+    switch (completion.result) {
+      ResultSuccess(:final value) => _successFor(
+        localizations,
+        completion.kind,
+        value,
+        completion.target,
+      ),
+      ResultFailure(:final failure) => _failureFor(
+        localizations,
+        completion.kind,
+        failure,
+      ),
+    };
+
+String? _cascadeMessage(
+  AppLocalizations l,
+  ConfirmedGraphChangePackage? package, {
+  required bool isRelation,
+}) {
+  final outcome = package?.changes.whereType<CascadeOutcome>().firstOrNull;
+  if (outcome == null) return null;
+  return switch (outcome.executed) {
+    ArchiveCascadeComposition(:final departing, :final promoted) =>
+      departing.isNotEmpty
+          ? (isRelation
+                ? l.cascadeArchiveRelationSupporting(departing.length)
+                : l.cascadeArchiveIntentionSupporting(departing.length))
+          : promoted.isNotEmpty
+          ? (isRelation
+                ? l.cascadeArchiveRelationPromoted
+                : l.cascadeArchiveIntentionPromoted(promoted.length))
+          : null,
+    DeleteCascadeComposition(
+      :final departing,
+      :final promoted,
+      :final archivedByInvariant,
+    ) =>
+      () {
+        if (departing.isEmpty &&
+            promoted.isEmpty &&
+            archivedByInvariant.isNotEmpty) {
+          return isRelation
+              ? l.cascadeDeleteRelationArchived(archivedByInvariant.length)
+              : l.cascadeDeleteIntentionArchived(archivedByInvariant.length);
+        }
+        final message = departing.isNotEmpty
+            ? (isRelation
+                  ? l.cascadeDeleteRelationSupporting(departing.length)
+                  : l.cascadeDeleteIntentionSupporting(departing.length))
+            : promoted.isNotEmpty
+            ? (isRelation
+                  ? l.cascadeDeleteRelationPromoted
+                  : l.cascadeDeleteIntentionPromoted(promoted.length))
+            : (isRelation ? l.relationDeleted : l.detailsDeleted);
+        if (archivedByInvariant.isEmpty) return message;
+        return '$message${l.cascadeDeleteArchived(archivedByInvariant.length)}';
+      }(),
+    RestoreCascadeComposition(:final restored, :final returnedAsMain) =>
+      isRelation
+          ? returnedAsMain != null
+                ? restored.length > 1
+                      ? l.cascadeRestoreRelationMainOthers(restored.length)
+                      : l.cascadeRestoreRelationMain
+                : restored.isNotEmpty
+                ? l.cascadeRestoreRelation(restored.length)
+                : null
+          : returnedAsMain != null
+          ? restored.isEmpty
+                ? l.cascadeRestoreIntentionMain
+                : l.cascadeRestoreIntentionMainSupporting(restored.length)
+          : restored.isNotEmpty
+          ? l.cascadeRestoreIntentionSupporting(restored.length)
+          : null,
+  };
+}
 
 String _successFor(
   AppLocalizations localizations,
@@ -543,13 +617,14 @@ String _successFor(
   (IntentionCommandKind.create, IntentionSaved()) => switch (target) {
     CreatingIntentionForSearchOperationTarget() =>
       localizations.editorCreatedAndChosen,
+    CreatingIntentionForPathStartOperationTarget() =>
+      localizations.editorCreatedAndChosenPathStart,
     CreatingIntentionOperationTarget() ||
     ExistingIntentionOperationTarget() => localizations.editorCreated,
   },
   (
     IntentionCommandKind.update ||
-        IntentionCommandKind.enableReadiness ||
-        IntentionCommandKind.disableReadiness ||
+        IntentionCommandKind.changeKind ||
         IntentionCommandKind.archive ||
         IntentionCommandKind.restore,
     _,
@@ -573,8 +648,8 @@ String _failureFor(
   IntentionCommandKind.create => switch (failure) {
     IntentionValidationFailure() => localizations.editorInvalidInput,
     IntentionConflictFailure() => localizations.editorCreateConflict,
-    IntentionHasBlockingRelationsFailure() =>
-      localizations.editorCreateUnexpected,
+    IntentionCascadeConflictFailure() ||
+    IntentionCascadePreviewFailure() => localizations.editorCreateUnexpected,
     IntentionUnavailableFailure() => localizations.editorCreateUnavailable,
     IntentionCorruptionFailure() => localizations.editorCreateCorruption,
     IntentionNotFoundFailure() ||
@@ -584,34 +659,51 @@ String _failureFor(
     IntentionValidationFailure() => localizations.detailsUpdateInvalidInput,
     IntentionNotFoundFailure() => localizations.detailsUpdateNotFound,
     IntentionConflictFailure() => localizations.detailsUpdateConflict,
-    IntentionHasBlockingRelationsFailure() =>
-      localizations.detailsUpdateUnexpected,
+    IntentionCascadeConflictFailure() ||
+    IntentionCascadePreviewFailure() => localizations.detailsUpdateUnexpected,
     IntentionUnavailableFailure() => localizations.detailsUpdateUnavailable,
     IntentionCorruptionFailure() => localizations.detailsUpdateCorruption,
     IntentionUnexpectedFailure() => localizations.detailsUpdateUnexpected,
   },
-  IntentionCommandKind.enableReadiness ||
-  IntentionCommandKind.disableReadiness ||
+  IntentionCommandKind.changeKind ||
   IntentionCommandKind.archive ||
   IntentionCommandKind.restore => switch (failure) {
     IntentionValidationFailure() => localizations.detailsStateChangeInvalid,
     IntentionNotFoundFailure() => localizations.detailsStateChangeNotFound,
     IntentionConflictFailure() => localizations.detailsStateChangeConflict,
-    IntentionHasBlockingRelationsFailure() =>
-      localizations.detailsStateChangeUnexpected,
+    IntentionCascadeConflictFailure() =>
+      localizations.detailsStateChangeCascadeConflict,
     IntentionUnavailableFailure() =>
       localizations.detailsStateChangeUnavailable,
     IntentionCorruptionFailure() => localizations.detailsStateChangeCorruption,
     IntentionUnexpectedFailure() => localizations.detailsStateChangeUnexpected,
+    IntentionCascadePreviewFailure(:final cause) => switch (cause) {
+      CascadePreviewSubjectNotFound() =>
+        localizations.detailsStateChangeNotFound,
+      CascadePreviewOperationInapplicable() ||
+      CascadePreviewExpired() => localizations.detailsStateChangeConflict,
+      CascadePreviewUnavailable() =>
+        localizations.detailsStateChangeUnavailable,
+      CascadePreviewCorruption() => localizations.detailsStateChangeCorruption,
+      CascadePreviewUnexpected() => localizations.detailsStateChangeUnexpected,
+    },
   },
   IntentionCommandKind.delete => switch (failure) {
     IntentionValidationFailure() => localizations.detailsDeleteInvalid,
     IntentionNotFoundFailure() => localizations.detailsDeleteNotFound,
     IntentionConflictFailure() => localizations.detailsDeleteConflict,
-    IntentionHasBlockingRelationsFailure() =>
-      localizations.detailsDeleteBlockedByRelations,
+    IntentionCascadeConflictFailure() =>
+      localizations.detailsDeleteCascadeConflict,
     IntentionUnavailableFailure() => localizations.detailsDeleteUnavailable,
     IntentionCorruptionFailure() => localizations.detailsDeleteCorruption,
     IntentionUnexpectedFailure() => localizations.detailsDeleteUnexpected,
+    IntentionCascadePreviewFailure(:final cause) => switch (cause) {
+      CascadePreviewSubjectNotFound() => localizations.detailsDeleteNotFound,
+      CascadePreviewOperationInapplicable() ||
+      CascadePreviewExpired() => localizations.detailsDeleteConflict,
+      CascadePreviewUnavailable() => localizations.detailsDeleteUnavailable,
+      CascadePreviewCorruption() => localizations.detailsDeleteCorruption,
+      CascadePreviewUnexpected() => localizations.detailsDeleteUnexpected,
+    },
   },
 };

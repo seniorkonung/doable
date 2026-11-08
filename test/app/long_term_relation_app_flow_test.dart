@@ -6,11 +6,11 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/action/application/action_details.dart';
+import 'package:doable/src/action/domain/action_id.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/design_system/doable_priority.dart';
-import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/action/application/action_day.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart'
@@ -19,9 +19,11 @@ import 'package:doable/src/design_system/components/archived_fold.dart';
 import 'package:doable/src/design_system/components/catalog_header.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/components/option_row.dart';
+import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:doable/src/design_system/components/priority_picker.dart';
 import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/design_system/components/relation_row.dart';
+import 'package:doable/src/design_system/components/action_path.dart' as ui;
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_options.dart';
@@ -31,18 +33,21 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
 import 'package:drift/native.dart' show DatabaseSetup;
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
-import '../support/daily_choice_details_controls.dart';
-
+import '../support/action_panel_controls.dart';
+import '../support/action_panel_edit_controls.dart';
+import '../support/action_panel_fixture.dart';
+import '../support/action_seed.dart';
 import '../support/app_root_pages.dart';
-import '../support/daily_choice_catalog_controls.dart';
-import '../support/daily_choice_durability_fixture.dart';
-import '../support/daily_choice_local_date.dart';
+import '../support/controlled_local_date.dart';
+import '../support/action_day_controls.dart';
+import '../support/graph_durability_fixture.dart';
 import '../support/graph_seed.dart';
 import '../support/intention_catalog_controls.dart';
 import '../support/quick_creation.dart';
@@ -53,6 +58,78 @@ import '../support/intention_edit_screen.dart';
 import '../support/intention_options.dart';
 
 void main() {
+  testWidgets(
+    '«Оставить главным» удаляет только связь и сообщает об изменении',
+    (tester) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
+      addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+      tester.view.physicalSize = const Size(1200, 6000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final storage = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
+      await tester.runAsync(() async {
+        final database = await storage.openReadyDatabase();
+        await seedDurabilityGraph(database);
+        await seedGraph(database, () async {
+          await database.customStatement(
+            "UPDATE intentions SET kind = 'supporting' WHERE id = ?",
+            [durabilityUuid(2)],
+          );
+        });
+        await storage.closePersistenceObjectGraph();
+      });
+      late sqlite.Database raw;
+      final runtime = _fileRuntime(
+        storage,
+        diagnostics: InMemoryDiagnosticsSink(),
+        setup: (db) => raw = db,
+      );
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await runtime.shutdown();
+        await storage.dispose();
+      });
+      final l10n = lookupAppLocalizations(const Locale('ru'));
+      await tester.pumpWidget(MainApp(runtime: runtime));
+      await openIntentionGraph(tester, waitFor: _pumpUntilFound);
+      await _pumpUntilFound(tester, find.text('Намерение 1'));
+      await _openIntention(tester, 'Намерение 1');
+      await _chooseDetailsTab(tester, l10n.detailsRelationsTab);
+      final phrase = l10n.relationNeighborhoodNeedPhrase(
+        'Намерение 1',
+        'Намерение 2',
+      );
+      await _tapWhenFound(tester, _relationRow(phrase));
+      await _pumpUntilRelationSheet(tester, phrase);
+      await _chooseRelationOption(tester, l10n, l10n.relationSheetOptionDelete);
+      await _tapWhenFound(tester, find.text('Оставить главным'));
+      await _pumpUntilAbsent(tester, _relationSheet);
+      await _pumpUntilFound(
+        tester,
+        find.textContaining('Связь удалена, намерение стало главным'),
+      );
+      expect(
+        raw.select('SELECT kind FROM intentions WHERE id = ?', [
+          durabilityUuid(2),
+        ]).single['kind'],
+        'main',
+      );
+      expect(
+        raw.select('SELECT id FROM long_term_relations WHERE id = ?', [
+          durabilityUuid(101),
+        ]),
+        isEmpty,
+      );
+      expect(
+        raw.select('SELECT id FROM long_term_relations WHERE id = ?', [
+          durabilityUuid(102),
+        ]),
+        hasLength(1),
+      );
+    },
+  );
+
   testWidgets(
     'создаёт связь, согласует соседство и сохраняет поток после открытия файла',
     (tester) async {
@@ -197,13 +274,28 @@ void main() {
       await _expandArchive(tester);
       await _pumpUntilFound(tester, _relationRow(renamedPhrase));
 
+      // Восстановление намерения возвращает его связь с активным намерением.
       await _chooseIntentionOption(tester, IntentionOption.restore);
-      await _pumpUntilAbsent(tester, intentionHeadRestore);
+      await _pumpUntilHeadActive(tester);
       await _dismissOperationMessage(tester);
       expect(_relationRow(renamedPhrase), findsOneWidget);
       expect(
-        find.bySemanticsLabel('Relations: 0 active, 1 archived'),
+        find.bySemanticsLabel('Relations: 1 active, 0 archived'),
         findsOneWidget,
+      );
+
+      await tester.tap(_relationRow(renamedPhrase));
+      await _pumpUntilRelationSheet(tester, renamedPhrase);
+      await _chooseRelationOption(
+        tester,
+        l10n,
+        l10n.relationSheetOptionArchive,
+      );
+      await _pumpUntilRelationHead<RelationHeadArchived>(tester);
+      await _closeRelationSheet(tester);
+      await _pumpUntilFound(
+        tester,
+        find.bySemanticsLabel('Relations: 0 active, 1 archived'),
       );
 
       await tester.pumpWidget(const SizedBox.shrink());
@@ -311,11 +403,14 @@ void main() {
       await _closeRelationSheet(tester);
 
       await _openIntentionOptions(tester);
-      final blockedDeletion = tester.widget<OptionRow>(
+      // Предпросмотр читается асинхронно после открытия параметров.
+      await _pumpUntilFound(tester, find.text('Its tags stay'));
+      // Связи не блокируют удаление намерения.
+      final deletion = tester.widget<OptionRow>(
         intentionOption(IntentionOption.delete),
       );
-      expect(blockedDeletion.onPressed, isNull);
-      expect(blockedDeletion.hint, 'Delete its relations first');
+      expect(deletion.onPressed, isNotNull);
+      expect(deletion.hint, 'Its tags stay');
       await tester.binding.handlePopRoute();
       await _pumpUntilAbsent(tester, find.byType(Sheet));
       await _chooseDetailsTab(tester, 'Relations');
@@ -408,7 +503,7 @@ void main() {
       ]);
       expect(_pickerMarks(tester, l10n, _sleep), isEmpty);
       final header = tester.widget<CatalogHeader>(find.byType(CatalogHeader));
-      expect(header.title, l10n.intentionPickerAllHeader);
+      expect(header.title, l10n.intentionPickerIntentionsHeader);
       expect(header.count, 3);
 
       // Страница из поиска позволяет удалить занимающую связь.
@@ -489,7 +584,7 @@ void main() {
               (4, _sleep),
             ]) {
               await db.customStatement(
-                'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, ?, ?)',
+                'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', 0, ?, ?)',
                 [_id(id), title, id, id],
               );
             }
@@ -519,6 +614,10 @@ void main() {
         await _chooseDetailsTab(tester, l10n.detailsRelationsTab);
         await _tapWhenFound(
           tester,
+          find.byKey(const ValueKey('intention-relations-group-needs')),
+        );
+        await _tapWhenFound(
+          tester,
           find.byKey(const ValueKey('intention-relations-add')),
         );
         for (final title in [_sleep, _swim, _walk]) {
@@ -537,6 +636,10 @@ void main() {
         await _chooseDetailsTab(tester, l10n.detailsRelationsTab);
         await _tapWhenFound(
           tester,
+          find.byKey(const ValueKey('intention-relations-group-needs')),
+        );
+        await _tapWhenFound(
+          tester,
           _relationRow(l10n.relationNeighborhoodNeedPhrase(_walk, _healthy)),
         );
         await _pumpUntilRelationSheet(
@@ -551,6 +654,10 @@ void main() {
         );
         await _pumpUntilDetailsTitle(tester, _healthy);
         await _chooseDetailsTab(tester, l10n.detailsRelationsTab);
+        await _tapWhenFound(
+          tester,
+          find.byKey(const ValueKey('intention-relations-group-needs')),
+        );
         await _tapWhenFound(
           tester,
           find.byKey(const ValueKey('intention-relations-add')),
@@ -658,7 +765,7 @@ void main() {
           (5, 'Бегать'),
         ]) {
           await db.customStatement(
-            'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, ?, ?)',
+            'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', 0, ?, ?)',
             [_id(id), title, id, id],
           );
         }
@@ -905,12 +1012,12 @@ void main() {
             [_id(104), _id(2), _id(3), 'need'],
           );
           await db.customStatement(
-            'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, 5, 5)',
+            'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', 0, 5, 5)',
             [_id(5), 'Бегать'],
           );
           for (var id = 6; id <= 14; id++) {
             await db.customStatement(
-              'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, ?, ?)',
+              'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', 0, ?, ?)',
               [_id(id), 'Намерение $id', id, id],
             );
           }
@@ -933,6 +1040,10 @@ void main() {
       await _tapWhenFound(tester, intentionCatalogRow(_healthy));
       await _pumpUntilDetailsTitle(tester, _healthy);
       await _chooseDetailsTab(tester, l10n.detailsRelationsTab);
+      await _tapWhenFound(
+        tester,
+        find.byKey(const ValueKey('intention-relations-group-needs')),
+      );
       await _tapWhenFound(
         tester,
         find.byKey(const ValueKey('intention-relations-add')),
@@ -980,6 +1091,10 @@ void main() {
       await _tapPickerArrow(tester, _walk);
       await _pumpUntilDetailsTitle(tester, _walk);
       await _chooseDetailsTab(tester, l10n.detailsRelationsTab);
+      await _tapWhenFound(
+        tester,
+        find.byKey(const ValueKey('intention-relations-group-needs')),
+      );
       await _expandArchive(tester);
       final archivedPhrase = l10n.relationNeighborhoodNeedPhrase(_walk, _swim);
       await _tapWhenFound(tester, _relationRow(archivedPhrase));
@@ -997,14 +1112,14 @@ void main() {
         ),
       );
       await _pumpUntilDetailsTitle(tester, _swim);
+      // Восстановление «Плавать» возвращает его связи с активными
+      // намерениями, в том числе открытую в панели.
       await _chooseIntentionOption(tester, IntentionOption.restore);
       await _pumpUntilAbsent(tester, intentionHeadRestore);
       await _dismissOperationMessage(tester);
       await tester.binding.handlePopRoute();
-      await _pumpUntilRelationSheet(
-        tester,
-        l10n.relationSheetArchivedLabel(archivedPhrase),
-      );
+      await _pumpUntilRelationSheet(tester, archivedPhrase);
+      await _pumpUntilRelationHead<RelationHeadActive>(tester);
       await _closeRelationSheet(tester);
       await tester.binding.handlePopRoute();
       await _pumpUntilFound(tester, find.byType(CatalogHeader));
@@ -1020,14 +1135,14 @@ void main() {
         scrollable: scrollable,
       );
       expect(_pickerMarks(tester, l10n, _swim), [
-        l10n.relationPairAlreadyAddedArchived,
+        l10n.relationPairAlreadyAdded,
       ]);
       expect(find.text(l10n.batchAddCount(1)), findsOneWidget);
     },
   );
 
   testWidgets(
-    'панель переводит связь из пути сохранённого выбора в другую группу, а подробный просмотр выбора показывает новый тип с прежним составом пути',
+    'панель переводит связь из пути сохранённого действия в другую группу, а вкладка «Путь» действия показывает новый тип с прежним составом пути',
     (tester) async {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
@@ -1041,16 +1156,27 @@ void main() {
 
       final storage = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
       addTearDown(storage.dispose);
+      final actionDate = CalendarDate.fromParts(2026, 9, 23);
       await tester.runAsync(() async {
-        final database = await storage.openReadyDatabase();
+        late sqlite.Database seeded;
+        final database = await storage.openReadyDatabase(
+          setup: (database) => seeded = database,
+        );
         await seedDurabilityGraph(database);
-        expect(
-          await durabilityRepository(database).execute(durabilityCreate()),
-          isA<GraphCommandSucceeded>(),
+        // Путь 1 → 2 → 3 идёт по связям 101 («нужно») и 102 («можно»).
+        seedRawGraph(
+          seeded,
+          () => seedAction(
+            seeded,
+            id: seedUuid(201),
+            path: [seedUuid(1), seedUuid(2), seedUuid(3)],
+            date: actionDate.toCanonicalString(),
+            isCompleted: true,
+          ),
         );
         await storage.closePersistenceObjectGraph();
       });
-      final localDate = ControlledDailyChoiceLocalDate(durabilityChoiceDate);
+      final localDate = ControlledLocalDate(actionDate);
       late sqlite.Database raw;
       final runtime = AppRuntime(
         quickCreationModeStore: InMemoryQuickCreationModeStore(),
@@ -1059,7 +1185,7 @@ void main() {
           setup: (database) => raw = database,
         ),
         diagnosticsSink: InMemoryDiagnosticsSink(),
-        dailyChoiceLocalDateSource: localDate.read,
+        localDateSource: localDate.read,
       );
       addTearDown(() async {
         await tester.pumpWidget(const SizedBox.shrink());
@@ -1071,9 +1197,9 @@ void main() {
       final repository = (await runtime.bootstrap() as AppRuntimeReady)
           .container
           .read(personalGraphRepositoryProvider);
-      final choiceId = durabilityChoice(201);
-      final before = await _readDailyChoice(repository, choiceId);
-      expect(before.path.map((step) => step.relation.type), [
+      final actionId = actionIdOf(201);
+      final before = await _readAction(repository, actionId);
+      expect(before.path.steps.map((step) => step.link.type), [
         LongTermRelationType.need,
         LongTermRelationType.can,
       ]);
@@ -1100,12 +1226,12 @@ void main() {
         raw.select(
           'SELECT source_intention_id, related_intention_id, type '
           'FROM long_term_relations WHERE id = ?',
-          [durabilityUuid(101)],
+          [seedUuid(101)],
         ),
         [
           {
-            'source_intention_id': durabilityUuid(1),
-            'related_intention_id': durabilityUuid(2),
+            'source_intention_id': seedUuid(1),
+            'related_intention_id': seedUuid(2),
             'type': 'can',
           },
         ],
@@ -1143,58 +1269,67 @@ void main() {
       );
       final newPair = raw.select(
         'SELECT id, priority, description FROM long_term_relations WHERE source_intention_id = ? AND related_intention_id = ?',
-        [durabilityUuid(1), durabilityUuid(3)],
+        [seedUuid(1), seedUuid(3)],
       ).single;
-      expect(newPair['id'], isNot(durabilityUuid(101)));
+      expect(newPair['id'], isNot(seedUuid(101)));
       expect(newPair['priority'], 4);
       expect(newPair['description'], isNull);
       expect(
         raw.select('SELECT is_archived FROM long_term_relations WHERE id = ?', [
-          durabilityUuid(101),
+          seedUuid(101),
         ]).single['is_archived'],
         1,
       );
       await _dismissOperationMessage(tester);
-      // Подробный просмотр выбора показывает новый тип связи.
+      // Вкладка «Путь» действия показывает новый тип связи.
       await tester.binding.handlePopRoute();
       await _pumpUntilFound(
         tester,
         find.byType(catalog_page.IntentionCatalogPage),
       );
       await tester.pumpAndSettle(const Duration(milliseconds: 1));
-      await openDailyChoices(tester, tap: _tapWhenFound);
+      await openActions(tester, tap: _tapWhenFound);
       await _pumpUntilFound(
         tester,
         find.byKey(
-          const ValueKey('daily-choice-section-true'),
+          const ValueKey('action-day-section-completed'),
           skipOffstage: false,
         ),
       );
-      await showDailyChoiceCatalogSection(tester, true);
+      await showActionDaySection(tester, ActionDaySection.completed);
       await _tapWhenFound(
         tester,
-        find.byKey(const ValueKey('daily-choice-row-1')),
+        find.byKey(const ValueKey('action-day-row-1')),
       );
-      await _pumpUntilFound(tester, dailyChoiceDetails);
+      await _pumpUntilFound(tester, actionPanelReady);
       await tester.pumpAndSettle(const Duration(milliseconds: 1));
-      await showDailyChoicePath(tester, tap: _tapWhenFound);
+      await showActionPanelPath(
+        tester,
+        waitFor: _pumpUntilFound,
+        tap: _tapWhenFound,
+      );
       expect(
-        find.descendant(
-          of: dailyChoiceDetailsRelation(1),
-          matching: find.text(l10n.relationNeighborhoodTypeCan),
-        ),
-        findsOneWidget,
+        tester
+            .widget<ui.ActionPath>(find.byType(ui.ActionPath))
+            .links
+            .map((link) => link.relation.kind),
+        [ui.ActionPathRelationKind.can, ui.ActionPathRelationKind.can],
       );
 
       // Состав пути, дата и выполнение прежние, меняется только тип.
-      final after = await _readDailyChoice(repository, choiceId);
-      expect(after.choice.date, before.choice.date);
-      expect(after.choice.isCompleted, before.choice.isCompleted);
+      final after = await _readAction(repository, actionId);
+      expect(after.action.date, before.action.date);
+      expect(after.action.isCompleted, before.action.isCompleted);
+      expect(after.action.path.intentions, before.action.path.intentions);
       expect(
-        after.path.map((step) => (step.step.id, step.relation.id)),
-        before.path.map((step) => (step.step.id, step.relation.id)),
+        after.path.steps.map(
+          (step) => (step.link as ExistingActionPathLink).relation.id,
+        ),
+        before.path.steps.map(
+          (step) => (step.link as ExistingActionPathLink).relation.id,
+        ),
       );
-      expect(after.path.map((step) => step.relation.type), [
+      expect(after.path.steps.map((step) => step.link.type), [
         LongTermRelationType.can,
         LongTermRelationType.can,
       ]);
@@ -1203,13 +1338,13 @@ void main() {
   );
 }
 
-Future<DailyChoiceDetails> _readDailyChoice(
+Future<ActionDetails> _readAction(
   PersonalGraphRepository repository,
-  DailyChoiceId id,
+  ActionId id,
 ) async {
-  final result = await repository.getDailyChoice(id);
-  expect(result, isA<DailyChoiceReadSuccess>());
-  return (result as DailyChoiceReadSuccess).value.value!;
+  final result = await repository.watchAction(id).first;
+  expect(result, isA<ActionReadSuccess>());
+  return (result as ActionReadSuccess).value.value!;
 }
 
 const _healthy = 'Быть здоровым';
@@ -1233,7 +1368,7 @@ Future<void> _seedOccupiedPairs(AppDatabase database) =>
         (4, _sleep),
       ]) {
         await database.customStatement(
-          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, ?, ?)',
+          'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', 0, ?, ?)',
           [_id(number), title, number, number],
         );
       }
@@ -1561,6 +1696,7 @@ Future<void> _deleteCurrentIntention(WidgetTester tester) async {
     if (tester.widget<OptionRow>(delete).onPressed != null) break;
     await tester.pump(const Duration(milliseconds: 1));
   }
+  await _pumpUntilFound(tester, find.text('Its tags stay'));
   expect(tester.widget<OptionRow>(delete).hint, 'Its tags stay');
   await tester.tap(delete);
   await _tapWhenFound(tester, intentionDeletionConfirm);
@@ -1632,7 +1768,7 @@ Future<void> _pumpUntilFound(
       await tester.pump();
       return;
     }
-    await tester.pump(const Duration(milliseconds: 1));
+    await _pumpPollStep(tester);
   }
   fail('App-level поток не показал ожидаемый элемент: $finder');
 }
@@ -1647,9 +1783,16 @@ Future<void> _pumpUntilAbsent(
       await tester.pump();
       return;
     }
-    await tester.pump(const Duration(milliseconds: 1));
+    await _pumpPollStep(tester);
   }
   fail('App-level поток не закрыл ожидаемый элемент: $finder');
+}
+
+/// Шаг ожидания: предпросмотр каскада считает удержание в отдельном
+/// изоляте, ответ которого приходит только в настоящем цикле событий.
+Future<void> _pumpPollStep(WidgetTester tester) async {
+  await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+  await tester.pump(const Duration(milliseconds: 1));
 }
 
 Future<void> _tapWhenFound(
@@ -1676,6 +1819,25 @@ Finder _relationRow(String phrase) => find.byWidgetPredicate(
 );
 
 /// Раскрывает свёрнутый архив выбранной группы, когда его строка появится.
+/// Ждёт восстановления открытого намерения: страница прокручивается к шапке,
+/// и та перестаёт показывать архивное состояние.
+Future<void> _pumpUntilHeadActive(WidgetTester tester) async {
+  await tester.scrollUntilVisible(
+    find.byKey(const ValueKey('intention-details-title')),
+    -500,
+    scrollable: find
+        .descendant(
+          of: find.byType(IntentionDetailsPage).last,
+          matching: find.byType(Scrollable),
+        )
+        .first,
+  );
+  await _pumpUntilFound(
+    tester,
+    find.byWidgetPredicate((widget) => widget is PageHead && !widget.muted),
+  );
+}
+
 Future<void> _expandArchive(WidgetTester tester) async {
   final fold = find.descendant(
     of: find.byType(ArchivedFold),

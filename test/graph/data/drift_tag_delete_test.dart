@@ -13,6 +13,7 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/action_seed.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_positions.dart';
@@ -50,8 +51,8 @@ void main() {
       'intentions',
       'intention_titles_fts',
       'long_term_relations',
-      'daily_choices',
-      'daily_choice_path_steps',
+      'actions',
+      'action_path_items',
     ])
       table: raw
           .select('SELECT * FROM $table ORDER BY rowid')
@@ -72,22 +73,15 @@ void main() {
     seedRawGraph(raw, () {
       for (var i = 1; i <= 106; i++) {
         raw.execute(
-          'INSERT INTO intentions (id, title, description, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [_uuid(i), 'Намерение $i', 'Описание $i', 1, i.isEven ? 1 : 0, i, i],
+          'INSERT INTO intentions (id, title, description, kind, is_archived, created_at, updated_at) VALUES (?, ?, ?, \'main\', ?, ?, ?)',
+          [_uuid(i), 'Намерение $i', 'Описание $i', i.isEven ? 1 : 0, i, i],
         );
       }
       raw.execute(
         'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, 0)',
         [_uuid(201), _uuid(1), _uuid(3), 'need', 2, 1],
       );
-      raw.execute(
-        'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
-        [_uuid(202), _uuid(1), _uuid(3), '2026-09-25', 0],
-      );
-      raw.execute(
-        'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
-        [_uuid(203), _uuid(202), _uuid(201)],
-      );
+      seedAction(raw, id: _uuid(202), path: [_uuid(1), _uuid(3)]);
       raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         _uuid(301),
         'Дом',
@@ -167,8 +161,8 @@ void main() {
     seedRawGraph(raw, () {
       for (var i = 1; i <= 2; i++) {
         raw.execute(
-          'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-          [_uuid(i), 'Намерение $i', 0, i - 1, i, i],
+          'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', ?, ?, ?)',
+          [_uuid(i), 'Намерение $i', i - 1, i, i],
         );
       }
       raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [

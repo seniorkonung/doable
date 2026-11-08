@@ -191,7 +191,7 @@ Future<_App> _launch(
   seedRawGraph(raw, () {
     for (final (id, title, archived) in [(1, 'Гулять', 0), (2, 'Читать', 1)]) {
       raw.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, ?, 1, 1)',
+        'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', ?, 1, 1)',
         [tagFixtureId(id), title, archived],
       );
     }
@@ -234,14 +234,12 @@ Future<void> _open(WidgetTester tester, _App app) async {
   expect(find.byType(IntentionEditorPage), findsOneWidget);
 }
 
-/// Название, описание, готовность и теги команды подготавливаются
+/// Название, описание и теги команды подготавливаются
 /// реальными панелью, панелью тегов и листом тега.
 Future<TagId> _prepare(WidgetTester tester, _App app) async {
   await _open(tester, app);
   await tester.enterText(_key('intention-editor-title'), _rawTitle);
   await tester.enterText(_key('intention-editor-description'), _description);
-  await _tap(tester, _key('intention-editor-readiness'));
-  await _tap(tester, _key('intention-editor-readiness-confirm'));
   await _tap(tester, _key('intention-editor-choose-tags'));
   await _include(tester, _home);
   // Локальные правки не маскируются событиями постоянных команд.
@@ -311,12 +309,8 @@ void _expectDraft(WidgetTester tester, List<TagId> tags) {
   for (final id in tags) {
     expect(_chip(id), findsOneWidget);
   }
-  expect(_icon(tester, 'intention-editor-readiness'), Icons.check_circle);
+  expect(find.text('Главное'), findsOneWidget);
 }
-
-IconData? _icon(WidgetTester tester, String key) => tester
-    .widget<Icon>(find.descendant(of: _key(key), matching: find.byType(Icon)))
-    .icon;
 
 String _text(WidgetTester tester, String key) =>
     tester.widget<TextField>(_key(key)).controller!.text;
@@ -334,8 +328,8 @@ Map<String, List<List<Object?>>> _storedGraph(sqlite.Database raw) => {
     'tags',
     'tag_assignments',
     'long_term_relations',
-    'daily_choices',
-    'daily_choice_path_steps',
+    'actions',
+    'action_path_items',
   ])
     table: [
       for (final row in raw.select('SELECT * FROM $table ORDER BY rowid'))
@@ -412,7 +406,7 @@ void _expectFaultPoint(_App app, List<TagId> tags) {
     _title,
     'рисовать акварель',
     _description,
-    1,
+    'main',
     0,
     isA<int>(),
     isA<int>(),
@@ -456,18 +450,18 @@ void _expectSaved(
   app.diagnostics.privateValues.add(intention.id.toCanonicalString());
   expect(intention.title, _title);
   expect(intention.description, _description);
-  expect(intention.readiness, IntentionReadiness.ready);
+  expect(intention.kind, IntentionKind.main);
   expect(intention.archiveState, IntentionArchiveState.active);
   expect(intention.createdAt, intention.updatedAt);
   final stored = app.raw
       .select(
-        'SELECT title, description, is_action_ready, is_archived, created_at, updated_at FROM intentions WHERE id = ?',
+        'SELECT title, description, kind, is_archived, created_at, updated_at FROM intentions WHERE id = ?',
         [intention.id.toCanonicalString()],
       )
       .single
       .values
       .toList();
-  expect(stored, [_title, _description, 1, 0, isA<int>(), isA<int>()]);
+  expect(stored, [_title, _description, 'main', 0, isA<int>(), isA<int>()]);
   expect(stored[4], stored[5]);
   expect(_storedGraph(app.raw)['ftsCreatedMatches'], hasLength(1));
   expect(

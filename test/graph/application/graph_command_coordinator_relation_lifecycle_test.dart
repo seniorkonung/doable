@@ -1,13 +1,7 @@
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
 
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
-
-import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -27,8 +21,11 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart'
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/intention_cascade_execution.dart';
 import '../../support/tag_read_contract_test_fallback.dart';
+import '../../support/action_read_contract_test_fallback.dart';
 import '../../support/statistics_read_contract_test_fallback.dart';
+import '../../support/intention_holding_read_contract_test_fallback.dart';
 
 void main() {
   group('GraphCommandCoordinator — изменение долговременной связи', () {
@@ -37,22 +34,22 @@ void main() {
       final coordinator = _coordinator(repository);
 
       final deletion = coordinator.acceptRelationDelete(
-        DeleteLongTermRelation(_relationId),
+        givenDeleteRelation(_relationId),
       );
       final repeatedDeletion = coordinator.acceptRelationDelete(
-        DeleteLongTermRelation(_relationId),
+        givenDeleteRelation(_relationId),
       );
       final competingUpdate = coordinator.acceptRelationUpdate(
         _updateRelation(_relationId),
       );
       final competingArchive = coordinator.acceptRelationArchive(
-        ArchiveLongTermRelation(_relationId),
+        givenArchiveRelation(_relationId),
       );
       final competingRestore = coordinator.acceptRelationRestore(
-        RestoreLongTermRelation(_relationId),
+        givenRestoreRelation(_relationId),
       );
       final independentDeletion = coordinator.acceptRelationDelete(
-        DeleteLongTermRelation(_otherRelationId),
+        givenDeleteRelation(_otherRelationId),
       );
 
       expect(deletion, isA<LongTermRelationCommandAccepted>());
@@ -154,13 +151,13 @@ void main() {
             (
               name: 'архивирование',
               start: (coordinator) => coordinator.acceptRelationArchive(
-                ArchiveLongTermRelation(_relationId),
+                givenArchiveRelation(_relationId),
               ),
             ),
             (
               name: 'восстановление',
               start: (coordinator) => coordinator.acceptRelationRestore(
-                RestoreLongTermRelation(_relationId),
+                givenRestoreRelation(_relationId),
               ),
             ),
           ];
@@ -194,7 +191,7 @@ void main() {
             expect(coordinator.claimInitiatorFailure(accepted.token), isNull);
 
             final failed = coordinator.acceptRelationDelete(
-              DeleteLongTermRelation(_otherRelationId),
+              givenDeleteRelation(_otherRelationId),
             ) as LongTermRelationCommandAccepted;
             coordinator.releaseInitiatorPresentation(failed.token);
             repository.completeRelationFailure(1);
@@ -255,7 +252,7 @@ void main() {
         coordinator.confirmAppPresentation(claims.single!, [created.token]);
 
         final deletion = coordinator.acceptRelationDelete(
-          DeleteLongTermRelation(_otherRelationId),
+          givenDeleteRelation(_otherRelationId),
         ) as LongTermRelationCommandAccepted;
         repository.completeRelationDeleted(1, _otherRelationId, revision: 2);
         final deleted = await deletion.future;
@@ -308,32 +305,12 @@ LongTermRelation _relation(
 );
 
 final class _ControlledPersonalGraphRepository
-    with StatisticsReadContractTestFallback, TagReadContractTestFallback
+    with
+        IntentionHoldingReadContractTestFallback,
+        ActionReadContractTestFallback,
+        StatisticsReadContractTestFallback,
+        TagReadContractTestFallback
     implements PersonalGraphRepository {
-  @override
-  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
-    DailyChoiceDayStatusQuery query,
-  ) => throw UnsupportedError(
-    'Чтение состояний дней не используется в этом тесте.',
-  );
-
-  @override
-  Future<ChoicePathContinuationResult> getChoicePathContinuations(
-    ChoicePathContinuationQuery query,
-  ) => throw UnimplementedError();
-
-  @override
-  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Чтение дневного выбора не используется этим тестом.',
-      );
-
-  @override
-  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Наблюдение дневного выбора не используется этим тестом.',
-      );
-
   final commands = <Object>[];
   final _results = <Completer<Object>>[];
 
@@ -447,15 +424,8 @@ final class _ControlledPersonalGraphRepository
   ) => throw UnsupportedError('Каталог не используется в этих тестах.');
 
   @override
-  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
-    DailyChoiceCatalogQuery query,
-  ) => throw UnsupportedError(
-    'Каталог дневных выборов не используется в этом тесте.',
-  );
-
-  @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) => throw UnsupportedError('Группы связей не используются в этих тестах.');
 
   @override

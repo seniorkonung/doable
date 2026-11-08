@@ -58,12 +58,13 @@ String? intentionEditGeneralFailureMessage(
       null,
     IntentionGenericValidationFailure() ||
     IntentionTextInputValidationFailure() ||
-    IntentionCreationTagsMissingFailure() =>
+    IntentionCreationTagsMissingFailure() ||
+    IntentionMissingIncomingRelationFailure() =>
       localizations.detailsUpdateInvalidInput,
     IntentionNotFoundFailure() => localizations.detailsUpdateNotFound,
     IntentionConflictFailure() => localizations.detailsUpdateConflict,
-    IntentionHasBlockingRelationsFailure() =>
-      localizations.detailsUpdateUnexpected,
+    IntentionCascadeConflictFailure() ||
+    IntentionCascadePreviewFailure() => localizations.detailsUpdateUnexpected,
     IntentionUnavailableFailure() => localizations.detailsUpdateUnavailable,
     IntentionCorruptionFailure() => localizations.detailsUpdateCorruption,
     IntentionUnexpectedFailure() => localizations.detailsUpdateUnexpected,

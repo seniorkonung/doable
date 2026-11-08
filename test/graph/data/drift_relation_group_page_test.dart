@@ -4,7 +4,7 @@ import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention.dart'
-    show IntentionArchiveState, IntentionReadiness;
+    show IntentionArchiveState;
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -121,20 +121,19 @@ void main() {
   );
 
   test(
-    'отдаёт соседа с готовностью и началом описания без владельца группы',
+    'отдаёт соседа с названием и началом описания без владельца группы',
     () async {
       final longDescription = 'я' * (TextPreview.maxLength + 1);
       for (final direction in RelationDirection.values) {
         final base = direction == RelationDirection.outgoing ? 10 : 20;
-        final readyNeighbor = _intentionId(_uuid(base));
+        final firstNeighbor = _intentionId(_uuid(base));
         final plainNeighbor = _intentionId(_uuid(base + 1));
         final longNeighbor = _intentionId(_uuid(base + 2));
         final archivedNeighbor = _intentionId(_uuid(base + 3));
         await _insertIntention(
           database,
-          readyNeighbor,
-          title: 'Готовый сосед $base',
-          isActionReady: true,
+          firstNeighbor,
+          title: 'Первый сосед $base',
         );
         await _insertIntention(
           database,
@@ -155,7 +154,7 @@ void main() {
         for (final (index, participantId, scope, description) in [
           (
             0,
-            readyNeighbor,
+            firstNeighbor,
             RelationScope.active,
             '  Начало\n\n  описания\tсвязи  ',
           ),
@@ -207,19 +206,14 @@ void main() {
         expect(first.items, hasLength(2));
         expect(continuation.nextCursor, isNull);
         expect(entries.map((entry) => entry.neighbor.id), [
-          readyNeighbor,
+          firstNeighbor,
           plainNeighbor,
           longNeighbor,
         ]);
         expect(entries.map((entry) => entry.neighbor.title), [
-          'Готовый сосед $base',
+          'Первый сосед $base',
           'Сосед без описания $base',
           'Сосед с длинным описанием $base',
-        ]);
-        expect(entries.map((entry) => entry.neighbor.readiness), [
-          IntentionReadiness.ready,
-          IntentionReadiness.notReady,
-          IntentionReadiness.notReady,
         ]);
         expect(
           entries.map((entry) => entry.neighbor.archiveState),
@@ -296,8 +290,6 @@ void main() {
           RelationGroupContinuationPage(
             :final items,
           ) => items.map((item) => item.relation.creationSequence.value),
-          DailyChoiceGroupFirstPage() || DailyChoiceGroupContinuationPage() =>
-            throw StateError('Ожидалась группа долговременных связей.'),
         });
         if (reads == 1) {
           expect((page as RelationGroupFirstPage).counts.activeNeedOutgoing, 5);
@@ -348,7 +340,9 @@ void main() {
     );
     final cursor = first.nextCursor!;
 
-    await repository.execute(EnableIntentionReadiness(ownerId));
+    await repository.execute(
+      UpdateIntention(id: ownerId, title: 'Новое название', description: null),
+    );
     final changedRevision = await repository.getRelationGroupPage(
       _query(ownerId, pageSize: 1, cursor: cursor),
     );
@@ -454,7 +448,6 @@ Future<void> _insertIntention(
   AppDatabase database,
   IntentionId id, {
   required String title,
-  bool isActionReady = false,
   bool isArchived = false,
 }) => seedGraph(
   database,
@@ -464,7 +457,6 @@ Future<void> _insertIntention(
         IntentionsCompanion.insert(
           id: id.toCanonicalString(),
           title: title,
-          isActionReady: Value(isActionReady),
           isArchived: Value(isArchived),
           createdAt: DateTime.utc(2026, 9, 20).microsecondsSinceEpoch,
           updatedAt: DateTime.utc(2026, 9, 20).microsecondsSinceEpoch,

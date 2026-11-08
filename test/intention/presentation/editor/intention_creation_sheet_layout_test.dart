@@ -305,7 +305,7 @@ void main() {
           await tester.enterText(find.byKey(_description), _lines(8));
           sessions.notifier(tester)
             ..draftTagSet.add(tag)
-            ..confirmReadiness();
+            ..changeKind(IntentionKind.supporting);
           await tester.pumpAndSettle();
           _expectFocusedInputVisible(tester, _description);
           final draft = sessions.state(tester).draft;
@@ -339,7 +339,6 @@ void main() {
             field == _description ? 'Исправлено' : draft.description,
           );
           expect(command.tagIds, draft.tagIds);
-          expect(command.readiness, draft.readiness);
           repository.completeCommand(
             1,
             const ResultFailure(IntentionUnavailableFailure()),
@@ -671,7 +670,7 @@ void main() {
           sessions.notifier(tester)
             ..draftTagSet.add(tags[0])
             ..draftTagSet.add(tags[1])
-            ..confirmReadiness();
+            ..changeKind(IntentionKind.supporting);
           await tester.enterText(find.byKey(_title), 'Намерение');
           await tester.enterText(find.byKey(_description), _lines(12));
           await tester.pumpAndSettle();
@@ -696,7 +695,7 @@ void main() {
               final state = sessions.state(tester);
               expect(state.draft.title, draft.title);
               expect(state.draft.description, draft.description);
-              expect(state.draft.readiness, draft.readiness);
+              expect(state.draft.kind, draft.kind);
               expect(state.draft.tagIds, [_tagId(2)]);
               expect(find.byKey(_tagChip(1)), findsNothing);
               await tester.tapAt(
@@ -734,12 +733,7 @@ void main() {
                     .having((command) => command.tagIds, 'теги', [
                       _tagId(1),
                       _tagId(2),
-                    ])
-                    .having(
-                      (command) => command.readiness,
-                      'готовность',
-                      IntentionReadiness.ready,
-                    ),
+                    ]),
               );
               expect(find.byKey(_failure), findsNothing);
               repository.completeCommand(1, ResultFailure(failure));
@@ -782,7 +776,7 @@ void main() {
           await _openEditor(tester, repository, sessions);
           sessions.notifier(tester)
             ..draftTagSet.add(tags.single)
-            ..confirmReadiness();
+            ..changeKind(IntentionKind.supporting);
           await tester.enterText(find.byKey(_title), '  Намерение');
           await tester.enterText(find.byKey(_description), 'Описание\n');
           await tester.pumpAndSettle();
@@ -812,7 +806,7 @@ void main() {
             isTagMissing ? isEmpty : [_tagId(1)],
             reason: name,
           );
-          expect(state.draft.readiness, IntentionReadiness.ready, reason: name);
+          expect(state.draft.kind, IntentionKind.supporting, reason: name);
           expect(_controller(tester, _title).text, '  Намерение', reason: name);
           expect(
             _controller(tester, _description).text,
@@ -876,24 +870,6 @@ void main() {
 
           await expectUsable(keyboard: true);
 
-          // Готовность включается действием панели; её объяснение
-          // забирает фокус у поля, и платформа скрывает клавиатуру.
-          await _tapInFields(tester, _readiness);
-          _usePhone(tester, device);
-          await tester.pumpAndSettle();
-          await _expectDialogUsable(tester, [
-            _readinessCancel,
-            _readinessConfirm,
-          ]);
-          await _tapDialogAction(tester, _readinessConfirm);
-          _usePhone(tester, device, keyboard: true);
-          await tester.pumpAndSettle();
-          expect(
-            sessions.state(tester).draft.readiness,
-            IntentionReadiness.ready,
-          );
-          await expectUsable(keyboard: true);
-
           final draft = sessions.state(tester).draft;
           await tester.enterText(find.byKey(_title), 'Коротко');
           await tester.pumpAndSettle();
@@ -902,7 +878,7 @@ void main() {
           await tester.pumpAndSettle();
           expect(sessions.state(tester).draft.description, draft.description);
           expect(sessions.state(tester).draft.tagIds, draft.tagIds);
-          expect(sessions.state(tester).draft.readiness, draft.readiness);
+          expect(sessions.state(tester).draft.kind, draft.kind);
           await expectUsable(keyboard: true);
 
           // Скрытие клавиатуры возвращает полям место в компактной панели.
@@ -972,12 +948,7 @@ void main() {
             isA<CreateIntention>()
                 .having((command) => command.title, 'название', title)
                 .having((command) => command.description, 'описание', _lines(8))
-                .having((command) => command.tagIds, 'теги', [_tagId(2)])
-                .having(
-                  (command) => command.readiness,
-                  'готовность',
-                  IntentionReadiness.ready,
-                ),
+                .having((command) => command.tagIds, 'теги', [_tagId(2)]),
           );
           expect(sessions.added, hasLength(1));
           expect(tester.takeException(), isNull);
@@ -1017,7 +988,7 @@ Future<void> _expectPanelUsable(
     for (final id in tagIds)
       ValueKey('intention-editor-tag-remove-${id.toCanonicalString()}'),
     _chooseTags,
-    _readiness,
+    _kind,
   ]) {
     await _scrollToCenter(tester, control);
     expect(
@@ -1038,14 +1009,6 @@ Future<void> _scrollToCenter(WidgetTester tester, Key key) async {
     tester.element(find.byKey(key)),
     alignment: 0.5,
   );
-  await tester.pumpAndSettle();
-}
-
-/// Нажимает действие полей при исходной геометрии и открытой клавиатуре.
-Future<void> _tapInFields(WidgetTester tester, Key key) async {
-  expect(tester.getRect(find.byKey(_fields)).height, greaterThan(0));
-  await _scrollToCenter(tester, key);
-  await tester.tap(find.byKey(key));
   await tester.pumpAndSettle();
 }
 
@@ -1350,10 +1313,8 @@ const _description = ValueKey('intention-editor-description');
 const _submit = ValueKey('intention-editor-submit');
 const _status = ValueKey('intention-creation-sheet-status');
 const _failure = ValueKey('intention-editor-failure');
-const _readiness = ValueKey('intention-editor-readiness');
+const _kind = ValueKey('intention-editor-kind');
 const _chooseTags = ValueKey('intention-editor-choose-tags');
-const _readinessCancel = ValueKey('intention-editor-readiness-cancel');
-const _readinessConfirm = ValueKey('intention-editor-readiness-confirm');
 const _closeConfirmation = ValueKey('intention-editor-close-confirmation');
 const _closeContinue = ValueKey('intention-editor-close-continue');
 const _closeDiscard = ValueKey('intention-editor-close-discard');
@@ -1578,7 +1539,7 @@ void _expectDraftValues(
   expect(actual.title, expected.title, reason: reason);
   expect(actual.description, expected.description, reason: reason);
   expect(actual.tagIds, expected.tagIds, reason: reason);
-  expect(actual.readiness, expected.readiness, reason: reason);
+  expect(actual.kind, expected.kind, reason: reason);
 }
 
 /// Сессии формы создания, построенные и освобождённые за время теста.

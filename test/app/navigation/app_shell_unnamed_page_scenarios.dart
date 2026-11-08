@@ -1,34 +1,6 @@
 part of 'app_shell_pages_above_test.dart';
 
 void _registerUnnamedPageTests() {
-  testWidgets('безымянное построение пути: пересчёт перед созданием', (
-    tester,
-  ) async {
-    final router = await _start(tester);
-    unawaited(
-      Navigator.of(tester.element(find.byType(HomePage))).push<void>(
-        MaterialPageRoute(
-          builder: (_) => ChoicePathPage.forCreationRefresh(
-            startingIntentionId: _intentionId(_read),
-            direction: ChoicePathDraftDirection.topDown,
-            pathInstance: ChoicePathPageInstance(),
-          ),
-        ),
-      ),
-    );
-    await _until(tester, find.byType(ChoicePathPage));
-    await tester.pumpAndSettle();
-    _expectAboveShell(
-      tester,
-      ChoicePathPage,
-      AppDestination.home,
-      expectedPanel: false,
-    );
-    await _close(tester, ChoicePathPage);
-    _expectRootPage(tester, router, AppDestination.home);
-    expect(tester.takeException(), isNull);
-  });
-
   testWidgets('диалог над намерением блокирует страницу и панель до закрытия', (
     tester,
   ) async {

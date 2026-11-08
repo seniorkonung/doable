@@ -201,8 +201,9 @@ void main() {
       ]),
       isEmpty,
     );
-    expect(raw.select('SELECT id FROM daily_choices'), hasLength(1));
-    expect(raw.select('SELECT id FROM daily_choice_path_steps'), hasLength(1));
+    // Действие фикстуры и его путь из двух намерений не затронуты.
+    expect(raw.select('SELECT id FROM actions'), hasLength(1));
+    expect(raw.select('SELECT action_id FROM action_path_items'), hasLength(2));
   });
 }
 

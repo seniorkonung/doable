@@ -4,7 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/src/action/domain/action_id.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show AppDatabase, LocalDatabaseSqlOperation, LocalDatabaseSqlStatement;
 import 'package:doable/src/data/local/sqlite_failure_classifier.dart';
@@ -22,6 +22,7 @@ import 'package:doable/src/graph_format/graph_format_records.dart';
 import 'package:doable/src/graph_snapshots/graph_snapshot_store.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
+import 'package:doable/src/intention/application/intention_holding.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -36,24 +37,44 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:drift/drift.dart' show CouldNotRollBackException;
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/action_seed.dart';
 import '../../support/encoded_diagnostics_log.dart';
+import '../../support/graph_seed.dart';
 import '../../support/graph_log_completeness_reference.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/transaction_storage_exhaustion.dart';
 
 /// Эталонный файл формата версии 1: все виды записей, синий и бесцветный
-/// теги, архивированные намерение и связь и путь через архивированную связь
-/// к намерению без готовности к действию.
+/// теги, архивированные намерение и связь и пути действий через
+/// архивированную связь, удалённое намерение и удалённую связь.
 const _goldenPath = 'test/graph_format/golden/graph_format_v1.jsonl';
 
 /// Идентификаторы сущностей эталонного файла.
 const _goldenHealthId = '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f11';
 const _goldenRunningId = '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f12';
 const _goldenFiveKilometersId = '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f13';
+const _goldenSwimmingId = '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f14';
 const _goldenSportTagId = '7b0e2f4c-1d3a-4c5e-8f60-0a1b2c3d4e12';
 const _goldenHealthRunningRelationId = '2a3b4c5d-6e7f-4a80-b91c-0d1e2f3a4b11';
-const _goldenDailyChoiceId = '3c4d5e6f-7a8b-4c9d-a0e1-1f2a3b4c5d12';
+const _goldenActionId = '5e6f7a8b-9c0d-4eaf-b012-3a4b5c6d7e11';
+
+/// Количества записей эталонного файла.
+final _goldenCounts = _goldenCountsWith();
+
+/// Количества записей эталонного файла с другим числом надгробий.
+GraphRecordCounts _goldenCountsWith({
+  int deletedIntentions = 1,
+  int deletedRelationPairs = 1,
+}) => GraphRecordCounts(
+  tags: 2,
+  intentions: 4,
+  deletedIntentions: deletedIntentions,
+  tagAssignments: 3,
+  longTermRelations: 3,
+  deletedRelationPairs: deletedRelationPairs,
+  actions: 3,
+);
 
 void main() {
   late LocalDatabaseHarness harness;
@@ -122,7 +143,6 @@ void main() {
     CreateIntention.withInitialState(
       title: title,
       description: null,
-      readiness: IntentionReadiness.notReady,
       tagIds: tagIds,
     ),
   )).intention;
@@ -134,10 +154,11 @@ void main() {
   }
 
   /// Записывает в каталог снимков снимок замены с записями эталонного
-  /// файла, строки которого изменяет [edit], как его запишет хранилище
-  /// снимков, и возвращает его.
+  /// файла, строки которого изменяет [edit], а количества записей —
+  /// [counts], как его запишет хранилище снимков, и возвращает его.
   Future<UnregisteredGraphSnapshot> goldenSnapshot({
     String Function(String jsonl) edit = _unchanged,
+    GraphRecordCounts? counts,
   }) async {
     final bytes = gzip.encode(utf8.encode(edit(golden)));
     final fileName = 'замена-${++snapshotNumber}.jsonl.gz';
@@ -148,13 +169,7 @@ void main() {
       fileName: fileName,
       byteSize: bytes.length,
       checksum: Uint8List.fromList(sha256.convert(bytes).bytes),
-      counts: GraphRecordCounts(
-        tags: 2,
-        intentions: 4,
-        tagAssignments: 3,
-        longTermRelations: 3,
-        dailyChoices: 2,
-      ),
+      counts: counts ?? _goldenCounts,
     );
   }
 
@@ -202,6 +217,63 @@ void main() {
     await repository.readCurrentPosition(),
   ];
 
+  group('правило входящей связи вспомогательного намерения', () {
+    for (final violation in [
+      'нет связи',
+      'только архивная связь',
+      'архивное без связи',
+    ]) {
+      test('$violation отклоняется без изменения графа и копий', () async {
+        await createPreviousGraph();
+        final before = await storedState();
+        final snapshot = await goldenSnapshot(
+          edit: (jsonl) {
+            return jsonl
+                .split('\n')
+                .map((line) {
+                  if (line.isEmpty) return line;
+                  final record = jsonDecode(line) as Map<String, dynamic>;
+                  if (violation == 'нет связи' &&
+                      record['id'] == _goldenHealthId) {
+                    record['intentionKind'] = 'supporting';
+                  }
+                  if (violation == 'только архивная связь') {
+                    if (record['id'] == _goldenFiveKilometersId) {
+                      record['intentionKind'] = 'supporting';
+                    }
+                    if (record['kind'] == 'longTermRelation' &&
+                        record['relatedIntentionId'] ==
+                            _goldenFiveKilometersId) {
+                      record['archived'] = true;
+                    }
+                  }
+                  if (violation == 'архивное без связи') {
+                    if (record['kind'] == 'longTermRelation' &&
+                        record['relatedIntentionId'] ==
+                            '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f14') {
+                      record['relatedIntentionId'] = _goldenHealthId;
+                    }
+                    if (record['kind'] == 'action' &&
+                        (record['path'] as List).contains(
+                          '1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f14',
+                        )) {
+                      (record['path'] as List).removeLast();
+                    }
+                  }
+                  return jsonEncode(record);
+                })
+                .join('\n');
+          },
+        );
+        await expectLater(
+          replace(snapshot),
+          throwsA(isA<GraphReplacementRecordsRejected>()),
+        );
+        expect(await storedState(), before);
+      });
+    }
+  });
+
   test('замена непустого графа снимком со всеми видами записей даёт граф '
       'снимка и пакет «сброс» с этим снимком, а выгрузка базы совпадает с '
       'состоянием из снимка замены и последующих пакетов', () async {
@@ -230,6 +302,42 @@ void main() {
       await repository.readCurrentPosition(),
     );
     expect(_lines(await state.records.toList()), await graphLines());
+  });
+
+  test('замена графа с действиями и надгробиями удаляет их вместе с путями, '
+      'не создавая надгробий удалённых связей и намерений прежнего графа, '
+      'считает их в ходе замены и даёт граф снимка', () async {
+    final raw = probe.storage;
+    seedRawGraph(raw, () {
+      for (final (number, title) in [(1, 'Здоровье'), (2, 'Бегать')]) {
+        seedIntention(raw, seedUuid(number), title);
+      }
+      seedIntention(raw, seedUuid(3), 'Плавать');
+      seedRelation(raw, seedUuid(101), seedUuid(1), seedUuid(2));
+      seedRelation(raw, seedUuid(102), seedUuid(1), seedUuid(3));
+      seedAction(raw, id: seedUuid(11), path: [seedUuid(1), seedUuid(2)]);
+      seedAction(raw, id: seedUuid(12), path: [seedUuid(1), seedUuid(3)]);
+      raw
+        ..execute('DELETE FROM long_term_relations WHERE id = ?', [
+          seedUuid(102),
+        ])
+        ..execute('DELETE FROM intentions WHERE id = ?', [seedUuid(3)]);
+    });
+    expect(
+      await rows(
+        'SELECT (SELECT count(*) FROM deleted_intentions), '
+        '(SELECT count(*) FROM deleted_relation_pairs)',
+      ),
+      [
+        [1, 1],
+      ],
+    );
+    final progress = <double>[];
+
+    await replace(await goldenSnapshot(), onProgress: progress.add);
+
+    expect(await graphLines(), _recordLines(golden));
+    expect(progress.last, 1);
   });
 
   test('копия перед заменой получает позицию до сброса и сводку с '
@@ -329,6 +437,11 @@ void main() {
           'ревизия',
           GraphRevisionOrder.same,
         ),
+        isA<IntentionHoldingChanged>().having(
+          (change) => change.revision.compareTo(replacement.revision),
+          'ревизия',
+          GraphRevisionOrder.same,
+        ),
       ]);
       expect(
         before.compareTo(replacement.revision),
@@ -349,7 +462,37 @@ void main() {
       );
     });
 
-    test('после замены наблюдатели намерения, дневного выбора, '
+    test('замена сбрасывает индекс удержания: удержание читается по новому '
+        'графу на ревизии новой эпохи', () async {
+      await createPreviousGraph();
+      final ids = {
+        _intentionId(_goldenRunningId),
+        _intentionId(_goldenSwimmingId),
+      };
+      expect(
+        await repository.getIntentionHolding(ids),
+        isA<IntentionHoldingRead>(),
+      );
+
+      final replacement = await replace(await goldenSnapshot());
+
+      final read = await repository.getIntentionHolding(ids);
+      expect(
+        read,
+        isA<IntentionHoldingRead>()
+            .having(
+              (read) => read.revision.compareTo(replacement.revision),
+              'ревизия',
+              GraphRevisionOrder.same,
+            )
+            .having((read) => read.holdings, 'удержание', {
+              _intentionId(_goldenRunningId): IntentionHolding.held,
+              _intentionId(_goldenSwimmingId): IntentionHolding.notHeld,
+            }),
+      );
+    });
+
+    test('после замены наблюдатели намерения, действия, '
         'долговременной связи и тега перечитывают их на '
         'ревизии новой эпохи', () async {
       await createPreviousGraph();
@@ -358,8 +501,8 @@ void main() {
         'намерение': StreamIterator(
           repository.watchIntention(_intentionId(_goldenRunningId)),
         ),
-        'дневной выбор': StreamIterator(
-          repository.watchDailyChoice(_dailyChoiceId(_goldenDailyChoiceId)),
+        'действие': StreamIterator(
+          repository.watchAction(_actionId(_goldenActionId)),
         ),
         'долговременная связь': StreamIterator(
           repository.watchRelation(relation),
@@ -400,7 +543,7 @@ void main() {
         const GraphComposition(
           intentionCount: 4,
           relationCount: 3,
-          dailyChoiceCount: 2,
+          actionCount: 3,
           tagCount: 2,
         ),
       );
@@ -726,25 +869,65 @@ void main() {
       expect(await storedState(), before);
     });
 
-    test('путь дневного выбора, который не доходит до выбранного намерения, '
-        'отклоняет записи снимка и оставляет граф, копии, лог и реестр '
-        'снимков прежними', () async {
-      await createPreviousGraph();
-      final before = await storedState();
-      final snapshot = await goldenSnapshot(
-        edit: (jsonl) => jsonl.replaceFirst(
-          '"selectedIntentionId":"1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f13"',
-          '"selectedIntentionId":"1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f12"',
-        ),
-      );
+    final brokenActionPaths =
+        <String, (String Function(String jsonl), GraphRecordCounts)>{
+          'звено пути действия без связи и без надгробия пары': (
+            (jsonl) => jsonl
+                .replaceFirst(
+                  '"deletedRelationPairs":1',
+                  '"deletedRelationPairs":0',
+                )
+                .replaceFirst(
+                  RegExp(r'\{"kind":"deletedRelationPair"[^\n]*\n'),
+                  '',
+                ),
+            _goldenCountsWith(deletedRelationPairs: 0),
+          ),
+          'надгробие намерения, которого нет ни в одном пути': (
+            (jsonl) => jsonl
+                .replaceFirst('"deletedIntentions":1', '"deletedIntentions":2')
+                .replaceFirst(
+                  '"title":"Заниматься йогой"}\n',
+                  '"title":"Заниматься йогой"}\n'
+                      '{"kind":"deletedIntention",'
+                      '"id":"1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f16",'
+                      '"title":"Медитировать"}\n',
+                ),
+            _goldenCountsWith(deletedIntentions: 2),
+          ),
+          'надгробие пары, которой нет ни в одном пути': (
+            (jsonl) => jsonl
+                .replaceFirst(
+                  '"deletedRelationPairs":1',
+                  '"deletedRelationPairs":2',
+                )
+                .replaceFirst(
+                  '{"kind":"deletedRelationPair"',
+                  '{"kind":"deletedRelationPair",'
+                      '"sourceIntentionId":"$_goldenHealthId",'
+                      '"relatedIntentionId":"1f6c7a2e-3b4d-4e5f-9a60-0b1c2d3e4f14",'
+                      '"type":"can"}\n'
+                      '{"kind":"deletedRelationPair"',
+                ),
+            _goldenCountsWith(deletedRelationPairs: 2),
+          ),
+        };
+    for (final MapEntry(key: violation, value: (edit, counts))
+        in brokenActionPaths.entries) {
+      test('$violation отклоняет записи снимка и оставляет граф, копии, лог '
+          'и реестр снимков прежними', () async {
+        await createPreviousGraph();
+        final before = await storedState();
+        final snapshot = await goldenSnapshot(edit: edit, counts: counts);
 
-      await expectLater(
-        replace(snapshot),
-        throwsA(isA<GraphReplacementRecordsRejected>()),
-      );
+        await expectLater(
+          replace(snapshot),
+          throwsA(isA<GraphReplacementRecordsRejected>()),
+        );
 
-      expect(await storedState(), before);
-    });
+        expect(await storedState(), before);
+      });
+    }
 
     test('нехватка места при вставке записей снимка относится к нехватке '
         'места и оставляет граф, копии, лог и реестр снимков '
@@ -754,8 +937,8 @@ void main() {
       // Длинные описания занимают страницы переполнения, которых в базе нет.
       final snapshot = await goldenSnapshot(
         edit: (jsonl) => jsonl.replaceAll(
-          '"description":null,"actionReady"',
-          '"description":"${'ж' * 4000}","actionReady"',
+          '"description":null,"intentionKind"',
+          '"description":"${'ж' * 4000}","intentionKind"',
         ),
       );
       final pageCount = await database
@@ -841,8 +1024,8 @@ IntentionId _intentionId(String id) =>
 LongTermRelationId _relationId(String id) =>
     (LongTermRelationId.decode(id) as LongTermRelationIdDecodingSuccess).id;
 
-DailyChoiceId _dailyChoiceId(String id) =>
-    (DailyChoiceId.decode(id) as DailyChoiceIdDecodingSuccess).id;
+ActionId _actionId(String id) =>
+    (ActionId.decode(id) as ActionIdDecodingSuccess).id;
 
 TagId _tagId(String id) => (TagId.decode(id) as TagIdDecodingSuccess).id;
 

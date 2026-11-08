@@ -96,7 +96,7 @@ typedef GraphReplacementSql = ({
 });
 
 /// Время операторов SQL замены графа: удаления прежнего графа, пакетов
-/// вставки записей снимка и чтений шагов вставленных путей. Считает только
+/// вставки записей снимка и проверки вставленных путей. Считает только
 /// во время замера [GraphReplacementTiming].
 final class GraphReplacementTrace extends LocalDatabaseConnectionObserver {
   final _statement = Stopwatch();
@@ -138,7 +138,8 @@ final class GraphReplacementTrace extends LocalDatabaseConnectionObserver {
       _insertion += elapsed;
     } else if (sql.startsWith('DELETE FROM')) {
       _deletion += elapsed;
-    } else if (sql.contains('daily_choice_path_steps')) {
+    } else if (sql.contains('is_violated')) {
+      // Проверку путей вставленного графа отличает её итоговый столбец.
       _pathVerification += elapsed;
     }
   }

@@ -25,14 +25,14 @@ void main() {
     (
       'ru',
       'Экспорт данных',
-      '1 намерение, 2 связи, 5 дневных выборов и 21 тег в одном файле',
+      '1 намерение, 2 связи, 5 действий и 21 тег в одном файле',
       _russianWarning,
       'Сохранить в файл',
     ),
     (
       'en',
       'Export data',
-      '1 intention, 2 relations, 5 daily choices and 21 tags in one file',
+      '1 intention, 2 relations, 5 actions and 21 tags in one file',
       'The file is not protected. Anyone who has it can read what you wrote.',
       'Save to a file',
     ),
@@ -45,7 +45,7 @@ void main() {
           GraphComposition(
             intentionCount: 1,
             relationCount: 2,
-            dailyChoiceCount: 5,
+            actionCount: 5,
             tagCount: 21,
           ),
         ),
@@ -81,44 +81,44 @@ void main() {
     (
       'ru',
       (2, 5, 21, 1),
-      '2 намерения, 5 связей, 21 дневной выбор и 1 тег в одном файле',
+      '2 намерения, 5 связей, 21 действие и 1 тег в одном файле',
     ),
     (
       'ru',
       (5, 21, 1, 2),
-      '5 намерений, 21 связь, 1 дневной выбор и 2 тега в одном файле',
+      '5 намерений, 21 связь, 1 действие и 2 тега в одном файле',
     ),
     (
       'ru',
       (21, 1, 2, 5),
-      '21 намерение, 1 связь, 2 дневных выбора и 5 тегов в одном файле',
+      '21 намерение, 1 связь, 2 действия и 5 тегов в одном файле',
     ),
     (
       'en',
       (2, 5, 21, 1),
-      '2 intentions, 5 relations, 21 daily choices and 1 tag in one file',
+      '2 intentions, 5 relations, 21 actions and 1 tag in one file',
     ),
     (
       'en',
       (5, 21, 1, 2),
-      '5 intentions, 21 relations, 1 daily choice and 2 tags in one file',
+      '5 intentions, 21 relations, 1 action and 2 tags in one file',
     ),
     (
       'en',
       (21, 1, 2, 5),
-      '21 intentions, 1 relation, 2 daily choices and 5 tags in one file',
+      '21 intentions, 1 relation, 2 actions and 5 tags in one file',
     ),
   ]) {
     testWidgets('$language: состав согласует числа $counts по правилам языка', (
       tester,
     ) async {
-      final (intentions, relations, dailyChoices, tags) = counts;
+      final (intentions, relations, actions, tags) = counts;
       await _ExportSheetApp(
         GraphCompositionReadSucceeded(
           GraphComposition(
             intentionCount: intentions,
             relationCount: relations,
-            dailyChoiceCount: dailyChoices,
+            actionCount: actions,
             tagCount: tags,
           ),
         ),
@@ -152,7 +152,7 @@ void main() {
         GraphComposition(
           intentionCount: 1,
           relationCount: 0,
-          dailyChoiceCount: 0,
+          actionCount: 0,
           tagCount: 0,
         ),
       ),

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
@@ -36,14 +35,25 @@ void main() {
       preparation.stop();
       final volume = fixture.volume(null);
       expect(
-        raw.select('SELECT COUNT(*) AS n FROM daily_choices').single['n'],
-        volume.choices,
+        raw.select('SELECT COUNT(*) AS n FROM actions').single['n'],
+        volume.actions,
+      );
+      expect(
+        raw.select('SELECT COUNT(*) AS n FROM action_path_items').single['n'],
+        volume.pathItems,
+      );
+      final deletedIntentions = fixture.distribution(
+        null,
+      )['deletedPathIntentions'];
+      expect(
+        raw.select('SELECT COUNT(*) AS n FROM deleted_intentions').single['n'],
+        deletedIntentions,
       );
       expect(
         raw
-            .select('SELECT COUNT(*) AS n FROM daily_choice_path_steps')
+            .select('SELECT COUNT(*) AS n FROM deleted_relation_pairs')
             .single['n'],
-        volume.steps,
+        deletedIntentions,
       );
       _report({
         'profile': profile.name,
@@ -51,8 +61,8 @@ void main() {
         'dart': Platform.version,
         'temporaryDirectory': Directory.systemTemp.path,
         'sqlite': sqlite.sqlite3.version.libVersion,
-        'choices': volume.choices,
-        'steps': volume.steps,
+        'actions': volume.actions,
+        'pathItems': volume.pathItems,
         ...fixture.distribution(null),
         'preparationMs': preparation.elapsedMilliseconds,
         'databaseBytes': harness.databaseFile.lengthSync(),
@@ -72,17 +82,17 @@ void main() {
       var commandNumber = 0;
       for (final archived in [false, true]) {
         if (archived) fixture.archivePathParts(raw);
-        final archivedSteps =
-            raw.select(
-                  '''SELECT COUNT(*) AS n
-          FROM daily_choice_path_steps s JOIN long_term_relations r
-          ON r.id = s.long_term_relation_id WHERE r.is_archived = 1''',
-                ).single['n']
+        final archivedLinks =
+            raw.select('''SELECT COUNT(*) AS n
+          FROM action_path_items p JOIN long_term_relations r
+          ON r.source_intention_id = p.previous_intention_id
+          AND r.related_intention_id = p.intention_id
+          WHERE r.is_archived = 1''').single['n']
                 as int;
         _report({
           'profile': profile.name,
           'archived': archived,
-          'archivedSteps': archivedSteps,
+          'archivedLinks': archivedLinks,
           'archivedIntentions':
               raw.select('''SELECT COUNT(*) AS n
             FROM intentions WHERE is_archived = 1''').single['n']
@@ -100,18 +110,17 @@ void main() {
             raw
                 .select(
                   '''SELECT COUNT(*) AS n
-            FROM daily_choice_path_steps s JOIN daily_choices c
-            ON c.id = s.daily_choice_id
-            WHERE c.choice_date BETWEEN ? AND ?''',
+            FROM action_path_items p JOIN actions a ON a.id = p.action_id
+            WHERE a.date BETWEEN ? AND ?''',
                   [firstDate, lastDate],
                 )
                 .single['n'],
-            volume.steps,
+            volume.pathItems,
           );
           for (final view in const [
-            StatisticsView.sourceIntentions,
+            StatisticsView.rootIntentions,
             StatisticsView.intermediateIntentions,
-            StatisticsView.selectedActions,
+            StatisticsView.terminalIntentions,
           ]) {
             final expected = fixture.expected(period, view);
             // Продолжение проверяется, если вид содержит больше одной порции.
@@ -137,7 +146,6 @@ void main() {
                 StatisticsQuery query() => StatisticsQuery(
                   period: period,
                   view: view,
-                  localDate: CalendarDate.fromParts(2026, 6, 15),
                   pageSize: 100,
                   cursor: cursor,
                 );
@@ -189,10 +197,8 @@ void main() {
                 if (offset == 0) {
                   final first = page as StatisticsFirstPage;
                   expect(first.totalItems, expected.length);
-                  expect(first.summary.counts.planned, volume.choices);
-                  expect(first.summary.counts.contribution, volume.completed);
-                  expect(first.summary.uncompleted.missed, volume.missed);
-                  expect(first.summary.uncompleted.upcoming, volume.upcoming);
+                  expect(first.summary.planned, volume.actions);
+                  expect(first.summary.contribution, volume.completed);
                 }
                 // Сводка — не более двух групп на дату; остальные строки —
                 // порция с запасом и названия её элементов.
@@ -245,8 +251,8 @@ void main() {
                 'period': period is StatisticsMonth ? 'month' : 'year',
                 'view': view.name,
                 'offset': offset,
-                'periodChoices': volume.choices,
-                'periodSteps': volume.steps,
+                'periodActions': volume.actions,
+                'periodPathItems': volume.pathItems,
                 ...fixture.distribution(period),
                 'queueP95Ms': benchmarkP95(queue),
                 'requestP95Ms': benchmarkP95(requests),

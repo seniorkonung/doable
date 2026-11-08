@@ -563,7 +563,7 @@ final class _Entry extends Fake implements IntentionCatalogEntrySnapshot {
         id: id,
         title: 'Одинаковое намерение',
         descriptionPreview: null,
-        readiness: IntentionReadiness.notReady,
+        kind: IntentionKind.main,
         archiveState: IntentionArchiveState.active,
         createdAt: IntentionTimestamp(DateTime.utc(2026)),
         updatedAt: IntentionTimestamp(DateTime.utc(2026)),

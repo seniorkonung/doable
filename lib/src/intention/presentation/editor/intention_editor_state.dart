@@ -46,12 +46,13 @@ final class IntentionEditorCreated extends IntentionEditorEvent {
 /// порядке добавления. Поиск, кандидат выбора, фокус и размер панели не
 /// входят в черновик.
 final class IntentionCreationDraft {
-  const IntentionCreationDraft.initial({String initialTitle = ''})
-    : title = initialTitle,
-      _initialTitle = initialTitle,
-      description = '',
-      tagIds = const {},
-      readiness = IntentionReadiness.notReady;
+  const IntentionCreationDraft.initial({
+    String initialTitle = '',
+    this.kind = IntentionKind.main,
+  }) : title = initialTitle,
+       _initialTitle = initialTitle,
+       description = '',
+       tagIds = const {};
 
   /// [tagIds] должен быть неизменяемым; копию создают только методы правки
   /// набора, чтобы неизменённый набор сохранял свою идентичность.
@@ -60,7 +61,7 @@ final class IntentionCreationDraft {
     required this._initialTitle,
     required this.description,
     required this.tagIds,
-    required this.readiness,
+    required this.kind,
   });
 
   final String title;
@@ -68,16 +69,12 @@ final class IntentionCreationDraft {
   final String description;
   final Set<TagId> tagIds;
 
-  /// Начальная готовность к действию; включается только явным решением.
-  final IntentionReadiness readiness;
+  final IntentionKind kind;
 
-  /// Отличается ли хотя бы одно из четырёх полей от начального значения.
+  /// Отличается ли хотя бы одно из трёх полей от начального значения.
   /// Текст сравнивается буквально, включая пробелы.
   bool get isChanged =>
-      title != _initialTitle ||
-      description.isNotEmpty ||
-      tagIds.isNotEmpty ||
-      readiness != IntentionReadiness.notReady;
+      title != _initialTitle || description.isNotEmpty || tagIds.isNotEmpty;
 
   IntentionCreationDraft withTitle(String value) => _copy(title: value);
 
@@ -92,20 +89,19 @@ final class IntentionCreationDraft {
       ? _copy(tagIds: Set.unmodifiable(tagIds.where((id) => !ids.contains(id))))
       : this;
 
-  IntentionCreationDraft withReadiness(IntentionReadiness value) =>
-      _copy(readiness: value);
+  IntentionCreationDraft withKind(IntentionKind value) => _copy(kind: value);
 
   IntentionCreationDraft _copy({
     String? title,
     String? description,
     Set<TagId>? tagIds,
-    IntentionReadiness? readiness,
+    IntentionKind? kind,
   }) => IntentionCreationDraft._(
     title: title ?? this.title,
     initialTitle: _initialTitle,
     description: description ?? this.description,
     tagIds: tagIds ?? this.tagIds,
-    readiness: readiness ?? this.readiness,
+    kind: kind ?? this.kind,
   );
 }
 
@@ -183,13 +179,18 @@ final class IntentionEditorState {
     required this.closing,
   });
 
-  IntentionEditorState.initial({String initialTitle = ''})
-    : draft = IntentionCreationDraft.initial(initialTitle: initialTitle),
-      selectedTags = const {},
-      operation = const OperationIdle<Intention>(),
-      event = null,
-      failurePresentation = null,
-      closing = const IntentionCreationCloseNotRequested();
+  IntentionEditorState.initial({
+    String initialTitle = '',
+    IntentionKind initialKind = IntentionKind.main,
+  }) : draft = IntentionCreationDraft.initial(
+         initialTitle: initialTitle,
+         kind: initialKind,
+       ),
+       selectedTags = const {},
+       operation = const OperationIdle<Intention>(),
+       event = null,
+       failurePresentation = null,
+       closing = const IntentionCreationCloseNotRequested();
 
   final IntentionCreationDraft draft;
 
@@ -311,8 +312,8 @@ final class IntentionEditorState {
         )
       : this;
 
-  IntentionEditorState withReadiness(IntentionReadiness value) =>
-      draft.readiness == value ? this : _withDraft(draft.withReadiness(value));
+  IntentionEditorState withKind(IntentionKind value) =>
+      draft.kind == value ? this : _withDraft(draft.withKind(value));
 
   /// Меняет состояние отправки и публикует только переданное право ошибки
   /// [failurePresentation]; прежнее неподтверждённое право сессия передаёт
@@ -457,9 +458,11 @@ final class IntentionEditorState {
       // Отсутствующие теги ушли из набора вместе с отказом; его объяснение
       // остаётся до правки набора.
       IntentionCreationTagsMissingFailure() => edit is _DraftTagSetEdit,
+      IntentionMissingIncomingRelationFailure() ||
       IntentionNotFoundFailure() ||
       IntentionConflictFailure() ||
-      IntentionHasBlockingRelationsFailure() ||
+      IntentionCascadeConflictFailure() ||
+      IntentionCascadePreviewFailure() ||
       IntentionUnavailableFailure() ||
       IntentionCorruptionFailure() ||
       IntentionUnexpectedFailure() => false,

@@ -6,7 +6,6 @@ import 'package:doable/main.dart';
 import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/settings/settings_page.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart' hide GraphBackups;
 import 'package:doable/src/data_transfer/presentation/backups_sheet.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
@@ -22,6 +21,7 @@ import 'package:doable/src/graph_backups/graph_backups_provider.dart';
 import 'package:doable/src/graph_backups/graph_change_summary.dart';
 import 'package:doable/src/graph_snapshots/graph_log_compaction.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
@@ -32,7 +32,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
-import '../../support/daily_choice_local_date.dart';
+import '../../support/controlled_local_date.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
 import '../../support/temporary_graph_files.dart';
@@ -230,9 +230,7 @@ void main() {
       'подписях, и в доступных названиях', (tester) async {
     final semantics = tester.ensureSemantics();
     var now = _now;
-    final localDate = ControlledDailyChoiceLocalDate(
-      CalendarDate.fromParts(2026, 10, 7),
-    );
+    final localDate = ControlledLocalDate(CalendarDate.fromParts(2026, 10, 7));
     await _openSheet(
       tester,
       overrides: [

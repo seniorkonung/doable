@@ -10,9 +10,9 @@ part of 'intention_editor_view_model.dart';
 // ignore_for_file: type=lint, type=warning
 /// Экранная сессия создания намерения по собственному ключу формы.
 ///
-/// До отправки владеет черновиком: правки текста, набора тегов и готовности
+/// До отправки владеет черновиком: правки текста, набора тегов и вида
 /// меняют только его и не отправляют команд графа. Отправка передаёт
-/// координатору одну команду с неизменяемым снимком всех четырёх полей и до
+/// координатору одну команду с неизменяемым снимком данных создания и до
 /// результата отвергает правки черновика и повторную отправку. Принятую
 /// отправку удерживает координатор: освобождение сессии её не отменяет и не
 /// снимает ограничение ключа формы. Сессия закрыта после успешного создания,
@@ -51,9 +51,9 @@ final intentionEditorViewModelProvider = IntentionEditorViewModelFamily._();
 
 /// Экранная сессия создания намерения по собственному ключу формы.
 ///
-/// До отправки владеет черновиком: правки текста, набора тегов и готовности
+/// До отправки владеет черновиком: правки текста, набора тегов и вида
 /// меняют только его и не отправляют команд графа. Отправка передаёт
-/// координатору одну команду с неизменяемым снимком всех четырёх полей и до
+/// координатору одну команду с неизменяемым снимком данных создания и до
 /// результата отвергает правки черновика и повторную отправку. Принятую
 /// отправку удерживает координатор: освобождение сессии её не отменяет и не
 /// снимает ограничение ключа формы. Сессия закрыта после успешного создания,
@@ -90,9 +90,9 @@ final class IntentionEditorViewModelProvider
     extends $NotifierProvider<IntentionEditorViewModel, IntentionEditorState> {
   /// Экранная сессия создания намерения по собственному ключу формы.
   ///
-  /// До отправки владеет черновиком: правки текста, набора тегов и готовности
+  /// До отправки владеет черновиком: правки текста, набора тегов и вида
   /// меняют только его и не отправляют команд графа. Отправка передаёт
-  /// координатору одну команду с неизменяемым снимком всех четырёх полей и до
+  /// координатору одну команду с неизменяемым снимком данных создания и до
   /// результата отвергает правки черновика и повторную отправку. Принятую
   /// отправку удерживает координатор: освобождение сессии её не отменяет и не
   /// снимает ограничение ключа формы. Сессия закрыта после успешного создания,
@@ -130,6 +130,7 @@ final class IntentionEditorViewModelProvider
     required (
       IntentionCreationFormKey, {
       String initialTitle,
+      IntentionKind initialKind,
       IntentionCreationOperationTarget target,
     })
     super.argument,
@@ -176,13 +177,13 @@ final class IntentionEditorViewModelProvider
 }
 
 String _$intentionEditorViewModelHash() =>
-    r'a8b99df4100d5e499c38fa964d26744034c4786d';
+    r'758f70829631e1aaf49ef5c1d772c56794adfaab';
 
 /// Экранная сессия создания намерения по собственному ключу формы.
 ///
-/// До отправки владеет черновиком: правки текста, набора тегов и готовности
+/// До отправки владеет черновиком: правки текста, набора тегов и вида
 /// меняют только его и не отправляют команд графа. Отправка передаёт
-/// координатору одну команду с неизменяемым снимком всех четырёх полей и до
+/// координатору одну команду с неизменяемым снимком данных создания и до
 /// результата отвергает правки черновика и повторную отправку. Принятую
 /// отправку удерживает координатор: освобождение сессии её не отменяет и не
 /// снимает ограничение ключа формы. Сессия закрыта после успешного создания,
@@ -226,6 +227,7 @@ final class IntentionEditorViewModelFamily extends $Family
           (
             IntentionCreationFormKey, {
             String initialTitle,
+            IntentionKind initialKind,
             IntentionCreationOperationTarget target,
           })
         > {
@@ -240,9 +242,9 @@ final class IntentionEditorViewModelFamily extends $Family
 
   /// Экранная сессия создания намерения по собственному ключу формы.
   ///
-  /// До отправки владеет черновиком: правки текста, набора тегов и готовности
+  /// До отправки владеет черновиком: правки текста, набора тегов и вида
   /// меняют только его и не отправляют команд графа. Отправка передаёт
-  /// координатору одну команду с неизменяемым снимком всех четырёх полей и до
+  /// координатору одну команду с неизменяемым снимком данных создания и до
   /// результата отвергает правки черновика и повторную отправку. Принятую
   /// отправку удерживает координатор: освобождение сессии её не отменяет и не
   /// снимает ограничение ключа формы. Сессия закрыта после успешного создания,
@@ -279,10 +281,16 @@ final class IntentionEditorViewModelFamily extends $Family
   IntentionEditorViewModelProvider call(
     IntentionCreationFormKey formKey, {
     String initialTitle = '',
+    IntentionKind initialKind = IntentionKind.main,
     IntentionCreationOperationTarget target =
         const CreatingIntentionOperationTarget(),
   }) => IntentionEditorViewModelProvider._(
-    argument: (formKey, initialTitle: initialTitle, target: target),
+    argument: (
+      formKey,
+      initialTitle: initialTitle,
+      initialKind: initialKind,
+      target: target,
+    ),
     from: this,
   );
 
@@ -292,9 +300,9 @@ final class IntentionEditorViewModelFamily extends $Family
 
 /// Экранная сессия создания намерения по собственному ключу формы.
 ///
-/// До отправки владеет черновиком: правки текста, набора тегов и готовности
+/// До отправки владеет черновиком: правки текста, набора тегов и вида
 /// меняют только его и не отправляют команд графа. Отправка передаёт
-/// координатору одну команду с неизменяемым снимком всех четырёх полей и до
+/// координатору одну команду с неизменяемым снимком данных создания и до
 /// результата отвергает правки черновика и повторную отправку. Принятую
 /// отправку удерживает координатор: освобождение сессии её не отменяет и не
 /// снимает ограничение ключа формы. Сессия закрыта после успешного создания,
@@ -335,15 +343,18 @@ abstract class _$IntentionEditorViewModel
           as (
             IntentionCreationFormKey, {
             String initialTitle,
+            IntentionKind initialKind,
             IntentionCreationOperationTarget target,
           });
   IntentionCreationFormKey get formKey => _$args.$1;
   String get initialTitle => _$args.initialTitle;
+  IntentionKind get initialKind => _$args.initialKind;
   IntentionCreationOperationTarget get target => _$args.target;
 
   IntentionEditorState build(
     IntentionCreationFormKey formKey, {
     String initialTitle = '',
+    IntentionKind initialKind = IntentionKind.main,
     IntentionCreationOperationTarget target =
         const CreatingIntentionOperationTarget(),
   });
@@ -364,6 +375,7 @@ abstract class _$IntentionEditorViewModel
       () => build(
         _$args.$1,
         initialTitle: _$args.initialTitle,
+        initialKind: _$args.initialKind,
         target: _$args.target,
       ),
     );

@@ -6,8 +6,6 @@ import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
-import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tag;
 import 'package:doable/src/design_system/components/catalog_header.dart';
 import 'package:doable/src/design_system/components/docked_footer.dart';
@@ -26,6 +24,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
@@ -52,6 +51,7 @@ import '../../../intention/presentation/picker/intention_picker_test_support.dar
 import '../../../support/app_root_pages.dart';
 import '../../../support/graph_seed.dart';
 import '../../../support/in_memory_diagnostics_sink.dart';
+import '../../../support/intention_cascade_execution.dart';
 import '../../../support/in_memory_quick_creation_mode_store.dart';
 import '../../../support/tag_condition_cycles.dart';
 import '../../../support/tag_positions.dart';
@@ -274,6 +274,128 @@ void main() {
     },
   );
 
+  Future<void> createFromSearch(WidgetTester tester, String title) async {
+    await tester.enterText(
+      find.byKey(const ValueKey('participant-picker-filter')),
+      title,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Создать «$title»'));
+    await tester.pumpAndSettle();
+  }
+
+  Future<String> storedKind(WidgetTester tester, String title) async {
+    final rows = await tester.runAsync(
+      () => (database.select(
+        database.intentions,
+      )..where((row) => row.title.equals(title))).get(),
+    );
+    return rows!.single.kind;
+  }
+
+  testWidgets(
+    'в группе «Нужно» созданное намерение по умолчанию становится вспомогательным вместе со связью',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await open(tester, IntentionRelationGroup.needs);
+      await createFromSearch(tester, 'Ходить на работу');
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(IntentionEditorPage)),
+      );
+      expect(
+        find.semantics
+            .byLabel(l10n.intentionKindSupportingSemantics)
+            .evaluate()
+            .single,
+        isSemantics(hasCheckedState: true, isChecked: true, isEnabled: true),
+      );
+      expect(
+        find.semantics
+            .byLabel(l10n.intentionKindMainSemantics)
+            .evaluate()
+            .single,
+        isSemantics(hasCheckedState: true, isChecked: false, isEnabled: true),
+      );
+      await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+      await settleCommand(tester);
+      expect(await storedKind(tester, 'Ходить на работу'), 'main');
+
+      await tester.tap(addButton);
+      await settleCommand(tester);
+
+      expect(find.byType(RelationBatchPickerPage), findsNothing);
+      expect(await storedKind(tester, 'Ходить на работу'), 'supporting');
+      expect(await tester.runAsync(relations), hasLength(5));
+      semantics.dispose();
+    },
+  );
+
+  testWidgets('повторная отметка сохраняет выбранный при создании вид', (
+    tester,
+  ) async {
+    await open(tester, IntentionRelationGroup.needs);
+    await createFromSearch(tester, 'Ходить на работу');
+    await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+    await settleCommand(tester);
+    await tester.tap(find.text('Ходить на работу'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ходить на работу'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(addButton);
+    await settleCommand(tester);
+
+    expect(await tester.runAsync(relations), hasLength(5));
+    expect(await storedKind(tester, 'Ходить на работу'), 'supporting');
+  });
+
+  testWidgets('снятая отметка оставляет созданное намерение главным', (
+    tester,
+  ) async {
+    await open(tester, IntentionRelationGroup.needs);
+    await createFromSearch(tester, 'Ходить на работу');
+    await tester.tap(find.byKey(const ValueKey('intention-editor-submit')));
+    await settleCommand(tester);
+    await tester.tap(find.text('Ходить на работу'));
+    await tester.tap(find.text('Гулять'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(addButton);
+    await settleCommand(tester);
+
+    final added = (await tester.runAsync(relations))!.last;
+    expect(added.relatedIntentionId, _uuid(5));
+    expect(await storedKind(tester, 'Ходить на работу'), 'main');
+  });
+
+  testWidgets(
+    'в группе «Нужно для» панель создания выбирает главное без вспомогательного',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await open(tester, IntentionRelationGroup.neededFor);
+      await tester.tap(find.bySemanticsLabel('Создать намерение'));
+      await tester.pumpAndSettle();
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(IntentionEditorPage)),
+      );
+      expect(
+        find.semantics
+            .byLabel(l10n.intentionKindMainSemantics)
+            .evaluate()
+            .single,
+        isSemantics(hasCheckedState: true, isChecked: true, isEnabled: true),
+      );
+      expect(
+        find.semantics
+            .byLabel(l10n.intentionKindSupportingUnavailable)
+            .evaluate()
+            .single,
+        isSemantics(hasCheckedState: true, isChecked: false, isEnabled: false),
+      );
+      semantics.dispose();
+    },
+  );
+
   testWidgets(
     'точное совпадение скрывает создание, плюс открывает пустую панель только один раз',
     (tester) async {
@@ -407,7 +529,7 @@ void main() {
             'Здоровье',
           ).notifier,
         );
-        model.acceptCreated(_id(6), 'Созданное');
+        model.acceptCreated(_id(6), 'Созданное', IntentionKind.main);
         await tester.pumpAndSettle();
         await tester.tap(
           find.byKey(const ValueKey('participant-picker-cancel')),
@@ -659,15 +781,20 @@ void main() {
     final container = ProviderScope.containerOf(
       tester.element(find.byType(RelationBatchPickerPage)),
     );
-    final accepted =
-        container
-                .read(graphCommandCoordinatorProvider.notifier)
-                .acceptExisting(
-                  ArchiveIntention(_id(3)),
-                  presentationTitle: 'Бегать',
-                )
-            as IntentionCommandAccepted;
-    await tester.runAsync(() => accepted.future);
+    final archive = (await tester.runAsync(
+      () => previewedArchiveIntention(
+        container.read(personalGraphRepositoryProvider),
+        _id(3),
+      ),
+    ))!;
+    await tester.runAsync(() async {
+      final accepted =
+          container
+                  .read(graphCommandCoordinatorProvider.notifier)
+                  .acceptExisting(archive, presentationTitle: 'Бегать')
+              as IntentionCommandAccepted;
+      await accepted.future;
+    });
     await tester.pumpAndSettle();
 
     expect(find.byType(Notice), findsNothing);
@@ -699,7 +826,7 @@ void main() {
             'Здоровье',
           ).notifier,
         )
-        .acceptCreated(_id(6), 'Созданное');
+        .acceptCreated(_id(6), 'Созданное', IntentionKind.main);
     await tester.pumpAndSettle();
     expect(find.byType(Notice), findsNothing);
     expect(find.text('Добавить 2 связи'), findsOneWidget);
@@ -1450,36 +1577,6 @@ void main() {
     );
   }
 
-  testWidgets('со страницы действия над поиском доступны оба направления '
-      'создания дневного выбора', (tester) async {
-    await seedGraph(database, () async {
-      await (database.update(database.intentions)
-            ..where((row) => row.id.equals(_uuid(5))))
-          .write(const IntentionsCompanion(isActionReady: Value(true)));
-    });
-    await open(tester, IntentionRelationGroup.needs);
-    await openRowPage(tester, 'Гулять');
-    await tester.tap(find.text('Выборы').first);
-    await tester.pumpAndSettle();
-    for (final (role, direction) in [
-      ('source', ChoicePathDraftDirection.topDown),
-      ('selected', ChoicePathDraftDirection.bottomUp),
-    ]) {
-      await tester.tap(find.byKey(ValueKey('intention-choices-role-$role')));
-      await tester.pumpAndSettle();
-      final add = find.byKey(const ValueKey('intention-choices-add'));
-      await tester.ensureVisible(add);
-      await tester.tap(add);
-      await tester.pumpAndSettle();
-      expect(
-        tester.widget<ChoicePathPage>(find.byType(ChoicePathPage)).direction,
-        direction,
-      );
-      await router.maybePop();
-      await tester.pumpAndSettle();
-    }
-  });
-
   testWidgets('пункт панели закрывает поиск с отметкой без отправки пачки', (
     tester,
   ) async {
@@ -1522,14 +1619,21 @@ void main() {
   ) async {
     await open(tester, IntentionRelationGroup.needs);
     await openRowPage(tester, 'Гулять');
-    final coordinator = ProviderScope.containerOf(
+    final container = ProviderScope.containerOf(
       tester.element(find.byType(IntentionDetailsPage)),
-    ).read(graphCommandCoordinatorProvider.notifier);
-    final result = coordinator.acceptExisting(
-      ArchiveIntention(_id(5)),
-      presentationTitle: 'Гулять',
     );
-    await tester.runAsync(() => (result as IntentionCommandAccepted).future);
+    final archive = (await tester.runAsync(
+      () => previewedArchiveIntention(
+        container.read(personalGraphRepositoryProvider),
+        _id(5),
+      ),
+    ))!;
+    await tester.runAsync(() async {
+      final result = container
+          .read(graphCommandCoordinatorProvider.notifier)
+          .acceptExisting(archive, presentationTitle: 'Гулять');
+      await (result as IntentionCommandAccepted).future;
+    });
     await tester.pumpAndSettle();
 
     expect(find.byType(DockedFooter), findsNothing);
@@ -1772,7 +1876,7 @@ void _defineControlledCatalogTests() {
       find.byWidgetPredicate(
         (widget) =>
             widget is CatalogHeader &&
-            widget.title == 'All' &&
+            widget.title == 'Intentions' &&
             widget.count == 4,
       ),
       findsOneWidget,
@@ -1875,13 +1979,13 @@ Future<void> _pumpUntilQueries(
 }
 
 /// Запрос поиска сохраняет активный охват и пробу пары при любых условиях;
-/// готовность поиск не ограничивает.
+/// вид намерения поиск не ограничивает.
 void _expectParticipantQuery(
   IntentionCatalogQuery query,
   IntentionTagFilter tagFilter,
 ) {
   expect(query.scope, IntentionScope.active);
-  expect(query.readinessFilter, IntentionReadinessFilter.all);
+  expect(query.kindFilter, IntentionKindFilter.mainAndSupporting);
   expect(query.pairProbe, _needsProbe);
   expect(query.tagFilter, tagFilter);
   expect(query.cursor, isNull);
@@ -1895,7 +1999,6 @@ void _expectNoCommands(
   expect(repository.tagCommands, hasLength(tagCommands));
   expect(repository.commands, isEmpty);
   expect(repository.relationCommands, isEmpty);
-  expect(repository.dailyChoiceCommands, isEmpty);
 }
 
 Result<IntentionCatalogFirstPage> _page(

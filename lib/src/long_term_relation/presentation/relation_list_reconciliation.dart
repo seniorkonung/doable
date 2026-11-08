@@ -556,7 +556,8 @@ final class RelationListReconciliation<
       RelationGroupIntentionNotFoundFailure(_intentionId),
     intention_result.IntentionValidationFailure() ||
     intention_result.IntentionConflictFailure() ||
-    intention_result.IntentionHasBlockingRelationsFailure() ||
+    intention_result.IntentionCascadeConflictFailure() ||
+    intention_result.IntentionCascadePreviewFailure() ||
     intention_result.IntentionUnexpectedFailure() =>
       const RelationGroupUnexpectedFailure(),
   };

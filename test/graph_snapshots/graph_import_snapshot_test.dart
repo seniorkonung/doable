@@ -60,7 +60,7 @@ void main() {
     final file = File.fromUri(snapshots.uri.resolve(snapshot.fileName));
     expect(await file.length(), snapshot.byteSize);
     expect(sha256.convert(await file.readAsBytes()).bytes, snapshot.checksum);
-    expect(_countsOf(snapshot.counts), [2, 4, 3, 3, 2]);
+    expect(_countsOf(snapshot.counts), [2, 4, 1, 3, 3, 1, 3]);
     expect(_lines(await snapshot.readRecords().toList()), goldenLines.skip(1));
     expect(
       await repository.readSnapshotFileNames(),
@@ -72,9 +72,11 @@ void main() {
 List<int> _countsOf(GraphRecordCounts counts) => [
   counts.tags,
   counts.intentions,
+  counts.deletedIntentions,
   counts.tagAssignments,
   counts.longTermRelations,
-  counts.dailyChoices,
+  counts.deletedRelationPairs,
+  counts.actions,
 ];
 
 List<String> _lines(List<GraphEntityRecord> records) => [

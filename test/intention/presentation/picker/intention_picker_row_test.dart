@@ -7,11 +7,9 @@ import 'package:doable/src/design_system/components/tag_line.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
+import 'package:doable/src/intention/application/intention_holding.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
-import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_row.dart';
 import 'package:doable/src/tag/domain/tag.dart';
 import 'package:doable/src/tag/domain/tag_color.dart';
@@ -20,13 +18,13 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter/material.dart' hide Badge;
 import 'package:flutter_test/flutter_test.dart';
 
-import '../catalog/catalog_test_support.dart';
 import '../../../support/intention_description_preview.dart';
 import '../../../support/tag_positions.dart';
 import '../../../support/intention_title_order_key.dart';
 
 void main() {
-  testWidgets('карточка показывает начало описания, молнию и теги, которые '
+  testWidgets('карточка показывает начало описания, метку вспомогательного и '
+      'теги, которые '
       'поместились, а диктор слышит все шесть тегов на двух языках', (
     tester,
   ) async {
@@ -40,6 +38,7 @@ void main() {
     final summary = _summary(
       'Сделать силовую тренировку',
       description: description,
+      kind: IntentionKind.supporting,
       tags: [
         _tag(1, 'Утро'),
         _tag(2, 'Спорт'),
@@ -49,19 +48,24 @@ void main() {
         _tag(6, 'Привычки'),
       ],
     );
-    final purpose = SelectDailyChoiceAction(session: IntentionSearchSession());
 
-    for (final (locale, tagsLabel) in const [
-      (Locale('ru'), 'Теги: Утро, Спорт, Здоровье, Сила, Дом, Привычки'),
-      (Locale('en'), 'Tags: Утро, Спорт, Здоровье, Сила, Дом, Привычки'),
+    for (final (locale, kind, tagsLabel) in const [
+      (
+        Locale('ru'),
+        'вспомогательное',
+        'Теги: Утро, Спорт, Здоровье, Сила, Дом, Привычки',
+      ),
+      (
+        Locale('en'),
+        'supporting',
+        'Tags: Утро, Спорт, Здоровье, Сила, Дом, Привычки',
+      ),
     ]) {
-      await tester.pumpWidget(
-        _app(locale: locale, purpose: purpose, summary: summary),
-      );
+      await tester.pumpWidget(_app(locale: locale, summary: summary));
 
       expect(find.text('Сделать силовую тренировку'), findsOneWidget);
       expect(find.text(preview), findsOneWidget);
-      expect(_marks(tester), [(DoableIconData.bolt, BadgeTone.ink)]);
+      expect(_marks(tester), [(DoableIconData.supporting, BadgeTone.muted)]);
       expect(tester.widget<PickerRow>(find.byType(PickerRow)).archived, false);
       expect(find.byType(TagChip), findsNWidgets(6));
       expect(
@@ -70,7 +74,7 @@ void main() {
       );
       expect(
         find.bySemanticsLabel(
-          'Сделать силовую тренировку, $preview, $tagsLabel',
+          'Сделать силовую тренировку, $kind, $preview, $tagsLabel',
         ),
         findsOneWidget,
       );
@@ -78,64 +82,93 @@ void main() {
     semantics.dispose();
   });
 
-  for (final (search, purpose) in [
-    (
-      'исходного намерения',
-      SelectDailyChoiceSource(session: IntentionSearchSession()),
-    ),
-    (
-      'участника',
-      SelectRelationParticipant(
-        session: IntentionSearchSession(),
-        pairProbe: RelationPairProbe(
-          counterpartId: testSummary(index: 999).id,
-          candidateRole: RelationParticipantRole.related,
-        ),
+  testWidgets('метка и доступное название отличают главное намерение от '
+      'вспомогательного и неудерживаемое вспомогательное на двух языках', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+
+    for (final (locale, main, supporting, unheld) in const [
+      (
+        Locale('ru'),
+        'Быть здоровым, главное, Без тегов',
+        'Пройти пешком до парка, вспомогательное, Без тегов',
+        'Пройти пешком до парка, вспомогательное, его не удерживает ни одно '
+            'главное намерение, Без тегов',
       ),
-    ),
-  ]) {
-    testWidgets('в поиске $search молния и доступное название отличают '
-        'действие от намерения на двух языках', (tester) async {
-      final semantics = tester.ensureSemantics();
+      (
+        Locale('en'),
+        'Быть здоровым, main, No tags',
+        'Пройти пешком до парка, supporting, No tags',
+        'Пройти пешком до парка, supporting, no main intention holds it, '
+            'No tags',
+      ),
+    ]) {
+      await tester.pumpWidget(
+        _app(locale: locale, summary: _summary('Быть здоровым')),
+      );
+      expect(_marks(tester), isEmpty);
+      expect(find.bySemanticsLabel(main), findsOneWidget);
 
-      for (final (locale, intention, action) in const [
-        (
-          Locale('ru'),
-          'Быть здоровым, намерение, Без тегов',
-          'Пройти пешком до парка, действие, Без тегов',
-        ),
-        (
-          Locale('en'),
-          'Быть здоровым, intention, No tags',
-          'Пройти пешком до парка, action, No tags',
-        ),
-      ]) {
-        await tester.pumpWidget(
-          _app(
-            locale: locale,
-            purpose: purpose,
-            summary: _summary(
-              'Быть здоровым',
-              readiness: IntentionReadiness.notReady,
-            ),
-          ),
-        );
-        expect(_marks(tester), isEmpty);
-        expect(find.bySemanticsLabel(intention), findsOneWidget);
+      final walk = _summary(
+        'Пройти пешком до парка',
+        kind: IntentionKind.supporting,
+      );
+      await tester.pumpWidget(
+        _app(locale: locale, summary: walk, holding: IntentionHolding.held),
+      );
+      expect(_marks(tester), [(DoableIconData.supporting, BadgeTone.muted)]);
+      expect(find.bySemanticsLabel(supporting), findsOneWidget);
 
-        await tester.pumpWidget(
-          _app(
-            locale: locale,
-            purpose: purpose,
-            summary: _summary('Пройти пешком до парка'),
+      await tester.pumpWidget(
+        _app(locale: locale, summary: walk, holding: IntentionHolding.notHeld),
+      );
+      expect(_marks(tester), [(DoableIconData.supporting, BadgeTone.accent)]);
+      expect(find.bySemanticsLabel(unheld), findsOneWidget);
+    }
+    semantics.dispose();
+  });
+
+  testWidgets('отметка начала пути стоит первой в линии меток, а диктор '
+      'слышит её на двух языках', (tester) async {
+    final semantics = tester.ensureSemantics();
+
+    for (final (locale, word, label) in const [
+      (
+        Locale('ru'),
+        'Сейчас в начале пути',
+        'Пройти пешком до парка, Сейчас в начале пути, вспомогательное, Без '
+            'тегов',
+      ),
+      (
+        Locale('en'),
+        'Current start of path',
+        'Пройти пешком до парка, Current start of path, supporting, No tags',
+      ),
+    ]) {
+      await tester.pumpWidget(
+        _app(
+          locale: locale,
+          summary: _summary(
+            'Пройти пешком до парка',
+            kind: IntentionKind.supporting,
           ),
-        );
-        expect(_marks(tester), [(DoableIconData.bolt, BadgeTone.ink)]);
-        expect(find.bySemanticsLabel(action), findsOneWidget);
-      }
-      semantics.dispose();
-    });
-  }
+          currentPathStart: true,
+        ),
+      );
+      final marks = tester.widgetList<Badge>(find.bySubtype<Badge>()).toList();
+      expect(marks, [
+        isA<BadgeWord>().having((mark) => mark.word, 'word', word),
+        isA<BadgeMark>().having(
+          (mark) => mark.icon,
+          'icon',
+          DoableIconData.supporting,
+        ),
+      ]);
+      expect(find.bySemanticsLabel(label), findsOneWidget);
+    }
+    semantics.dispose();
+  });
 
   testWidgets('теги из фильтра стоят первыми и выделены, а цвет тега '
       'сохраняется', (tester) async {
@@ -144,7 +177,6 @@ void main() {
 
     await tester.pumpWidget(
       _app(
-        purpose: SelectDailyChoiceAction(session: IntentionSearchSession()),
         summary: _summary(
           'Бегать по утрам',
           tags: [_tag(1, 'Утро'), _tag(2, 'Спорт'), health],
@@ -165,36 +197,35 @@ void main() {
       ],
     );
     expect(
-      find.bySemanticsLabel('Бегать по утрам, Теги: Здоровье, Утро, Спорт'),
+      find.bySemanticsLabel(
+        'Бегать по утрам, главное, Теги: Здоровье, Утро, Спорт',
+      ),
       findsOneWidget,
     );
     semantics.dispose();
   });
 
   testWidgets('строка без тегов называет их отсутствие, а стрелка открывает '
-      'страницу без выбора на двух языках', (tester) async {
+      'страницу намерения без выбора на двух языках', (tester) async {
     final semantics = tester.ensureSemantics();
     var picks = 0;
     var pageOpenings = 0;
 
-    for (final (locale, label, actionPage, intentionPage) in const [
+    for (final (locale, label, page) in const [
       (
         Locale('ru'),
-        'Бегать по утрам, Без тегов',
-        'Открыть страницу действия «Бегать по утрам»',
-        'Открыть страницу намерения «Быть здоровым»',
+        'Бегать по утрам, главное, Без тегов',
+        'Открыть страницу намерения «Бегать по утрам»',
       ),
       (
         Locale('en'),
-        'Бегать по утрам, No tags',
-        'Open the page of action Бегать по утрам',
-        'Open the page of intention Быть здоровым',
+        'Бегать по утрам, main, No tags',
+        'Open the page of intention Бегать по утрам',
       ),
     ]) {
       await tester.pumpWidget(
         _app(
           locale: locale,
-          purpose: SelectDailyChoiceAction(session: IntentionSearchSession()),
           summary: _summary('Бегать по утрам'),
           onPick: () => picks++,
           onOpenPage: () => pageOpenings++,
@@ -202,23 +233,11 @@ void main() {
       );
       expect(find.bySemanticsLabel(label), findsOneWidget);
 
-      await tester.tap(find.bySemanticsLabel(actionPage));
+      await tester.tap(find.bySemanticsLabel(page));
       expect((picks, pageOpenings), (0, 1));
       await tester.tap(find.bySemanticsLabel(label));
       expect((picks, pageOpenings), (1, 1));
       picks = pageOpenings = 0;
-
-      await tester.pumpWidget(
-        _app(
-          locale: locale,
-          purpose: SelectDailyChoiceSource(session: IntentionSearchSession()),
-          summary: _summary(
-            'Быть здоровым',
-            readiness: IntentionReadiness.notReady,
-          ),
-        ),
-      );
-      expect(find.bySemanticsLabel(intentionPage), findsOneWidget);
     }
     semantics.dispose();
   });
@@ -232,7 +251,7 @@ List<(DoableIconData, BadgeTone)> _marks(WidgetTester tester) => [
 IntentionSummary _summary(
   String title, {
   String? description,
-  IntentionReadiness readiness = IntentionReadiness.ready,
+  IntentionKind kind = IntentionKind.main,
   IntentionArchiveState archiveState = IntentionArchiveState.active,
   List<Tag> tags = const [],
 }) => IntentionSummary(
@@ -241,7 +260,7 @@ IntentionSummary _summary(
   ) as IntentionIdDecodingSuccess).id,
   title: title,
   descriptionPreview: testDescriptionPreview(description),
-  readiness: readiness,
+  kind: kind,
   archiveState: archiveState,
   createdAt: IntentionTimestamp(DateTime.utc(2026)),
   updatedAt: IntentionTimestamp(DateTime.utc(2026)),
@@ -259,12 +278,13 @@ Tag _tag(int number, String name, {TagColor? color}) => Tag(
 );
 
 Widget _app({
-  required IntentionPickerPurpose purpose,
   required IntentionSummary summary,
   Locale locale = const Locale('ru'),
   Set<TagId> requiredTagIds = const {},
   VoidCallback? onPick,
   VoidCallback? onOpenPage,
+  IntentionHolding? holding,
+  bool currentPathStart = false,
 }) => MaterialApp(
   theme: doableTheme(Brightness.light),
   locale: locale,
@@ -275,11 +295,12 @@ Widget _app({
       child: SizedBox(
         width: 300,
         child: IntentionPickerRow(
-          purpose: purpose,
           summary: summary,
           requiredTagIds: requiredTagIds,
+          holding: holding,
           onPick: onPick ?? () {},
           onOpenPage: onOpenPage ?? () {},
+          currentPathStart: currentPathStart,
         ),
       ),
     ),

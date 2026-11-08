@@ -1,13 +1,15 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/domain/choice_path_step_id.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
+import 'package:doable/l10n/app_localizations_ru.dart';
+import 'package:doable/src/action/application/action_command.dart';
+import 'package:doable/src/action/application/action_result.dart';
+import 'package:doable/src/action/domain/action.dart' as action_domain;
+import 'package:doable/src/action/domain/action_id.dart';
+import 'package:doable/src/action/domain/action_path.dart';
+import 'package:doable/src/action/domain/action_priority.dart';
+import 'package:doable/src/action/domain/action_schedule.dart';
+import 'package:doable/src/action/domain/action_text.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -16,6 +18,7 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/graph_backups/graph_backups.dart';
+import 'package:doable/src/intention/application/cascade/intention_cascade.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -25,6 +28,7 @@ import 'package:doable/src/long_term_relation/application/intention_relation_gro
 import 'package:doable/src/long_term_relation/presentation/relation_command_failure_message.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/tag/application/tag_change.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
@@ -36,11 +40,315 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../intention/presentation/details/details_test_support.dart';
+import '../../support/intention_cascade_execution.dart';
 
 void main() {
   setUp(() {
     WidgetsBinding.instance.handleAppLifecycleStateChanged(
       AppLifecycleState.resumed,
+    );
+  });
+
+  for (final (count, suffix) in [
+    (1, '1 вспомогательным'),
+    (2, '2 вспомогательными'),
+    (5, '5 вспомогательными'),
+    (21, '21 вспомогательным'),
+  ]) {
+    testWidgets('число вспомогательных согласуется: $count', (tester) async {
+      final harness = await _pumpPresenterApp(
+        tester,
+        locale: const Locale('ru'),
+      );
+      final accepted = harness.startArchive();
+      harness.completeIntentionCascade(
+        accepted,
+        ArchiveCascadeComposition(
+          departing: [
+            for (var i = 0; i < count; i++) testDetailsIntentionId(i + 2),
+          ],
+          promoted: [],
+          archivedRelationCount: 0,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Архивирование — «Намерение»: В архиве вместе с $suffix'),
+        findsOneWidget,
+      );
+    });
+  }
+
+  testWidgets('архивирование связи объявляет превращение в главное', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final accepted = harness.startRelationArchive();
+    harness.completeRelationArchived(
+      accepted,
+      composition: ArchiveCascadeComposition(
+        departing: [],
+        promoted: [testDetailsIntentionId(2)],
+        archivedRelationCount: 1,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Архивирование — «связь»: Связь в архиве, намерение стало главным',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('удаление объявляет каскад и архивирование одним сообщением', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final accepted = harness.startDelete(index: 1, title: 'Намерение');
+    harness.completeDeleted(
+      accepted,
+      composition: DeleteCascadeComposition(
+        departing: [testDetailsIntentionId(2)],
+        promoted: [],
+        archivedByInvariant: [
+          testDetailsIntentionId(3),
+          testDetailsIntentionId(4),
+        ],
+        mainsLosingRelation: [],
+        deletedRelationCount: 2,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Удаление — «Намерение»: Намерение удалено вместе с 1 вспомогательным; в архив ушли 2 намерения',
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(SnackBar), findsOneWidget);
+  });
+
+  for (final (count, suffix) in [
+    (1, 'ушло 1 намерение'),
+    (2, 'ушли 2 намерения'),
+    (5, 'ушли 5 намерений'),
+  ]) {
+    testWidgets('удаление намерения с архивированием: $count', (tester) async {
+      final harness = await _pumpPresenterApp(
+        tester,
+        locale: const Locale('ru'),
+        alteredDeletionPunctuation: true,
+      );
+      final accepted = harness.startDelete(index: 1, title: 'Намерение');
+      harness.completeDeleted(
+        accepted,
+        composition: DeleteCascadeComposition(
+          departing: [],
+          promoted: [],
+          archivedByInvariant: [
+            for (var i = 0; i < count; i++) testDetailsIntentionId(i + 2),
+          ],
+          mainsLosingRelation: [],
+          deletedRelationCount: 0,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Удаление — «Намерение»: Намерение удалено; в архив $suffix'),
+        findsOneWidget,
+      );
+    });
+  }
+
+  testWidgets('удаление связи с архивированием не зависит от другой строки', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(
+      tester,
+      locale: const Locale('ru'),
+      alteredDeletionPunctuation: true,
+    );
+    final accepted = harness.startRelationDelete();
+    harness.completeRelationDeleted(
+      accepted,
+      composition: DeleteCascadeComposition(
+        departing: [],
+        promoted: [],
+        archivedByInvariant: [testDetailsIntentionId(3)],
+        mainsLosingRelation: [],
+        deletedRelationCount: 1,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Удаление — «связь»: Связь удалена; в архив ушло 1 намерение'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('удаление связи объявляет оставленное главным намерение', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final accepted = harness.startRelationDelete();
+    harness.completeRelationDeleted(
+      accepted,
+      composition: DeleteCascadeComposition(
+        departing: [],
+        promoted: [testDetailsIntentionId(2)],
+        archivedByInvariant: [],
+        mainsLosingRelation: [],
+        deletedRelationCount: 1,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Удаление — «связь»: Связь удалена, намерение стало главным'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('восстановление связи объявляет вернувшееся главным намерение', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final accepted = harness.startRelationRestore();
+    harness.completeRelationRestored(
+      accepted,
+      composition: RestoreCascadeComposition(
+        restored: [testDetailsIntentionId(1)],
+        returnedAsMain: testDetailsIntentionId(1),
+        restoredRelationCount: 1,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Восстановление — «связь»: Связь восстановлена, намерение вернулось главным',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+    'восстановление намерения главным с каскадом объявляет оба результата',
+    (tester) async {
+      final harness = await _pumpPresenterApp(
+        tester,
+        locale: const Locale('ru'),
+      );
+      final accepted = harness.startRestore();
+      harness.completeIntentionCascade(
+        accepted,
+        RestoreCascadeComposition(
+          restored: [testDetailsIntentionId(2)],
+          returnedAsMain: testDetailsIntentionId(1),
+          restoredRelationCount: 1,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Восстановление — «Намерение»: Восстановлено как главное вместе с 1 вспомогательным',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('архивирование без других намерений не показывает сообщение', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final accepted = harness.startArchive();
+    harness.completeIntentionCascade(
+      accepted,
+      ArchiveCascadeComposition(
+        departing: [],
+        promoted: [],
+        archivedRelationCount: 0,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
+  for (final (count, promoted, archived) in [
+    (1, '1 намерение стало главным', 'ушло 1 намерение'),
+    (2, '2 намерения стали главными', 'ушли 2 намерения'),
+    (5, '5 намерений стали главными', 'ушли 5 намерений'),
+    (21, '21 намерение стало главным', 'ушло 21 намерение'),
+  ]) {
+    testWidgets('числа ставших главными и архивированных согласуются: $count', (
+      tester,
+    ) async {
+      final harness = await _pumpPresenterApp(
+        tester,
+        locale: const Locale('ru'),
+      );
+      final accepted = harness.startDelete(index: 1, title: 'Намерение');
+      harness.completeDeleted(
+        accepted,
+        composition: DeleteCascadeComposition(
+          departing: [],
+          promoted: [
+            for (var i = 0; i < count; i++) testDetailsIntentionId(i + 2),
+          ],
+          archivedByInvariant: [
+            for (var i = 0; i < count; i++) testDetailsIntentionId(i + 100),
+          ],
+          mainsLosingRelation: [],
+          deletedRelationCount: 1,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Удаление — «Намерение»: Намерение удалено, $promoted; в архив $archived',
+        ),
+        findsOneWidget,
+      );
+    });
+  }
+
+  testWidgets('восстановление связи считает все возвращённые намерения', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final accepted = harness.startRelationRestore();
+    harness.completeRelationRestored(
+      accepted,
+      composition: RestoreCascadeComposition(
+        restored: [testDetailsIntentionId(1), testDetailsIntentionId(2)],
+        returnedAsMain: testDetailsIntentionId(1),
+        restoredRelationCount: 1,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Восстановление — «связь»: Связь восстановлена вместе с 2 намерениями, одно из них главным',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('сообщение каскада локализуется на английский', (tester) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('en'));
+    final accepted = harness.startArchive();
+    harness.completeIntentionCascade(
+      accepted,
+      ArchiveCascadeComposition(
+        departing: [testDetailsIntentionId(2)],
+        promoted: [],
+        archivedRelationCount: 1,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Archive — “Намерение”: Archived with 1 supporting intention'),
+      findsOneWidget,
     );
   });
 
@@ -416,6 +724,36 @@ void main() {
     }
   }
 
+  for (final (locale, live, late) in [
+    (
+      const Locale('ru'),
+      'Создание — «Полное намерение»: Намерение создано и выбрано началом пути.',
+      'Создание — «Полное намерение»: Намерение создано.',
+    ),
+    (
+      const Locale('en'),
+      'Create — “Полное намерение”: Intention created and selected as the start of the path.',
+      'Create — “Полное намерение”: Intention created.',
+    ),
+  ]) {
+    for (final released in [false, true]) {
+      testWidgets(
+        'создание начала пути сообщает исход с учётом ухода, ${locale.languageCode}, освобождено: $released',
+        (tester) async {
+          final harness = await _pumpPresenterApp(tester, locale: locale);
+          final creation = harness.startFullCreation(
+            releaseInitiator: released,
+            target: const CreatingIntentionForPathStartOperationTarget(),
+          );
+          harness.completeFullCreated(creation);
+          await tester.pumpAndSettle();
+          expect(find.text(released ? late : live), findsOneWidget);
+          await _closeMessage(tester);
+        },
+      );
+    }
+  }
+
   // Язык не меняет путь предъявления, поэтому достаточно русского.
   const fullCreation = (
     locale: Locale('ru'),
@@ -428,7 +766,7 @@ void main() {
         : 'при живой форме';
     testWidgets(
       'успех полного создания $initiator предъявляется одним сообщением без '
-      'отдельных исходов готовности и назначений, '
+      'отдельных исходов назначений, '
       '${fullCreation.locale.languageCode}',
       (tester) async {
         final harness = await _pumpPresenterApp(
@@ -480,15 +818,130 @@ void main() {
     expect(find.byType(SnackBar), findsNothing);
   });
 
+  testWidgets('отказ изменения вида предъявляется общей поверхностью', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final operation = harness.startKindChange();
+    harness.completeFailure(
+      operation,
+      const IntentionMissingIncomingRelationFailure(),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Изменение вида — «Намерение»: Не удалось изменить состояние намерения.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  for (final scenario in [
+    (
+      operation: CascadeOperation.archive,
+      cause: const CascadePreviewUnavailable(),
+      text:
+          'Архивирование — «Намерение»: Не удалось изменить состояние '
+          'намерения. Повторите попытку.',
+    ),
+    (
+      operation: CascadeOperation.restore,
+      cause: const CascadePreviewSubjectNotFound(),
+      text:
+          'Восстановление — «Намерение»: Намерение больше не существует. '
+          'Его состояние не изменено.',
+    ),
+    (
+      operation: CascadeOperation.delete,
+      cause: const CascadePreviewCorruption(),
+      text:
+          'Удаление — «Намерение»: Сохранённые данные повреждены. Намерение '
+          'не удалено.',
+    ),
+  ]) {
+    testWidgets(
+      'отказ предпросмотра операции ${scenario.operation.name} предъявляется '
+      'общей поверхностью как отказ этой операции один раз',
+      (tester) async {
+        final harness = await _pumpPresenterApp(
+          tester,
+          locale: const Locale('ru'),
+        );
+
+        harness.startPreviewFailure(scenario.operation, scenario.cause);
+        await tester.pumpAndSettle();
+
+        expect(find.text(scenario.text), findsOneWidget);
+        await _closeMessage(tester);
+        expect(find.byType(SnackBar), findsNothing);
+      },
+    );
+  }
+
+  testWidgets('конфликт состава каскада предъявляется общей поверхностью '
+      'текстом о конфликте актуального состояния', (tester) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final archive = harness.startArchive();
+    harness.completeFailure(archive, const IntentionCascadeConflictFailure());
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Архивирование — «Намерение»: Состояние намерения не изменено: '
+        'связанные намерения изменились, и операция затронула бы их иначе. '
+        'Попробуйте снова.',
+      ),
+      findsOneWidget,
+    );
+    await _closeMessage(tester);
+
+    final relationArchive = harness.startRelationArchive();
+    harness.completeRelationFailure(
+      relationArchive,
+      const LongTermRelationCascadeConflictFailure(),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining(
+        'Связь не удалось архивировать из-за конфликта актуального состояния.',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets(
-    'показывает безопасный конфликт блокирующих связей в общей поверхности',
+    'отказ предпросмотра, принятый без фокуса на странице, после ухода с '
+    'неё ждёт возвращения фокуса и предъявляется один раз',
     (tester) async {
       final harness = await _pumpPresenterApp(tester);
-      final operation = harness.startDelete(index: 3, title: 'Связанное');
-      harness.completeBlockingRelations(operation);
+      final navigator = Navigator.of(tester.element(find.byType(Scaffold)));
+      unawaited(
+        navigator.push(
+          MaterialPageRoute<void>(
+            builder: (_) => const Scaffold(body: Text('Страница намерения')),
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
 
-      expect(find.text(_linkedNotDeleted('Связанное')), findsOneWidget);
+      harness.startPreviewFailure(
+        CascadeOperation.archive,
+        const CascadePreviewUnexpected(),
+      );
+      await tester.pump();
+      navigator.pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Archive — “Намерение”: The intention state couldn’t be changed '
+          'because of an unexpected error.',
+        ),
+        findsOneWidget,
+      );
       await _closeMessage(tester);
       expect(find.byType(SnackBar), findsNothing);
     },
@@ -745,142 +1198,111 @@ void main() {
     });
   }
 
-  for (final scenario in <({DailyChoiceValidationField field, String ru})>[
-    (
-      field: DailyChoiceValidationField.sourceIntention,
-      ru: 'Проверьте исходное намерение дневного выбора.',
-    ),
-    (
-      field: DailyChoiceValidationField.selectedIntention,
-      ru: 'Проверьте выбранное намерение дневного выбора.',
-    ),
-    (
-      field: DailyChoiceValidationField.date,
-      ru: 'Проверьте дату дневного выбора.',
-    ),
-    (
-      field: DailyChoiceValidationField.description,
-      ru: 'Проверьте описание дневного выбора.',
-    ),
-  ]) {
-    testWidgets('ошибка поля ${scenario.field.name} объяснена', (tester) async {
-      final harness = await _pumpPresenterApp(
-        tester,
-        locale: const Locale('ru'),
-      );
-      final update = harness.startDailyChoiceUpdate();
-      harness.completeDailyChoiceFailure(
-        update,
-        DailyChoiceValidationFailure(scenario.field),
-      );
-      await tester.pumpAndSettle();
-
-      final message = 'Изменение — «дневной выбор»: ${scenario.ru}';
-      expect(find.text(message), findsOneWidget);
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-    });
-  }
-
-  for (final scenario in <({DailyChoiceCommandFailure failure, String ru})>[
-    (
-      failure: const DailyChoiceNotFoundFailure(),
-      ru: 'Дневной выбор больше не существует.',
-    ),
-    (
-      failure: const DailyChoiceConflictFailure(
-        DailyChoiceConflictReason.dependencyChanged,
-      ),
-      ru: 'Данные изменились. Обновите их и подтвердите снова.',
-    ),
-    (
-      failure: const DailyChoiceUnavailableFailure(),
-      ru: 'Не удалось выполнить действие с дневным выбором. Повторите попытку.',
-    ),
-    (
-      failure: const DailyChoiceCorruptionFailure(),
-      ru: 'Сохранённые данные повреждены. Дневной выбор не изменён.',
-    ),
-    (
-      failure: const DailyChoiceUnexpectedFailure(),
-      ru: 'Действие с дневным выбором не выполнено из-за непредвиденной ошибки.',
-    ),
-  ]) {
-    testWidgets('отказ ${scenario.failure.runtimeType} безопасен', (
-      tester,
-    ) async {
-      final harness = await _pumpPresenterApp(
-        tester,
-        locale: const Locale('ru'),
-      );
-      final update = harness.startDailyChoiceUpdate();
-      harness.completeDailyChoiceFailure(update, scenario.failure);
-      await tester.pumpAndSettle();
-
-      final message = 'Изменение — «дневной выбор»: ${scenario.ru}';
-      expect(find.text(message), findsOneWidget);
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-    });
-  }
-
-  testWidgets(
-    'дневной выбор предъявляет успех лишь после подтверждения записи',
-    (tester) async {
-      final harness = await _pumpPresenterApp(
-        tester,
-        locale: const Locale('ru'),
-      );
-      final deletion = harness.startDailyChoiceDelete(releaseInitiator: false);
-      await tester.pump();
-      expect(find.byType(SnackBar), findsNothing);
-
-      harness.completeDailyChoiceDeleted(deletion);
-      await tester.pumpAndSettle();
-      expect(
-        find.text('Удаление — «дневной выбор»: Дневной выбор удалён.'),
-        findsOneWidget,
-      );
-      expect(
-        tester.getSemantics(
-          find.byKey(const ValueKey('graph-operation-message')),
-        ),
-        matchesSemantics(
-          label: 'Удаление — «дневной выбор»: Дневной выбор удалён.',
-          isLiveRegion: true,
-          textDirection: TextDirection.ltr,
-        ),
-      );
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-    },
-  );
-
-  testWidgets('успех создания дневного выбора предъявляется один раз', (
+  testWidgets('создание действия и конфликт пути предъявляются безопасно', (
     tester,
   ) async {
-    final harness = await _pumpPresenterApp(tester);
-    final accepted = harness.startDailyChoice(DailyChoiceCommandKind.create);
-    harness.completeDailyChoiceSuccess(accepted, DailyChoiceCommandKind.create);
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final creation = harness.startActionCreation();
+    harness.completeActionCreated(creation);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Создание — «действие»: Действие создано.'),
+      findsOneWidget,
+    );
+    await _closeMessage(tester);
+    final conflict = harness.startActionCreation();
+    harness.completeActionFailure(conflict, const ActionPathConflictFailure());
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Создание — «действие»: Путь больше не совпадает с графом. Проверьте путь и попробуйте снова.',
+      ),
+      findsOneWidget,
+    );
+    await _closeMessage(tester);
+  });
+
+  testWidgets('действие предъявляет удаление лишь после подтверждения записи', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(tester, locale: const Locale('ru'));
+    final deletion = harness.startActionDelete();
+    await tester.pump();
+    expect(find.byType(SnackBar), findsNothing);
+
+    harness.completeActionDeleted(deletion);
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Create — “daily choice”: Daily choice created.'),
+      find.text('Удаление — «действие»: Действие удалено.'),
       findsOneWidget,
     );
     await _closeMessage(tester);
     expect(find.byType(SnackBar), findsNothing);
   });
 
+  testWidgets('сообщение об удалении действия локализуется', (tester) async {
+    final harness = await _pumpPresenterApp(tester);
+    final deletion = harness.startActionDelete();
+
+    harness.completeActionDeleted(deletion);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete — “action”: Action deleted.'), findsOneWidget);
+    await _closeMessage(tester);
+  });
+
+  for (final scenario in <({ActionCommandFailure failure, String ru})>[
+    (
+      failure: const ActionNotFoundFailure(),
+      ru: 'Действие больше не существует.',
+    ),
+    (
+      failure: const ActionConflictFailure(),
+      ru: 'Данные изменились. Обновите их и подтвердите снова.',
+    ),
+    (
+      failure: const ActionUnavailableFailure(),
+      ru: 'Не удалось выполнить операцию с действием. Повторите попытку.',
+    ),
+    (
+      failure: const ActionCorruptionFailure(),
+      ru: 'Сохранённые данные повреждены. Действие не изменено.',
+    ),
+    (
+      failure: const ActionUnexpectedFailure(),
+      ru: 'Операция с действием не выполнена из-за непредвиденной ошибки.',
+    ),
+  ]) {
+    testWidgets('отказ действия ${scenario.failure.runtimeType} объяснён', (
+      tester,
+    ) async {
+      final harness = await _pumpPresenterApp(
+        tester,
+        locale: const Locale('ru'),
+      );
+      final update = harness.startActionUpdate();
+      harness.completeActionFailure(update, scenario.failure);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Изменение — «действие»: ${scenario.ru}'),
+        findsOneWidget,
+      );
+      await _closeMessage(tester);
+      expect(find.byType(SnackBar), findsNothing);
+    });
+  }
+
   testWidgets(
-    'успех изменения дневного выбора не объявляется сообщением и не занимает '
+    'успех изменения действия не объявляется сообщением и не занимает '
     'очередь',
     (tester) async {
       final harness = await _pumpPresenterApp(tester);
       final intention = harness.startDelete(index: 1, title: 'Намерение');
-      final update = harness.startDailyChoice(DailyChoiceCommandKind.update);
+      final update = harness.startActionUpdate();
       harness.completeDeleted(intention);
-      harness.completeDailyChoiceSuccess(update, DailyChoiceCommandKind.update);
+      harness.completeActionUpdated(update);
       await update.future;
       await tester.pumpAndSettle();
 
@@ -1169,41 +1591,6 @@ void main() {
     expect(find.byType(SnackBar), findsNothing);
   });
 
-  for (final scenario in <({RelationParticipantRole role, String outcome})>[
-    (
-      role: RelationParticipantRole.source,
-      outcome: 'Restore the source intention before restoring this relation.',
-    ),
-    (
-      role: RelationParticipantRole.related,
-      outcome: 'Restore the related intention before restoring this relation.',
-    ),
-  ]) {
-    testWidgets(
-      'восстановление объясняет архивного участника ${scenario.role.name}',
-      (tester) async {
-        final harness = await _pumpPresenterApp(tester);
-        final restore = harness.startRelationRestore();
-        harness.completeRelationFailure(
-          restore,
-          LongTermRelationParticipantArchivedFailure(
-            role: scenario.role,
-            intentionId: testDetailsIntentionId(1),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        expect(
-          find.text(_relationRestoreOutcome(scenario.outcome)),
-          findsOneWidget,
-        );
-
-        await _closeMessage(tester);
-        expect(find.byType(SnackBar), findsNothing);
-      },
-    );
-  }
-
   testWidgets('восстановление связи предъявляется на русском языке', (
     tester,
   ) async {
@@ -1211,17 +1598,14 @@ void main() {
     final restore = harness.startRelationRestore();
     harness.completeRelationFailure(
       restore,
-      LongTermRelationParticipantArchivedFailure(
-        role: RelationParticipantRole.related,
-        intentionId: testDetailsIntentionId(2),
-      ),
+      const LongTermRelationCascadeConflictFailure(),
     );
     await tester.pumpAndSettle();
 
     expect(
       find.text(
-        'Восстановление — «связь»: Сначала восстановите связанное намерение, '
-        'затем восстановите эту связь.',
+        'Восстановление — «связь»: Связь не удалось восстановить из-за '
+        'конфликта актуального состояния.',
       ),
       findsOneWidget,
     );
@@ -1719,15 +2103,7 @@ String _deleted(String title) => 'Delete — “$title”: Intention deleted.';
 String _notDeleted(String title) =>
     'Delete — “$title”: The intention couldn’t be deleted. Try again.';
 
-String _linkedNotDeleted(String title) =>
-    'Delete — “$title”: The intention wasn’t deleted: its relations still '
-    'block deletion. Archived relations and relations that aren’t loaded yet '
-    'block it too.';
-
 String _relationUpdateOutcome(String outcome) => 'Edit — “relation”: $outcome';
-
-String _relationRestoreOutcome(String outcome) =>
-    'Restore — “relation”: $outcome';
 
 String _relationDeleteOutcome(String outcome) =>
     'Delete — “relation”: $outcome';
@@ -1830,13 +2206,11 @@ final _otherRelationId = switch (LongTermRelationId.decode(
   ),
 };
 
-final _dailyChoiceId = switch (DailyChoiceId.decode(
-  '018f1400-0000-7000-8000-000000000001',
+final _actionId = switch (ActionId.decode(
+  '018f1400-0000-7000-8000-000000000005',
 )) {
-  DailyChoiceIdDecodingSuccess(:final id) => id,
-  InvalidDailyChoiceIdDecoding() => throw StateError(
-    'Некорректный ID дневного выбора.',
-  ),
+  ActionIdDecodingSuccess(:final id) => id,
+  InvalidActionIdDecoding() => throw StateError('Некорректный ID действия.'),
 };
 
 final _tagId = switch (TagId.decode('018f1400-0000-7000-8000-000000000003')) {
@@ -1860,22 +2234,6 @@ final class _CreatedCatalogEntrySnapshot
 
   @override
   bool matches(IntentionCatalogQuery query) => query.includes(summary);
-}
-
-final _choicePathStepId = switch (ChoicePathStepId.decode(
-  '018f1400-0000-7000-8000-000000000002',
-)) {
-  ChoicePathStepIdDecodingSuccess(:final id) => id,
-  InvalidChoicePathStepIdDecoding() => throw StateError(
-    'Некорректный ID шага пути.',
-  ),
-};
-
-final class _PresentationOnlyChange implements GraphChange {
-  const _PresentationOnlyChange(this.revision);
-
-  @override
-  final GraphRevision revision;
 }
 
 Future<void> _openSheet(BuildContext context) => showDoableSheet<void>(
@@ -1933,7 +2291,7 @@ final class _PresenterHarness {
   final _commandIndexes = <IntentionCommandAccepted, int>{};
   final _titles = <IntentionCommandAccepted, (int, String)>{};
   final _relationIndexes = <LongTermRelationCommandAccepted, int>{};
-  final _dailyChoiceIndexes = <DailyChoiceCommandAccepted, int>{};
+  final _actionIndexes = <ActionCommandAccepted, int>{};
   final _tagIndexes = <TagCommandAccepted, int>{};
   final _exports = <GraphExportAccepted, Completer<GraphExportOutcome>>{};
   final _restores =
@@ -2000,149 +2358,183 @@ final class _PresenterHarness {
   void releaseInitiatorPresentation(GraphOperationToken token) =>
       _coordinator.releaseInitiatorPresentation(token);
 
-  DailyChoiceCommandAccepted startDailyChoice(DailyChoiceCommandKind kind) =>
-      switch (kind) {
-        DailyChoiceCommandKind.create => _startDailyChoiceCreate(),
-        DailyChoiceCommandKind.update => startDailyChoiceUpdate(),
-        DailyChoiceCommandKind.delete => startDailyChoiceDelete(),
-      };
-
-  ConfirmedChoicePath _confirmedChoicePath() => ConfirmedChoicePath([
-    ConfirmedChoicePathStep(
-      relationId: _relationId,
-      sourceIntentionId: testDetailsIntentionId(1),
-      type: LongTermRelationType.need,
-      relatedIntentionId: testDetailsIntentionId(2),
-    ),
-  ]);
-
-  DailyChoiceCommandAccepted _startDailyChoiceCreate() {
-    final commandIndex = repository.dailyChoiceCommands.length;
-    final accepted = _coordinator.acceptDailyChoiceCreation(
-      DailyChoiceCreationFormKey(),
-      CreateDailyChoice(
-        sourceIntentionId: testDetailsIntentionId(1),
-        selectedIntentionId: testDetailsIntentionId(2),
-        path: _confirmedChoicePath(),
-        date: CalendarDate.fromParts(2026, 9, 23),
+  ActionCommandAccepted startActionCreation() {
+    final commandIndex = repository.actionCommands.length;
+    final accepted = _coordinator.acceptActionCreation(
+      ActionCreationFormKey(),
+      CreateAction(
+        title: ActionTitle('Пробежка'),
         description: null,
-        isCompleted: false,
+        path: ActionPath([testDetailsIntentionId(1)]),
+        date: CalendarDate.fromParts(2026, 9, 23),
+        schedule: const ActionAllDay(),
+        priority: ActionPriority.p4,
       ),
-    ) as DailyChoiceCommandAccepted;
+    ) as ActionCommandAccepted;
     _coordinator.releaseInitiatorPresentation(accepted.token);
-    _dailyChoiceIndexes[accepted] = commandIndex;
+    _actionIndexes[accepted] = commandIndex;
     return accepted;
   }
 
-  DailyChoiceCommandAccepted startDailyChoiceUpdate({
-    bool releaseInitiator = true,
-  }) {
-    final commandIndex = repository.dailyChoiceCommands.length;
-    final accepted = _coordinator.acceptDailyChoiceUpdate(
-      UpdateDailyChoiceFields(
-        choiceId: _dailyChoiceId,
-        patch: const DailyChoiceFieldsPatch(
-          isCompleted: DailyChoiceFieldSet(true),
-        ),
-      ),
-    ) as DailyChoiceCommandAccepted;
-    if (releaseInitiator) {
-      _coordinator.releaseInitiatorPresentation(accepted.token);
-    }
-    _dailyChoiceIndexes[accepted] = commandIndex;
-    return accepted;
-  }
-
-  DailyChoiceCommandAccepted startDailyChoiceDelete({
-    bool releaseInitiator = true,
-  }) {
-    final commandIndex = repository.dailyChoiceCommands.length;
-    final accepted = _coordinator.acceptDailyChoiceDelete(
-      DeleteDailyChoice(_dailyChoiceId),
-    ) as DailyChoiceCommandAccepted;
-    if (releaseInitiator) {
-      _coordinator.releaseInitiatorPresentation(accepted.token);
-    }
-    _dailyChoiceIndexes[accepted] = commandIndex;
-    return accepted;
-  }
-
-  void completeDailyChoiceDeleted(DailyChoiceCommandAccepted accepted) {
+  void completeActionCreated(ActionCommandAccepted accepted) {
     const revision = TestDetailsRevision(7);
-    repository.completeDailyChoiceCommand(
-      _dailyChoiceIndexes[accepted]!,
+    final action = _action();
+    repository.completeActionCommand(
+      _actionIndexes[accepted]!,
       GraphCommandSucceeded(
         ConfirmedGraphResult(
           revision: revision,
-          value: DailyChoiceDeleted(
-            choice: DailyChoice(
-              id: _dailyChoiceId,
-              sourceIntentionId: testDetailsIntentionId(1),
-              selectedIntentionId: testDetailsIntentionId(2),
-              date: CalendarDate.fromParts(2026, 9, 23),
-              description: null,
-              isCompleted: false,
-            ),
-            changes: const [_PresentationOnlyChange(revision)],
+          value: ActionCreated(
+            action: action,
+            changes: [ActionCreatedChange(revision: revision, action: action)],
           ),
         ),
       ),
     );
   }
 
-  void completeDailyChoiceSuccess(
-    DailyChoiceCommandAccepted accepted,
-    DailyChoiceCommandKind kind,
-  ) {
+  ActionCommandAccepted startActionUpdate() {
+    final commandIndex = repository.actionCommands.length;
+    final accepted = _coordinator.acceptActionUpdate(
+      UpdateActionFields(
+        actionId: _actionId,
+        patch: const ActionFieldsPatch(isCompleted: ActionFieldSet(true)),
+      ),
+    ) as ActionCommandAccepted;
+    _coordinator.releaseInitiatorPresentation(accepted.token);
+    _actionIndexes[accepted] = commandIndex;
+    return accepted;
+  }
+
+  ActionCommandAccepted startActionDelete() {
+    final commandIndex = repository.actionCommands.length;
+    final accepted = _coordinator.acceptActionDelete(
+      DeleteAction(_actionId),
+    ) as ActionCommandAccepted;
+    _coordinator.releaseInitiatorPresentation(accepted.token);
+    _actionIndexes[accepted] = commandIndex;
+    return accepted;
+  }
+
+  void completeActionUpdated(ActionCommandAccepted accepted) {
     const revision = TestDetailsRevision(7);
-    final choice = DailyChoice(
-      id: _dailyChoiceId,
-      sourceIntentionId: testDetailsIntentionId(1),
-      selectedIntentionId: testDetailsIntentionId(2),
-      date: CalendarDate.fromParts(2026, 9, 23),
-      description: null,
-      isCompleted: false,
-    );
-    final path = StoredChoicePath([
-      ChoicePathStep(
-        id: _choicePathStepId,
-        dailyChoiceId: _dailyChoiceId,
-        relationId: _relationId,
-        previousStepId: null,
-      ),
-    ]);
-    final changes = <GraphChange>[const _PresentationOnlyChange(revision)];
-    final success = switch (kind) {
-      DailyChoiceCommandKind.create => DailyChoiceCreated(
-        choice: choice,
-        path: path,
-        changes: changes,
-      ),
-      DailyChoiceCommandKind.update => DailyChoiceFieldsUpdated(
-        before: choice,
-        choice: choice,
-        path: path,
-        changes: changes,
-      ),
-      DailyChoiceCommandKind.delete => DailyChoiceDeleted(
-        choice: choice,
-        changes: changes,
-      ),
-    };
-    repository.completeDailyChoiceCommand(
-      _dailyChoiceIndexes[accepted]!,
+    final action = _action();
+    repository.completeActionCommand(
+      _actionIndexes[accepted]!,
       GraphCommandSucceeded(
-        ConfirmedGraphResult(revision: revision, value: success),
+        ConfirmedGraphResult(
+          revision: revision,
+          value: ActionFieldsUpdated(
+            action: action,
+            changes: [
+              ActionUpdatedChange(
+                revision: revision,
+                before: action,
+                after: action,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  void completeDailyChoiceFailure(
-    DailyChoiceCommandAccepted accepted,
-    DailyChoiceCommandFailure failure,
-  ) => repository.completeDailyChoiceCommand(
-    _dailyChoiceIndexes[accepted]!,
+  void completeActionDeleted(ActionCommandAccepted accepted) {
+    const revision = TestDetailsRevision(7);
+    final action = _action();
+    repository.completeActionCommand(
+      _actionIndexes[accepted]!,
+      GraphCommandSucceeded(
+        ConfirmedGraphResult(
+          revision: revision,
+          value: ActionDeleted(
+            action: action,
+            changes: [ActionDeletedChange(revision: revision, action: action)],
+          ),
+        ),
+      ),
+    );
+  }
+
+  action_domain.Action _action() => action_domain.Action(
+    id: _actionId,
+    title: ActionTitle('Пробежка'),
+    description: null,
+    path: ActionPath([testDetailsIntentionId(1)]),
+    date: CalendarDate.fromParts(2026, 9, 23),
+    schedule: const ActionAllDay(),
+    priority: ActionPriority.p4,
+    isCompleted: false,
+    creationSequence: action_domain.ActionCreationSequence(1),
+    createdAt: action_domain.ActionTimestamp(DateTime.utc(2026, 9, 23)),
+    updatedAt: action_domain.ActionTimestamp(DateTime.utc(2026, 9, 23)),
+  );
+
+  void completeActionFailure(
+    ActionCommandAccepted accepted,
+    ActionCommandFailure failure,
+  ) => repository.completeActionCommand(
+    _actionIndexes[accepted]!,
     GraphCommandFailed(failure),
+  );
+
+  IntentionCommandAccepted startKindChange() {
+    final commandIndex = repository.commands.length;
+    final accepted = _coordinator.acceptExisting(
+      ChangeIntentionKind(testDetailsIntentionId(1), IntentionKind.supporting),
+      presentationTitle: 'Намерение',
+    ) as IntentionCommandAccepted;
+    _commandIndexes[accepted] = commandIndex;
+    return accepted;
+  }
+
+  IntentionCommandAccepted startArchive() {
+    final commandIndex = repository.commands.length;
+    final accepted = _coordinator.acceptExisting(
+      givenArchiveIntention(testDetailsIntentionId(1)),
+      presentationTitle: 'Намерение',
+    ) as IntentionCommandAccepted;
+    _coordinator.releaseInitiatorPresentation(accepted.token);
+    _commandIndexes[accepted] = commandIndex;
+    return accepted;
+  }
+
+  IntentionCommandAccepted startRestore() {
+    final commandIndex = repository.commands.length;
+    final accepted = _coordinator.acceptExisting(
+      givenRestoreIntention(testDetailsIntentionId(1)),
+      presentationTitle: 'Намерение',
+    ) as IntentionCommandAccepted;
+    _coordinator.releaseInitiatorPresentation(accepted.token);
+    _commandIndexes[accepted] = commandIndex;
+    return accepted;
+  }
+
+  void completeIntentionCascade(
+    IntentionCommandAccepted accepted,
+    CascadeComposition composition,
+  ) {
+    const revision = TestDetailsRevision(0);
+    repository.completeCommand(
+      _commandIndexes[accepted]!,
+      testDetailsSavedResult(
+        testDetailsIntention(),
+        additionalChanges: [
+          CascadeOutcome(revision: revision, executed: composition),
+        ],
+      ),
+    );
+  }
+
+  /// Операция страницы намерения, предпросмотр каскада которой не прочитан.
+  void startPreviewFailure(
+    CascadeOperation operation,
+    CascadePreviewFailure failure,
+  ) => _coordinator.acceptIntentionPreviewFailure(
+    intentionId: testDetailsIntentionId(1),
+    operation: operation,
+    failure: failure,
+    presentationTitle: 'Намерение',
   );
 
   IntentionCommandAccepted startDelete({
@@ -2153,7 +2545,7 @@ final class _PresenterHarness {
     final intention = testDetailsIntention(index: index, title: title);
     final commandIndex = repository.commands.length;
     final accepted = _coordinator.acceptExisting(
-      DeleteIntention(intention.id),
+      givenDeleteIntention(intention.id),
       presentationTitle: title,
     ) as IntentionCommandAccepted;
     if (releaseInitiator) {
@@ -2164,7 +2556,7 @@ final class _PresenterHarness {
     return accepted;
   }
 
-  /// Создание с готовностью и двумя тегами из отдельной формы.
+  /// Создание с двумя тегами из отдельной формы.
   IntentionCommandAccepted startFullCreation({
     required bool releaseInitiator,
     IntentionCreationOperationTarget target =
@@ -2176,7 +2568,6 @@ final class _PresenterHarness {
       CreateIntention.withInitialState(
         title: 'Полное намерение',
         description: null,
-        readiness: IntentionReadiness.ready,
         tagIds: [_tagId, _otherTagId],
       ),
       target: target,
@@ -2196,7 +2587,6 @@ final class _PresenterHarness {
       index: 7,
       title: 'Полное намерение',
       description: null,
-      readiness: IntentionReadiness.ready,
     );
     repository.completeCommand(
       _commandIndexes[accepted]!,
@@ -2231,13 +2621,30 @@ final class _PresenterHarness {
     ResultFailure(failure),
   );
 
-  void completeDeleted(IntentionCommandAccepted accepted) {
+  void completeDeleted(
+    IntentionCommandAccepted accepted, {
+    DeleteCascadeComposition? composition,
+  }) {
     final (index, title) = _titles[accepted]!;
+    final original = testDetailsDeletedResult(
+      testDetailsIntention(index: index, title: title),
+    ) as ResultSuccess<IntentionCommandSuccess>;
     repository.completeCommand(
       _commandIndexes[accepted]!,
-      testDetailsDeletedResult(
-        testDetailsIntention(index: index, title: title),
-      ),
+      composition == null
+          ? original
+          : ResultSuccess(
+              IntentionDeleted(
+                (original.value as IntentionDeleted).id,
+                catalogMutation: original.value.catalogMutation,
+                additionalChanges: [
+                  CascadeOutcome(
+                    revision: const TestDetailsRevision(0),
+                    executed: composition,
+                  ),
+                ],
+              ),
+            ),
     );
   }
 
@@ -2325,21 +2732,21 @@ final class _PresenterHarness {
   LongTermRelationCommandAccepted startRelationArchive({
     bool releaseInitiator = true,
   }) => _startExistingRelationCommand(
-    ArchiveLongTermRelation(_relationId),
+    givenArchiveRelation(_relationId),
     releaseInitiator: releaseInitiator,
   );
 
   LongTermRelationCommandAccepted startRelationRestore({
     bool releaseInitiator = true,
   }) => _startExistingRelationCommand(
-    RestoreLongTermRelation(_relationId),
+    givenRestoreRelation(_relationId),
     releaseInitiator: releaseInitiator,
   );
 
   LongTermRelationCommandAccepted startRelationDelete({
     bool releaseInitiator = true,
   }) => _startExistingRelationCommand(
-    DeleteLongTermRelation(_relationId),
+    givenDeleteRelation(_relationId),
     releaseInitiator: releaseInitiator,
   );
 
@@ -2418,23 +2825,32 @@ final class _PresenterHarness {
     );
   }
 
-  void completeRelationArchived(LongTermRelationCommandAccepted accepted) =>
-      _completeRelationScopeChanged(
-        accepted,
-        beforeScope: RelationScope.active,
-        afterScope: RelationScope.archived,
-        revision: 3,
-      );
+  void completeRelationArchived(
+    LongTermRelationCommandAccepted accepted, {
+    ArchiveCascadeComposition? composition,
+  }) => _completeRelationScopeChanged(
+    accepted,
+    beforeScope: RelationScope.active,
+    afterScope: RelationScope.archived,
+    revision: 3,
+    composition: composition,
+  );
 
-  void completeRelationRestored(LongTermRelationCommandAccepted accepted) =>
-      _completeRelationScopeChanged(
-        accepted,
-        beforeScope: RelationScope.archived,
-        afterScope: RelationScope.active,
-        revision: 4,
-      );
+  void completeRelationRestored(
+    LongTermRelationCommandAccepted accepted, {
+    RestoreCascadeComposition? composition,
+  }) => _completeRelationScopeChanged(
+    accepted,
+    beforeScope: RelationScope.archived,
+    afterScope: RelationScope.active,
+    revision: 4,
+    composition: composition,
+  );
 
-  void completeRelationDeleted(LongTermRelationCommandAccepted accepted) {
+  void completeRelationDeleted(
+    LongTermRelationCommandAccepted accepted, {
+    DeleteCascadeComposition? composition,
+  }) {
     const revision = TestDetailsRevision(5);
     final relation = LongTermRelation(
       id: _relationId,
@@ -2459,6 +2875,8 @@ final class _PresenterHarness {
                 revision: revision,
                 relation: relation,
               ),
+              if (composition != null)
+                CascadeOutcome(revision: revision, executed: composition),
             ],
           ),
         ),
@@ -2471,6 +2889,7 @@ final class _PresenterHarness {
     required RelationScope beforeScope,
     required RelationScope afterScope,
     required int revision,
+    CascadeComposition? composition,
   }) {
     final graphRevision = TestDetailsRevision(revision);
     final before = LongTermRelation(
@@ -2510,6 +2929,8 @@ final class _PresenterHarness {
                 before: before,
                 after: after,
               ),
+              if (composition != null)
+                CascadeOutcome(revision: graphRevision, executed: composition),
             ],
           ),
         ),
@@ -2524,15 +2945,6 @@ final class _PresenterHarness {
     _relationIndexes[accepted]!,
     GraphCommandFailed(failure),
   );
-
-  void completeBlockingRelations(IntentionCommandAccepted accepted) {
-    final (index, _) = _titles[accepted]!;
-    final intentionId = testDetailsIntention(index: index).id;
-    repository.completeCommand(
-      _commandIndexes[accepted]!,
-      ResultFailure(IntentionHasBlockingRelationsFailure(intentionId)),
-    );
-  }
 
   GraphExportAccepted startExport() {
     final outcome = Completer<GraphExportOutcome>();
@@ -2596,6 +3008,7 @@ final class _PresenterHarness {
 Future<_PresenterHarness> _pumpPresenterApp(
   WidgetTester tester, {
   Locale locale = const Locale('en'),
+  bool alteredDeletionPunctuation = false,
 }) async {
   final repository = ControlledDetailsRepository();
   final container = ProviderContainer(
@@ -2615,7 +3028,10 @@ Future<_PresenterHarness> _pumpPresenterApp(
         valueListenable: currentLocale,
         builder: (context, locale, _) => MaterialApp(
           locale: locale,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: [
+            if (alteredDeletionPunctuation) const _AlteredRussianDelegate(),
+            ...AppLocalizations.localizationsDelegates,
+          ],
           supportedLocales: AppLocalizations.supportedLocales,
           builder: (context, child) => ValueListenableBuilder<int>(
             valueListenable: presenterGeneration,
@@ -2641,4 +3057,26 @@ Future<_PresenterHarness> _pumpPresenterApp(
     presenterGeneration,
     currentLocale,
   );
+}
+
+class _AlteredRussianLocalizations extends AppLocalizationsRu {
+  @override
+  String get detailsDeleted => 'Намерение удалено!';
+
+  @override
+  String get relationDeleted => 'Связь удалена!';
+}
+
+class _AlteredRussianDelegate extends LocalizationsDelegate<AppLocalizations> {
+  const _AlteredRussianDelegate();
+
+  @override
+  bool isSupported(Locale locale) => locale.languageCode == 'ru';
+
+  @override
+  Future<AppLocalizations> load(Locale locale) async =>
+      _AlteredRussianLocalizations();
+
+  @override
+  bool shouldReload(_AlteredRussianDelegate old) => false;
 }

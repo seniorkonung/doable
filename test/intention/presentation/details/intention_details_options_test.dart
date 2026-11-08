@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/design_system/components/badge.dart';
@@ -6,6 +8,7 @@ import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
+import 'package:doable/src/intention/application/cascade/intention_cascade.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -16,6 +19,7 @@ import 'package:flutter/material.dart' hide Badge;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/intention_cascade_execution.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import 'details_test_support.dart';
 
@@ -25,6 +29,236 @@ void main() {
       AppLifecycleState.resumed,
     );
   });
+
+  testWidgets('архивирование предлагает оставить вспомогательное главным', (
+    tester,
+  ) async {
+    final child = testDetailsIntentionId(2);
+    final withSupporting = ArchiveCascadeComposition(
+      departing: [child],
+      promoted: [],
+      archivedRelationCount: 1,
+    );
+    final onlyThis = ArchiveCascadeComposition(
+      departing: [],
+      promoted: [child],
+      archivedRelationCount: 1,
+    );
+    final preview = ArchiveCascadePreview(
+      revision: const TestDetailsRevision(0),
+      plan: CascadePlan(
+        withSupporting: withSupporting,
+        onlyThis: onlyThis,
+        asksQuestion: true,
+      ),
+      titles: {child: 'Много ходить'},
+    );
+    final repository = ControlledDetailsRepository()
+      ..onPreviewCascade = (subject, operation) =>
+          operation == CascadeOperation.archive
+          ? preview
+          : givenCascadePreview(
+              subject,
+              operation,
+              const TestDetailsRevision(0),
+            );
+    await _openLoaded(tester, repository, testDetailsIntention());
+    await _openOptions(tester);
+    await _choose(tester, 'Архивировать');
+    expect(find.byType(Dialog), findsOneWidget);
+    expect(repository.commands, isEmpty);
+    await tester.tap(find.text('Только это'));
+    await tester.pump();
+    final execution =
+        (repository.commands.single as ArchiveIntention).execution;
+    expect(execution.choice, CascadeChoice.onlyThis);
+    expect(execution.expected, same(onlyThis));
+  });
+
+  testWidgets('отмена вопроса не архивирует намерение', (tester) async {
+    final child = testDetailsIntentionId(2);
+    final composition = ArchiveCascadeComposition(
+      departing: [child],
+      promoted: [],
+      archivedRelationCount: 1,
+    );
+    final repository = ControlledDetailsRepository()
+      ..onPreviewCascade = (subject, operation) =>
+          operation == CascadeOperation.archive
+          ? ArchiveCascadePreview(
+              revision: const TestDetailsRevision(0),
+              plan: CascadePlan(
+                withSupporting: composition,
+                onlyThis: composition,
+                asksQuestion: true,
+              ),
+              titles: {child: 'Много ходить'},
+            )
+          : givenCascadePreview(
+              subject,
+              operation,
+              const TestDetailsRevision(0),
+            );
+    await _openLoaded(tester, repository, testDetailsIntention());
+    await _openOptions(tester);
+    expect(
+      _rows(tester)[1].hint,
+      'Вместе с ним в архив уйдут вспомогательные намерения: 1',
+    );
+    await _choose(tester, 'Архивировать');
+    await tester.tap(find.text('Отмена'));
+    await tester.pumpAndSettle();
+    expect(repository.commands, isEmpty);
+  });
+
+  testWidgets('архивирование со вспомогательными передаёт состав каскада', (
+    tester,
+  ) async {
+    final child = testDetailsIntentionId(2);
+    final composition = ArchiveCascadeComposition(
+      departing: [child],
+      promoted: [],
+      archivedRelationCount: 1,
+    );
+    final repository = ControlledDetailsRepository()
+      ..onPreviewCascade = (subject, operation) =>
+          operation == CascadeOperation.archive
+          ? ArchiveCascadePreview(
+              revision: const TestDetailsRevision(0),
+              plan: CascadePlan(
+                withSupporting: composition,
+                onlyThis: composition,
+                asksQuestion: true,
+              ),
+              titles: {child: 'Много ходить'},
+            )
+          : givenCascadePreview(
+              subject,
+              operation,
+              const TestDetailsRevision(0),
+            );
+    await _openLoaded(tester, repository, testDetailsIntention());
+    await _openOptions(tester);
+    await _choose(tester, 'Архивировать');
+    await tester.tap(find.text('Со вспомогательными'));
+    await tester.pump();
+    final execution =
+        (repository.commands.single as ArchiveIntention).execution;
+    expect(execution.choice, CascadeChoice.withSupporting);
+    expect(execution.expected, same(composition));
+  });
+
+  testWidgets('лист объясняет удаление намерения из сохранённого пути', (
+    tester,
+  ) async {
+    final repository = ControlledDetailsRepository()
+      ..onPreviewCascade = (subject, operation) {
+        final preview = givenCascadePreview(
+          subject,
+          operation,
+          const TestDetailsRevision(0),
+        );
+        if (preview is IntentionDeleteCascadePreview) {
+          return IntentionDeleteCascadePreview(
+            revision: preview.revision,
+            plan: preview.plan,
+            titles: const {},
+            isInActionPath: true,
+          );
+        }
+        return preview;
+      };
+    await _openLoaded(tester, repository, testDetailsIntention());
+    await _openOptions(tester);
+    expect(
+      _rows(tester).last.hint,
+      'В сохранённых путях останется с пометкой «Удалено»',
+    );
+  });
+
+  testWidgets(
+    'пока предпросмотр читается и после отказа пункты доступны без пояснений',
+    (tester) async {
+      final pending = Completer<CascadePreviewResult>();
+      final repository = ControlledDetailsRepository()
+        ..onPreviewCascade = (_, _) => pending.future;
+      await _openLoaded(tester, repository, testDetailsIntention());
+      await _openOptions(tester);
+      expect(
+        _rows(tester).skip(1).map((row) => row.hint),
+        everyElement(isNull),
+      );
+      expect(
+        _rows(tester).skip(1).map((row) => row.onPressed),
+        everyElement(isNotNull),
+      );
+      pending.complete(const CascadePreviewUnavailable());
+      await tester.pumpAndSettle();
+      expect(
+        _rows(tester).skip(1).map((row) => row.hint),
+        everyElement(isNull),
+      );
+      expect(
+        _rows(tester).skip(1).map((row) => row.onPressed),
+        everyElement(isNotNull),
+      );
+    },
+  );
+
+  testWidgets(
+    'восстановление только этого намерения оставляет вспомогательное в архиве',
+    (tester) async {
+      final child = testDetailsIntentionId(2);
+      final together = RestoreCascadeComposition(
+        restored: [child],
+        returnedAsMain: null,
+        restoredRelationCount: 1,
+      );
+      final alone = RestoreCascadeComposition(
+        restored: [],
+        returnedAsMain: null,
+        restoredRelationCount: 0,
+      );
+      final repository = ControlledDetailsRepository()
+        ..onPreviewCascade = (subject, operation) =>
+            operation == CascadeOperation.restore
+            ? RestoreCascadePreview(
+                revision: const TestDetailsRevision(0),
+                plan: CascadePlan(
+                  withSupporting: together,
+                  onlyThis: alone,
+                  asksQuestion: true,
+                ),
+                titles: {child: 'Много ходить'},
+              )
+            : givenCascadePreview(
+                subject,
+                operation,
+                const TestDetailsRevision(0),
+              );
+      await _openLoaded(
+        tester,
+        repository,
+        testDetailsIntention(archiveState: IntentionArchiveState.archived),
+      );
+      await _openOptions(tester);
+      expect(
+        _rows(tester)[1].hint,
+        'Вместе с ним вернутся вспомогательные намерения: 1',
+      );
+      await _choose(tester, 'Восстановить из архива');
+      expect(
+        find.text('Вместе с ним вернутся вспомогательные намерения: 1.'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Только это'));
+      await tester.pump();
+      final execution =
+          (repository.commands.single as RestoreIntention).execution;
+      expect(execution.choice, CascadeChoice.onlyThis);
+      expect(execution.expected, same(alone));
+    },
+  );
 
   testWidgets('кнопки параметров нет при загрузке и отказе чтения, а после '
       'получения подробных данных она есть', (tester) async {
@@ -65,6 +299,24 @@ void main() {
       title: 'Бегать',
       archiveState: IntentionArchiveState.archived,
     );
+    final composition = ArchiveCascadeComposition(
+      departing: [],
+      promoted: [],
+      archivedRelationCount: 1,
+    );
+    final preview = ArchiveCascadePreview(
+      revision: const TestDetailsRevision(0),
+      plan: CascadePlan(
+        withSupporting: composition,
+        onlyThis: composition,
+        asksQuestion: false,
+      ),
+      titles: const {},
+    );
+    repository.onPreviewCascade = (subject, operation) =>
+        operation == CascadeOperation.archive
+        ? preview
+        : givenCascadePreview(subject, operation, const TestDetailsRevision(0));
     await _openLoaded(
       tester,
       repository,
@@ -80,13 +332,16 @@ void main() {
     expect(_rows(tester).map((row) => (row.name, row.hint)), [
       ('Изменить', null),
       ('Архивировать', 'Его связи архивируются вместе с ним'),
-      ('Удалить', 'Сначала удалите его связи'),
+      ('Удалить', 'Его теги сохранятся'),
     ]);
 
     await _choose(tester, 'Архивировать');
     expect(find.byType(Sheet), findsNothing);
     expect(find.byType(Dialog), findsNothing);
-    expect(repository.commands.single, isA<ArchiveIntention>());
+    final execution =
+        (repository.commands.single as ArchiveIntention).execution;
+    expect(execution.choice, CascadeChoice.withSupporting);
+    expect(execution.expected, same(preview.plan.withSupporting));
 
     repository.completeCommand(
       0,
@@ -129,6 +384,34 @@ void main() {
       findsOneWidget,
     );
     expect(tester.widget<PageHead>(find.byType(PageHead)).badge, isNull);
+  });
+
+  testWidgets('отказ чтения предпросмотра при «Архивировать» показан общим '
+      'сообщением ровно один раз, а команда архивирования не выполнена', (
+    tester,
+  ) async {
+    final repository = ControlledDetailsRepository()
+      ..onPreviewCascade = (_, _) => const CascadePreviewUnavailable();
+    final intention = testDetailsIntention(title: 'Бегать');
+    await _openLoaded(
+      tester,
+      repository,
+      intention,
+      locale: const Locale('en'),
+    );
+
+    await _openOptions(tester, label: 'Options of the intention');
+    await _choose(tester, 'Archive');
+    await tester.pumpAndSettle();
+
+    expect(repository.commands, isEmpty);
+    expect(
+      find.text(
+        'Archive — “Бегать”: The intention state couldn’t be changed. '
+        'Try again.',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('восстановление из параметров сразу восстанавливает '
@@ -196,19 +479,25 @@ void main() {
     final intention = testDetailsIntention(title: 'Бегать');
     final ready = testDetailsIntention(
       title: 'Бегать',
-      readiness: IntentionReadiness.ready,
+      kind: IntentionKind.supporting,
     );
-    await _openLoaded(tester, repository, intention);
-    await tester.tap(find.text('Действие').last);
+    await _openLoaded(
+      tester,
+      repository,
+      intention,
+      counts: testRelationCounts(activeNeedIncoming: 1),
+    );
+    await tester.tap(find.text('Вспомогательное'));
     await tester.pump();
-    expect(repository.commands.single, isA<EnableIntentionReadiness>());
+    expect(repository.commands.single, isA<ChangeIntentionKind>());
 
     await _openOptions(tester, settle: false);
     expect(_rows(tester).map((row) => row.onPressed), everyElement(isNull));
-    expect(
-      _rows(tester).map((row) => row.hint),
-      everyElement('Дождитесь окончания текущего изменения'),
-    );
+    expect(_rows(tester).map((row) => row.hint), [
+      'Дождитесь окончания текущего изменения',
+      'Дождитесь окончания текущего изменения',
+      'Дождитесь окончания текущего изменения',
+    ]);
     await tester.tap(_inSheet('Изменить'), warnIfMissed: false);
     // Индикатор выполняющейся команды не даёт кадрам успокоиться.
     await tester.pump(const Duration(seconds: 1));
@@ -221,7 +510,10 @@ void main() {
     );
     await tester.pump();
     await waitForDetailRequests(repository, 2);
-    repository.detailRequests[1].add(ResultSuccess(ready));
+    repository.detailRequests[1].add(
+      ResultSuccess(ready),
+      relationCounts: testRelationCounts(activeNeedIncoming: 1),
+    );
     await tester.pumpAndSettle();
     expect(find.byType(Sheet), findsOneWidget);
     expect(_rows(tester).map((row) => row.onPressed), everyElement(isNotNull));
@@ -239,11 +531,7 @@ void main() {
     expect(find.byType(Sheet), findsNothing);
     expect(find.text('Удалить намерение?'), findsOneWidget);
     expect(
-      find.text(
-        'Намерение Бегать будет безвозвратно удалено вместе с описанием. '
-        'Его теги сохранятся.',
-        findRichText: true,
-      ),
+      find.textContaining('Намерение «Бегать» и его описание будут удалены.'),
       findsOneWidget,
     );
 
@@ -272,44 +560,28 @@ void main() {
     expect(find.widgetWithText(PageHead, 'Бегать'), findsOneWidget);
   });
 
-  for (final (scenario, counts, reason) in [
-    (
-      'архивированная входящая связь',
-      testRelationCounts(archivedCanIncoming: 1),
-      'Сначала удалите его связи',
-    ),
-    (
-      'дневной выбор, начатый намерением,',
-      testRelationCounts(dailySource: 1),
-      'Сначала удалите его дневные выборы',
-    ),
-    (
-      'дневной выбор, выбравший намерение,',
-      testRelationCounts(dailySelected: 1),
-      'Сначала удалите его дневные выборы',
-    ),
-  ]) {
-    testWidgets('$scenario блокирует удаление: «Удалить» выключено и называет '
-        'причину', (tester) async {
-      final repository = ControlledDetailsRepository();
-      await _openLoaded(
-        tester,
-        repository,
-        testDetailsIntention(),
-        counts: counts,
-      );
+  testWidgets('связи не блокируют удаление: «Удалить» доступно и '
+      'спрашивает подтверждение', (tester) async {
+    final repository = ControlledDetailsRepository();
+    await _openLoaded(
+      tester,
+      repository,
+      testDetailsIntention(title: 'Бегать'),
+      counts: testRelationCounts(activeNeedOutgoing: 1, archivedCanIncoming: 1),
+    );
 
-      await _openOptions(tester);
-      final delete = _rows(tester).last;
-      expect(delete.onPressed, isNull);
-      expect(delete.hint, reason);
-      await tester.tap(_inSheet('Удалить'), warnIfMissed: false);
-      await tester.pumpAndSettle();
-      expect(find.byType(Sheet), findsOneWidget);
-      expect(find.text('Удалить намерение?'), findsNothing);
-      expect(repository.commands, isEmpty);
-    });
-  }
+    await _openOptions(tester);
+    final delete = _rows(tester).last;
+    expect(delete.onPressed, isNotNull);
+    expect(delete.hint, 'Его теги сохранятся');
+    await _choose(tester, 'Удалить');
+    await tester.tap(
+      find.descendant(of: find.byType(Dialog), matching: find.text('Удалить')),
+    );
+    await tester.pump();
+
+    expect(repository.commands.single, isA<DeleteIntention>());
+  });
 
   testWidgets('утрата подробных данных закрывает открытый лист', (
     tester,

@@ -52,56 +52,69 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
     'stage': stage.name,
     ..._encodeStatus(event.status),
   },
-  DailyChoiceReadDiagnosticsEvent() => {
-    'operation': 'dailyChoiceDetailRead',
-    'stage': 'read',
-    ..._encodeStatus(event.status),
-  },
-  DailyChoiceDayStatusesReadDiagnosticsEvent() => {
-    'operation': 'dailyChoiceDayStatusesRead',
-    'stage': 'read',
-    ..._encodeStatus(event.status),
-  },
   StatisticsReadDiagnosticsEvent(:final readType, :final stage) => {
     'operation': 'statisticsRead',
     'readType': readType.name,
     'stage': stage.name,
     ..._encodeStatus(event.status),
   },
-  DailyChoiceCatalogPageReadDiagnosticsEvent(
+  IntentionHoldingIndexDiagnosticsEvent(:final stage) => {
+    'operation': 'intentionHoldingIndex',
+    'stage': stage.name,
+    ..._encodeStatus(event.status),
+  },
+  IntentionCascadePreviewDiagnosticsEvent(:final stage) => {
+    'operation': 'intentionCascadePreview',
+    'stage': stage.name,
+    ..._encodeStatus(event.status),
+  },
+  ActionCommandDiagnosticsEvent(:final commandType, :final stage) => {
+    'operation': 'actionCommand',
+    'commandType': commandType.name,
+    'stage': stage.name,
+    ..._encodeStatus(event.status),
+  },
+  ActionDayPageReadDiagnosticsEvent(:final pageSize, :final isContinuation) => {
+    'operation': 'actionDayPageRead',
+    'stage': 'read',
+    'pageSize': pageSize,
+    'isContinuation': isContinuation,
+    ..._encodeStatus(event.status),
+  },
+  ActionDayStatusesReadDiagnosticsEvent() => {
+    'operation': 'actionDayStatusesRead',
+    'stage': 'read',
+    ..._encodeStatus(event.status),
+  },
+  ActionReadDiagnosticsEvent() => {
+    'operation': 'actionRead',
+    'stage': 'read',
+    ..._encodeStatus(event.status),
+  },
+  ActionPathStateReadDiagnosticsEvent() => {
+    'operation': 'actionPathStateRead',
+    'stage': 'read',
+    ..._encodeStatus(event.status),
+  },
+  IntentionActionsPageReadDiagnosticsEvent(
     :final pageSize,
     :final isContinuation,
   ) =>
     {
-      'operation': 'dailyChoiceCatalogPageRead',
+      'operation': 'intentionActionsPageRead',
       'stage': 'read',
       'pageSize': pageSize,
       'isContinuation': isContinuation,
       ..._encodeStatus(event.status),
     },
-  ChoicePathContinuationReadDiagnosticsEvent(
-    :final stage,
-    :final pageSize,
-    :final isContinuation,
-  ) =>
+  PathCandidatesReadDiagnosticsEvent(:final pageSize, :final isContinuation) =>
     {
-      'operation': 'choicePathContinuationRead',
-      'stage': stage.name,
-      ..._encodeStatus(event.status),
+      'operation': 'pathCandidatesRead',
+      'stage': 'read',
       'pageSize': pageSize,
       'isContinuation': isContinuation,
+      ..._encodeStatus(event.status),
     },
-  DailyChoicePathValidationDiagnosticsEvent() => {
-    'operation': 'dailyChoicePathValidation',
-    'stage': 'validation',
-    ..._encodeStatus(event.status),
-  },
-  DailyChoiceCommandDiagnosticsEvent(:final commandType, :final stage) => {
-    'operation': 'dailyChoiceCommand',
-    'commandType': commandType.name,
-    'stage': stage.name,
-    ..._encodeStatus(event.status),
-  },
   BootstrapDiagnosticsEvent(:final schemaVersion) => {
     'operation': 'bootstrap',
     ..._encodeStatus(event.status),
@@ -131,19 +144,6 @@ Map<String, Object> _encode(DiagnosticsEvent event) => switch (event) {
   ) =>
     {
       'operation': 'relationGroupPageRead',
-      'stage': 'read',
-      ..._encodeStatus(event.status),
-      'pageSize': pageSize,
-      'isContinuation': isContinuation,
-      'requiresNewSnapshot': requiresNewSnapshot,
-    },
-  DailyChoiceGroupPageReadDiagnosticsEvent(
-    :final pageSize,
-    :final isContinuation,
-    :final requiresNewSnapshot,
-  ) =>
-    {
-      'operation': 'dailyChoiceGroupPageRead',
       'stage': 'read',
       ..._encodeStatus(event.status),
       'pageSize': pageSize,

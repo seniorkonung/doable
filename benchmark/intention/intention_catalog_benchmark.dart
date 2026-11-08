@@ -16,7 +16,7 @@ import '../support/benchmark.dart';
 const _intentions = 50000;
 
 void main() {
-  test('бенчмарк каталога намерений: короткие фильтры, подсчёт и порядок по названию', () async {
+  test('бенчмарк каталога намерений: короткие фильтры, виды с подсчётом и порядок по названию', () async {
     final harness = await LocalDatabaseHarness.fileBacked();
     addTearDown(harness.dispose);
     final database = await harness.openReadyDatabase();
@@ -72,19 +72,14 @@ void main() {
       }
       reportBenchmarkBudget(benchmarkCase, 'request', samples, 100);
     }
-    for (final counting in [
-      IntentionCatalogCounting.totalOnly,
-      IntentionCatalogCounting.byScopeAndType,
-    ]) {
-      final benchmarkCase =
-          'intentionCatalog/active/counting/${counting.name}/firstPage';
-      if (!benchmarkIncludes(benchmarkCase)) continue;
+    final totalOnlyCase =
+        'intentionCatalog/active/counting/totalOnly/firstPage';
+    if (benchmarkIncludes(totalOnlyCase)) {
       final query = IntentionCatalogQuery(
         scope: IntentionScope.active,
         order: IntentionCatalogOrder.createdAtDescending,
         titleFilter: null,
         pageSize: 100,
-        counting: counting,
       );
       final samples = <Duration>[];
       for (
@@ -97,7 +92,40 @@ void main() {
         watch.stop();
         final page = _successfulPage(result) as IntentionCatalogFirstPage;
         expect(page.items, hasLength(100));
-        _expectHalfArchivedCounts(page, counting);
+        expect(page.totalCount, _intentions ~/ 2);
+        expect(page.counts, isA<IntentionCountsTotalOnly>());
+        if (sample >= 0) samples.add(watch.elapsed);
+      }
+      reportBenchmarkBudget(totalOnlyCase, 'request', samples, 100);
+    }
+    for (final kindFilter in IntentionKindFilter.values) {
+      final benchmarkCase =
+          'intentionCatalog/active/kind/${kindFilter.name}/firstPage';
+      if (!benchmarkIncludes(benchmarkCase)) continue;
+      final query = IntentionCatalogQuery(
+        scope: IntentionScope.active,
+        kindFilter: kindFilter,
+        order: IntentionCatalogOrder.createdAtDescending,
+        titleFilter: null,
+        pageSize: 100,
+        counting: IntentionCatalogCounting.byScopeAndKind,
+      );
+      final samples = <Duration>[];
+      for (
+        var sample = -benchmarkWarmups;
+        sample < benchmarkSamples;
+        sample++
+      ) {
+        final watch = Stopwatch()..start();
+        final result = await repository.getCatalogPage(query);
+        watch.stop();
+        final page = _successfulPage(result) as IntentionCatalogFirstPage;
+        expect(page.items, hasLength(100));
+        expect(
+          page.items.every((item) => kindFilter.admits(item.kind)),
+          isTrue,
+        );
+        _expectQuarterKindCounts(page, kindFilter);
         if (sample >= 0) samples.add(watch.elapsed);
       }
       reportBenchmarkBudget(benchmarkCase, 'request', samples, 100);
@@ -164,25 +192,19 @@ void main() {
   }, timeout: const Timeout(Duration(minutes: 3)));
 }
 
-/// Набор наполовину в архиве и без действий: общее количество активного охвата
-/// равно половине набора, матрица даёт половину в каждом охвате.
-void _expectHalfArchivedCounts(
+/// Набор наполовину в архиве, а в каждом охвате наполовину из
+/// вспомогательных: каждый вид каждого охвата — четверть набора.
+void _expectQuarterKindCounts(
   IntentionCatalogFirstPage page,
-  IntentionCatalogCounting counting,
+  IntentionKindFilter kindFilter,
 ) {
-  expect(page.totalCount, _intentions ~/ 2);
-  switch (page.counts) {
-    case IntentionCountsTotalOnly():
-      expect(counting, IntentionCatalogCounting.totalOnly);
-    case IntentionCountsByType():
-      fail('Бенчмарк не запрашивает числа типов одного охвата');
-    case IntentionCountsByScopeAndType(:final active, :final archived):
-      expect(counting, IntentionCatalogCounting.byScopeAndType);
-      expect(active.all, _intentions ~/ 2);
-      expect(active.actions, 0);
-      expect(archived.all, _intentions ~/ 2);
-      expect(archived.actions, 0);
+  const quarter = _intentions ~/ 4;
+  final counts = page.counts as IntentionCountsByScopeAndKind;
+  for (final scopeCounts in [counts.active, counts.archived]) {
+    expect(scopeCounts.main, quarter);
+    expect(scopeCounts.supporting, quarter);
   }
+  expect(page.totalCount, counts.active.matching(kindFilter));
 }
 
 IntentionCatalogPage _successfulPage(Result<IntentionCatalogPage> result) {

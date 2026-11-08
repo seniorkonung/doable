@@ -1,21 +1,19 @@
 import 'dart:isolate';
 
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/action/application/action_command.dart';
+import 'package:doable/src/action/application/action_day_statuses.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/graph/data/contribution_reachability.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
 import 'package:doable/src/statistics/application/contribution_counts.dart';
 import 'package:doable/src/statistics/application/intention_statistics_calendar.dart';
@@ -25,8 +23,10 @@ import 'package:doable/src/statistics/application/statistics_read_contract.dart'
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
-import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/action_seed.dart';
+import '../../support/graph_durability_fixture.dart';
 import '../../support/graph_seed.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
@@ -65,9 +65,6 @@ void main() {
     diagnostics = InMemoryDiagnosticsSink();
     await seedDurabilityGraph(database);
     await seedGraph(database, () async {
-      await database.customStatement(
-        'UPDATE intentions SET is_action_ready = 1',
-      );
       for (final (number, source, target) in _relations.skip(4)) {
         await database.customStatement(
           '''INSERT INTO long_term_relations
@@ -86,58 +83,53 @@ void main() {
   tearDown(() => harness.dispose());
 
   IntentionStatisticsQuery query({
-    StatisticsView view = StatisticsView.throughRelations,
+    StatisticsView? view = StatisticsView.throughRelations,
     StatisticsPeriod? period,
     int intention = 2,
     int pageSize = 1,
-    CalendarDate? localDate,
   }) => IntentionStatisticsQuery(
     intentionId: durabilityIntention(intention),
     period: period ?? StatisticsMonth(2026, 10),
     view: view,
-    localDate: localDate ?? CalendarDate.fromParts(2026, 10, 12),
     pageSize: pageSize,
   );
 
-  Future<void> addChoice(
+  /// Действие с путём вдоль связей [relations]: исходное намерение первой
+  /// связи и связанные намерения всех связей по порядку.
+  Future<void> addAction(
     int number,
-    List<int> path, {
+    List<int> relations, {
     String date = '2026-10-12',
     bool completed = true,
   }) => seedGraph(database, () async {
+    final path = [
+      _relations.singleWhere((r) => r.$1 == relations.first).$2,
+      for (final relation in relations)
+        _relations.singleWhere((r) => r.$1 == relation).$3,
+    ];
     await database.customStatement(
-      '''INSERT INTO daily_choices
-         (id, source_intention_id, selected_intention_id, choice_date, is_completed)
-         VALUES (?, ?, ?, ?, ?)''',
-      [
-        durabilityUuid(number),
-        durabilityUuid(_relations.singleWhere((r) => r.$1 == path.first).$2),
-        durabilityUuid(_relations.singleWhere((r) => r.$1 == path.last).$3),
-        date,
-        completed ? 1 : 0,
-      ],
+      '''INSERT INTO actions
+         (id, title, date, priority, is_completed, created_at, updated_at)
+         VALUES (?, 'Действие', ?, 4, ?, 1, 1)''',
+      [durabilityUuid(number), date, completed ? 1 : 0],
     );
-    for (var i = 0; i < path.length; i++) {
-      await database.customStatement(
-        '''INSERT INTO daily_choice_path_steps
-           (id, daily_choice_id, long_term_relation_id, previous_step_id)
-           VALUES (?, ?, ?, ?)''',
-        [
-          durabilityUuid(number * 10 + i),
-          durabilityUuid(number),
-          durabilityUuid(path[i]),
-          i == 0 ? null : durabilityUuid(number * 10 + i - 1),
-        ],
-      );
+    for (final (position, intention) in path.indexed) {
+      await database.customStatement(insertActionPathItem, [
+        durabilityUuid(number),
+        position,
+        durabilityUuid(intention),
+        position == 0 ? null : durabilityUuid(path[position - 1]),
+        actionPathRole(position, path.length),
+      ]);
     }
   });
 
   test('раздел собирает четыре карточки и календарь выбранного вида', () async {
-    await addChoice(201, [102], date: '2026-10-01');
-    await addChoice(202, [101, 102], date: '2026-10-11');
-    await addChoice(203, [101, 102], date: '2026-10-11', completed: false);
-    await addChoice(204, [101], completed: false);
-    await addChoice(205, [107], date: '2026-10-13');
+    await addAction(201, [102], date: '2026-10-01');
+    await addAction(202, [101, 102], date: '2026-10-11');
+    await addAction(203, [101, 102], date: '2026-10-11', completed: false);
+    await addAction(204, [101], completed: false);
+    await addAction(205, [107], date: '2026-10-13');
 
     for (final view in StatisticsView.values) {
       final section = _value(
@@ -159,36 +151,20 @@ void main() {
             entry.key.day: entry.value,
         },
         switch (view) {
-          StatisticsView.sourceIntentions => {
-            1: DailyChoiceDayStatus.allCompleted,
-          },
+          StatisticsView.rootIntentions => {1: ActionDayStatus.allCompleted},
           StatisticsView.intermediateIntentions => {
-            11: DailyChoiceDayStatus.hasIncomplete,
+            11: ActionDayStatus.hasIncomplete,
           },
-          StatisticsView.selectedActions => {
-            12: DailyChoiceDayStatus.hasIncomplete,
+          StatisticsView.terminalIntentions => {
+            12: ActionDayStatus.hasIncomplete,
           },
           StatisticsView.throughRelations => {
-            1: DailyChoiceDayStatus.allCompleted,
-            11: DailyChoiceDayStatus.hasIncomplete,
-            12: DailyChoiceDayStatus.hasIncomplete,
-            13: DailyChoiceDayStatus.allCompleted,
+            1: ActionDayStatus.allCompleted,
+            11: ActionDayStatus.hasIncomplete,
+            12: ActionDayStatus.hasIncomplete,
+            13: ActionDayStatus.allCompleted,
           },
         },
-      );
-      expect(
-        section.details.uncompleted.missed,
-        view == StatisticsView.intermediateIntentions ||
-                view == StatisticsView.throughRelations
-            ? 1
-            : 0,
-      );
-      expect(
-        section.details.uncompleted.upcoming,
-        view == StatisticsView.selectedActions ||
-                view == StatisticsView.throughRelations
-            ? 1
-            : 0,
       );
 
       final year = _value(
@@ -237,7 +213,7 @@ void main() {
         [105],
       ];
       for (var i = 0; i < paths.length; i++) {
-        await addChoice(201 + i, paths[i]);
+        await addAction(201 + i, paths[i]);
       }
       for (final view in StatisticsView.values) {
         final section = _value(
@@ -258,23 +234,23 @@ void main() {
         }
 
         switch (section.details) {
-          case IntentionStatisticsSourceDetails(:final selectedActions):
-            await intentions(selectedActions, [(4, 1), (3, 1), (1, 1)]);
+          case IntentionStatisticsRootDetails(:final terminalIntentions):
+            await intentions(terminalIntentions, [(4, 1), (3, 1), (1, 1)]);
           case IntentionStatisticsIntermediateDetails(
-            :final sourceIntentions,
-            :final selectedActions,
+            :final rootIntentions,
+            :final terminalIntentions,
           ):
-            await intentions(sourceIntentions, [(4, 2), (1, 2)]);
-            await intentions(selectedActions, [(3, 2), (4, 1), (1, 1)]);
-          case IntentionStatisticsSelectedDetails(:final sourceIntentions):
-            await intentions(sourceIntentions, [(4, 1), (1, 1)]);
+            await intentions(rootIntentions, [(4, 2), (1, 2)]);
+            await intentions(terminalIntentions, [(3, 2), (4, 1), (1, 1)]);
+          case IntentionStatisticsTerminalDetails(:final rootIntentions):
+            await intentions(rootIntentions, [(4, 1), (1, 1)]);
           case IntentionStatisticsThroughRelationsDetails(
-            :final selectedActions,
+            :final terminalIntentions,
             :final relations,
-            :final explicitPathChoices,
+            :final explicitPathActions,
           ):
-            expect(explicitPathChoices, 9);
-            await intentions(selectedActions, [(3, 3), (4, 2), (2, 2), (1, 2)]);
+            expect(explicitPathActions, 9);
+            await intentions(terminalIntentions, [(3, 3), (4, 2), (1, 2)]);
             final rows = await collect(relations, section.revision);
             expect(
               [
@@ -306,16 +282,18 @@ void main() {
   );
 
   test('архивные отметки связи и связанного намерения независимы', () async {
-    await addChoice(201, [101, 102]);
-    await addChoice(202, [101, 108]);
+    await addAction(201, [101, 102]);
+    await addAction(202, [101, 108]);
     expect(
       await repository.execute(
-        ArchiveLongTermRelation(durabilityRelation(102)),
+        await previewedArchiveRelation(repository, durabilityRelation(102)),
       ),
       isA<GraphCommandSucceeded>(),
     );
     expect(
-      await repository.execute(ArchiveIntention(durabilityIntention(4))),
+      await repository.execute(
+        await previewedArchiveIntention(repository, durabilityIntention(4)),
+      ),
       isA<GraphCommandSucceeded>(),
     );
     final section = _value(
@@ -340,7 +318,7 @@ void main() {
       'Намерение 4',
     );
     expect(byId[durabilityRelation(106)]!.scope, RelationScope.active);
-    final actions = await collect(details.selectedActions, section.revision);
+    final actions = await collect(details.terminalIntentions, section.revision);
     expect(actions.first.id, durabilityIntention(4));
     expect(actions.first.archiveState, IntentionArchiveState.archived);
   });
@@ -365,19 +343,19 @@ void main() {
           empty.details as IntentionStatisticsThroughRelationsDetails;
       expect(details.relations.totalItems, 0);
       expect(details.relations.nextCursor, isNull);
-      expect(details.selectedActions.items, isEmpty);
-      await addChoice(201, [102]);
+      expect(details.terminalIntentions.items, isEmpty);
+      await addAction(201, [102]);
       repository = createRepository();
       final emptyView = _value(
         await repository.getIntentionStatisticsSection(
-          query(view: StatisticsView.selectedActions),
+          query(view: StatisticsView.terminalIntentions),
         ),
       );
       expect(_counts(emptyView.periodCounts), (1, 1));
       expect(_counts(emptyView.selectedCounts), (0, 0));
       expect(
-        (emptyView.details as IntentionStatisticsSelectedDetails)
-            .sourceIntentions
+        (emptyView.details as IntentionStatisticsTerminalDetails)
+            .rootIntentions
             .totalItems,
         0,
       );
@@ -387,7 +365,7 @@ void main() {
   test(
     'команда завершается во время изолята, устаревшая попытка не повторяется',
     () async {
-      await addChoice(201, [101, 102]);
+      await addAction(201, [101, 102]);
       final started = ReceivePort();
       addTearDown(started.close);
       var delay = true;
@@ -424,11 +402,9 @@ void main() {
       expect(completed, isFalse);
       expect(
         await repository.execute(
-          UpdateDailyChoiceFields(
-            choiceId: durabilityChoice(201),
-            patch: const DailyChoiceFieldsPatch(
-              isCompleted: DailyChoiceFieldSet(false),
-            ),
+          UpdateActionFields(
+            actionId: seedActionId(201),
+            patch: const ActionFieldsPatch(isCompleted: ActionFieldSet(false)),
           ),
         ),
         isA<GraphCommandSucceeded>(),
@@ -461,7 +437,7 @@ void main() {
             .statuses
             .values
             .single,
-        DailyChoiceDayStatus.hasIncomplete,
+        ActionDayStatus.hasIncomplete,
       );
       expect(probe.sourceReads, 2);
       expect(probe.snapshotReads, 1);
@@ -472,14 +448,14 @@ void main() {
   test(
     'смена ревизии и эпохи отклоняет продолжение до чтения названий',
     () async {
-      await addChoice(201, [102]);
-      await addChoice(202, [108]);
+      await addAction(201, [102]);
+      await addAction(202, [108]);
       final section = _value(
         await repository.getIntentionStatisticsSection(query()),
       );
       final cursor =
           (section.details as IntentionStatisticsThroughRelationsDetails)
-              .selectedActions
+              .terminalIntentions
               .nextCursor!;
       final titleReads = probe.titleRows.length;
       await expectLater(
@@ -487,7 +463,9 @@ void main() {
         completion(_readFailure(isA<StatisticsSnapshotExpired>())),
       );
       expect(
-        await repository.execute(ArchiveIntention(durabilityIntention(4))),
+        await repository.execute(
+          await previewedArchiveIntention(repository, durabilityIntention(4)),
+        ),
         isA<GraphCommandSucceeded>(),
       );
       await expectLater(
@@ -501,21 +479,21 @@ void main() {
   );
 
   test('кэш сохраняет два результата, а вытесненный курсор не пересчитывает раздел', () async {
-    await addChoice(201, [102]);
-    await addChoice(202, [108]);
+    await addAction(201, [102]);
+    await addAction(202, [108]);
     final first = _value(
       await repository.getIntentionStatisticsSection(query()),
     );
     final firstCursor =
         (first.details as IntentionStatisticsThroughRelationsDetails)
-            .selectedActions
+            .terminalIntentions
             .nextCursor!;
     final wider = _value(
       await repository.getIntentionStatisticsSection(query(pageSize: 2)),
     );
     expect(
       (wider.details as IntentionStatisticsThroughRelationsDetails)
-          .selectedActions
+          .terminalIntentions
           .items,
       hasLength(2),
     );
@@ -526,7 +504,7 @@ void main() {
     );
     final yearCursor =
         (year.details as IntentionStatisticsThroughRelationsDetails)
-            .selectedActions
+            .terminalIntentions
             .nextCursor!;
     _value(
       await repository.getIntentionStatisticsSection(
@@ -551,42 +529,40 @@ void main() {
   });
 
   test(
-    'ключ кэша различает намерение и местную дату без смены ревизии',
+    'ключ кэша различает намерение и заданный вид без смены ревизии',
     () async {
-      await addChoice(201, [102], completed: false);
+      await addAction(201, [102], completed: false);
       final source = _value(
         await repository.getIntentionStatisticsSection(
-          query(view: StatisticsView.sourceIntentions),
+          query(view: StatisticsView.rootIntentions),
         ),
       );
       final other = _value(
         await repository.getIntentionStatisticsSection(
-          query(view: StatisticsView.sourceIntentions, intention: 3),
+          query(view: StatisticsView.rootIntentions, intention: 3),
         ),
       );
-      final tomorrow = _value(
-        await repository.getIntentionStatisticsSection(
-          query(
-            view: StatisticsView.sourceIntentions,
-            localDate: CalendarDate.fromParts(2026, 10, 13),
-          ),
-        ),
+      final opened = _value(
+        await repository.getIntentionStatisticsSection(query(view: null)),
       );
       expect(_counts(source.selectedCounts), (1, 0));
       expect(_counts(other.selectedCounts), (0, 0));
-      expect(source.details.uncompleted.upcoming, 1);
-      expect(tomorrow.details.uncompleted.missed, 1);
+      expect(opened.query.view, isNull);
+      expect(opened.view, StatisticsView.rootIntentions);
+      expect(opened.details, isA<IntentionStatisticsRootDetails>());
+      expect(_counts(opened.selectedCounts), (1, 0));
       expect(
-        tomorrow.revision.compareTo(source.revision),
+        opened.revision.compareTo(source.revision),
         GraphRevisionOrder.same,
       );
+      expect(probe.sourceReads, 3);
     },
   );
 
   test(
     'отказ второй разбивки отклоняет целый раздел с диагностикой этапа',
     () async {
-      await addChoice(201, [101, 102]);
+      await addAction(201, [101, 102]);
       probe.failTitleRead = 2;
       await expectLater(
         repository.getIntentionStatisticsSection(
@@ -611,7 +587,7 @@ void main() {
   );
 
   test('отказ изолята отклоняет раздел до чтения названий', () async {
-    await addChoice(201, [101, 102]);
+    await addAction(201, [101, 102]);
     repository = createRepository(runner: _failedComputation);
     await expectLater(
       repository.getIntentionStatisticsSection(query()),
@@ -636,8 +612,8 @@ void main() {
   });
 
   test('отказ продолжения сохраняет кэш для явного повтора', () async {
-    await addChoice(201, [102]);
-    await addChoice(202, [108]);
+    await addAction(201, [102]);
+    await addAction(202, [108]);
     final first = _value(
       await repository.getIntentionStatisticsSection(query()),
     );
@@ -670,7 +646,7 @@ void main() {
   });
 
   test('повреждение архивной отметки связи отклоняет целый раздел', () async {
-    await addChoice(201, [101, 102]);
+    await addAction(201, [101, 102]);
     probe.corruptRelationArchive = true;
     await expectLater(
       repository.getIntentionStatisticsSection(query()),
@@ -745,7 +721,7 @@ final class _ReadProbe extends LocalDatabaseConnectionObserver {
     LocalDatabaseSqlStatement statement,
     List<Map<String, Object?>> rows,
   ) {
-    if (statement.statements.single.contains('archived_seed_key')) {
+    if (statement.statements.single.contains('path_rows')) {
       sourceReads++;
     }
     if (statement.statements.single.contains('creation_sequence >')) {

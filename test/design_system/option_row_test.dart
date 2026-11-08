@@ -18,7 +18,7 @@ void main() {
         _app(
           brightness: brightness,
           OptionRow(
-            icon: DoableIconData.delete,
+            icon: OptionRowIcon(DoableIconData.delete),
             name: 'Удалить намерение',
             hint: 'Его теги сохранятся',
             tone: OptionRowTone.danger,
@@ -42,7 +42,7 @@ void main() {
         _app(
           brightness: brightness,
           const OptionRow(
-            icon: DoableIconData.delete,
+            icon: OptionRowIcon(DoableIconData.delete),
             name: 'Удалить намерение',
             hint: 'Сначала удалите его связи',
             tone: OptionRowTone.danger,
@@ -75,7 +75,7 @@ void main() {
     await tester.pumpWidget(
       _app(
         const OptionRow(
-          icon: DoableIconData.export,
+          icon: OptionRowIcon(DoableIconData.export),
           name: 'Экспорт данных',
           hint: 'Пока нечего экспортировать',
           onPressed: null,
@@ -102,7 +102,7 @@ void main() {
     await tester.pumpWidget(
       _app(
         const OptionRow(
-          icon: DoableIconData.export,
+          icon: OptionRowIcon(DoableIconData.export),
           name: 'Экспорт данных',
           hint: 'Сохраняется в файл…',
           onPressed: null,

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' show CheckedState, Tristate;
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/src/action/application/intention_actions.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
@@ -18,7 +19,6 @@ import 'package:doable/src/intention/presentation/details/intention_details_page
 import 'package:doable/src/intention/presentation/details/intention_details_tabs.dart';
 import 'package:doable/src/intention/presentation/details/intention_page_target.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
-import 'package:doable/src/long_term_relation/application/relation_group.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/statistics/application/intention_statistics_target.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
@@ -32,7 +32,7 @@ import '../../../support/in_memory_quick_creation_mode_store.dart';
 import 'details_test_support.dart';
 
 void main() {
-  for (final (target, name, label, readsGroups, readsChoices) in [
+  for (final (target, name, label, readsGroups, readsActions) in [
     (const OverviewTarget(), 'Обзор', 'Overview', false, false),
     (
       const RelationsTarget(),
@@ -41,7 +41,7 @@ void main() {
       true,
       false,
     ),
-    (const ChoicesTarget(), 'Выборы', 'Choices', false, true),
+    (const ActionsTarget(), 'Действия', 'Actions', false, true),
   ]) {
     testWidgets('цель «$name» открывает соответствующую вкладку', (
       tester,
@@ -61,12 +61,12 @@ void main() {
         Tristate.isTrue,
       );
       expect(repository.relationGroupQueries, hasLength(readsGroups ? 1 : 0));
-      if (readsChoices) {
-        final query = repository.dailyChoiceGroupQueries.single;
-        expect(query.role, DailyChoiceRelationRole.source);
+      if (readsActions) {
+        final query = repository.intentionActionsListQueries.single;
+        expect(query.role, IntentionActionRole.root);
         expect(query.cursor, isNull);
       } else {
-        expect(repository.dailyChoiceGroupQueries, isEmpty);
+        expect(repository.intentionActionsListQueries, isEmpty);
       }
       expect(repository.statisticsQueries, isEmpty);
     });
@@ -156,7 +156,7 @@ void main() {
       final repository = ControlledDetailsRepository();
       await _openPage(tester, repository, locale: Locale(locale));
       expect(repository.relationGroupQueries, isEmpty);
-      expect(repository.dailyChoiceGroupQueries, isEmpty);
+      expect(repository.intentionActionsListQueries, isEmpty);
       final intention = testDetailsIntention();
       repository.detailRequests.single.add(
         ResultSuccess(intention),
@@ -164,7 +164,6 @@ void main() {
           activeNeedIncoming: 2,
           activeCanOutgoing: 3,
           archivedCanIncoming: 3,
-          dailySource: 7,
         ),
       );
       await tester.pumpAndSettle();
@@ -188,7 +187,7 @@ void main() {
         findsOneWidget,
       );
       expect(repository.relationGroupQueries, isEmpty);
-      expect(repository.dailyChoiceGroupQueries, isEmpty);
+      expect(repository.intentionActionsListQueries, isEmpty);
 
       repository.detailRequests.single.add(ResultSuccess(intention));
       await tester.pumpAndSettle();
@@ -298,7 +297,7 @@ void main() {
     repository.detailRequests.single.add(ResultSuccess(testDetailsIntention()));
     await tester.pumpAndSettle();
     expect(repository.relationGroupQueries, isEmpty);
-    expect(repository.dailyChoiceGroupQueries, isEmpty);
+    expect(repository.intentionActionsListQueries, isEmpty);
     expect(find.text('Описание'), findsNothing);
     final query = repository.statisticsQueries.single;
     expect(query.view, StatisticsView.intermediateIntentions);

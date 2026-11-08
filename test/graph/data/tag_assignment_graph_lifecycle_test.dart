@@ -16,6 +16,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/tagged_intention_ids.dart';
 
@@ -83,8 +84,8 @@ void main() {
     for (final table in [
       'intentions',
       'long_term_relations',
-      'daily_choices',
-      'daily_choice_path_steps',
+      'actions',
+      'action_path_items',
       'tags',
       'tag_assignments',
     ])
@@ -119,24 +120,25 @@ void main() {
       expect(assignedTags(3), [tagFixtureId(lastTagNumber)]);
       final otherIntentions = [row('intentions', 2), row('intentions', 3)];
       final alreadyArchivedRelation = row('long_term_relations', 102);
-      final dailyChoices = rows('daily_choices');
-      final pathSteps = rows('daily_choice_path_steps');
+      final actions = rows('actions');
+      final pathSteps = rows('action_path_items');
       final tags = rows('tags');
       final createdAt = row('intentions', 1)['created_at'];
       final activeDirectRelations = [
         row('long_term_relations', 101),
         row('long_term_relations', 103),
       ];
-      // Каскад архива меняет показание изменения прямых связей один раз;
-      // восстановление намерения связи не восстанавливает.
+      // Архивирование и восстановление намерения меняют показание изменения
+      // прямых связей с активными намерениями; отдельно архивированная связь
+      // 102 с архивным намерением не меняется.
       var directRelationUpdatedAt = activeDirectRelations[0]['updated_at'];
+      var directRelationArchiveBefore = 0;
 
       Future<void> expectStep(
         IntentionCommand command, {
         required int minute,
         required String title,
         required String description,
-        required int readiness,
         required int archived,
         required int directRelationArchive,
       }) async {
@@ -145,11 +147,13 @@ void main() {
         final intention = row('intentions', 1);
         expect(intention['title'], title);
         expect(intention['description'], description);
-        expect(intention['is_action_ready'], readiness);
         expect(intention['is_archived'], archived);
         expect(intention['created_at'], createdAt);
         expect(intention['updated_at'], now.microsecondsSinceEpoch);
-        if (archived == 1) directRelationUpdatedAt = now.microsecondsSinceEpoch;
+        if (directRelationArchive != directRelationArchiveBefore) {
+          directRelationUpdatedAt = now.microsecondsSinceEpoch;
+          directRelationArchiveBefore = directRelationArchive;
+        }
         expect(row('long_term_relations', 101), {
           ...activeDirectRelations[0],
           'is_archived': directRelationArchive,
@@ -164,8 +168,8 @@ void main() {
         expect([row('intentions', 2), row('intentions', 3)], otherIntentions);
         expect(assignments(), originalAssignments);
         expect(rows('tags'), tags);
-        expect(rows('daily_choices'), dailyChoices);
-        expect(rows('daily_choice_path_steps'), pathSteps);
+        expect(rows('actions'), actions);
+        expect(rows('action_path_items'), pathSteps);
         await expectTagged(
           firstTagNumber,
           IntentionScope.active,
@@ -198,7 +202,6 @@ void main() {
         minute: 1,
         title: 'Новое название',
         description: 'Описание 1',
-        readiness: 1,
         archived: 0,
         directRelationArchive: 0,
       );
@@ -211,40 +214,28 @@ void main() {
         minute: 2,
         title: 'Новое название',
         description: 'Новое описание',
-        readiness: 1,
         archived: 0,
         directRelationArchive: 0,
       );
       await expectStep(
-        DisableIntentionReadiness(_intention(1)),
+        await previewedArchiveIntention(repository, _intention(1)),
         minute: 3,
         title: 'Новое название',
         description: 'Новое описание',
-        readiness: 0,
-        archived: 0,
-        directRelationArchive: 0,
-      );
-      await expectStep(
-        ArchiveIntention(_intention(1)),
-        minute: 4,
-        title: 'Новое название',
-        description: 'Новое описание',
-        readiness: 0,
         archived: 1,
         directRelationArchive: 1,
       );
       await expectStep(
-        RestoreIntention(_intention(1)),
-        minute: 5,
+        await previewedRestoreIntention(repository, _intention(1)),
+        minute: 4,
         title: 'Новое название',
         description: 'Новое описание',
-        readiness: 0,
         archived: 0,
-        directRelationArchive: 1,
+        directRelationArchive: 0,
       );
 
       final beforeUnchangedAndRejected = graph();
-      now = DateTime.utc(2026, 9, 25, 12, 6);
+      now = DateTime.utc(2026, 9, 25, 12, 5);
       expect(
         await repository.execute(
           UpdateIntention(
@@ -272,7 +263,7 @@ void main() {
       seedRawGraph(raw, () {
         for (final number in [4, 5]) {
           raw.execute(
-            'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, 0, 100, 200)',
+            'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', 0, 100, 200)',
             [tagFixtureId(number), 'Намерение $number'],
           );
         }
@@ -312,8 +303,8 @@ void main() {
         row('long_term_relations', 101),
         row('long_term_relations', 102),
       ];
-      final dailyChoices = rows('daily_choices');
-      final pathSteps = rows('daily_choice_path_steps');
+      final actions = rows('actions');
+      final pathSteps = rows('action_path_items');
       final tags = rows('tags');
 
       Future<void> expectRelationStep(
@@ -333,8 +324,8 @@ void main() {
           row('long_term_relations', 101),
           row('long_term_relations', 102),
         ], otherRelations);
-        expect(rows('daily_choices'), dailyChoices);
-        expect(rows('daily_choice_path_steps'), pathSteps);
+        expect(rows('actions'), actions);
+        expect(rows('action_path_items'), pathSteps);
         expect(rows('tags'), tags);
         expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
       }
@@ -368,22 +359,24 @@ void main() {
         ),
         {'priority': 4},
       );
-      await expectRelationStep(ArchiveLongTermRelation(_relation(103)), {
-        'is_archived': 1,
-      });
-      await expectRelationStep(RestoreLongTermRelation(_relation(103)), {
-        'is_archived': 0,
-      });
+      await expectRelationStep(
+        await previewedArchiveRelation(repository, _relation(103)),
+        {'is_archived': 1},
+      );
+      await expectRelationStep(
+        await previewedRestoreRelation(repository, _relation(103)),
+        {'is_archived': 0},
+      );
     },
   );
 
   test(
-    'теги участников дневного пути меняются независимо от связи и пути',
+    'теги намерений пути действия меняются независимо от связи и пути',
     () async {
       final relationBefore = row('long_term_relations', 101);
       final intentionsBefore = rows('intentions');
-      final choicesBefore = rows('daily_choices');
-      final pathBefore = rows('daily_choice_path_steps');
+      final actionsBefore = rows('actions');
+      final pathBefore = rows('action_path_items');
 
       expect(
         await repository.execute(
@@ -402,8 +395,8 @@ void main() {
       );
       expect(row('long_term_relations', 101), relationBefore);
       expect(rows('intentions'), intentionsBefore);
-      expect(rows('daily_choices'), choicesBefore);
-      expect(rows('daily_choice_path_steps'), pathBefore);
+      expect(rows('actions'), actionsBefore);
+      expect(rows('action_path_items'), pathBefore);
       expect(assignedTags(1), [tagFixtureId(lastTagNumber)]);
 
       final assignmentsBeforeEdit = assignments();
@@ -428,8 +421,8 @@ void main() {
         'updated_at': now.microsecondsSinceEpoch,
       });
       expect(assignments(), assignmentsBeforeEdit);
-      expect(rows('daily_choices'), choicesBefore);
-      expect(rows('daily_choice_path_steps'), pathBefore);
+      expect(rows('actions'), actionsBefore);
+      expect(rows('action_path_items'), pathBefore);
     },
   );
 }

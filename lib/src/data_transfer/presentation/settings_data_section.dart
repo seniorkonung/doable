@@ -4,8 +4,6 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
-import '../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
 import '../../design_system/components/notice.dart';
 import '../../design_system/components/option_row.dart';
 import '../../design_system/doable_colors.dart';
@@ -16,6 +14,8 @@ import '../../graph/application/graph_command_coordinator.dart';
 import '../../graph/presentation/operation_failure_presentation.dart';
 import '../../graph_backups/graph_backup_registry.dart';
 import '../../graph_backups/graph_backups_provider.dart';
+import '../../shared/presentation/local_day/local_date_provider.dart';
+import '../../shared/presentation/local_day/local_day_observer.dart';
 import '../application/graph_composition.dart';
 import '../application/graph_composition_provider.dart';
 import '../application/graph_export_provider.dart';
@@ -112,7 +112,7 @@ final class _BackupsRowState extends ConsumerState<_BackupsRow> {
 
   /// Перестраивает строку с началом другой местной даты, чтобы день
   /// последней копии назывался относительно нового сегодня.
-  late final DailyChoiceLocalDayObserver _localDay;
+  late final LocalDayObserver _localDay;
 
   /// Восстановление, начатое строкой, пока она ждёт его исхода или
   /// предъявляет его отказ.
@@ -123,8 +123,8 @@ final class _BackupsRowState extends ConsumerState<_BackupsRow> {
   void initState() {
     super.initState();
     _coordinator = ref.read(graphCommandCoordinatorProvider.notifier);
-    _localDay = DailyChoiceLocalDayObserver(
-      readLocalDay: ref.read(dailyChoiceLocalDateSourceProvider),
+    _localDay = LocalDayObserver(
+      readLocalDay: ref.read(localDateSourceProvider),
       onTodayChanged: () => setState(() {}),
     );
   }
@@ -233,7 +233,7 @@ final class _BackupsRowState extends ConsumerState<_BackupsRow> {
   /// Строка по прочитанным копиям и составу графа.
   OptionRow _row(AppLocalizations localizations) {
     OptionRow row({String? hint, VoidCallback? onPressed}) => OptionRow(
-      icon: DoableIconData.backups,
+      icon: OptionRowIcon(DoableIconData.backups),
       name: localizations.dataBackupsTitle,
       hint: hint,
       onPressed: onPressed,
@@ -307,7 +307,7 @@ final class _ExportRow extends ConsumerWidget {
       VoidCallback? onPressed,
       OptionRowProgress? progress,
     }) => OptionRow(
-      icon: DoableIconData.export,
+      icon: OptionRowIcon(DoableIconData.export),
       name: localizations.dataExportTitle,
       hint: hint,
       onPressed: onPressed,
@@ -435,7 +435,7 @@ final class _ImportRowState extends ConsumerState<_ImportRow> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         OptionRow(
-          icon: DoableIconData.import,
+          icon: OptionRowIcon(DoableIconData.import),
           name: localizations.dataImportTitle,
           hint: switch (ref.watch(graphCompositionProvider).value) {
             GraphCompositionReadSucceeded(:final composition)

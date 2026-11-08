@@ -1,5 +1,6 @@
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import 'action_seed.dart';
 import 'graph_seed.dart';
 import 'tag_positions.dart';
 
@@ -43,12 +44,11 @@ void seedTagRecipientGraphFixture(sqlite.Database database) {
 void _writeTagRecipientGraph(sqlite.Database database) {
   for (final (number, archived) in [(1, 0), (2, 1), (3, 0)]) {
     database.execute(
-      'INSERT INTO intentions (id, title, description, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      "INSERT INTO intentions (id, title, description, kind, is_archived, created_at, updated_at) VALUES (?, ?, ?, 'main', ?, ?, ?)",
       [
         tagFixtureId(number),
         'Намерение $number',
         'Описание $number',
-        1,
         archived,
         100 + number,
         200 + number,
@@ -68,13 +68,11 @@ void _writeTagRecipientGraph(sqlite.Database database) {
       ],
     );
   }
-  database.execute(
-    'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
-    [tagFixtureId(201), tagFixtureId(1), tagFixtureId(3), '2026-09-25', 1],
-  );
-  database.execute(
-    'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
-    [tagFixtureId(202), tagFixtureId(201), tagFixtureId(101)],
+  seedAction(
+    database,
+    id: tagFixtureId(201),
+    path: [tagFixtureId(1), tagFixtureId(3)],
+    isCompleted: true,
   );
 }
 
@@ -84,8 +82,8 @@ Map<String, List<List<Object?>>> retainedTagFixtureGraph(sqlite.Database db) =>
         'intentions',
         'intention_titles_fts',
         'long_term_relations',
-        'daily_choices',
-        'daily_choice_path_steps',
+        'actions',
+        'action_path_items',
       ])
         table: db
             .select('SELECT * FROM $table ORDER BY rowid')
@@ -104,11 +102,10 @@ void seedLargeTagReadFixture(
   seedRawGraph(database, () {
     for (final number in [1, 2, 3, if (includeDenseRecipients) 4]) {
       database.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        "INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, 'main', ?, ?, ?)",
         [
           tagFixtureId(number),
           'Намерение $number',
-          0,
           number == 2 ? 1 : 0,
           number,
           number,
@@ -158,8 +155,8 @@ void seedWidelyAssignedTagFixture(
 }) {
   seedRawGraph(database, () {
     database.execute(
-      'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [tagFixtureId(1), 'Исходное намерение', 0, 0, 1, 1],
+      "INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, 'main', ?, ?, ?)",
+      [tagFixtureId(1), 'Исходное намерение', 0, 1, 1],
     );
     for (final (number, name) in [
       (9000, 'Общий тег'),
@@ -179,8 +176,8 @@ void seedWidelyAssignedTagFixture(
       final relationId = tagFixtureId(20000 + index);
       final archived = index.isOdd ? 1 : 0;
       database.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [intentionId, 'Получатель $index', 0, archived, index + 2, index + 2],
+        "INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, 'main', ?, ?, ?)",
+        [intentionId, 'Получатель $index', archived, index + 2, index + 2],
       );
       database.execute(
         'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, 0)',

@@ -1,16 +1,16 @@
-import '../../daily_choice/domain/calendar_date.dart';
-import '../../daily_choice/domain/choice_path_step_id.dart';
-import '../../daily_choice/domain/daily_choice.dart';
-import '../../daily_choice/domain/daily_choice_description.dart';
-import '../../daily_choice/domain/daily_choice_id.dart';
-import '../../daily_choice/domain/daily_choice_priority.dart';
-import '../../daily_choice/domain/daily_choice_schedule.dart';
+import '../../action/domain/action.dart';
+import '../../action/domain/action_id.dart';
+import '../../action/domain/action_path.dart';
+import '../../action/domain/action_priority.dart';
+import '../../action/domain/action_schedule.dart';
+import '../../action/domain/action_text.dart';
 import '../../intention/domain/intention.dart';
 import '../../intention/domain/intention_id.dart';
 import '../../intention/domain/intention_text.dart';
 import '../../long_term_relation/domain/long_term_relation.dart';
 import '../../long_term_relation/domain/long_term_relation_description.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
+import '../../shared/domain/calendar_date.dart';
 import '../../tag/domain/tag.dart';
 import '../../tag/domain/tag_assignment.dart';
 import '../../tag/domain/tag_color.dart';
@@ -73,17 +73,10 @@ LongTermRelationId decodeStoredRelationId(String value) =>
         throw const StoredGraphCorruption(),
     };
 
-DailyChoiceId decodeStoredDailyChoiceId(String value) =>
-    switch (DailyChoiceId.decode(value)) {
-      DailyChoiceIdDecodingSuccess(:final id) => id,
-      InvalidDailyChoiceIdDecoding() => throw const StoredGraphCorruption(),
-    };
-
-ChoicePathStepId _decodeStoredChoicePathStepId(String value) =>
-    switch (ChoicePathStepId.decode(value)) {
-      ChoicePathStepIdDecodingSuccess(:final id) => id,
-      InvalidChoicePathStepIdDecoding() => throw const StoredGraphCorruption(),
-    };
+ActionId decodeStoredActionId(String value) => switch (ActionId.decode(value)) {
+  ActionIdDecodingSuccess(:final id) => id,
+  InvalidActionIdDecoding() => throw const StoredGraphCorruption(),
+};
 
 /// Тег из столбцов `id`, `name`, `color` и `position`. Название проверяет
 /// `CHECK` схемы той же функцией [TagName.fromStored], поэтому здесь оно
@@ -133,10 +126,7 @@ Intention decodeStoredIntention(
       id: decodeStoredIntentionId(requiredStoredString(data, '${prefix}id')),
       title: title,
       description: description,
-      readiness: decodeStoredIntentionReadiness(
-        data,
-        '${prefix}is_action_ready',
-      ),
+      kind: decodeStoredIntentionKind(data, '${prefix}kind'),
       archiveState: decodeStoredIntentionArchiveState(
         data,
         '${prefix}is_archived',
@@ -167,12 +157,12 @@ String decodeStoredIntentionTitle(Map<String, Object?> data, String column) {
   return stored;
 }
 
-IntentionReadiness decodeStoredIntentionReadiness(
+IntentionKind decodeStoredIntentionKind(
   Map<String, Object?> data,
   String column,
-) => switch (requiredStoredInteger(data, column)) {
-  0 => IntentionReadiness.notReady,
-  1 => IntentionReadiness.ready,
+) => switch (requiredStoredString(data, column)) {
+  'main' => IntentionKind.main,
+  'supporting' => IntentionKind.supporting,
   _ => throw const StoredGraphCorruption(),
 };
 
@@ -242,18 +232,8 @@ final class StoredLongTermRelation {
     if (creationSequence <= 0) throw const StoredGraphCorruption();
     final id = decodeStoredRelationId(requiredStoredString(data, 'id'));
     final ends = decodeStoredRelationEnds(data);
-    final type = switch (requiredStoredString(data, 'type')) {
-      'need' => LongTermRelationType.need,
-      'can' => LongTermRelationType.can,
-      _ => throw const StoredGraphCorruption(),
-    };
-    final priority = switch (requiredStoredInteger(data, 'priority')) {
-      1 => RelationPriority.p1,
-      2 => RelationPriority.p2,
-      3 => RelationPriority.p3,
-      4 => RelationPriority.p4,
-      _ => throw const StoredGraphCorruption(),
-    };
+    final type = decodeStoredRelationType(data);
+    final priority = decodeStoredRelationPriority(data);
     final scope = decodeStoredRelationScope(data);
     final description = _nullableStoredString(data, 'description');
     final createdAt = _decodeStoredRelationTimestamp(data, 'created_at');
@@ -342,6 +322,24 @@ final class StoredLongTermRelation {
   ),
 );
 
+/// Тип связи из столбца `type`.
+LongTermRelationType decodeStoredRelationType(Map<String, Object?> data) =>
+    switch (requiredStoredString(data, 'type')) {
+      'need' => LongTermRelationType.need,
+      'can' => LongTermRelationType.can,
+      _ => throw const StoredGraphCorruption(),
+    };
+
+/// Приоритет связи из столбца `priority`.
+RelationPriority decodeStoredRelationPriority(Map<String, Object?> data) =>
+    switch (requiredStoredInteger(data, 'priority')) {
+      1 => RelationPriority.p1,
+      2 => RelationPriority.p2,
+      3 => RelationPriority.p3,
+      4 => RelationPriority.p4,
+      _ => throw const StoredGraphCorruption(),
+    };
+
 /// Охват связи из столбца `is_archived`.
 RelationScope decodeStoredRelationScope(Map<String, Object?> data) =>
     switch (requiredStoredInteger(data, 'is_archived')) {
@@ -350,57 +348,106 @@ RelationScope decodeStoredRelationScope(Map<String, Object?> data) =>
       _ => throw const StoredGraphCorruption(),
     };
 
-/// Дневной выбор из столбцов таблицы `daily_choices`.
-DailyChoice decodeStoredDailyChoice(Map<String, Object?> data) {
-  if (requiredStoredInteger(data, 'creation_sequence') <= 0) {
-    throw const StoredGraphCorruption();
-  }
-  final id = decodeStoredDailyChoiceId(requiredStoredString(data, 'id'));
-  final sourceId = decodeStoredIntentionId(
-    requiredStoredString(data, 'source_intention_id'),
-  );
-  final selectedId = decodeStoredIntentionId(
-    requiredStoredString(data, 'selected_intention_id'),
-  );
+/// Поля действия из столбцов таблицы `actions`, общие для полного действия и
+/// строки выдачи дня.
+typedef StoredActionFields = ({
+  ActionId id,
+  ActionTitle title,
+  ActionDescription? description,
+  CalendarDate date,
+  ActionSchedule schedule,
+  ActionPriority priority,
+  bool isCompleted,
+});
+
+/// Название и описание хранятся в той форме, к которой их приводит ввод.
+StoredActionFields decodeStoredActionFields(Map<String, Object?> data) {
+  final title = requiredStoredString(data, 'title');
   final description = _nullableStoredString(data, 'description');
-  final schedule = switch (data['scheduled_minute']) {
-    null => const DailyChoiceAllDay(),
-    final int minute when minute >= 0 && minute <= 1439 => DailyChoiceTime(
-      hour: minute ~/ 60,
-      minute: minute % 60,
-    ),
-    _ => throw const StoredGraphCorruption(),
-  };
-  final priority = switch (requiredStoredInteger(data, 'priority')) {
-    1 => DailyChoicePriority.p1,
-    2 => DailyChoicePriority.p2,
-    3 => DailyChoicePriority.p3,
-    4 => DailyChoicePriority.p4,
-    _ => throw const StoredGraphCorruption(),
-  };
   try {
-    return DailyChoice(
-      id: id,
-      sourceIntentionId: sourceId,
-      selectedIntentionId: selectedId,
-      date: decodeStoredChoiceDate(data),
+    final fields = (
+      id: decodeStoredActionId(requiredStoredString(data, 'id')),
+      title: ActionTitle(title),
       description: description == null
           ? null
-          : DailyChoiceDescription.fromStored(description),
-      isCompleted: decodeStoredChoiceCompletion(data),
-      schedule: schedule,
-      priority: priority,
+          : ActionDescription.fromInput(description) ??
+                (throw const StoredGraphCorruption()),
+      date: CalendarDate.parseCanonical(requiredStoredString(data, 'date')),
+      schedule: switch (data['scheduled_hour']) {
+        null => const ActionAllDay(),
+        final int hour => ActionAtHour(hour),
+        _ => throw const StoredGraphCorruption(),
+      },
+      priority: switch (requiredStoredInteger(data, 'priority')) {
+        1 => ActionPriority.p1,
+        2 => ActionPriority.p2,
+        3 => ActionPriority.p3,
+        4 => ActionPriority.p4,
+        _ => throw const StoredGraphCorruption(),
+      },
+      isCompleted: decodeStoredActionCompletion(data),
     );
-  } on DailyChoiceDescriptionValidationException {
+    if (fields.title.value != title ||
+        fields.description?.value != description) {
+      throw const StoredGraphCorruption();
+    }
+    return fields;
+  } on IntentionTextValidationException {
+    throw const StoredGraphCorruption();
+  } on CalendarDateValidationException {
     throw const StoredGraphCorruption();
   } on ArgumentError {
     throw const StoredGraphCorruption();
   }
 }
 
-/// Дата дневного выбора из столбца `choice_date`.
-CalendarDate decodeStoredChoiceDate(Map<String, Object?> data) {
-  final value = requiredStoredString(data, 'choice_date');
+/// Действие из столбцов таблицы `actions` и строк его пути из
+/// `action_path_items` в порядке позиций. Путь непуст, позиции идут подряд с
+/// нуля, а `previous_intention_id` повторяет намерение предыдущей позиции.
+Action decodeStoredAction(
+  Map<String, Object?> data,
+  Iterable<Map<String, Object?>> pathRows,
+) {
+  final fields = decodeStoredActionFields(data);
+  try {
+    return Action(
+      id: fields.id,
+      title: fields.title,
+      description: fields.description,
+      path: _decodeStoredActionPath(pathRows),
+      date: fields.date,
+      schedule: fields.schedule,
+      priority: fields.priority,
+      isCompleted: fields.isCompleted,
+      creationSequence: ActionCreationSequence(
+        requiredStoredInteger(data, 'creation_sequence'),
+      ),
+      createdAt: ActionTimestamp(_decodeStoredInstant(data, 'created_at')),
+      updatedAt: ActionTimestamp(_decodeStoredInstant(data, 'updated_at')),
+    );
+  } on ArgumentError {
+    throw const StoredGraphCorruption();
+  }
+}
+
+ActionPath _decodeStoredActionPath(Iterable<Map<String, Object?>> rows) {
+  final intentions = <IntentionId>[];
+  for (final row in rows) {
+    final previous = _nullableStoredString(row, 'previous_intention_id');
+    if (requiredStoredInteger(row, 'position') != intentions.length ||
+        previous != intentions.lastOrNull?.toCanonicalString()) {
+      throw const StoredGraphCorruption();
+    }
+    intentions.add(
+      decodeStoredIntentionId(requiredStoredString(row, 'intention_id')),
+    );
+  }
+  return ActionPath(intentions);
+}
+
+/// Дата действия из столбца `date`.
+CalendarDate decodeStoredActionDate(Map<String, Object?> data) {
+  final value = requiredStoredString(data, 'date');
   try {
     return CalendarDate.parseCanonical(value);
   } on CalendarDateValidationException {
@@ -408,27 +455,10 @@ CalendarDate decodeStoredChoiceDate(Map<String, Object?> data) {
   }
 }
 
-/// Выполнение дневного выбора из столбца `is_completed`.
-bool decodeStoredChoiceCompletion(Map<String, Object?> data) =>
+/// Выполнение действия из столбца `is_completed`.
+bool decodeStoredActionCompletion(Map<String, Object?> data) =>
     switch (requiredStoredInteger(data, 'is_completed')) {
       0 => false,
       1 => true,
       _ => throw const StoredGraphCorruption(),
     };
-
-/// Шаг пути дневного выбора из столбцов таблицы `daily_choice_path_steps`.
-ChoicePathStep decodeStoredChoicePathStep(Map<String, Object?> data) {
-  final previous = _nullableStoredString(data, 'previous_step_id');
-  return ChoicePathStep(
-    id: _decodeStoredChoicePathStepId(requiredStoredString(data, 'id')),
-    dailyChoiceId: decodeStoredDailyChoiceId(
-      requiredStoredString(data, 'daily_choice_id'),
-    ),
-    relationId: decodeStoredRelationId(
-      requiredStoredString(data, 'long_term_relation_id'),
-    ),
-    previousStepId: previous == null
-        ? null
-        : _decodeStoredChoicePathStepId(previous),
-  );
-}

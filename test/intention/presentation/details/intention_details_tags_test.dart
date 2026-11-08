@@ -4,7 +4,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/design_system/components/option_tiles.dart';
+import 'package:doable/src/design_system/components/segmented_control.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/components/tag_chip.dart';
 import 'package:doable/src/design_system/components/tags_section.dart';
@@ -97,7 +97,7 @@ void main() {
         expect(
           tester.getTopLeft(find.byType(TagsSection)).dy,
           tester
-                  .getBottomLeft(find.byType(OptionTiles<IntentionReadiness>))
+                  .getBottomLeft(find.byType(SegmentedControl<IntentionKind>))
                   .dy +
               8,
         );

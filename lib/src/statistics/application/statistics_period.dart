@@ -1,4 +1,4 @@
-import '../../daily_choice/domain/calendar_date.dart';
+import '../../shared/domain/calendar_date.dart';
 
 /// Календарный период с включительными границами без часового пояса.
 sealed class StatisticsPeriod {

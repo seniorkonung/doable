@@ -13,16 +13,15 @@ import 'package:doable/src/app/quick_creation/file_quick_creation_mode_store.dar
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_presentation.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode_store.dart';
-import 'package:doable/src/app/quick_creation/quick_creation_daily_choice_start_sheet.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
+import 'package:doable/src/action/presentation/day/action_day_date_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/shared/diagnostics/developer_diagnostics_sink.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:doable/src/design_system/components/option_row.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -52,30 +51,27 @@ void main() {
   });
   tearDown(() => directory.delete(recursive: true));
 
-  // Новый ключ дневного выбора восстанавливает режим с листом выбора начала.
-  for (final mode in <QuickCreationMode?>[
-    null,
-    QuickCreationMode.dailyChoice,
-  ]) {
-    final title =
-        mode?.title(lookupAppLocalizations(const Locale('ru'))) ??
-        'Первый запуск';
+  for (final persisted in [false, true]) {
+    final title = persisted ? 'Сохранённое намерение' : 'Первый запуск';
     testWidgets('$title: свежий runtime '
         'открывает Главную и запускает сохранённый режим кнопкой', (
       tester,
     ) async {
       final firstStore = store();
       final first = await _mount(tester, firstStore, diagnostics);
-      _expectHome(tester, first, QuickCreationMode.intention);
+      _expectHome(tester, first);
       await tester.tap(appNavigationDestination(AppDestination.intentionGraph));
       await _settle(tester);
-      if (mode != null) {
-        await _choose(tester, mode);
+      if (persisted) {
+        await _choose(tester);
         expect(
           await _complete(tester, firstStore.writes.single),
           isA<QuickCreationModeSaved>(),
         );
-        expect(await tester.runAsync(modeFile.readAsString), mode.storageKey);
+        expect(
+          await tester.runAsync(modeFile.readAsString),
+          QuickCreationMode.intention.storageKey,
+        );
       } else {
         expect(await tester.runAsync(modeFile.exists), isFalse);
       }
@@ -83,32 +79,36 @@ void main() {
       await _close(tester, first);
 
       final second = await _mount(tester, store(), diagnostics);
-      final restored = mode ?? QuickCreationMode.intention;
-      _expectHome(tester, second, restored);
-      await _expectLaunch(tester, second, restored);
+      _expectHome(tester, second);
+      await _expectLaunch(tester, second);
       expect(diagnostics.failures, isEmpty);
     });
   }
 
-  for (final unreadable in [false, true]) {
-    testWidgets('${unreadable ? 'отказ чтения' : 'неизвестный ключ'}: '
-        'Главная и создание доступны без сообщения об ошибке', (tester) async {
+  // null означает нечитаемый файл настройки.
+  for (final (title, contents) in [
+    ('отказ чтения', null),
+    ('неизвестный ключ', 'Секретное содержимое настройки'),
+  ]) {
+    testWidgets('$title: Главная и создание доступны без сообщения об ошибке', (
+      tester,
+    ) async {
       await tester.runAsync(() async {
-        if (unreadable) {
+        if (contents == null) {
           await Directory(modeFile.path).create(recursive: true);
         } else {
           await modeFile.parent.create();
-          await modeFile.writeAsString('Секретное содержимое настройки');
+          await modeFile.writeAsString(contents);
         }
       });
       final session = await _mount(tester, store(), diagnostics);
-      _expectHome(tester, session, QuickCreationMode.intention);
+      _expectHome(tester, session);
       _expectFailures(diagnostics, 'read', [
-        unreadable ? 'unavailable' : 'corruption',
+        contents == null ? 'unavailable' : 'corruption',
       ]);
       expect(find.byType(SnackBar), findsNothing);
       expect(find.byType(AlertDialog), findsNothing);
-      await _expectLaunch(tester, session, QuickCreationMode.intention);
+      await _expectLaunch(tester, session);
     });
   }
 
@@ -122,13 +122,16 @@ void main() {
         'показывают последний выбор; свежий runtime получает последний успех', (
       tester,
     ) async {
-      const initial = QuickCreationMode.dailyChoice;
-      const a = QuickCreationMode.intention;
-      const b = QuickCreationMode.dailyChoice;
-      await tester.runAsync(() => store().save(initial));
-      final modes = [a, b, if (outcomes.length == 3) a];
+      // Неизвестный ключ отличает нетронутый файл от записанного режима.
+      const initial = 'unknown';
+      const mode = QuickCreationMode.intention;
+      await tester.runAsync(() async {
+        await modeFile.parent.create();
+        await modeFile.writeAsString(initial);
+      });
+      final count = outcomes.length;
       final attempts = [
-        for (var i = 0; i < modes.length; i++)
+        for (var i = 0; i < count; i++)
           ModeWriteAttempt(
             holdAt: step,
             failAt: outcomes[i] == 'f' ? step : null,
@@ -138,6 +141,8 @@ void main() {
       final observed = store(io: io);
       diagnostics.throwsOnMode = outcomes == 'ffs';
       final first = await _mount(tester, observed, diagnostics);
+      // Чтение прежнего ключа при запуске не относится к проверяемой записи.
+      diagnostics.failures.clear();
       addTearDown(() async {
         for (final attempt in attempts) {
           if (!attempt.release.isCompleted) attempt.release.complete();
@@ -148,13 +153,13 @@ void main() {
       });
       await tester.tap(appNavigationDestination(AppDestination.intentionGraph));
       await _settle(tester);
-      await _choose(tester, a);
+      await _choose(tester);
       await _complete(tester, attempts.first.held.future);
 
       // Второй экземпляр панели принадлежит обычной странице над каталогом.
       await _openOrdinaryPage(tester);
-      for (final mode in modes.skip(1)) {
-        await _choose(tester, mode);
+      for (var i = 1; i < count; i++) {
+        await _choose(tester);
         expectQuickCreationMode(tester, mode);
         // Скрытый Consumer приостанавливается вместе с маршрутом.
         // Проверяем обе панели при показе, пока запись всё ещё удержана.
@@ -164,14 +169,14 @@ void main() {
         await _openOrdinaryPage(tester);
         expectQuickCreationMode(tester, mode);
       }
-      expect(await tester.runAsync(modeFile.readAsString), initial.storageKey);
+      expect(await tester.runAsync(modeFile.readAsString), initial);
       await _openMenu(tester);
       final localizations = AppLocalizations.of(
         tester.element(find.byType(BottomSheet)),
       );
       final selected = find.widgetWithText(
         OptionRow,
-        modes.last.title(localizations),
+        mode.title(localizations),
       );
       expect(
         tester.getSemantics(selected).flagsCollection.isSelected,
@@ -184,7 +189,7 @@ void main() {
         final result = await _complete(tester, observed.writes[i]);
         if (outcomes[i] == 's') {
           expect(result, isA<QuickCreationModeSaved>());
-          expected = modes[i];
+          expected = mode.storageKey;
         } else {
           expect(result, isA<QuickCreationModeSaveFailed>());
         }
@@ -192,11 +197,8 @@ void main() {
           await _complete(tester, attempts[i + 1].held.future);
         }
         await tester.pump();
-        expect(
-          await tester.runAsync(modeFile.readAsString),
-          expected.storageKey,
-        );
-        expectQuickCreationMode(tester, modes.last);
+        expect(await tester.runAsync(modeFile.readAsString), expected);
+        expectQuickCreationMode(tester, mode);
         expect(
           tester.getSemantics(selected).flagsCollection.isSelected,
           Tristate.isTrue,
@@ -213,12 +215,12 @@ void main() {
       _expectSelected(tester, AppDestination.intentionGraph);
       await tester.binding.handlePopRoute();
       await _settle(tester);
-      expectQuickCreationMode(tester, modes.last);
+      expectQuickCreationMode(tester, mode);
       await _close(tester, first);
 
       final restored = await _mount(tester, store(), diagnostics);
-      _expectHome(tester, restored, expected);
-      await _expectLaunch(tester, restored, expected);
+      _expectHome(tester, restored);
+      await _expectLaunch(tester, restored);
     });
   }
 }
@@ -296,7 +298,7 @@ Future<void> _settle(WidgetTester tester) async {
   throw StateError('Чтение или анимация приложения не завершились.');
 }
 
-/// Открывает над каталогом намерений каталог дневных выборов на дату —
+/// Открывает над каталогом намерений экран дня на дату —
 /// обычную страницу с собственной панелью.
 Future<void> _openOrdinaryPage(WidgetTester tester) async {
   unawaited(
@@ -304,14 +306,10 @@ Future<void> _openOrdinaryPage(WidgetTester tester) async {
         .element(find.byType(IntentionCatalogPage))
         .router
         .root
-        .push(
-          DailyChoiceDateCatalogRoute(
-            date: CalendarDate.fromParts(2026, 9, 25),
-          ),
-        ),
+        .push(ActionDayDateRoute(date: CalendarDate.fromParts(2026, 9, 25))),
   );
   await _settle(tester);
-  expect(find.byType(DailyChoiceDateCatalogPage), findsOneWidget);
+  expect(find.byType(ActionDayDatePage), findsOneWidget);
 }
 
 Future<void> _openMenu(WidgetTester tester) async {
@@ -320,7 +318,9 @@ Future<void> _openMenu(WidgetTester tester) async {
   expect(find.byType(BottomSheet), findsOneWidget);
 }
 
-Future<void> _choose(WidgetTester tester, QuickCreationMode mode) async {
+/// Выбирает в меню единственный режим «Новое намерение».
+Future<void> _choose(WidgetTester tester) async {
+  const mode = QuickCreationMode.intention;
   final localizations = AppLocalizations.of(
     tester.element(quickCreationAction()),
   );
@@ -331,34 +331,20 @@ Future<void> _choose(WidgetTester tester, QuickCreationMode mode) async {
   expectQuickCreationMode(tester, mode);
 }
 
-void _expectHome(
-  WidgetTester tester,
-  _Session session,
-  QuickCreationMode mode,
-) {
+void _expectHome(WidgetTester tester, _Session session) {
   expect(find.byType(HomePage), findsOneWidget);
   _expectSelected(tester, AppDestination.home);
   final button = quickCreationAction();
   expect(button.hitTestable(), findsOneWidget);
-  expectQuickCreationMode(tester, mode);
+  expectQuickCreationMode(tester, QuickCreationMode.intention);
   expect(find.byType(SnackBar), findsNothing);
   expect(tester.takeException(), isNull);
 }
 
-Future<void> _expectLaunch(
-  WidgetTester tester,
-  _Session session,
-  QuickCreationMode mode,
-) async {
+Future<void> _expectLaunch(WidgetTester tester, _Session session) async {
   await tester.tap(quickCreationAction());
   await _settle(tester);
-  expect(
-    find.byType(switch (mode) {
-      QuickCreationMode.intention => IntentionEditorPage,
-      QuickCreationMode.dailyChoice => QuickCreationDailyChoiceStartSheet,
-    }),
-    findsOneWidget,
-  );
+  expect(find.byType(IntentionEditorPage), findsOneWidget);
   expect(find.byType(SnackBar), findsNothing);
   expect(tester.takeException(), isNull);
 }

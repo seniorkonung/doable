@@ -6,7 +6,6 @@ import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -24,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_cascade_execution.dart';
 
 void main() {
   late AppDatabase database;
@@ -283,7 +283,9 @@ void main() {
     () async {
       await _create(repository, sourceId, relatedId);
       expect(
-        await repository.execute(DeleteLongTermRelation(relationId)),
+        await repository.execute(
+          await previewedDeleteRelation(repository, relationId),
+        ),
         isA<GraphCommandSucceeded>(),
       );
       final revisionBefore = await _revision(repository, sourceId);
@@ -317,11 +319,15 @@ void main() {
   test('изменение архивной связи не восстанавливает её и участников', () async {
     await _create(repository, sourceId, relatedId);
     expect(
-      await repository.execute(ArchiveLongTermRelation(relationId)),
+      await repository.execute(
+        await previewedArchiveRelation(repository, relationId),
+      ),
       isA<GraphCommandSucceeded>(),
     );
     expect(
-      await repository.execute(ArchiveIntention(sourceId)),
+      await repository.execute(
+        await previewedArchiveIntention(repository, sourceId),
+      ),
       isA<GraphCommandSucceeded>(),
     );
 
@@ -395,7 +401,9 @@ void main() {
     Future<void> archiveRelation() async {
       await _create(repository, sourceId, relatedId, description: 'Описание');
       expect(
-        await repository.execute(ArchiveLongTermRelation(relationId)),
+        await repository.execute(
+          await previewedArchiveRelation(repository, relationId),
+        ),
         isA<GraphCommandSucceeded>(),
       );
     }
@@ -485,7 +493,9 @@ void main() {
     test('после восстановления тип меняется', () async {
       await archiveRelation();
       expect(
-        await repository.execute(RestoreLongTermRelation(relationId)),
+        await repository.execute(
+          await previewedRestoreRelation(repository, relationId),
+        ),
         isA<GraphCommandSucceeded>(),
       );
 

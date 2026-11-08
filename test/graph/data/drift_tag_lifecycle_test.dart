@@ -14,6 +14,7 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/action_seed.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_positions.dart';
@@ -52,8 +53,8 @@ void main() {
       'intentions',
       'intention_titles_fts',
       'long_term_relations',
-      'daily_choices',
-      'daily_choice_path_steps',
+      'actions',
+      'action_path_items',
       'tag_assignments',
     ])
       table: raw
@@ -66,24 +67,22 @@ void main() {
       'назначения', () async {
     seedRawGraph(raw, () {
       raw.execute(
-        'INSERT INTO intentions (id, title, description, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [_uuid(1), 'Исходное', 'Описание', 1, 0, 100, 200],
+        'INSERT INTO intentions (id, title, description, kind, is_archived, created_at, updated_at) VALUES (?, ?, ?, \'main\', ?, ?, ?)',
+        [_uuid(1), 'Исходное', 'Описание', 0, 100, 200],
       );
       raw.execute(
-        'INSERT INTO intentions (id, title, description, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [_uuid(2), 'Выбранное', null, 1, 0, 300, 400],
+        'INSERT INTO intentions (id, title, description, kind, is_archived, created_at, updated_at) VALUES (?, ?, ?, \'main\', ?, ?, ?)',
+        [_uuid(2), 'Выбранное', null, 0, 300, 400],
       );
       raw.execute(
         'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, 0)',
         [_uuid(3), _uuid(1), _uuid(2), 'need', 1, 'Связь'],
       );
-      raw.execute(
-        'INSERT INTO daily_choices (id, source_intention_id, selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
-        [_uuid(4), _uuid(1), _uuid(2), '2026-09-25', 1],
-      );
-      raw.execute(
-        'INSERT INTO daily_choice_path_steps (id, daily_choice_id, long_term_relation_id) VALUES (?, ?, ?)',
-        [_uuid(5), _uuid(4), _uuid(3)],
+      seedAction(
+        raw,
+        id: _uuid(4),
+        path: [_uuid(1), _uuid(2)],
+        isCompleted: true,
       );
       raw.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
         _uuid(6),

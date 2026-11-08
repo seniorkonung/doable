@@ -4,24 +4,21 @@ import 'dart:isolate';
 import 'dart:math' show min;
 import 'dart:typed_data';
 
+import '../../action/application/action_command.dart';
+import '../../action/application/action_day.dart';
+import '../../action/application/action_day_statuses.dart';
+import '../../action/application/action_details.dart';
+import '../../action/application/action_list_item.dart';
+import '../../action/application/action_result.dart';
+import '../../action/application/intention_actions.dart';
+import '../../action/application/path_candidates.dart';
+import '../../action/domain/action.dart';
+import '../../action/domain/action_id.dart';
+import '../../action/domain/action_path.dart';
+import '../../action/domain/action_schedule.dart';
 import '../../data/local/app_database.dart' as local;
 import '../../data/local/fts_query.dart';
 import '../../data/local/sqlite_failure_classifier.dart';
-import '../../daily_choice/application/daily_choice_details.dart';
-import '../../daily_choice/application/daily_choice_catalog.dart';
-import '../../daily_choice/application/choice_path_continuations.dart';
-import '../../daily_choice/application/choice_path_draft.dart';
-import '../../daily_choice/application/confirmed_choice_path.dart';
-import '../../daily_choice/application/daily_choice_command.dart';
-import '../../daily_choice/application/daily_choice_day_statuses.dart';
-import '../../daily_choice/application/daily_choice_id_generator.dart';
-import '../../daily_choice/application/daily_choice_result.dart';
-import '../../daily_choice/domain/calendar_date.dart';
-import '../../daily_choice/domain/choice_path_step_id.dart';
-import '../../daily_choice/domain/daily_choice.dart';
-import '../../daily_choice/domain/daily_choice_id.dart';
-import '../../daily_choice/domain/daily_choice_priority.dart';
-import '../../daily_choice/domain/daily_choice_schedule.dart';
 import '../../data_transfer/application/graph_composition.dart';
 import '../../data_transfer/application/graph_replacement.dart';
 import '../../graph_backups/graph_backup_registry.dart';
@@ -30,7 +27,9 @@ import '../../graph_format/graph_format_codec.dart'
     show GraphFormatCodec, GraphFormatVersion;
 import '../../graph_format/graph_format_records.dart'
     show
-        DailyChoiceRecord,
+        ActionRecord,
+        DeletedIntentionRecord,
+        DeletedRelationPairRecord,
         GraphEntityRecord,
         GraphRecordCounts,
         IntentionRecord,
@@ -43,10 +42,12 @@ import '../../graph_snapshots/graph_snapshot_store.dart'
         GraphHistoryPackage,
         UnregisteredGraphSnapshot,
         graphSnapshotFailureCode;
+import '../../intention/application/cascade/intention_cascade.dart';
 import '../../intention/application/intention_command.dart';
 import '../../intention/application/intention_id_generator.dart';
 import '../../intention/application/intention_catalog.dart';
 import '../../intention/application/intention_details.dart';
+import '../../intention/application/intention_holding.dart';
 import '../../intention/application/intention_result.dart';
 import '../../intention/application/title_search_key.dart';
 import '../../intention/domain/intention.dart' as domain;
@@ -55,7 +56,6 @@ import '../../intention/domain/intention_text.dart';
 import '../../long_term_relation/application/long_term_relation_command.dart';
 import '../../long_term_relation/application/long_term_relation_id_generator.dart';
 import '../../long_term_relation/application/long_term_relation_projection.dart';
-import '../../long_term_relation/application/long_term_relation_permissions.dart';
 import '../../long_term_relation/application/relation_counts.dart';
 import '../../long_term_relation/application/relation_group_page.dart';
 import '../../long_term_relation/application/relation_pair_probe.dart';
@@ -64,6 +64,7 @@ import '../../long_term_relation/domain/long_term_relation.dart'
 import '../../long_term_relation/domain/long_term_relation_description.dart';
 import '../../long_term_relation/domain/long_term_relation_id.dart';
 import '../../shared/diagnostics/diagnostics_sink.dart';
+import '../../shared/domain/calendar_date.dart';
 import '../../shared/domain/text_preview.dart';
 import '../../statistics/application/contribution_counts.dart';
 import '../../statistics/application/intention_statistics_breakdown.dart';
@@ -90,21 +91,24 @@ import 'drift_relation_count_aggregates.dart';
 import 'contribution_reachability.dart';
 import 'graph_fact_capture.dart';
 import 'graph_record_rows.dart';
-import 'stored_choice_path_verification.dart';
+import 'intention_cascade_planner.dart';
+import 'intention_holding_computation.dart';
 import 'stored_graph_rows.dart';
 
 import 'package:drift/drift.dart';
 import 'package:sqlite3/sqlite3.dart';
+import 'package:uuid/uuid.dart';
 
-part 'drift_daily_choice_path_validation.dart';
-part 'drift_personal_graph_repository_daily_choice_reads.dart';
-part 'drift_personal_graph_repository_daily_choice_catalog.dart';
-part 'drift_personal_graph_repository_daily_choice_day_statuses.dart';
-part 'drift_personal_graph_repository_daily_choice_commands.dart';
+part 'drift_personal_graph_repository_action_commands.dart';
+part 'drift_personal_graph_repository_action_day.dart';
+part 'drift_personal_graph_repository_action_day_statuses.dart';
+part 'drift_personal_graph_repository_action_reads.dart';
+part 'drift_personal_graph_repository_cascade_commands.dart';
+part 'drift_personal_graph_repository_intention_actions.dart';
+part 'drift_personal_graph_repository_path_candidates.dart';
 part 'drift_personal_graph_repository_relation_commands.dart';
 part 'drift_personal_graph_repository_relation_details.dart';
 part 'drift_personal_graph_repository_relation_groups.dart';
-part 'drift_personal_graph_repository_choice_path_reads.dart';
 part 'drift_personal_graph_repository_tag_reads.dart';
 part 'drift_personal_graph_repository_tag_commands.dart';
 part 'drift_personal_graph_repository_fact_log.dart';
@@ -117,6 +121,8 @@ part 'drift_statistics_seed_groups.dart';
 part 'drift_intention_statistics_source.dart';
 part 'drift_intention_statistics_reader.dart';
 part 'drift_through_relations_statistics_reader.dart';
+part 'drift_intention_holding_index.dart';
+part 'drift_intention_cascade_preview.dart';
 
 final class DriftPersonalGraphRepository
     implements
@@ -131,17 +137,12 @@ final class DriftPersonalGraphRepository
     this._now,
     this._diagnosticsSink, {
     LongTermRelationIdGenerator? relationIdGenerator,
-    DailyChoiceIdGenerator? dailyChoiceIdGenerator,
-    ChoicePathStepIdGenerator? choicePathStepIdGenerator,
     TagIdGenerator? tagIdGenerator,
     this._statisticsReachabilityRunner = runContributionReachabilityInIsolate,
     this._intentionStatisticsRunner = runIntentionContributionInIsolate,
+    this._intentionHoldingRunner = runIntentionHoldingInIsolate,
   }) : _relationIdGenerator =
            relationIdGenerator ?? UuidV7LongTermRelationIdGenerator(),
-       _dailyChoiceIdGenerator =
-           dailyChoiceIdGenerator ?? UuidV7DailyChoiceIdGenerator(),
-       _choicePathStepIdGenerator =
-           choicePathStepIdGenerator ?? UuidV7ChoicePathStepIdGenerator(),
        _tagIdGenerator = tagIdGenerator ?? UuidV7TagIdGenerator();
 
   final local.AppDatabase _database;
@@ -149,8 +150,6 @@ final class DriftPersonalGraphRepository
   final DateTime Function() _now;
   final DiagnosticsSink _diagnosticsSink;
   final LongTermRelationIdGenerator _relationIdGenerator;
-  final DailyChoiceIdGenerator _dailyChoiceIdGenerator;
-  final ChoicePathStepIdGenerator _choicePathStepIdGenerator;
   final TagIdGenerator _tagIdGenerator;
   var _epoch = _GraphEpoch();
   final _AsyncSequencer _sequencer = _AsyncSequencer();
@@ -160,8 +159,7 @@ final class DriftPersonalGraphRepository
   /// Сигнал подтверждённой записи реестра копий.
   final StreamController<void> _backupsChanged = StreamController.broadcast();
   final Map<IntentionId, Set<StreamController<void>>> _intentionWatchers = {};
-  final Map<DailyChoiceId, Set<_DailyChoiceWatchRegistration>>
-  _dailyChoiceWatchers = {};
+  final Set<_ActionWatchRegistration> _actionWatchers = {};
   final Map<LongTermRelationId, Set<_RelationWatchRegistration>>
   _relationWatchers = {};
   var _mutationSequence = 0;
@@ -171,6 +169,11 @@ final class DriftPersonalGraphRepository
   final List<_ThroughRelationsStatisticsResult> _throughRelationsResults = [];
   final IntentionContributionRunner _intentionStatisticsRunner;
   final List<_IntentionStatisticsResult> _intentionStatisticsResults = [];
+  var _lastHoldingChangeSequence = 0;
+  _IntentionHoldingIndex? _intentionHoldingIndex;
+  ({int sequence, Future<_IntentionHoldingIndex> index})?
+  _intentionHoldingBuild;
+  final IntentionHoldingRunner _intentionHoldingRunner;
 
   GraphRevision get _currentRevision =>
       _DriftGraphRevision(_epoch, _mutationSequence);
@@ -178,17 +181,17 @@ final class DriftPersonalGraphRepository
   @override
   Future<StatisticsPageResult> getStatisticsPage(StatisticsQuery query) =>
       switch (query.view) {
-        StatisticsView.sourceIntentions => _readStatisticsPage(
+        StatisticsView.rootIntentions => _readStatisticsPage(
           query,
-          _SavedPathStatisticsView.source,
+          _PathRoleStatisticsView.root,
         ),
         StatisticsView.intermediateIntentions => _readStatisticsPage(
           query,
-          _SavedPathStatisticsView.intermediate,
+          _PathRoleStatisticsView.intermediate,
         ),
-        StatisticsView.selectedActions => _readStatisticsPage(
+        StatisticsView.terminalIntentions => _readStatisticsPage(
           query,
-          _SavedPathStatisticsView.selected,
+          _PathRoleStatisticsView.terminal,
         ),
         StatisticsView.throughRelations => _readThroughRelationsStatisticsPage(
           query,
@@ -227,6 +230,16 @@ final class DriftPersonalGraphRepository
       );
     }
   }
+
+  @override
+  Future<IntentionHoldingResult> getIntentionHolding(Set<IntentionId> ids) =>
+      _readIntentionHolding(ids);
+
+  @override
+  Future<CascadePreviewResult> previewCascade(
+    CascadeSubject subject,
+    CascadeOperation operation,
+  ) => _previewCascade(subject, operation);
 
   @override
   Future<TagCatalogResult> getTagCatalog(TagCatalogMode mode) =>
@@ -302,27 +315,30 @@ final class DriftPersonalGraphRepository
       DriftRelationCountAggregates(_database);
 
   @override
-  Future<ChoicePathContinuationResult> getChoicePathContinuations(
-    ChoicePathContinuationQuery query,
-  ) => _readChoicePathContinuations(query);
+  Future<ActionDayPageResult> getActionDayPage(ActionDayQuery query) =>
+      _readActionDayPage(query);
 
   @override
-  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
-      _readDailyChoice(id);
+  Future<ActionDayStatusesReadResult> getActionDayStatuses(
+    ActionDayStatusQuery query,
+  ) => _readActionDayStatuses(query);
 
   @override
-  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
-      _watchDailyChoice(id);
+  Stream<ActionReadResult> watchAction(ActionId id) => _watchAction(id);
 
   @override
-  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
-    DailyChoiceCatalogQuery query,
-  ) => _readDailyChoiceCatalogPage(query);
+  Stream<ActionPathStateReadResult> watchActionPathState(
+    ActionDraftPath path,
+  ) => _watchActionPathState(path);
 
   @override
-  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
-    DailyChoiceDayStatusQuery query,
-  ) => _readDailyChoiceDayStatuses(query);
+  Future<IntentionActionsPageResult> getIntentionActionsPage(
+    IntentionActionsQuery query,
+  ) => _readIntentionActionsPage(query);
+
+  @override
+  Future<PathCandidatesResult> getPathCandidates(PathCandidatesQuery query) =>
+      _readPathCandidates(query);
 
   @override
   Future<Result<IntentionCatalogPage>> getCatalogPage(
@@ -385,7 +401,7 @@ final class DriftPersonalGraphRepository
 
   @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) => _readRelationGroupPage(query);
 
   @override
@@ -459,7 +475,7 @@ final class DriftPersonalGraphRepository
                 id,
                 title,
                 description,
-                is_action_ready,
+                kind,
                 is_archived,
                 created_at,
                 updated_at
@@ -512,12 +528,6 @@ final class DriftPersonalGraphRepository
     return Map.unmodifiable(counts);
   }
 
-  Future<LongTermRelationPermissions> _readRelationPermissions(
-    LongTermRelationId id,
-  ) async =>
-      (await _relationCountAggregates.readPermissions([id]))[id] ??
-      (throw const StoredGraphCorruption());
-
   @override
   Future<GraphCommandResult<TSuccess, TFailure>> execute<
     TSuccess extends GraphCommandOutcome,
@@ -529,9 +539,7 @@ final class DriftPersonalGraphRepository
       ),
       final LongTermRelationCommand relationCommand =>
         await _executeLongTermRelation(relationCommand),
-      final DailyChoiceCommand dailyChoiceCommand => await _executeDailyChoice(
-        dailyChoiceCommand,
-      ),
+      final ActionCommand actionCommand => await _executeAction(actionCommand),
       final CreateTag createTag => await _executeTag(createTag),
       final UpdateTag updateTag => await _executeTag(updateTag),
       final MoveTag moveTag => await _executeTag(moveTag),
@@ -565,27 +573,10 @@ final class DriftPersonalGraphRepository
             onStage: (stage) => creationStage = stage,
           ),
           UpdateIntention() => _updateIntention(command, clock),
-          EnableIntentionReadiness() => _changeReadiness(
-            command.id,
-            domain.IntentionReadiness.ready,
-            clock,
-          ),
-          DisableIntentionReadiness() => _changeReadiness(
-            command.id,
-            domain.IntentionReadiness.notReady,
-            clock,
-          ),
-          ArchiveIntention() => _changeArchiveState(
-            command.id,
-            domain.IntentionArchiveState.archived,
-            clock,
-          ),
-          RestoreIntention() => _changeArchiveState(
-            command.id,
-            domain.IntentionArchiveState.active,
-            clock,
-          ),
-          DeleteIntention() => _deleteIntention(command.id),
+          ChangeIntentionKind() => _changeIntentionKind(command, clock),
+          ArchiveIntention() => _archiveIntentionCascade(command, clock),
+          RestoreIntention() => _restoreIntentionCascade(command, clock),
+          DeleteIntention() => _deleteIntentionCascade(command, clock),
         },
       );
       _recordDiagnostics(
@@ -704,8 +695,6 @@ final class DriftPersonalGraphRepository
           final afterId = after?.summary.id;
           if (beforeId != null) affected.add(beforeId);
           if (afterId != null) affected.add(afterId);
-        case DailyChoiceChange(:final intentionCounts):
-          affected.addAll(intentionCounts.keys);
         case GraphChange():
           break;
       }
@@ -718,8 +707,9 @@ final class DriftPersonalGraphRepository
   void _notifyGraphWatchersFor(Iterable<GraphChange> changes) {
     final stableChanges = List<GraphChange>.unmodifiable(changes);
     _invalidateStatisticsRelationSnapshot(stableChanges);
+    _invalidateIntentionHoldingIndex(stableChanges);
     _notifyIntentionWatchersFor(stableChanges);
-    _notifyDailyChoiceWatchersFor(stableChanges);
+    _notifyActionWatchersFor(stableChanges);
     _notifyRelationWatchersFor(stableChanges);
   }
 
@@ -752,7 +742,7 @@ final class DriftPersonalGraphRepository
       id: _idGenerator.generate(),
       title: title,
       description: description,
-      readiness: command.readiness,
+      kind: domain.IntentionKind.main,
       archiveState: domain.IntentionArchiveState.active,
       createdAt: createdAt,
       updatedAt: createdAt,
@@ -766,9 +756,6 @@ final class DriftPersonalGraphRepository
             id: intentionId,
             title: intention.title,
             description: Value(intention.description),
-            isActionReady: Value(
-              intention.readiness == domain.IntentionReadiness.ready,
-            ),
             isArchived: const Value(false),
             createdAt: intention.createdAt.value.microsecondsSinceEpoch,
             updatedAt: intention.updatedAt.value.microsecondsSinceEpoch,
@@ -821,7 +808,7 @@ final class DriftPersonalGraphRepository
       stored.id == expected.id &&
       stored.title == expected.title &&
       stored.description == expected.description &&
-      stored.readiness == expected.readiness &&
+      stored.kind == expected.kind &&
       stored.archiveState == expected.archiveState &&
       stored.createdAt == expected.createdAt &&
       stored.updatedAt == expected.updatedAt;
@@ -848,7 +835,7 @@ final class DriftPersonalGraphRepository
       id: existing.id,
       title: title,
       description: description,
-      readiness: existing.readiness,
+      kind: existing.kind,
       archiveState: existing.archiveState,
       createdAt: existing.createdAt,
       updatedAt: domain.IntentionTimestamp(clock.read()),
@@ -865,237 +852,55 @@ final class DriftPersonalGraphRepository
     final stored = await _readCommandSnapshot(command.id);
     if (stored == null) throw const StoredGraphCorruption();
     return _CommittedIntentionUpdated(
+      changesHolding: false,
       intention: stored.intention,
       before: before,
       after: await _catalogEntrySnapshot(stored),
     );
   }
 
-  Future<_CommittedIntentionCommand> _changeReadiness(
-    IntentionId id,
-    domain.IntentionReadiness readiness,
+  Future<_CommittedIntentionCommand> _changeIntentionKind(
+    ChangeIntentionKind command,
     _GraphWriteClock clock,
   ) async {
-    final storedBefore = await _readCommandSnapshot(id);
+    final storedBefore = await _readCommandSnapshot(command.id);
     if (storedBefore == null) throw const _IntentionNotFound();
-
     final existing = storedBefore.intention;
     final before = await _catalogEntrySnapshot(storedBefore);
-    if (existing.readiness == readiness) {
+    if (existing.kind == command.kind) {
       return _CommittedIntentionUnchanged(intention: existing, entry: before);
     }
-
-    final updated = domain.Intention(
-      id: existing.id,
-      title: existing.title,
-      description: existing.description,
-      readiness: readiness,
-      archiveState: existing.archiveState,
-      createdAt: existing.createdAt,
-      updatedAt: domain.IntentionTimestamp(clock.read()),
-    );
+    if (command.kind == domain.IntentionKind.supporting) {
+      final relations = _database.longTermRelations;
+      final query = _database.select(relations)
+        ..where(
+          (row) =>
+              row.relatedIntentionId.equals(command.id.toCanonicalString()) &
+              (existing.archiveState == domain.IntentionArchiveState.active
+                  ? row.isArchived.equals(false)
+                  : const Constant(true)),
+        )
+        ..limit(1);
+      if ((await query.get()).isEmpty) {
+        throw const _IntentionMissingIncomingRelation();
+      }
+    }
     await (_database.update(
       _database.intentions,
-    )..where((row) => row.id.equals(id.toCanonicalString()))).write(
+    )..where((row) => row.id.equals(command.id.toCanonicalString()))).write(
       local.IntentionsCompanion(
-        isActionReady: Value(readiness == domain.IntentionReadiness.ready),
-        updatedAt: Value(updated.updatedAt.value.microsecondsSinceEpoch),
+        kind: Value(command.kind.name),
+        updatedAt: Value(clock.read().microsecondsSinceEpoch),
       ),
     );
-    final stored = await _readCommandSnapshot(id);
+    final stored = await _readCommandSnapshot(command.id);
     if (stored == null) throw const StoredGraphCorruption();
     return _CommittedIntentionUpdated(
+      changesHolding: true,
       intention: stored.intention,
       before: before,
       after: await _catalogEntrySnapshot(stored),
     );
-  }
-
-  Future<_CommittedIntentionCommand> _changeArchiveState(
-    IntentionId id,
-    domain.IntentionArchiveState archiveState,
-    _GraphWriteClock clock,
-  ) async {
-    final storedBefore = await _readCommandSnapshot(id);
-    if (storedBefore == null) throw const _IntentionNotFound();
-
-    final existing = storedBefore.intention;
-    final before = await _catalogEntrySnapshot(storedBefore);
-    if (existing.archiveState == archiveState) {
-      return _CommittedIntentionUnchanged(intention: existing, entry: before);
-    }
-
-    final cascadedNeighborIds =
-        archiveState == domain.IntentionArchiveState.archived
-        ? await _readActiveRelationNeighborIds(id)
-        : const <IntentionId>[];
-    final archivedRelations = cascadedNeighborIds.isNotEmpty
-        ? await _archiveActiveRelations(id, clock)
-        : const <_CascadedRelationArchive>[];
-
-    final updated = domain.Intention(
-      id: existing.id,
-      title: existing.title,
-      description: existing.description,
-      readiness: existing.readiness,
-      archiveState: archiveState,
-      createdAt: existing.createdAt,
-      updatedAt: domain.IntentionTimestamp(clock.read()),
-    );
-    await (_database.update(
-      _database.intentions,
-    )..where((row) => row.id.equals(id.toCanonicalString()))).write(
-      local.IntentionsCompanion(
-        isArchived: Value(
-          archiveState == domain.IntentionArchiveState.archived,
-        ),
-        updatedAt: Value(updated.updatedAt.value.microsecondsSinceEpoch),
-      ),
-    );
-    final stored = await _readCommandSnapshot(id);
-    if (stored == null) throw const StoredGraphCorruption();
-    final affectedCounts = archiveState == domain.IntentionArchiveState.archived
-        ? await _readVerifiedRelationCountsFor([id, ...cascadedNeighborIds])
-        : const <IntentionId, RelationCounts>{};
-    return _CommittedIntentionUpdated(
-      intention: stored.intention,
-      before: before,
-      after: await _catalogEntrySnapshot(stored),
-      affectedCounts: affectedCounts,
-      archivedRelations: archivedRelations,
-    );
-  }
-
-  Future<List<IntentionId>> _readActiveRelationNeighborIds(
-    IntentionId id,
-  ) async {
-    final serializedId = id.toCanonicalString();
-    final rows = await _database
-        .customSelect(
-          '''
-            SELECT DISTINCT
-              CASE
-                WHEN source_intention_id = ? THEN related_intention_id
-                ELSE source_intention_id
-              END AS neighbor_id
-            FROM long_term_relations
-            WHERE
-              is_archived = 0 AND
-              (source_intention_id = ? OR related_intention_id = ?)
-            ORDER BY neighbor_id
-          ''',
-          variables: [
-            Variable<String>(serializedId),
-            Variable<String>(serializedId),
-            Variable<String>(serializedId),
-          ],
-          readsFrom: {_database.longTermRelations},
-        )
-        .get();
-    return [
-      for (final row in rows)
-        decodeStoredIntentionId(requiredStoredString(row.data, 'neighbor_id')),
-    ];
-  }
-
-  Future<List<_CascadedRelationArchive>> _archiveActiveRelations(
-    IntentionId id,
-    _GraphWriteClock clock,
-  ) async {
-    final serializedId = id.toCanonicalString();
-    final rows = await _database
-        .customSelect(
-          '''SELECT relation.creation_sequence, relation.id,
-                relation.source_intention_id, relation.related_intention_id,
-                relation.type, relation.priority, relation.is_archived,
-                relation.created_at, relation.updated_at,
-                EXISTS(SELECT 1 FROM daily_choice_path_steps AS step
-                       WHERE step.long_term_relation_id = relation.id) AS is_referenced
-         FROM long_term_relations AS relation
-         WHERE relation.is_archived = 0 AND
-               (relation.source_intention_id = ? OR relation.related_intention_id = ?)''',
-          variables: [
-            Variable<String>(serializedId),
-            Variable<String>(serializedId),
-          ],
-          readsFrom: {
-            _database.longTermRelations,
-            _database.dailyChoicePathSteps,
-          },
-        )
-        .get();
-    final archivedAt = relation_domain.RelationTimestamp(clock.read());
-    final archived = [
-      for (final row in rows)
-        _CascadedRelationArchive(
-          StoredLongTermRelation.decode(row.data).toDomain(),
-          archivedAt,
-          switch (requiredStoredInteger(row.data, 'is_referenced')) {
-            0 => const LongTermRelationPermissions.unrestricted(),
-            1 => const LongTermRelationPermissions.referencedByDailyPath(),
-            _ => throw const StoredGraphCorruption(),
-          },
-        ),
-    ];
-    await _database.customUpdate(
-      '''
-        UPDATE long_term_relations
-        SET is_archived = 1, updated_at = ?
-        WHERE
-          is_archived = 0 AND
-          (source_intention_id = ? OR related_intention_id = ?)
-      ''',
-      variables: [
-        Variable<int>(archivedAt.value.microsecondsSinceEpoch),
-        Variable<String>(serializedId),
-        Variable<String>(serializedId),
-      ],
-      updates: {_database.longTermRelations},
-    );
-    return archived;
-  }
-
-  Future<_CommittedIntentionCommand> _deleteIntention(IntentionId id) async {
-    final storedBefore = await _readCommandSnapshot(id);
-    if (storedBefore == null) throw const _IntentionNotFound();
-    if (await _hasBlockingRelations(id)) {
-      throw _IntentionHasBlockingRelations(id);
-    }
-    final before = await _catalogEntrySnapshot(storedBefore);
-    final deletedRows = await (_database.delete(
-      _database.intentions,
-    )..where((row) => row.id.equals(id.toCanonicalString()))).go();
-    if (deletedRows == 0) throw const _IntentionNotFound();
-    return _CommittedIntentionDeleted(id: id, before: before);
-  }
-
-  Future<bool> _hasBlockingRelations(IntentionId id) async {
-    final serializedId = id.toCanonicalString();
-    final row = await _database
-        .customSelect(
-          '''
-            SELECT EXISTS (
-              SELECT 1
-              FROM long_term_relations
-              WHERE source_intention_id = ? OR related_intention_id = ?
-              LIMIT 1
-            ) OR EXISTS (
-              SELECT 1
-              FROM daily_choices
-              WHERE source_intention_id = ? OR selected_intention_id = ?
-              LIMIT 1
-            ) AS has_blocking_relations
-          ''',
-          variables: [
-            Variable<String>(serializedId),
-            Variable<String>(serializedId),
-            Variable<String>(serializedId),
-            Variable<String>(serializedId),
-          ],
-          readsFrom: {_database.longTermRelations, _database.dailyChoices},
-        )
-        .getSingle();
-    return row.read<int>('has_blocking_relations') == 1;
   }
 
   Future<_StoredIntentionCommandSnapshot?> _readCommandSnapshot(
@@ -1109,7 +914,7 @@ final class DriftPersonalGraphRepository
               title,
               title_search_key,
               description,
-              is_action_ready,
+              kind,
               is_archived,
               created_at,
               updated_at
@@ -1133,7 +938,8 @@ final class DriftPersonalGraphRepository
     final (totalCount, counts) = await _countCatalog(query);
     final titleFilter = query.titleFilter;
     int? exactTitleCount;
-    if (query.pairProbe != null && titleFilter != null) {
+    if ((query.pairProbe != null || query.countExactActiveTitle) &&
+        titleFilter != null) {
       final count = countAll();
       final countQuery = _database.selectOnly(intentions)
         ..addColumns([count])
@@ -1149,7 +955,7 @@ final class DriftPersonalGraphRepository
         intentions.title,
         intentions.titleSearchKey,
         intentions.description,
-        intentions.isActionReady,
+        intentions.kind,
         intentions.isArchived,
         intentions.createdAt,
         intentions.updatedAt,
@@ -1177,81 +983,69 @@ final class DriftPersonalGraphRepository
     );
   }
 
-  /// Один подсчёт без условия готовности даёт и общее количество по условию
-  /// готовности запроса, и числа вида, который попросил запрос.
+  /// Общее количество по всем условиям запроса и числа вида, который
+  /// попросил запрос. Числа видов по охватам дают и общее количество.
   Future<(int, IntentionCatalogCounts)> _countCatalog(
     IntentionCatalogQuery query,
   ) async {
     switch (query.counting) {
       case IntentionCatalogCounting.totalOnly:
-        final typeCounts = await _countTypes(query);
+        final count = countAll();
+        final countQuery = _database.selectOnly(_database.intentions)
+          ..addColumns([count])
+          ..where(_catalogCondition(query));
         return (
-          typeCounts.matching(query.readinessFilter),
+          (await countQuery.getSingle()).read(count)!,
           const IntentionCountsTotalOnly(),
         );
-      case IntentionCatalogCounting.byType:
-        final typeCounts = await _countTypes(query);
-        return (
-          typeCounts.matching(query.readinessFilter),
-          IntentionCountsByType(typeCounts),
-        );
-      case IntentionCatalogCounting.byScopeAndType:
-        final counts = await _countTypesByScope(query);
-        return (
-          counts.inScope(query.scope).matching(query.readinessFilter),
-          counts,
-        );
+      case IntentionCatalogCounting.byScopeAndKind:
+        final counts = await _countKindsByScope(query);
+        return (counts.inScope(query.scope).matching(query.kindFilter), counts);
     }
   }
 
-  /// Числа типов в охвате запроса.
-  Future<IntentionTypeCounts> _countTypes(IntentionCatalogQuery query) async {
-    final intentions = _database.intentions;
-    final allExpression = countAll();
-    final actionsExpression = countAll(
-      filter: intentions.isActionReady.equals(true),
-    );
-    final countQuery = _database.selectOnly(intentions)
-      ..addColumns([allExpression, actionsExpression])
-      ..where(_catalogConditionExceptReadiness(query));
-    final countRow = await countQuery.getSingle();
-    return IntentionTypeCounts(
-      all: countRow.read(allExpression)!,
-      actions: countRow.read(actionsExpression)!,
-    );
-  }
-
-  /// Числа типов в активном и архивном охватах: условие охвата в запрос не
-  /// входит, его заменяют фильтры агрегатов.
-  Future<IntentionCountsByScopeAndType> _countTypesByScope(
+  /// Числа видов в активном и архивном охватах: условия охвата и вида в запрос
+  /// не входят, их заменяют фильтры агрегатов.
+  Future<IntentionCountsByScopeAndKind> _countKindsByScope(
     IntentionCatalogQuery query,
   ) async {
     final intentions = _database.intentions;
     final isActive = intentions.isArchived.equals(false);
     final isArchived = intentions.isArchived.equals(true);
-    final isAction = intentions.isActionReady.equals(true);
+    final isSupporting = intentions.kind.equals(
+      domain.IntentionKind.supporting.name,
+    );
     final activeExpression = countAll(filter: isActive);
-    final activeActionsExpression = countAll(filter: isActive & isAction);
+    final activeSupportingExpression = countAll(
+      filter: isActive & isSupporting,
+    );
     final archivedExpression = countAll(filter: isArchived);
-    final archivedActionsExpression = countAll(filter: isArchived & isAction);
+    final archivedSupportingExpression = countAll(
+      filter: isArchived & isSupporting,
+    );
     final countQuery = _database.selectOnly(intentions)
       ..addColumns([
         activeExpression,
-        activeActionsExpression,
+        activeSupportingExpression,
         archivedExpression,
-        archivedActionsExpression,
+        archivedSupportingExpression,
       ])
-      ..where(_catalogConditionExceptScopeAndReadiness(query));
+      ..where(_withCatalogFilters(const Constant<bool>(true), query));
     final countRow = await countQuery.getSingle();
-    return IntentionCountsByScopeAndType(
-      active: IntentionTypeCounts(
-        all: countRow.read(activeExpression)!,
-        actions: countRow.read(activeActionsExpression)!,
-      ),
-      archived: IntentionTypeCounts(
-        all: countRow.read(archivedExpression)!,
-        actions: countRow.read(archivedActionsExpression)!,
-      ),
+    IntentionKindCounts kindCounts(
+      Expression<int> all,
+      Expression<int> supporting,
+    ) {
+      final supportingCount = countRow.read(supporting)!;
+      return IntentionKindCounts(
+        main: countRow.read(all)! - supportingCount,
+        supporting: supportingCount,
+      );
+    }
+
+    return IntentionCountsByScopeAndKind(
+      active: kindCounts(activeExpression, activeSupportingExpression),
+      archived: kindCounts(archivedExpression, archivedSupportingExpression),
     );
   }
 
@@ -1266,7 +1060,7 @@ final class DriftPersonalGraphRepository
         intentions.title,
         intentions.titleSearchKey,
         intentions.description,
-        intentions.isActionReady,
+        intentions.kind,
         intentions.isArchived,
         intentions.createdAt,
         intentions.updatedAt,
@@ -1293,33 +1087,22 @@ final class DriftPersonalGraphRepository
 
   Expression<bool> _catalogCondition(IntentionCatalogQuery query) {
     final intentions = _database.intentions;
-    final readinessCondition = switch (query.readinessFilter) {
-      IntentionReadinessFilter.all => const Constant(true),
-      IntentionReadinessFilter.readyOnly => intentions.isActionReady.equals(
-        true,
-      ),
-
-      IntentionReadinessFilter.notReadyOnly => intentions.isActionReady.equals(
-        false,
-      ),
-    };
-    return readinessCondition & _catalogConditionExceptReadiness(query);
-  }
-
-  Expression<bool> _catalogConditionExceptReadiness(
-    IntentionCatalogQuery query,
-  ) {
-    final intentions = _database.intentions;
-    return _withCatalogFilters(switch (query.scope) {
+    final scopeCondition = switch (query.scope) {
       IntentionScope.active => intentions.isArchived.equals(false),
       IntentionScope.archived => intentions.isArchived.equals(true),
       IntentionScope.all => const Constant<bool>(true),
-    }, query);
+    };
+    final kindCondition = switch (query.kindFilter) {
+      IntentionKindFilter.mainOnly => intentions.kind.equals(
+        domain.IntentionKind.main.name,
+      ),
+      IntentionKindFilter.supportingOnly => intentions.kind.equals(
+        domain.IntentionKind.supporting.name,
+      ),
+      IntentionKindFilter.mainAndSupporting => const Constant<bool>(true),
+    };
+    return _withCatalogFilters(scopeCondition & kindCondition, query);
   }
-
-  Expression<bool> _catalogConditionExceptScopeAndReadiness(
-    IntentionCatalogQuery query,
-  ) => _withCatalogFilters(const Constant<bool>(true), query);
 
   /// Присоединяет к [condition] исключение, теги и название запроса.
   Expression<bool> _withCatalogFilters(
@@ -1536,7 +1319,7 @@ final class DriftPersonalGraphRepository
       final description? => TextPreview.fromText(description),
       null => null,
     },
-    readiness: intention.readiness,
+    kind: intention.kind,
     archiveState: intention.archiveState,
     createdAt: intention.createdAt,
     updatedAt: intention.updatedAt,
@@ -1659,16 +1442,8 @@ final class _DriftIntentionCatalogEntrySnapshot
         summary.archiveState == domain.IntentionArchiveState.archived,
       IntentionScope.all => true,
     };
-    final matchesReadiness = switch (query.readinessFilter) {
-      IntentionReadinessFilter.all => true,
-      IntentionReadinessFilter.readyOnly =>
-        summary.readiness == domain.IntentionReadiness.ready,
-
-      IntentionReadinessFilter.notReadyOnly =>
-        summary.readiness == domain.IntentionReadiness.notReady,
-    };
     if (!matchesScope ||
-        !matchesReadiness ||
+        !query.kindFilter.admits(summary.kind) ||
         summary.id == query.pairProbe?.counterpartId ||
         !query.tagFilter.matches(summary.tags.map((tag) => tag.id).toSet())) {
       return false;
@@ -1726,16 +1501,16 @@ final class _CommittedIntentionUpdated extends _CommittedIntentionCommand {
     required this.intention,
     required this.before,
     required this.after,
-    Map<IntentionId, RelationCounts> affectedCounts = const {},
-    List<_CascadedRelationArchive> archivedRelations = const [],
-  }) : affectedCounts = Map.unmodifiable(affectedCounts),
-       archivedRelations = List.unmodifiable(archivedRelations);
+    required this.changesHolding,
+  });
 
   final domain.Intention intention;
   final IntentionCatalogEntrySnapshot before;
   final IntentionCatalogEntrySnapshot after;
-  final Map<IntentionId, RelationCounts> affectedCounts;
-  final List<_CascadedRelationArchive> archivedRelations;
+
+  /// Изменение вида или архивного состояния, после которого пакет несёт
+  /// [IntentionHoldingChanged].
+  final bool changesHolding;
 
   @override
   IntentionId get intentionId => intention.id;
@@ -1752,13 +1527,7 @@ final class _CommittedIntentionUpdated extends _CommittedIntentionCommand {
       after: after,
     ),
     additionalChanges: [
-      for (final relation in archivedRelations) relation.toChange(revision),
-      for (final entry in affectedCounts.entries)
-        IntentionRelationCountsChanged(
-          revision: revision,
-          intentionId: entry.key,
-          counts: entry.value,
-        ),
+      if (changesHolding) IntentionHoldingChanged(revision: revision),
     ],
   );
 }
@@ -1785,25 +1554,6 @@ final class _CommittedIntentionUnchanged extends _CommittedIntentionCommand {
       revision: revision,
       entry: entry,
     ),
-  );
-}
-
-final class _CommittedIntentionDeleted extends _CommittedIntentionCommand {
-  const _CommittedIntentionDeleted({required this.id, required this.before});
-
-  final IntentionId id;
-  final IntentionCatalogEntrySnapshot before;
-
-  @override
-  IntentionId get intentionId => id;
-
-  @override
-  bool get didMutate => true;
-
-  @override
-  IntentionCommandSuccess toSuccess(GraphRevision revision) => IntentionDeleted(
-    id,
-    catalogMutation: IntentionCatalogDeleted(revision: revision, entry: before),
   );
 }
 
@@ -1938,11 +1688,14 @@ IntentionFailure _classifyCommandFailure(
   if (error is IntentionTextValidationException) {
     return IntentionTextInputValidationFailure(error.failure);
   }
+  if (error is _IntentionMissingIncomingRelation) {
+    return const IntentionMissingIncomingRelationFailure();
+  }
   if (error is _IntentionNotFound) {
     return const IntentionNotFoundFailure();
   }
-  if (error case _IntentionHasBlockingRelations(:final intentionId)) {
-    return IntentionHasBlockingRelationsFailure(intentionId);
+  if (error is _CascadeCompositionConflict) {
+    return const IntentionCascadeConflictFailure();
   }
   if (error case _IntentionCreationTagsMissing(:final tagIds)) {
     return IntentionCreationTagsMissingFailure(tagIds);
@@ -1973,8 +1726,7 @@ void _validateCommandText(IntentionCommand command) {
       if (description != null) {
         IntentionText.normalizeDescription(description);
       }
-    case EnableIntentionReadiness() ||
-        DisableIntentionReadiness() ||
+    case ChangeIntentionKind() ||
         ArchiveIntention() ||
         RestoreIntention() ||
         DeleteIntention():
@@ -2002,12 +1754,7 @@ IntentionCommandDiagnosticsEvent _commandDiagnosticsEvent(
       status: status,
     ),
     UpdateIntention() => event(IntentionCommandDiagnosticsType.update),
-    EnableIntentionReadiness() => event(
-      IntentionCommandDiagnosticsType.enableReadiness,
-    ),
-    DisableIntentionReadiness() => event(
-      IntentionCommandDiagnosticsType.disableReadiness,
-    ),
+    ChangeIntentionKind() => event(IntentionCommandDiagnosticsType.changeKind),
     ArchiveIntention() => event(IntentionCommandDiagnosticsType.archive),
     RestoreIntention() => event(IntentionCommandDiagnosticsType.restore),
     DeleteIntention() => event(IntentionCommandDiagnosticsType.delete),
@@ -2019,20 +1766,20 @@ DiagnosticsFailureCode _diagnosticsFailureCode(IntentionFailure failure) =>
       IntentionValidationFailure() => DiagnosticsFailureCode.validation,
       IntentionNotFoundFailure() => DiagnosticsFailureCode.notFound,
       IntentionConflictFailure() => DiagnosticsFailureCode.conflict,
-      IntentionHasBlockingRelationsFailure() => DiagnosticsFailureCode.conflict,
+      IntentionCascadeConflictFailure() =>
+        DiagnosticsFailureCode.cascadeConflict,
       IntentionUnavailableFailure() => DiagnosticsFailureCode.unavailable,
       IntentionCorruptionFailure() => DiagnosticsFailureCode.corruption,
+      IntentionCascadePreviewFailure() ||
       IntentionUnexpectedFailure() => DiagnosticsFailureCode.unexpected,
     };
 
-final class _IntentionNotFound implements Exception {
-  const _IntentionNotFound();
+final class _IntentionMissingIncomingRelation implements Exception {
+  const _IntentionMissingIncomingRelation();
 }
 
-final class _IntentionHasBlockingRelations implements Exception {
-  const _IntentionHasBlockingRelations(this.intentionId);
-
-  final IntentionId intentionId;
+final class _IntentionNotFound implements Exception {
+  const _IntentionNotFound();
 }
 
 /// Выбранные теги создания [tagIds] отсутствуют на момент проверки в

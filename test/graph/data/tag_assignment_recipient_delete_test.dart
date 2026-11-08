@@ -1,11 +1,9 @@
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -18,6 +16,7 @@ import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/tag_positions.dart';
+import '../../support/intention_cascade_execution.dart';
 
 IntentionId _intention(int number) =>
     (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id;
@@ -50,7 +49,7 @@ void main() {
   void addIntention(int number, {bool archived = false}) {
     seedRawGraph(raw, () {
       raw.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, 0, ?, 100, 200)',
+        'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', ?, 100, 200)',
         [tagFixtureId(number), 'Намерение $number', archived ? 1 : 0],
       );
     });
@@ -84,19 +83,6 @@ void main() {
       .select('SELECT * FROM $table ORDER BY rowid')
       .map((row) => row.values.toList())
       .toList();
-
-  Map<String, List<List<Object?>>> graph() => {
-    for (final table in [
-      'intentions',
-      'intention_titles_fts',
-      'long_term_relations',
-      'daily_choices',
-      'daily_choice_path_steps',
-      'tags',
-      'tag_assignments',
-    ])
-      table: rows(table),
-  };
 
   List<Object?> assigned(int number) => raw
       .select(
@@ -135,13 +121,15 @@ void main() {
     ];
     final otherGraph = [
       rows('long_term_relations'),
-      rows('daily_choices'),
-      rows('daily_choice_path_steps'),
+      rows('actions'),
+      rows('action_path_items'),
     ];
 
     await expectCompleteAssignments(_intention(4));
     expect(
-      await repository.execute(DeleteIntention(_intention(4))),
+      await repository.execute(
+        await previewedDeleteIntention(repository, _intention(4)),
+      ),
       isA<ResultSuccess>(),
     );
     expect(
@@ -156,12 +144,14 @@ void main() {
     expect(rows('tags'), tagsBefore);
     expect([
       rows('long_term_relations'),
-      rows('daily_choices'),
-      rows('daily_choice_path_steps'),
+      rows('actions'),
+      rows('action_path_items'),
     ], otherGraph);
 
     expect(
-      await repository.execute(DeleteIntention(_intention(5))),
+      await repository.execute(
+        await previewedDeleteIntention(repository, _intention(5)),
+      ),
       isA<ResultSuccess>(),
     );
     expect(
@@ -188,12 +178,14 @@ void main() {
       final intentionsBefore = rows('intentions');
       final tagsBefore = rows('tags');
       final assignmentsBefore = rows('tag_assignments');
-      final dailyChoicesBefore = rows('daily_choices');
-      final pathBefore = rows('daily_choice_path_steps');
+      final actionsBefore = rows('actions');
+      final pathBefore = rows('action_path_items');
 
       await expectCompleteAssignments(_intention(4));
       expect(
-        await repository.execute(DeleteLongTermRelation(_relation(103))),
+        await repository.execute(
+          await previewedDeleteRelation(repository, _relation(103)),
+        ),
         isA<GraphCommandSucceeded>(),
       );
       expect(
@@ -205,12 +197,14 @@ void main() {
       expect(rows('tag_assignments'), assignmentsBefore);
       expect(rows('intentions'), intentionsBefore);
       expect(rows('tags'), tagsBefore);
-      expect(rows('daily_choices'), dailyChoicesBefore);
-      expect(rows('daily_choice_path_steps'), pathBefore);
+      expect(rows('actions'), actionsBefore);
+      expect(rows('action_path_items'), pathBefore);
 
       await expectCompleteAssignments(_intention(2));
       expect(
-        await repository.execute(DeleteLongTermRelation(_relation(102))),
+        await repository.execute(
+          await previewedDeleteRelation(repository, _relation(102)),
+        ),
         isA<GraphCommandSucceeded>(),
       );
       expect(
@@ -222,61 +216,37 @@ void main() {
       expect(rows('tags'), tagsBefore);
       expect(rows('tag_assignments'), assignmentsBefore);
       expect(rows('intentions'), intentionsBefore);
-      expect(rows('daily_choices'), dailyChoicesBefore);
-      expect(rows('daily_choice_path_steps'), pathBefore);
+      expect(rows('actions'), actionsBefore);
+      expect(rows('action_path_items'), pathBefore);
       expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
     },
   );
 
-  test(
-    'зависимости намерения и шаг пути блокируют удаление вместе с назначениями',
-    () async {
-      final before = graph();
+  test('связи не блокируют удаление намерения: уходят его связи и назначения, '
+      'а теги, действия и пути остаются', () async {
+    final tagsBefore = rows('tags');
+    final actionsBefore = rows('actions');
+    final pathBefore = rows('action_path_items');
 
-      final active = await repository.execute(DeleteIntention(_intention(1)));
-      expect(
-        (active as ResultFailure).failure,
-        isA<IntentionHasBlockingRelationsFailure>(),
-      );
-      expect(graph(), before);
-
-      final archived = await repository.execute(DeleteIntention(_intention(2)));
-      expect(
-        (archived as ResultFailure).failure,
-        isA<IntentionHasBlockingRelationsFailure>(),
-      );
-      expect(graph(), before);
-
-      final relation = await repository.execute(
-        DeleteLongTermRelation(_relation(101)),
-      );
-      expect(
-        (relation as GraphCommandFailed).failure,
-        isA<LongTermRelationReferencedByDailyPathFailure>(),
-      );
-      expect(graph(), before);
-    },
-  );
-
-  test('новая зависимость после пустой проверки блокирует удаление в момент команды', () async {
-    addIntention(4);
-    await assign(firstTagNumber, _intention(4));
     expect(
-      raw.select(
-        'SELECT id FROM long_term_relations WHERE source_intention_id = ? OR related_intention_id = ?',
-        [tagFixtureId(4), tagFixtureId(4)],
+      await repository.execute(
+        await previewedDeleteIntention(repository, _intention(1)),
       ),
-      isEmpty,
+      isA<ResultSuccess>(),
     );
-    addRelation(103, 4, 3);
-    final before = graph();
-
-    final result = await repository.execute(DeleteIntention(_intention(4)));
 
     expect(
-      (result as ResultFailure).failure,
-      isA<IntentionHasBlockingRelationsFailure>(),
+      raw
+          .select('SELECT id FROM intentions ORDER BY rowid')
+          .map((row) => row['id']),
+      [tagFixtureId(2), tagFixtureId(3)],
     );
-    expect(graph(), before);
+    expect(rows('long_term_relations'), isEmpty);
+    expect(assigned(1), isEmpty);
+    expect(assigned(2), [tagFixtureId(firstTagNumber)]);
+    expect(rows('tags'), tagsBefore);
+    expect(rows('actions'), actionsBefore);
+    expect(rows('action_path_items'), pathBefore);
+    expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
   });
 }

@@ -185,7 +185,7 @@ extension _GraphBackupRegistryAccess on DriftPersonalGraphRepository {
         added:
             composition.intentionCount +
             composition.relationCount +
-            composition.dailyChoiceCount +
+            composition.actionCount +
             composition.tagCount,
         changed: 0,
         deleted: 0,

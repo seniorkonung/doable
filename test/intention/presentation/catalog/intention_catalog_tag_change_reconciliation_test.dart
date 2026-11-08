@@ -1,7 +1,8 @@
+import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
+import 'package:doable/src/long_term_relation/application/relation_pair_probe.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
@@ -20,11 +21,12 @@ import 'catalog_reconciliation_test_support.dart';
 import 'catalog_test_support.dart';
 import '../../../support/tag_positions.dart';
 
-final _actionSearchPurpose = SelectDailyChoiceAction(
+final _participantSearchPurpose = SelectRelationParticipant(
   session: IntentionSearchSession(),
-);
-final _sourceSearchPurpose = SelectDailyChoiceSource(
-  session: IntentionSearchSession(),
+  pairProbe: RelationPairProbe(
+    counterpartId: testSummary(index: 999).id,
+    candidateRole: RelationParticipantRole.related,
+  ),
 );
 
 void main() {
@@ -88,7 +90,7 @@ void main() {
     expect(current.nextCursor, same(before.nextCursor));
     expect(current.selection.tagFilter, filter);
     expect(current.selection.order, before.selection.order);
-    expect(current.selection.scope, before.selection.scope);
+    expect(current.selection.show, before.selection.show);
     expect(repository.queries, hasLength(2));
   });
 
@@ -261,9 +263,8 @@ void main() {
       final repository = ControlledCatalogRepository();
       final container = reconciliationCatalogContainer(repository);
       addTearDown(container.dispose);
-      final action = _actionSearchPurpose;
-      final source = _sourceSearchPurpose;
-      for (final purpose in [browse, action, source]) {
+      final participant = _participantSearchPurpose;
+      for (final purpose in [browse, participant]) {
         final subscription = container.listen(
           intentionCatalogViewModelProvider(purpose),
           (_, _) {},
@@ -271,23 +272,15 @@ void main() {
         );
         addTearDown(subscription.close);
       }
-      await waitForCatalogQueries(repository, 3);
-      final ready = testSummary(
-        index: 2,
-        readiness: IntentionReadiness.ready,
-        tags: [health],
-      );
-      final other = testSummary(
-        index: 1,
-        readiness: IntentionReadiness.ready,
-        tags: [health],
-      );
-      for (var index = 0; index < 3; index++) {
+      await waitForCatalogQueries(repository, 2);
+      final target = testSummary(index: 2, tags: [health]);
+      final other = testSummary(index: 1, tags: [health]);
+      for (var index = 0; index < 2; index++) {
         repository.complete(
           index,
           ResultSuccess(
             IntentionCatalogFirstPage(
-              items: [ready, other],
+              items: [target, other],
               totalCount: 2,
               nextCursor: null,
               revision: const TestCatalogRevision(1),
@@ -295,62 +288,55 @@ void main() {
           ),
         );
       }
-      for (final purpose in [browse, action, source]) {
+      for (final purpose in [browse, participant]) {
         await container.read(intentionCatalogViewModelProvider(purpose).future);
       }
       final healthFilter = IntentionTagFilter(requiredTagIds: [health.id]);
       final withoutHealth = IntentionTagFilter(excludedTagIds: [health.id]);
       container
           .read(intentionCatalogViewModelProvider(browse).notifier)
-          .changeTagFilter(healthFilter);
-      container
-          .read(intentionCatalogViewModelProvider(source).notifier)
           .changeTagFilter(withoutHealth);
-      await waitForCatalogQueries(repository, 5);
+      container
+          .read(intentionCatalogViewModelProvider(participant).notifier)
+          .changeTagFilter(healthFilter);
+      await waitForCatalogQueries(repository, 4);
+      repository.complete(2, _emptyPage(1));
       repository.complete(
         3,
         ResultSuccess(
           IntentionCatalogFirstPage(
-            items: [ready, other],
+            items: [target, other],
             totalCount: 2,
             nextCursor: null,
             revision: const TestCatalogRevision(1),
           ),
         ),
       );
-      repository.complete(4, _emptyPage(1));
       await container.read(intentionCatalogViewModelProvider(browse).future);
-      await container.read(intentionCatalogViewModelProvider(source).future);
-
-      final readyWithoutHealth = testSummary(
-        index: 2,
-        readiness: IntentionReadiness.ready,
+      await container.read(
+        intentionCatalogViewModelProvider(participant).future,
       );
+
+      final targetWithoutHealth = testSummary(index: 2);
       await completeIntentionTagAssignment(
         container,
         repository,
         state: TagAssignmentState.absent,
         tagId: health.id,
-        before: ready,
-        after: readyWithoutHealth,
+        before: target,
+        after: targetWithoutHealth,
         revision: const TestCatalogRevision(2),
       );
 
       final browseState = _loaded(container, browse);
-      expect(browseState.items.map((item) => item.id), [other.id]);
+      expect(browseState.items.map((item) => item.id), [target.id]);
       expect(browseState.totalCount, 1);
-      expect(browseState.selection.tagFilter, healthFilter);
+      expect(browseState.selection.tagFilter, withoutHealth);
 
-      final actionState = _loaded(container, action);
-      expect(actionState.items.map((item) => item.id), [ready.id, other.id]);
-      expect(actionState.items.first.tags, isEmpty);
-      expect(actionState.totalCount, 2);
-      expect(actionState.selection.tagFilter, IntentionTagFilter.empty);
-
-      final sourceState = _loaded(container, source);
-      expect(sourceState.items.map((item) => item.id), [ready.id]);
-      expect(sourceState.totalCount, 1);
-      expect(sourceState.selection.tagFilter, withoutHealth);
+      final participantState = _loaded(container, participant);
+      expect(participantState.items.map((item) => item.id), [other.id]);
+      expect(participantState.totalCount, 1);
+      expect(participantState.selection.tagFilter, healthFilter);
     },
   );
 

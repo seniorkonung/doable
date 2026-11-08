@@ -2,10 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart' show AppDatabase;
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -31,10 +27,13 @@ import 'package:doable/src/tag/domain/tag_id.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/action_seed.dart';
 import '../support/failing_snapshot_temporary_files.dart';
 import '../support/forwarding_graph_fact_log.dart';
 import '../support/graph_log_completeness_reference.dart';
+import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/intention_cascade_execution.dart';
 import '../support/local_database_harness.dart';
 
 /// Порог проверок: несколько пакетов вместо производственного значения.
@@ -112,13 +111,11 @@ void main() {
 
   Future<Intention> createIntention(
     String title, {
-    IntentionReadiness readiness = IntentionReadiness.notReady,
     Set<TagId> tagIds = const {},
   }) async => (await confirm<IntentionSaved>(
     CreateIntention.withInitialState(
       title: title,
       description: null,
-      readiness: readiness,
       tagIds: tagIds,
     ),
   )).intention;
@@ -185,37 +182,26 @@ void main() {
         'Здоровье',
         tagIds: {home.id, sport.id},
       );
-      final running = await createIntention(
-        'Бегать',
-        readiness: IntentionReadiness.ready,
-      );
+      final running = await createIntention('Бегать');
       final swimming = await createIntention('Плавать');
-      final needRunning = await relate(health, running);
+      await relate(health, running);
       await relate(health, swimming, type: LongTermRelationType.can);
       await relate(swimming, running);
-      await confirm<DailyChoiceCreated>(
-        CreateDailyChoice(
-          sourceIntentionId: health.id,
-          selectedIntentionId: running.id,
-          path: ConfirmedChoicePath([
-            ConfirmedChoicePathStep(
-              relationId: needRunning.id,
-              sourceIntentionId: health.id,
-              type: needRunning.type,
-              relatedIntentionId: running.id,
-            ),
-          ]),
-          date: CalendarDate.fromParts(2026, 10, 18),
-          description: null,
-          isCompleted: false,
+      await recordGraphChange(
+        database,
+        () => insertAction(
+          database,
+          id: seedUuid(1),
+          path: [health.id.toCanonicalString(), running.id.toCanonicalString()],
         ),
+        recordedAt: now,
       );
       await store().writeSnapshot(await repository.readCurrentPosition());
       await confirm(
         RemoveTagAssignment(tagId: home.id, intentionId: health.id),
       );
       await confirm(AssignTag(tagId: home.id, intentionId: health.id));
-      await confirm(ArchiveIntention(swimming.id));
+      await confirm(await previewedArchiveIntention(repository, swimming.id));
       await createIntention('Читать', tagIds: {sport.id});
       final expected = await referenceState();
 
@@ -252,7 +238,9 @@ void main() {
       await packagesReached.future;
 
       expect(
-        await repository.execute(ArchiveIntention(health.id)),
+        await repository.execute(
+          await previewedArchiveIntention(repository, health.id),
+        ),
         isA<GraphCommandSucceeded>(),
       );
 

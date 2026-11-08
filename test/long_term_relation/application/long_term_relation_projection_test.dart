@@ -1,7 +1,6 @@
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
@@ -9,12 +8,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('прикладные проекции долговременной связи', () {
-    test('неизвестное разрешение не допускает удаление', () {
-      const permissions = LongTermRelationPermissions.unknown();
-      expect(permissions.isConfirmed, isFalse);
-      expect(permissions.canDelete, isFalse);
-      expect(permissions.canEditDescriptionAndPriority, isFalse);
-    });
     test('подробная связь передаёт полный проверенный текст описания', () {
       const text = '  Пояснение\nс переносом  ';
       final description = LongTermRelationDescription.fromInput(text)!;
@@ -29,14 +22,9 @@ void main() {
           'Много ходить',
         ),
         description: description,
-        permissions: const LongTermRelationPermissions.referencedByDailyPath(),
       );
 
       expect(details.description!.value, text);
-      expect(
-        details.permissions.restriction,
-        LongTermRelationPermissionRestriction.referencedByDailyPath,
-      );
     });
 
     test('проекции отклоняют участников, не совпадающих со связью', () {
@@ -65,7 +53,6 @@ void main() {
             id: _intentionId('00000000-0000-4000-8000-000000000003'),
             title: 'Другое намерение',
             archiveState: IntentionArchiveState.active,
-            readiness: IntentionReadiness.notReady,
           ),
         ),
         throwsA(isA<LongTermRelationProjectionValidationException>()),

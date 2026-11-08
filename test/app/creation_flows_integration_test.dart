@@ -3,52 +3,54 @@ import 'dart:ui' show CheckedState, Tristate;
 
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/l10n/app_localizations.dart';
-import 'package:doable/src/app/quick_creation/quick_creation_daily_choice_start_sheet.dart';
-import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
+import 'package:doable/src/action/application/action_day.dart';
+import 'package:doable/src/action/presentation/path/path_page.dart';
+import 'package:doable/src/action/presentation/path_start/path_start_picker_page.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/data/local/app_database.dart';
-import 'package:doable/src/design_system/components/filter_button.dart';
-import 'package:doable/src/design_system/components/picker_row.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
+import 'package:doable/src/design_system/components/time_dial.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
-    show IntentionCatalogOrder, IntentionTagFilter, IntentionScope;
+    show IntentionCatalogOrder, IntentionScope;
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_view_model.dart';
-import 'package:doable/src/intention/presentation/picker/intention_picker_view.dart';
 import 'package:doable/src/intention/presentation/picker/intention_picker_row.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/daily_choice_catalog_provider.dart';
-import '../support/daily_choice_catalog_controls.dart';
-import '../support/daily_choice_creation_controls.dart';
-import '../support/daily_choice_durability_fixture.dart';
-import '../support/daily_choice_local_date.dart';
+import '../support/controlled_local_date.dart';
+import '../support/action_day_provider.dart';
+import '../support/action_day_controls.dart';
+import '../support/action_editor_controls.dart';
+import '../support/action_seed.dart';
+import '../support/graph_durability_fixture.dart';
 import '../support/graph_seed.dart';
+import '../support/intention_cascade_execution.dart';
 import '../support/intention_catalog_controls.dart';
 import '../support/intention_creation_origin.dart';
+import '../support/intention_actions_tab.dart';
 import '../support/local_database_harness.dart';
+import '../support/path_screen_controls.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/quick_creation.dart';
-import '../support/tag_positions.dart';
 
 part 'creation_flows_test_support.dart';
 part 'creation_flows_accessibility_scenarios.dart';
@@ -63,9 +65,436 @@ void main() {
   );
   _registerAccessibilityTests();
   _registerQuickCreationFlowTests();
-  _registerNestedQuickCreationTests();
-  _registerRelationPickerDailyChoiceTests();
   _registerRelationPickerIntentionTest();
+  testWidgets('повторный выбор пункта сбрасывает пустой лист без вопроса', (
+    tester,
+  ) async {
+    final app = await _start(tester);
+    await _tap(tester, find.text('Новое действие'));
+    await _tap(tester, actionEditorValue('Выберите причину'));
+    final intention = find.bySemanticsLabel(
+      'Открыть страницу намерения «Намерение 1»',
+    );
+    await _until(tester, () => intention.evaluate().isNotEmpty);
+    await _tap(tester, intention);
+    final tabs = app.router.innerRouterOf<TabsRouter>(AppShellRoute.name)!;
+    final selected = tabs.activeIndex;
+    tester
+        .widget<AppNavigationBar>(find.byType(AppNavigationBar).last)
+        .onSelected(AppDestination.values[selected]);
+    await tester.pumpAndSettle();
+    expect(find.text('Отменить новое действие?'), findsNothing);
+    expect(app.router.stack.map((route) => route.name), [AppShellRoute.name]);
+    expect(tabs.activeIndex, selected);
+  });
+
+  testWidgets('сброс истории спрашивает о черновиках ниже обычной страницы', (
+    tester,
+  ) async {
+    final app = await _start(tester);
+    await _tap(tester, find.text('Новое действие'));
+    await tester.enterText(actionEditorTitleField, 'Первый черновик');
+    await _tap(tester, actionEditorValue('Выберите причину'));
+    final firstIntention = find.bySemanticsLabel(
+      'Открыть страницу намерения «Намерение 1»',
+    );
+    await _until(tester, () => firstIntention.evaluate().isNotEmpty);
+    await _tap(tester, firstIntention);
+    final tabs = app.router.innerRouterOf<TabsRouter>(AppShellRoute.name)!;
+    final selected = tabs.activeIndex;
+    void selectGraph() => tester
+        .widget<AppNavigationBar>(find.byType(AppNavigationBar).last)
+        .onSelected(AppDestination.intentionGraph);
+    final firstHistory = [
+      for (final route in app.router.stackData) route.matchId,
+    ];
+    selectGraph();
+    await tester.pumpAndSettle();
+    expect(find.text('Отменить новое действие?'), findsOneWidget);
+    await _tap(tester, find.text('Продолжить ввод'));
+    expect(app.router.stackData.map((route) => route.matchId), firstHistory);
+    expect(tabs.activeIndex, selected);
+    await openIntentionActionsTab(
+      tester,
+      waitFor: (tester, finder) =>
+          _until(tester, () => finder.evaluate().isNotEmpty),
+      tap: _tap,
+    );
+    await _tap(tester, find.text('Добавить'));
+    await tester.enterText(actionEditorDescriptionField, 'Второй черновик');
+    await _tap(tester, actionEditorValue('Намерение 1'));
+    await _until(tester, () => find.byType(PathPage).evaluate().isNotEmpty);
+    await _tap(tester, find.text('Намерение 1'));
+    final anotherIntention = find.bySemanticsLabel(
+      'Открыть страницу намерения «Намерение 2»',
+    );
+    await _until(tester, () => anotherIntention.evaluate().isNotEmpty);
+    await _tap(tester, anotherIntention);
+
+    final history = [for (final route in app.router.stackData) route.matchId];
+    selectGraph();
+    await tester.pumpAndSettle();
+    expect(find.text('Отменить новое действие?'), findsOneWidget);
+    await _tap(tester, find.text('Продолжить ввод'));
+    expect(app.router.stackData.map((route) => route.matchId), history);
+    expect(tabs.activeIndex, selected);
+    final texts = tester
+        .widgetList<EditableText>(
+          find.byType(EditableText, skipOffstage: false),
+        )
+        .map((field) => field.controller.text);
+    expect(texts, containsAll(['Первый черновик', 'Второй черновик']));
+
+    selectGraph();
+    await tester.pumpAndSettle();
+    expect(find.text('Отменить новое действие?'), findsOneWidget);
+    await _tap(tester, find.text('Сбросить'));
+    expect(app.router.stack.map((route) => route.name), [AppShellRoute.name]);
+    expect(tabs.activeIndex, AppDestination.intentionGraph.index);
+    expect(find.text('Отменить новое действие?'), findsNothing);
+  });
+  testWidgets('выбор причины сохраняет путь в листе и его введённые поля', (
+    tester,
+  ) async {
+    final app = await _start(tester);
+    await _until(
+      tester,
+      () => find.text('Новое действие').evaluate().isNotEmpty,
+    );
+    await _tap(tester, find.text('Новое действие'));
+    await tester.enterText(actionEditorTitleField, 'Прогулка');
+    await tester.enterText(actionEditorDescriptionField, 'В парке');
+    await _tap(tester, actionEditorValue('Весь день'));
+    await _tap(
+      tester,
+      find.descendant(of: find.byType(TimeDial), matching: find.text('18')),
+    );
+    await _tap(tester, actionEditorValue('P4'));
+    await _tap(tester, find.text('P2').last);
+    await _tap(tester, actionEditorValue('Выберите причину'));
+    await _until(
+      tester,
+      () => find.byType(PathStartPickerPage).evaluate().isNotEmpty,
+    );
+    expect(find.text('Новое действие: с чего начинается путь'), findsOneWidget);
+    await _until(tester, () => find.text('Намерение 1').evaluate().isNotEmpty);
+    await _tap(tester, find.text('Намерение 1'));
+    await _until(tester, () => find.byType(PathPage).evaluate().isNotEmpty);
+    await _until(tester, () => find.text('Намерение 2').evaluate().isNotEmpty);
+    await _tap(tester, find.text('Намерение 2'));
+    await _tap(tester, find.text('Сохранить'));
+    await _until(
+      tester,
+      () => actionEditorValue('Намерение 2').evaluate().isNotEmpty,
+    );
+    expect(actionEditorValue('Намерение 1'), findsOneWidget);
+    expect(
+      tester.widget<EditableText>(actionEditorTitleField).controller.text,
+      'Прогулка',
+    );
+    expect(
+      tester.widget<EditableText>(actionEditorDescriptionField).controller.text,
+      'В парке',
+    );
+    expect(actionEditorCanCreate(tester), isTrue);
+    expect(actionEditorValue('Вчера'), findsOneWidget);
+    expect(actionEditorValue('18:00'), findsOneWidget);
+    expect(actionEditorValue('P2'), findsOneWidget);
+    expect(
+      await tester.runAsync(() => durabilityRows(app.database, 'actions')),
+      isEmpty,
+    );
+    await _tap(tester, actionEditorValue('Намерение 1'));
+    await _until(tester, () => find.byType(PathPage).evaluate().isNotEmpty);
+    expect(find.text('Прогулка'), findsOneWidget);
+    await _tap(tester, find.text('Намерение 1'));
+    await _until(
+      tester,
+      () => find.byType(PathStartPickerPage).evaluate().isNotEmpty,
+    );
+    await _tap(tester, find.text('Намерение 4'));
+    await _until(tester, () => find.text('Намерение 4').evaluate().isNotEmpty);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await _tap(tester, find.text('Отменить'));
+    expect(actionEditorValue('Намерение 1'), findsOneWidget);
+    expect(actionEditorValue('Намерение 2'), findsOneWidget);
+    await _tap(tester, actionEditorCreateButton);
+    await _until(
+      tester,
+      () => actionEditorValue('Прогулка').evaluate().isEmpty,
+    );
+    final rows = await tester.runAsync(
+      () => durabilityRows(app.database, 'action_path_items'),
+    );
+    expect(rows!.map((row) => row['intention_id']), [
+      durabilityUuid(1),
+      durabilityUuid(2),
+    ]);
+  });
+
+  testWidgets('закрытие поиска возвращает пустой путь и черновик', (
+    tester,
+  ) async {
+    await _start(tester);
+    await _tap(tester, find.text('Новое действие'));
+    await tester.enterText(actionEditorTitleField, 'Прогулка');
+    await _tap(tester, actionEditorValue('Выберите причину'));
+    await _until(
+      tester,
+      () => find.byType(PathStartPickerPage).evaluate().isNotEmpty,
+    );
+    await _tap(tester, _key('path-start-picker-cancel'));
+    expect(actionEditorValue('Выберите причину'), findsOneWidget);
+    expect(
+      tester.widget<EditableText>(actionEditorTitleField).controller.text,
+      'Прогулка',
+    );
+  });
+
+  testWidgets(
+    'созданное в поиске намерение начинает путь и остаётся при отмене',
+    (tester) async {
+      final app = await _start(tester);
+      await _tap(tester, find.text('Новое действие'));
+      await _tap(tester, actionEditorValue('Выберите причину'));
+      await _until(
+        tester,
+        () => find.bySemanticsLabel('Создать намерение').evaluate().isNotEmpty,
+      );
+      await _tap(tester, find.bySemanticsLabel('Создать намерение'));
+      await tester.enterText(_key('intention-editor-title'), 'Новый корень');
+      app.observer.observe('intentions');
+      await _submit(tester, app);
+      await _until(tester, () => find.byType(PathPage).evaluate().isNotEmpty);
+      await _until(
+        tester,
+        () => find.text('Новый корень').evaluate().isNotEmpty,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Созданное 1 намерение останется.'),
+        findsOneWidget,
+      );
+      await _tap(tester, find.text('Отменить'));
+      expect(actionEditorValue('Выберите причину'), findsOneWidget);
+      final rows = await tester.runAsync(
+        () => durabilityRows(app.database, 'intentions'),
+      );
+      expect(rows!.any((row) => row['title'] == 'Новый корень'), isTrue);
+    },
+  );
+
+  testWidgets('второй лист со страницы намерения не меняет первый черновик', (
+    tester,
+  ) async {
+    await _start(tester);
+    await _tap(tester, find.text('Новое действие'));
+    await tester.enterText(actionEditorTitleField, 'Первый черновик');
+    await _tap(tester, actionEditorValue('Выберите причину'));
+    await _until(
+      tester,
+      () => find
+          .bySemanticsLabel('Открыть страницу намерения «Намерение 1»')
+          .evaluate()
+          .isNotEmpty,
+    );
+    await _tap(
+      tester,
+      find.bySemanticsLabel('Открыть страницу намерения «Намерение 1»'),
+    );
+    await openIntentionActionsTab(
+      tester,
+      waitFor: (tester, finder) =>
+          _until(tester, () => finder.evaluate().isNotEmpty),
+      tap: _tap,
+    );
+    await _tap(tester, find.text('Добавить'));
+    expect(actionEditorValue('Намерение 1'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Намерение 1'), findsWidgets);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await _tap(tester, _key('path-start-picker-cancel'));
+    expect(actionEditorValue('Выберите причину'), findsOneWidget);
+    expect(
+      tester.widget<EditableText>(actionEditorTitleField).controller.text,
+      'Первый черновик',
+    );
+  });
+  testWidgets('разорванный путь листа отмечен и открывается с первого целого '
+      'участка, а создание отклоняется с сохранением полей', (tester) async {
+    final app = await _start(tester);
+    await _tap(tester, find.text('Новое действие'));
+    await tester.enterText(actionEditorTitleField, 'Прогулка');
+    await _tap(tester, actionEditorValue('Выберите причину'));
+    await _until(tester, () => find.text('Намерение 1').evaluate().isNotEmpty);
+    await _tap(tester, find.text('Намерение 1'));
+    await _until(tester, () => find.text('Намерение 2').evaluate().isNotEmpty);
+    await _tap(tester, find.text('Намерение 2'));
+    await _until(tester, () => find.text('Намерение 3').evaluate().isNotEmpty);
+    await _tap(tester, find.text('Намерение 3'));
+    await _tap(tester, find.text('Сохранить'));
+    await _until(
+      tester,
+      () => actionEditorValue('Намерение 3').evaluate().isNotEmpty,
+    );
+
+    final repository = app.container.read(personalGraphRepositoryProvider);
+    for (final relation in [101, 103, 104]) {
+      await _executeWhilePumping(
+        tester,
+        repository,
+        (await tester.runAsync(
+          () =>
+              previewedDeleteRelation(repository, durabilityRelation(relation)),
+        ))!,
+      );
+    }
+    await _executeWhilePumping(
+      tester,
+      repository,
+      (await tester.runAsync(
+        () => previewedDeleteIntention(repository, durabilityIntention(1)),
+      ))!,
+    );
+    await _until(
+      tester,
+      () => actionEditorValue('Удалено').evaluate().isNotEmpty,
+    );
+    // Удалены корень и связь от него: отметка после названия и на пути.
+    expect(actionEditorValue('Удалено'), findsNWidgets(2));
+    expect(actionEditorValue('Намерение 1'), findsOneWidget);
+    expect(actionEditorCanCreate(tester), isTrue);
+
+    await _tap(tester, actionEditorValue('Намерение 1'));
+    await settlePathScreen(tester);
+    Finder onPath(String text) =>
+        find.descendant(of: pathScreen, matching: find.text(text));
+    expect(onPath('Намерение 1'), findsNothing);
+    expect(
+      tester.getTopLeft(onPath('Намерение 2')).dy,
+      lessThan(tester.getTopLeft(onPath('Намерение 3')).dy),
+    );
+    expect(isPathSaveEnabled(tester), isTrue);
+    await tapPathBack(tester);
+    await _tap(tester, find.text('Отменить'));
+    expect(actionEditorValue('Намерение 1'), findsOneWidget);
+    expect(actionEditorValue('Удалено'), findsNWidgets(2));
+
+    await _tap(tester, actionEditorCreateButton);
+    await _until(
+      tester,
+      () =>
+          actionEditorValue(app.l10n.actionPathConflict).evaluate().isNotEmpty,
+    );
+    expect(
+      tester.widget<EditableText>(actionEditorTitleField).controller.text,
+      'Прогулка',
+    );
+    expect(actionEditorValue('Намерение 3'), findsOneWidget);
+    expect(
+      await tester.runAsync(() => durabilityRows(app.database, 'actions')),
+      isEmpty,
+    );
+  });
+
+  testWidgets('восстановленная связь снимает конфликт создания без сохранения '
+      'неизменённого пути', (tester) async {
+    final app = await _start(tester);
+    await _tap(tester, find.text('Новое действие'));
+    await tester.enterText(actionEditorTitleField, 'Прогулка');
+    await _tap(tester, actionEditorValue('Выберите причину'));
+    await _until(tester, () => find.text('Намерение 1').evaluate().isNotEmpty);
+    await _tap(tester, find.text('Намерение 1'));
+    await _until(tester, () => find.text('Намерение 2').evaluate().isNotEmpty);
+    await _tap(tester, find.text('Намерение 2'));
+    await _tap(tester, find.text('Сохранить'));
+    await _until(
+      tester,
+      () => actionEditorValue('Намерение 2').evaluate().isNotEmpty,
+    );
+
+    final repository = app.container.read(personalGraphRepositoryProvider);
+    await _executeWhilePumping(
+      tester,
+      repository,
+      (await tester.runAsync(
+        () => previewedDeleteRelation(repository, durabilityRelation(101)),
+      ))!,
+    );
+    await _until(
+      tester,
+      () => actionEditorValue('Удалено').evaluate().isNotEmpty,
+    );
+    await _tap(tester, actionEditorCreateButton);
+    await _until(
+      tester,
+      () =>
+          actionEditorValue(app.l10n.actionPathConflict).evaluate().isNotEmpty,
+    );
+    expect(actionEditorCanCreate(tester), isFalse);
+
+    await _tap(tester, actionEditorValue('Намерение 1'));
+    await settlePathScreen(tester);
+    expect(find.text('Намерение 2'), findsNothing);
+    await _tap(tester, find.text('Добавить'));
+    await _until(tester, () => find.text('Намерение 2').evaluate().isNotEmpty);
+    await _tap(tester, find.text('Намерение 2'));
+    await _tap(tester, find.text('Добавить 1 связь'));
+    await _until(
+      tester,
+      () =>
+          pathScreen.evaluate().isNotEmpty &&
+          find.text('Намерение 2').evaluate().isNotEmpty,
+    );
+    await _tap(tester, find.text('Намерение 2'));
+    expect(isPathSaveEnabled(tester), isFalse);
+    await tapPathBack(tester);
+    expect(find.text('Отменить изменения?'), findsNothing);
+    expect(actionEditor, findsOneWidget);
+    await _until(tester, () => actionEditorCanCreate(tester));
+    await _tap(tester, actionEditorCreateButton);
+    await _until(
+      tester,
+      () => tester
+          .widget<EditableText>(actionEditorTitleField)
+          .controller
+          .text
+          .isEmpty,
+    );
+    final actions = await tester.runAsync(
+      () => durabilityRows(app.database, 'actions'),
+    );
+    expect(actions!.single['title'], 'Прогулка');
+    final rows = await tester.runAsync(
+      () => durabilityRows(app.database, 'action_path_items'),
+    );
+    expect(rows!.map((row) => row['intention_id']), [
+      durabilityUuid(1),
+      durabilityUuid(2),
+    ]);
+  });
+
+  testWidgets('пустой день открывает лист с выбранной датой и без пути', (
+    tester,
+  ) async {
+    await _start(tester);
+    final date = CalendarDate.fromParts(2026, 10, 6);
+    await selectActionDayDate(tester, date);
+    await _until(
+      tester,
+      () => find.text('Нет действий на эту дату').evaluate().isNotEmpty,
+    );
+    await _tap(tester, find.text('Новое действие'));
+    expect(actionEditorValue('6 окт.'), findsOneWidget);
+    expect(actionEditorValue('Выберите причину'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(shownActionDayDate(tester), date);
+  });
   testWidgets('охват «Все» остаётся в каталоге при переходе к связям', (
     tester,
   ) async {
@@ -97,29 +526,29 @@ void main() {
   });
 
   testWidgets(
-    'закрытие чистой панели возвращает дату, фильтр и прокрутку каталога дневных выборов',
+    'закрытие чистой панели возвращает дату, секции и прокрутку экрана дня',
     (tester) async {
-      final app = await _start(tester, seed: _seedDailyChoicesForReturn);
+      final app = await _start(tester, seed: _seedActionsForReturn);
       final date = CalendarDate.fromParts(2026, 10, 7);
-      await selectDailyChoiceCatalogDate(tester, date);
+      await selectActionDayDate(tester, date);
       await _until(
         tester,
-        () => _key('daily-choice-section-false').evaluate().isNotEmpty,
+        () => _key('action-day-section-incomplete').evaluate().isNotEmpty,
       );
-      await showDailyChoiceCatalogSection(tester, false);
-      await showDailyChoiceCatalogSection(tester, true);
+      await showActionDaySection(tester, ActionDaySection.incomplete);
+      await showActionDaySection(tester, ActionDaySection.completed);
       final semantics = tester.ensureSemantics();
       void expectSections() {
         expect(
           tester
-              .getSemantics(_key('daily-choice-section-false'))
+              .getSemantics(_key('action-day-section-incomplete'))
               .flagsCollection
               .isExpanded,
           Tristate.isFalse,
         );
         expect(
           tester
-              .getSemantics(_key('daily-choice-section-true'))
+              .getSemantics(_key('action-day-section-completed'))
               .flagsCollection
               .isExpanded,
           Tristate.isTrue,
@@ -127,29 +556,25 @@ void main() {
       }
 
       expectSections();
-      final position = _dailyChoiceScrollPosition(tester);
+      final position = _actionDayScrollPosition(tester);
       position.jumpTo(position.maxScrollExtent / 2);
       await tester.pumpAndSettle();
       expect(position.pixels, greaterThan(0));
       final offset = position.pixels;
-      expect(shownDailyChoiceCatalogDate(tester), date);
-      await _Flow.intention.open(
-        tester,
-        app,
-        IntentionCreationOrigin.dailyChoices,
-      );
+      expect(shownActionDayDate(tester), date);
+      await _openIntentionEditor(tester, app, IntentionCreationOrigin.actions);
       await tester.tap(_key('intention-editor-close'));
       await _until(
         tester,
         () => _key('intention-editor-title').evaluate().isEmpty,
       );
       await tester.pumpAndSettle();
-      expect(shownDailyChoiceCatalogDate(tester), date);
-      final restored = _dailyChoiceScrollPosition(tester);
+      expect(shownActionDayDate(tester), date);
+      final restored = _actionDayScrollPosition(tester);
       expect(restored.pixels, offset);
       expect(
         tester.widget<AppNavigationBar>(find.byType(AppNavigationBar)).selected,
-        AppDestination.dailyChoices,
+        AppDestination.actions,
       );
       // Заголовок невыполненных над прокрученной выдачей не построен.
       restored.jumpTo(0);
@@ -164,7 +589,6 @@ void main() {
   ) async {
     final app = await _start(tester, fileBacked: true);
     const origin = IntentionCreationOrigin.graph;
-    const flow = _Flow.intention;
     final history = await origin.open(
       tester,
       app.router,
@@ -172,8 +596,8 @@ void main() {
       waitFor: (tester, finder) =>
           _until(tester, () => finder.evaluate().isNotEmpty),
     );
-    await flow.open(tester, app, origin);
-    await flow.fill(tester);
+    await _openIntentionEditor(tester, app, origin);
+    await _fillIntentionEditor(tester);
     const title = 'Намерение новое';
     await tester.enterText(_key('intention-editor-title'), title);
     final coordinator = app.container.read(
@@ -182,9 +606,13 @@ void main() {
     final completions = <GraphCommandCompletion>[];
     final subscription = coordinator.completions.listen(completions.add);
     addTearDown(subscription.cancel);
-    coordinator.acceptRelationDelete(
-      DeleteLongTermRelation(durabilityRelation(104)),
-    );
+    final deletion = (await tester.runAsync(
+      () => previewedDeleteRelation(
+        app.container.read(personalGraphRepositoryProvider),
+        durabilityRelation(104),
+      ),
+    ))!;
+    coordinator.acceptRelationDelete(deletion);
     await _until(tester, () => completions.length == 1);
     await tester.pumpAndSettle();
     final first = app.l10n.graphOperationMessage(
@@ -199,18 +627,21 @@ void main() {
     );
     expect(find.text(first).hitTestable(), findsOneWidget);
 
-    app.observer.observe(flow.table);
-    await _submit(tester, app, flow);
-    await _until(tester, () => app.router.current.name == flow.resultRoute);
+    app.observer.observe(_intentionsTable);
+    await _submit(tester, app);
+    await _until(
+      tester,
+      () => app.router.current.name == IntentionDetailsRoute.name,
+    );
     await tester.pumpAndSettle();
     expect(_key('intention-editor-title'), findsNothing);
     expect(find.text(title), findsOneWidget);
     expect(find.text(first).hitTestable(), findsOneWidget);
     expect(find.text(createdMessage, skipOffstage: false), findsNothing);
     final stored = (await tester.runAsync(
-      () => durabilityRows(app.database, flow.table),
+      () => durabilityRows(app.database, _intentionsTable),
     ))!;
-    expect(stored, hasLength(flow.initialRows + 1));
+    expect(stored, hasLength(_initialIntentionRows + 1));
     expect(stored.last['title'], title);
     expect(stored.last['description'], 'Сохранённое описание');
 
@@ -227,7 +658,10 @@ void main() {
     await tester.drag(find.text(createdMessage), const Offset(600, 0));
     await tester.pumpAndSettle();
     await _tap(tester, find.text(title));
-    await _until(tester, () => app.router.current.name == flow.resultRoute);
+    await _until(
+      tester,
+      () => app.router.current.name == IntentionDetailsRoute.name,
+    );
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     await tester.pump(const Duration(seconds: 10));
@@ -237,59 +671,19 @@ void main() {
     expect(app.observer.attempts, 1);
     expect(completions, hasLength(2));
     expect(
-      await tester.runAsync(() => durabilityRows(app.database, flow.table)),
+      await tester.runAsync(
+        () => durabilityRows(app.database, _intentionsTable),
+      ),
       stored,
     );
     expect(tester.takeException(), isNull);
   });
 
-  // Варианты потоков связи и дневного выбора принадлежат их собственным
-  // тестам. Здесь дневной выбор от действия — одна связка общей кнопки с другим
-  // потоком, а намерение проверяется над корневой и глубокой историей.
-  testWidgets('дневной выбор от действия: успех над глубокой историей '
-      'возвращает на исходную страницу и сохраняет параметры каталогов', (
-    tester,
-  ) async {
-    const flow = _Flow.bottomUp;
-    const origin = IntentionCreationOrigin.deep;
-    final app = await _start(tester, fileBacked: true);
-    final history = await origin.open(
-      tester,
-      app.router,
-      participantId: durabilityIntention(2),
-      waitFor: (tester, finder) =>
-          _until(tester, () => finder.evaluate().isNotEmpty),
-    );
-    final catalogs = app.catalogs;
-    await flow.open(tester, app, origin);
-    history.expectPrefix(app.router);
-    await flow.fill(tester);
-    app.observer.observe(flow.table);
-    await _tap(tester, _key(flow.submit));
-    await _until(
-      tester,
-      () => app.router.stackData.length == history.routes.length,
-    );
-    await tester.pumpAndSettle();
-    history.expectRestored(tester, app.router);
-    final rows = (await tester.runAsync(
-      () => durabilityRows(app.database, flow.table),
-    ))!;
-    expect(rows, hasLength(flow.initialRows + 1));
-    expect(app.observer.attempts, 1);
-    flow.expectStored(rows.last);
-    expect(find.textContaining('Дневной выбор создан'), findsOneWidget);
-    expect(app.catalogs, catalogs);
-    await history.expectUnderlyingTask(tester, app.router);
-    expect(tester.takeException(), isNull);
-  });
-
-  const flow = _Flow.intention;
   for (final origin in const [
-    IntentionCreationOrigin.dailyChoices,
+    IntentionCreationOrigin.actions,
     IntentionCreationOrigin.deep,
   ]) {
-    testWidgets('${flow.label}: успех над ${origin.description} сохраняет '
+    testWidgets('намерение: успех над ${origin.description} сохраняет '
         'ID, историю, выбранный пункт и параметры каталогов', (tester) async {
       final app = await _start(tester);
       final history = await origin.open(
@@ -300,12 +694,15 @@ void main() {
             _until(tester, () => finder.evaluate().isNotEmpty),
       );
       final catalogs = app.catalogs;
-      await flow.open(tester, app, origin);
+      await _openIntentionEditor(tester, app, origin);
       history.expectPrefix(app.router);
-      await flow.fill(tester);
-      app.observer.observe(flow.table);
-      await _tap(tester, _key(flow.submit));
-      await _until(tester, () => app.router.current.name == flow.resultRoute);
+      await _fillIntentionEditor(tester);
+      app.observer.observe(_intentionsTable);
+      await _tap(tester, _key(_intentionSubmit));
+      await _until(
+        tester,
+        () => app.router.current.name == IntentionDetailsRoute.name,
+      );
       await tester.pumpAndSettle();
       history.expectPrefix(app.router);
       expect(app.router.stackData, hasLength(history.routes.length + 1));
@@ -314,10 +711,10 @@ void main() {
         origin.destination,
       );
       final rows = (await tester.runAsync(
-        () => durabilityRows(app.database, flow.table),
+        () => durabilityRows(app.database, _intentionsTable),
       ))!;
       final created = rows.last;
-      expect(rows, hasLength(flow.initialRows + 1));
+      expect(rows, hasLength(_initialIntentionRows + 1));
       expect(app.observer.attempts, 1);
       final resultId = switch (app.router.current.args) {
         IntentionDetailsRouteArgs(:final intentionId) =>
@@ -325,7 +722,7 @@ void main() {
         _ => throw StateError('Ожидался маршрут созданной сущности.'),
       };
       expect(resultId, created['id']);
-      flow.expectStored(created);
+      _expectIntentionStored(created);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       history.expectRestored(tester, app.router);
@@ -335,49 +732,61 @@ void main() {
     });
   }
   for (final origin in const [
-    IntentionCreationOrigin.dailyChoices,
+    IntentionCreationOrigin.actions,
     IntentionCreationOrigin.deep,
   ]) {
     for (final leave in [false, true]) {
-      testWidgets(
-        '${flow.label}: ${leave ? 'выход во время записи' : 'отмена'} '
-        'над ${origin.description} сохраняет исходную сессию',
-        (tester) async {
-          final app = await _start(tester);
-          final history = await origin.open(
+      testWidgets('намерение: ${leave ? 'выход во время записи' : 'отмена'} '
+          'над ${origin.description} сохраняет исходную сессию', (
+        tester,
+      ) async {
+        final app = await _start(tester);
+        final history = await origin.open(
+          tester,
+          app.router,
+          participantId: durabilityIntention(2),
+          waitFor: (tester, finder) =>
+              _until(tester, () => finder.evaluate().isNotEmpty),
+        );
+        final catalogs = app.catalogs;
+        await _openIntentionEditor(tester, app, origin);
+        await _fillIntentionEditor(tester);
+        app.observer.observe(_intentionsTable, hold: leave);
+        if (leave) await _submit(tester, app);
+        await _closeCreation(tester, app);
+        history.expectRestored(tester, app.router);
+        final current = app.router.stackData.last.matchId;
+        app.observer.release();
+        if (leave) {
+          await _until(
             tester,
-            app.router,
-            participantId: durabilityIntention(2),
-            waitFor: (tester, finder) =>
-                _until(tester, () => finder.evaluate().isNotEmpty),
+            () => _key('graph-operation-message').evaluate().isNotEmpty,
           );
-          final catalogs = app.catalogs;
-          await flow.open(tester, app, origin);
-          await flow.fill(tester);
-          app.observer.observe(flow.table, hold: leave);
-          if (leave) await _submit(tester, app, flow);
-          await _closeCreation(tester, app, flow);
-          history.expectRestored(tester, app.router);
-          final current = app.router.stackData.last.matchId;
-          app.observer.release();
-          if (leave) {
-            await _until(
-              tester,
-              () => _key('graph-operation-message').evaluate().isNotEmpty,
-            );
-            await tester.pumpAndSettle();
-          }
-          expect(app.router.stackData.last.matchId, current);
-          history.expectRestored(tester, app.router);
-          expect(app.catalogs, catalogs);
-          final rows = await durabilityRows(app.database, flow.table);
-          expect(rows, hasLength(flow.initialRows + (leave ? 1 : 0)));
-          expect(app.observer.attempts, leave ? 1 : 0);
-          if (leave) flow.expectStored(rows.last);
-          await history.expectUnderlyingTask(tester, app.router);
-          expect(tester.takeException(), isNull);
-        },
-      );
+          await tester.pumpAndSettle();
+        }
+        expect(app.router.stackData.last.matchId, current);
+        history.expectRestored(tester, app.router);
+        expect(app.catalogs, catalogs);
+        final rows = await durabilityRows(app.database, _intentionsTable);
+        expect(rows, hasLength(_initialIntentionRows + (leave ? 1 : 0)));
+        expect(app.observer.attempts, leave ? 1 : 0);
+        if (leave) _expectIntentionStored(rows.last);
+        await history.expectUnderlyingTask(tester, app.router);
+        expect(tester.takeException(), isNull);
+      });
     }
   }
+}
+
+/// Выполняет [command] в хранилище, пока экраны получают кадры, и проверяет
+/// успех: результат читается после ожидания, а не внутри колбэка.
+Future<void> _executeWhilePumping(
+  WidgetTester tester,
+  PersonalGraphRepository repository,
+  GraphCommand<GraphCommandOutcome, GraphCommandFailure> command,
+) async {
+  Object? result;
+  unawaited(repository.execute(command).then((value) => result = value));
+  await _until(tester, () => result != null);
+  expect(result, isA<GraphCommandSucceeded>());
 }

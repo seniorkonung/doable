@@ -98,6 +98,42 @@ abstract class AppLocalizations {
     Locale('ru'),
   ];
 
+  /// Подпись вида намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Intention kind'**
+  String get intentionKindLabel;
+
+  /// Подпись вида намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Main'**
+  String get intentionKindMain;
+
+  /// Подпись вида намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting'**
+  String get intentionKindSupporting;
+
+  /// Подпись вида намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Main. Matters on its own and remains when what needs it goes away'**
+  String get intentionKindMainSemantics;
+
+  /// Подпись вида намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting. Exists while a main intention needs it and goes away with it'**
+  String get intentionKindSupportingSemantics;
+
+  /// Подпись вида намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting. Available when another intention needs it or can use it'**
+  String get intentionKindSupportingUnavailable;
+
   /// Название приложения
   ///
   /// In en, this message translates to:
@@ -122,11 +158,11 @@ abstract class AppLocalizations {
   /// **'Home'**
   String get appDestinationHome;
 
-  /// Название пункта основной навигации и заголовок каталога дневных выборов
+  /// Название пункта основной навигации и заголовок экрана дня как корневой страницы
   ///
   /// In en, this message translates to:
-  /// **'Daily choices'**
-  String get appDestinationDailyChoices;
+  /// **'Actions'**
+  String get appDestinationActions;
 
   /// Название пункта основной навигации и заголовок каталога намерений как корневой страницы
   ///
@@ -134,29 +170,65 @@ abstract class AppLocalizations {
   /// **'Intention graph'**
   String get appDestinationIntentionGraph;
 
-  /// Вид статистики по исходным намерениям дневных выборов
+  /// Вид статистики по корневым намерениям сохранённых путей действий
   ///
   /// In en, this message translates to:
-  /// **'Source intentions'**
-  String get statisticsSourceIntentions;
+  /// **'Root intentions'**
+  String get statisticsRootIntentions;
 
-  /// Вид статистики по промежуточным намерениям сохранённого пути
+  /// Вид статистики по намерениям строго между корневым и конечным в сохранённых путях действий
   ///
   /// In en, this message translates to:
   /// **'Intermediate intentions'**
   String get statisticsIntermediateIntentions;
 
-  /// Вид статистики по выбранным действиям
+  /// Вид статистики по конечным намерениям сохранённых путей действий
   ///
   /// In en, this message translates to:
-  /// **'Selected actions'**
-  String get statisticsSelectedActions;
+  /// **'Final intentions'**
+  String get statisticsTerminalIntentions;
 
-  /// Вид статистики по сохранённому пути и текущим активным связям
+  /// Вид статистики по существующим намерениям сохранённых путей и текущим активным связям
   ///
   /// In en, this message translates to:
-  /// **'Total contribution'**
+  /// **'Through relations'**
   String get statisticsThroughRelations;
+
+  /// Заголовок листа выбора вида статистики на Главной
+  ///
+  /// In en, this message translates to:
+  /// **'Count actions by'**
+  String get statisticsViewSheetTitle;
+
+  /// Пояснение вида «Корневые намерения» в листе выбора вида
+  ///
+  /// In en, this message translates to:
+  /// **'Where each path starts'**
+  String get statisticsRootIntentionsHint;
+
+  /// Пояснение вида «Промежуточные намерения» в листе выбора вида
+  ///
+  /// In en, this message translates to:
+  /// **'Links between the root and the final intention'**
+  String get statisticsIntermediateIntentionsHint;
+
+  /// Пояснение вида «Конечные намерения» в листе выбора вида
+  ///
+  /// In en, this message translates to:
+  /// **'The last reason right above the action'**
+  String get statisticsTerminalIntentionsHint;
+
+  /// Пояснение вида «Через связи» в листе выбора вида
+  ///
+  /// In en, this message translates to:
+  /// **'Every intention the action serves'**
+  String get statisticsThroughRelationsHint;
+
+  /// Пояснение над каталогом вида «Через связи»: вид считает по текущим связям
+  ///
+  /// In en, this message translates to:
+  /// **'This view counts by the relations as they are now and changes with them.'**
+  String get statisticsThroughRelationsNote;
 
   /// Вкладка статистики календарного месяца
   ///
@@ -230,7 +302,7 @@ abstract class AppLocalizations {
   /// **'Current period'**
   String get statisticsCurrentPeriod;
 
-  /// Заголовок сводки дневных выборов всего периода
+  /// Заголовок сводки действий всего периода
   ///
   /// In en, this message translates to:
   /// **'Period summary'**
@@ -248,29 +320,17 @@ abstract class AppLocalizations {
   /// **'{count, plural, one{{count} item} other{{count} items}}'**
   String statisticsTotalItems(int count);
 
-  /// Запланированный вклад сводки периода
+  /// Число всех действий периода — его запланированный вклад — с числовой формой локали
   ///
   /// In en, this message translates to:
-  /// **'Planned contribution: {count}'**
-  String statisticsPlannedContribution(int count);
+  /// **'{count, plural, one{{count} action} other{{count} actions}}'**
+  String statisticsPeriodActions(int count);
 
-  /// Вклад сводки периода
+  /// Сколько из действий периода выполнено — вклад периода
   ///
   /// In en, this message translates to:
-  /// **'Contribution: {count}'**
-  String statisticsContribution(int count);
-
-  /// Число невыполненных выборов раньше текущей местной даты
-  ///
-  /// In en, this message translates to:
-  /// **'Missed: {count}'**
-  String statisticsMissed(int count);
-
-  /// Число невыполненных выборов текущей местной даты и позже
-  ///
-  /// In en, this message translates to:
-  /// **'Upcoming: {count}'**
-  String statisticsUpcoming(int count);
+  /// **'{completed} of {planned} completed'**
+  String statisticsPeriodCompleted(int completed, int planned);
 
   /// Компактный видимый вклад элемента из запланированного
   ///
@@ -284,17 +344,11 @@ abstract class AppLocalizations {
   /// **'Contribution: {contribution}. Planned contribution: {planned}'**
   String statisticsContributionCountsSemantics(int contribution, int planned);
 
-  /// Видимая и доступная доля вклада элемента; отношение к вкладу периода передаётся без умножения на 100
+  /// Видимая и доступная доля элемента Главной или вида раздела намерения: запланированный вклад, делённый на число действий периода, без умножения на 100
   ///
   /// In en, this message translates to:
-  /// **'Share of the period’s contribution: {share}'**
-  String statisticsContributionShare(num share);
-
-  /// Доступное объяснение отсутствия доли при нулевом вкладе периода; видимая доля в этом случае не показывается
-  ///
-  /// In en, this message translates to:
-  /// **'No share: the period’s contribution is zero'**
-  String get statisticsNoContributionShare;
+  /// **'Share of the period’s actions: {share}'**
+  String statisticsPeriodActionsShare(num share);
 
   /// Начальное получение статистики выбранных условий
   ///
@@ -302,11 +356,65 @@ abstract class AppLocalizations {
   /// **'Loading statistics…'**
   String get statisticsLoading;
 
-  /// Подтверждённый пустой вид, в том числе при непустой сводке периода
+  /// Сообщение Главной вместо сводки, выбора вида и каталога, когда в периоде нет действий
   ///
   /// In en, this message translates to:
-  /// **'No daily choices are credited to this view for the selected period.'**
-  String get statisticsEmpty;
+  /// **'There are no actions in this period. Actions dated within it will be counted here.'**
+  String get statisticsPeriodEmpty;
+
+  /// Сообщение Главной, когда в периоде есть действия, а в выбранном виде нет элементов
+  ///
+  /// In en, this message translates to:
+  /// **'There are no items in the “{view}” view for this period.'**
+  String statisticsViewEmpty(String view);
+
+  /// Заголовок раздела статистики намерения без действий вида «Корневое»
+  ///
+  /// In en, this message translates to:
+  /// **'No actions with it as the root in {period}'**
+  String statisticsIntentionEmptyRootTitle(String period);
+
+  /// Заголовок раздела статистики намерения без действий вида «Промежуточное»
+  ///
+  /// In en, this message translates to:
+  /// **'No actions through it in {period}'**
+  String statisticsIntentionEmptyIntermediateTitle(String period);
+
+  /// Заголовок раздела статистики намерения без действий вида «Конечное»
+  ///
+  /// In en, this message translates to:
+  /// **'No actions with it as the final one in {period}'**
+  String statisticsIntentionEmptyTerminalTitle(String period);
+
+  /// Заголовок раздела статистики намерения без действий вида «Через связи»
+  ///
+  /// In en, this message translates to:
+  /// **'No actions through relations in {period}'**
+  String statisticsIntentionEmptyThroughRelationsTitle(String period);
+
+  /// Объяснение, какие действия посчитает пустой вид «Корневое»
+  ///
+  /// In en, this message translates to:
+  /// **'An action of the selected period whose path starts from this intention will be counted here.'**
+  String get statisticsIntentionEmptyRootText;
+
+  /// Объяснение, какие действия посчитает пустой вид «Промежуточное»
+  ///
+  /// In en, this message translates to:
+  /// **'An action of the selected period whose path passes through this intention between the root and the final one will be counted here.'**
+  String get statisticsIntentionEmptyIntermediateText;
+
+  /// Объяснение, какие действия посчитает пустой вид «Конечное»
+  ///
+  /// In en, this message translates to:
+  /// **'An action of the selected period whose path ends at this intention will be counted here.'**
+  String get statisticsIntentionEmptyTerminalText;
+
+  /// Объяснение, какие действия посчитает пустой вид «Через связи»
+  ///
+  /// In en, this message translates to:
+  /// **'An action of the selected period that this intention serves through its relations will be counted here.'**
+  String get statisticsIntentionEmptyThroughRelationsText;
 
   /// Обновление статистики с сохранением прежних подтверждённых чисел
   ///
@@ -380,41 +488,23 @@ abstract class AppLocalizations {
   /// **'Statistics'**
   String get statisticsSectionTitle;
 
-  /// Заголовок разбивки вклада намерения по исходным намерениям
+  /// Заголовок разбивки действий вида по исходящим связям намерения; архивная отметка связи использует relationNeighborhoodRelationArchived, намерения — detailsArchived
   ///
   /// In en, this message translates to:
-  /// **'By source intentions'**
-  String get statisticsBreakdownSourceIntentions;
-
-  /// Заголовок разбивки вклада намерения по выбранным действиям
-  ///
-  /// In en, this message translates to:
-  /// **'By selected actions'**
-  String get statisticsBreakdownSelectedActions;
-
-  /// Заголовок разбивки вклада по исходящим связям намерения; архивная отметка связи использует relationNeighborhoodRelationArchived, намерения — detailsArchived
-  ///
-  /// In en, this message translates to:
-  /// **'By relations'**
+  /// **'Comes through'**
   String get statisticsBreakdownRelations;
 
-  /// Число запланированных выборов вида «Весь вклад», в сохранённом пути которых есть намерение; учитываются выполненные и невыполненные выборы
+  /// Сколько действий вида «Через связи» содержат намерение на сохранённом пути, из всех действий этого вида; учитываются выполненные и невыполненные
   ///
   /// In en, this message translates to:
-  /// **'Daily choices with this intention on the saved selection path: {count} of {planned}'**
-  String statisticsExplicitPathChoices(int count, int planned);
+  /// **'With this intention on the saved path: {count} of {planned}'**
+  String statisticsExplicitPathActions(int count, int planned);
 
-  /// Доля строки разбивки относительно вклада намерения в выбранном виде, а не всего периода; отношение передаётся без умножения на 100
+  /// Доля строки разбивки: её запланированный вклад, делённый на число действий выбранного вида намерения, без умножения на 100
   ///
   /// In en, this message translates to:
-  /// **'Share of this intention’s contribution in this view: {share}'**
-  String statisticsBreakdownContributionShare(num share);
-
-  /// Доступное объяснение отсутствия доли строки разбивки при нулевом вкладе намерения в выбранном виде
-  ///
-  /// In en, this message translates to:
-  /// **'No share: this intention’s contribution in this view is zero'**
-  String get statisticsBreakdownNoContributionShare;
+  /// **'Share of this view’s actions: {share}'**
+  String statisticsBreakdownActionsShare(num share);
 
   /// Краткий статус неудачного обновления рядом с прежними строками; допускает повтор
   ///
@@ -434,23 +524,23 @@ abstract class AppLocalizations {
   /// **'Update error.'**
   String get statisticsRefreshUnexpectedShort;
 
-  /// Значение галочки календаря статистики: выполнены все выборы дня, засчитанные намерению в выбранном виде; остальные выборы дня не учитываются
+  /// Значение галочки календаря статистики: выполнены все действия дня, засчитанные намерению в выбранном виде; остальные действия дня не учитываются
   ///
   /// In en, this message translates to:
-  /// **'All credited daily choices are completed'**
+  /// **'All actions of this view are completed'**
   String get statisticsCalendarDayAllCompleted;
 
-  /// Значение кружка календаря статистики: среди засчитанных намерению выборов дня есть невыполненный
+  /// Значение кружка календаря статистики: среди действий дня, засчитанных намерению в выбранном виде, есть невыполненное
   ///
   /// In en, this message translates to:
-  /// **'There is an incomplete credited daily choice'**
+  /// **'There is an incomplete action of this view'**
   String get statisticsCalendarDayHasIncomplete;
 
-  /// Доступное состояние дня без отметки: выбранный вид не засчитывает намерению выборов этой даты
+  /// Доступное состояние дня без отметки: выбранный вид не засчитывает намерению действий этой даты
   ///
   /// In en, this message translates to:
-  /// **'No credited daily choices'**
-  String get statisticsCalendarDayNoChoices;
+  /// **'No actions of this view'**
+  String get statisticsCalendarDayNoActions;
 
   /// Доступная подпись дня статистики с полной датой и локализованным состоянием; календарь раздела не выбирает день
   ///
@@ -464,11 +554,65 @@ abstract class AppLocalizations {
   /// **'{month}. {counts}'**
   String statisticsMonthBarSemantics(DateTime month, String counts);
 
-  /// Доступная подпись карточки вида: локализованные вид, период и обе меры; выбранное состояние передаётся свойством Semantics.selected. Доля выбранного вида использует statisticsContributionShare или statisticsNoContributionShare; название намерения не переводится, архивная отметка использует detailsArchived
+  /// Доступное название группы плиток видов статистики на странице намерения
   ///
   /// In en, this message translates to:
-  /// **'{view}. {period}. {counts}'**
-  String statisticsViewCardSemantics(String view, String period, String counts);
+  /// **'How the actions are counted for this intention'**
+  String get statisticsTilesLabel;
+
+  /// Плитка действий, путь которых начинается с намерения, в разделе статистики
+  ///
+  /// In en, this message translates to:
+  /// **'Root'**
+  String get statisticsTileRoot;
+
+  /// Плитка действий, путь которых проходит через намерение между корневым и конечным, в разделе статистики
+  ///
+  /// In en, this message translates to:
+  /// **'Intermediate'**
+  String get statisticsTileIntermediate;
+
+  /// Плитка действий, путь которых заканчивается намерением, в разделе статистики
+  ///
+  /// In en, this message translates to:
+  /// **'Final'**
+  String get statisticsTileTerminal;
+
+  /// Плитка на всю ширину: действия, засчитанные намерению по текущим активным связям
+  ///
+  /// In en, this message translates to:
+  /// **'Through relations, as they are now'**
+  String get statisticsTileThroughRelations;
+
+  /// Доступное название плитки вида: название, число действий и период; выбранное состояние передаёт сама плитка
+  ///
+  /// In en, this message translates to:
+  /// **'{view}: {actions} in {period}'**
+  String statisticsTileSemantics(String view, String actions, String period);
+
+  /// Пояснение выбранной плитки «Корневое» под плитками раздела статистики
+  ///
+  /// In en, this message translates to:
+  /// **'Actions whose path starts from this intention.'**
+  String get statisticsIntentionRootHint;
+
+  /// Пояснение выбранной плитки «Промежуточное» под плитками раздела статистики
+  ///
+  /// In en, this message translates to:
+  /// **'Actions whose path passes through this intention between the root and the final one.'**
+  String get statisticsIntentionIntermediateHint;
+
+  /// Пояснение выбранной плитки «Конечное» под плитками раздела статистики
+  ///
+  /// In en, this message translates to:
+  /// **'Actions whose path ends at this intention: it is their final one.'**
+  String get statisticsIntentionTerminalHint;
+
+  /// Пояснение выбранной плитки «Через связи, как сейчас»: число меняется вместе со связями
+  ///
+  /// In en, this message translates to:
+  /// **'Actions that this intention serves through its relations. The count changes when the relations do.'**
+  String get statisticsIntentionThroughRelationsHint;
 
   /// Доступное название кнопки быстрого создания
   ///
@@ -500,6 +644,18 @@ abstract class AppLocalizations {
   /// **'Touch and hold to change mode'**
   String get quickCreationLongPressHint;
 
+  /// Quick creation action mode
+  ///
+  /// In en, this message translates to:
+  /// **'New action'**
+  String get quickCreationModeAction;
+
+  /// Quick creation action mode explanation
+  ///
+  /// In en, this message translates to:
+  /// **'A one-time task for the day'**
+  String get quickCreationModeActionHint;
+
   /// Название режима создания намерения
   ///
   /// In en, this message translates to:
@@ -511,48 +667,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Something you want to do or change'**
   String get quickCreationModeIntentionHint;
-
-  /// Название режима и заголовок листа нового дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'New daily choice'**
-  String get quickCreationModeDailyChoice;
-
-  /// Пояснение режима создания дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'An action for an intention on a chosen day'**
-  String get quickCreationModeDailyChoiceHint;
-
-  /// Пояснение листа выбора начала дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Choose where to start'**
-  String get quickCreationDailyChoiceStartPrompt;
-
-  /// Вариант начала дневного выбора с исходного намерения
-  ///
-  /// In en, this message translates to:
-  /// **'From an intention'**
-  String get quickCreationDailyChoiceFromIntention;
-
-  /// Пояснение выбора от исходного намерения к действию
-  ///
-  /// In en, this message translates to:
-  /// **'Pick an intention, then an action for it'**
-  String get quickCreationDailyChoiceFromIntentionHint;
-
-  /// Вариант начала дневного выбора с действия
-  ///
-  /// In en, this message translates to:
-  /// **'From an action'**
-  String get quickCreationDailyChoiceFromAction;
-
-  /// Пояснение выбора от действия к исходному намерению
-  ///
-  /// In en, this message translates to:
-  /// **'Pick an action, then the intention it serves'**
-  String get quickCreationDailyChoiceFromActionHint;
 
   /// Общее состояние загрузки
   ///
@@ -680,24 +794,6 @@ abstract class AppLocalizations {
   /// **'Loading relations and summary…'**
   String get relationNeighborhoodSummaryLoading;
 
-  /// No description provided for @relationNeighborhoodDailyTotal.
-  ///
-  /// In en, this message translates to:
-  /// **'Daily choices: {count}'**
-  String relationNeighborhoodDailyTotal(int count);
-
-  /// Роль намерения как источника дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Source intention'**
-  String get relationNeighborhoodDailySourceRole;
-
-  /// Роль намерения как выбранного действия
-  ///
-  /// In en, this message translates to:
-  /// **'Selected action'**
-  String get relationNeighborhoodDailySelectedRole;
-
   /// Тип долговременной связи нужно
   ///
   /// In en, this message translates to:
@@ -739,12 +835,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The intention whose relations were being viewed no longer exists.'**
   String get relationNeighborhoodIntentionNotFound;
-
-  /// Подтверждённо пустая выбранная группа
-  ///
-  /// In en, this message translates to:
-  /// **'There are no relations in this group.'**
-  String get relationNeighborhoodEmpty;
 
   /// Подгрузка следующей порции выбранной группы
   ///
@@ -932,12 +1022,6 @@ abstract class AppLocalizations {
   /// **'Open the intention page: {title}'**
   String detailsRelationsWalkIntention(String title);
 
-  /// Доступное название стрелки строки связи, когда сосед — действие
-  ///
-  /// In en, this message translates to:
-  /// **'Open the action page: {title}'**
-  String detailsRelationsWalkAction(String title);
-
   /// Подсказка о смысле группы «Нужно» под плитками вкладки «Связи»
   ///
   /// In en, this message translates to:
@@ -1004,12 +1088,6 @@ abstract class AppLocalizations {
   /// **'Add what this intention cannot do without.'**
   String get detailsRelationsEmptyNeedsIntentionText;
 
-  /// Текст пустой группы «Нужно» у действия
-  ///
-  /// In en, this message translates to:
-  /// **'An action can stand alone. Add what it needs if it has steps of its own.'**
-  String get detailsRelationsEmptyNeedsActionText;
-
   /// Заголовок пустой группы «Можно использовать»
   ///
   /// In en, this message translates to:
@@ -1064,77 +1142,125 @@ abstract class AppLocalizations {
   /// **'Archived in {group}: {count}'**
   String detailsRelationsArchiveFoldSemantic(String group, int count);
 
-  /// Вкладка дневных выборов, прямо использующих намерение
+  /// Вкладка действий, в сохранённых путях которых участвует намерение
   ///
   /// In en, this message translates to:
-  /// **'Choices'**
-  String get detailsChoicesTab;
+  /// **'Actions'**
+  String get detailsActionsTab;
 
-  /// Подсказка над непустым списком роли «исходное» на вкладке «Выборы»
+  /// Доступное название вкладки «Действия» с числом действий, в путях которых есть намерение
   ///
   /// In en, this message translates to:
-  /// **'Daily choices that start from this intention.'**
-  String get detailsChoicesSourceHint;
+  /// **'Actions: {count}'**
+  String detailsActionsTabSemantic(int count);
 
-  /// Подсказка над непустым списком роли «выбранное» на вкладке «Выборы»
+  /// Доступное название плиток ролей на вкладке «Действия»
   ///
   /// In en, this message translates to:
-  /// **'Daily choices that end in this intention.'**
-  String get detailsChoicesSelectedHint;
+  /// **'Part of the intention in action paths'**
+  String get detailsActionsRolesLabel;
 
-  /// Видимая подпись начала дневного выбора на вкладке «Выборы»
+  /// Плитка действий, путь которых начинается с намерения
   ///
   /// In en, this message translates to:
-  /// **'Add'**
-  String get detailsChoicesAdd;
+  /// **'Root'**
+  String get detailsActionsRoleRoot;
 
-  /// Доступное название «Добавить» у роли «исходное»
+  /// Плитка действий, путь которых проходит через намерение
   ///
   /// In en, this message translates to:
-  /// **'Create a daily choice that starts from this intention'**
-  String get detailsChoicesAddSourceLabel;
+  /// **'Intermediate'**
+  String get detailsActionsRoleIntermediate;
 
-  /// Доступное название «Добавить» у роли «выбранное»
+  /// Плитка действий, путь которых заканчивается намерением
   ///
   /// In en, this message translates to:
-  /// **'Create a daily choice that ends in this action'**
-  String get detailsChoicesAddSelectedLabel;
+  /// **'Final'**
+  String get detailsActionsRoleFinal;
+
+  /// Доступное название плитки роли с числом действий
+  ///
+  /// In en, this message translates to:
+  /// **'{role}: {count, plural, one{{count} action} other{{count} actions}}'**
+  String detailsActionsRoleTileSemantic(String role, int count);
+
+  /// Заголовок пустой плитки на вкладке «Действия»
+  ///
+  /// In en, this message translates to:
+  /// **'No actions yet'**
+  String get detailsActionsEmptyTitle;
+
+  /// Объяснение пустой плитки «Корневое»
+  ///
+  /// In en, this message translates to:
+  /// **'An action whose path starts with this intention will appear here.'**
+  String get detailsActionsEmptyRoot;
+
+  /// Объяснение пустой плитки «Промежуточное»
+  ///
+  /// In en, this message translates to:
+  /// **'An action whose path goes through this intention will appear here.'**
+  String get detailsActionsEmptyIntermediate;
+
+  /// Объяснение пустой плитки «Конечное»
+  ///
+  /// In en, this message translates to:
+  /// **'An action whose path ends with this intention will appear here.'**
+  String get detailsActionsEmptyFinal;
+
+  /// Первая группа списка действий: сегодняшний день и более поздние даты
+  ///
+  /// In en, this message translates to:
+  /// **'Today and later'**
+  String get detailsActionsTodayAndLater;
+
+  /// Состояние первого чтения списка на вкладке «Действия»
+  ///
+  /// In en, this message translates to:
+  /// **'Loading actions…'**
+  String get detailsActionsLoading;
+
+  /// Состояние подгрузки следующей порции списка на вкладке «Действия»
+  ///
+  /// In en, this message translates to:
+  /// **'Loading more actions…'**
+  String get detailsActionsLoadingMore;
+
+  /// Состояние замены показанной части списка на вкладке «Действия»
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing…'**
+  String get detailsActionsRefreshing;
+
+  /// Временный отказ чтения списка на вкладке «Действия»
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the actions.'**
+  String get detailsActionsUnavailable;
+
+  /// Отказ чтения списка на вкладке «Действия» из-за повреждённых данных
+  ///
+  /// In en, this message translates to:
+  /// **'The stored action data is damaged and cannot be shown.'**
+  String get detailsActionsCorruption;
+
+  /// Отказ продолжения списка на вкладке «Действия», когда граф изменился
+  ///
+  /// In en, this message translates to:
+  /// **'The list has changed. Refresh it to continue.'**
+  String get detailsActionsExpired;
+
+  /// Неизвестный отказ чтения списка на вкладке «Действия»
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the actions because of an unexpected error.'**
+  String get detailsActionsUnexpected;
 
   /// Доступное имя страницы намерения при загрузке и отказе чтения
   ///
   /// In en, this message translates to:
   /// **'Intention details'**
   String get detailsTitle;
-
-  /// Тип неготового намерения в верхней панели его страницы
-  ///
-  /// In en, this message translates to:
-  /// **'Intention'**
-  String get detailsTypeIntention;
-
-  /// Тип готового к действию намерения в верхней панели его страницы
-  ///
-  /// In en, this message translates to:
-  /// **'Action'**
-  String get detailsTypeAction;
-
-  /// Доступное название пары плиток выбора готовности к действию на обзоре намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Intention or action'**
-  String get detailsTypeChoiceLabel;
-
-  /// Пояснение плитки неготового намерения на обзоре
-  ///
-  /// In en, this message translates to:
-  /// **'Any size. It may take more than a day.'**
-  String get detailsTypeIntentionHint;
-
-  /// Оба критерия действия на плитке готового намерения на обзоре
-  ///
-  /// In en, this message translates to:
-  /// **'Doable within one day, and clear what to do.'**
-  String get detailsTypeActionHint;
 
   /// Метка архива после названия в шапке страницы архивированного намерения
   ///
@@ -1199,7 +1325,7 @@ abstract class AppLocalizations {
   /// Пояснение восстановления намерения, у которого есть связи
   ///
   /// In en, this message translates to:
-  /// **'Its relations stay archived until you restore them'**
+  /// **'Its relations with active intentions will be restored with it'**
   String get detailsOptionRestoreWithRelations;
 
   /// Пояснение восстановления намерения без связей
@@ -1214,24 +1340,6 @@ abstract class AppLocalizations {
   /// **'Its tags stay'**
   String get detailsOptionDeleteKeepsTags;
 
-  /// Причина выключенного удаления намерения с долговременными связями
-  ///
-  /// In en, this message translates to:
-  /// **'Delete its relations first'**
-  String get detailsOptionDeleteRelationsFirst;
-
-  /// Причина выключенного удаления намерения с дневными выборами
-  ///
-  /// In en, this message translates to:
-  /// **'Delete its daily choices first'**
-  String get detailsOptionDeleteDailyChoicesFirst;
-
-  /// Причина выключенного удаления намерения со связями и дневными выборами
-  ///
-  /// In en, this message translates to:
-  /// **'Delete its relations and daily choices first'**
-  String get detailsOptionDeleteRelationsAndDailyChoicesFirst;
-
   /// Причина недоступности пунктов параметров во время изменяющей операции
   ///
   /// In en, this message translates to:
@@ -1243,18 +1351,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete intention?'**
   String get detailsDeleteDialogTitle;
-
-  /// Текст подтверждения удаления до выделенного названия намерения
-  ///
-  /// In en, this message translates to:
-  /// **'This removes the intention '**
-  String get detailsDeleteDialogTextBefore;
-
-  /// Текст подтверждения удаления после выделенного названия намерения
-  ///
-  /// In en, this message translates to:
-  /// **' with its description and cannot be undone. Its tags stay.'**
-  String get detailsDeleteDialogTextAfter;
 
   /// Отмена удаления намерения
   ///
@@ -1370,6 +1466,12 @@ abstract class AppLocalizations {
   /// **'The intention changed elsewhere. Its state wasn’t changed.'**
   String get detailsStateChangeConflict;
 
+  /// Конфликт актуального состояния: каскад архивирования или восстановления затронул бы другие намерения иначе, чем показанный состав
+  ///
+  /// In en, this message translates to:
+  /// **'The intention state wasn’t changed: related intentions changed, so the operation would affect them differently. Try again.'**
+  String get detailsStateChangeCascadeConflict;
+
   /// Устранимая недоступность перехода состояния намерения
   ///
   /// In en, this message translates to:
@@ -1406,11 +1508,11 @@ abstract class AppLocalizations {
   /// **'The intention changed elsewhere. It wasn’t deleted.'**
   String get detailsDeleteConflict;
 
-  /// Объяснение блокировки удаления намерения его связями
+  /// Конфликт актуального состояния: каскад удаления затронул бы другие намерения иначе, чем показанный состав
   ///
   /// In en, this message translates to:
-  /// **'The intention wasn’t deleted: its relations still block deletion. Archived relations and relations that aren’t loaded yet block it too.'**
-  String get detailsDeleteBlockedByRelations;
+  /// **'The intention wasn’t deleted: related intentions changed, so deletion would affect them differently. Try again.'**
+  String get detailsDeleteCascadeConflict;
 
   /// Устранимая недоступность физического удаления намерения
   ///
@@ -1634,6 +1736,12 @@ abstract class AppLocalizations {
   /// **'Intention created and selected.'**
   String get editorCreatedAndChosen;
 
+  /// Успех создания намерения для начала пути
+  ///
+  /// In en, this message translates to:
+  /// **'Intention created and selected as the start of the path.'**
+  String get editorCreatedAndChosenPathStart;
+
   /// Заголовок подтверждения закрытия изменённого черновика создания до отправки
   ///
   /// In en, this message translates to:
@@ -1687,54 +1795,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close the form'**
   String get editorCloseFormAction;
-
-  /// Доступное название быстрой отметки начальной готовности к действию в черновике нового намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Create as ready for action'**
-  String get editorReadinessOption;
-
-  /// Подсказка включённой быстрой отметки готовности: новое намерение будет создано готовым к действию, готовность ещё не сохранена
-  ///
-  /// In en, this message translates to:
-  /// **'Create as ready for action: on'**
-  String get editorReadinessOptionOn;
-
-  /// Подсказка выключенной быстрой отметки готовности к действию в черновике нового намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Create as ready for action: off'**
-  String get editorReadinessOptionOff;
-
-  /// Заголовок объяснения критериев действия перед включением начальной готовности в черновике
-  ///
-  /// In en, this message translates to:
-  /// **'Create as ready for action?'**
-  String get editorReadinessConfirmationTitle;
-
-  /// Критерий действия в объяснении начальной готовности: полная выполнимость в рамках одного дня
-  ///
-  /// In en, this message translates to:
-  /// **'It can be completed fully within one day.'**
-  String get editorReadinessOneDayCriterion;
-
-  /// Критерий действия в объяснении начальной готовности: операционная понятность человеку
-  ///
-  /// In en, this message translates to:
-  /// **'It is clear enough for a person to carry out.'**
-  String get editorReadinessClarityCriterion;
-
-  /// Отказ от включения начальной готовности; черновик остаётся неготовым
-  ///
-  /// In en, this message translates to:
-  /// **'Cancel'**
-  String get editorReadinessCancelAction;
-
-  /// Явное подтверждение обоих критериев действия, включающее начальную готовность только в черновике
-  ///
-  /// In en, this message translates to:
-  /// **'Mark as ready'**
-  String get editorReadinessConfirmAction;
 
   /// Подсказка и доступное название быстрого действия, открывающего общий выбор тегов для черновика нового намерения
   ///
@@ -1790,23 +1850,17 @@ abstract class AppLocalizations {
   /// **'Create'**
   String get graphOperationCreate;
 
+  /// Вид операции изменения вида намерения в сообщении оболочки
+  ///
+  /// In en, this message translates to:
+  /// **'Change kind'**
+  String get graphOperationChangeKind;
+
   /// Вид операции изменения намерения в сообщении оболочки
   ///
   /// In en, this message translates to:
   /// **'Edit'**
   String get graphOperationUpdate;
-
-  /// Вид операции включения готовности в сообщении оболочки
-  ///
-  /// In en, this message translates to:
-  /// **'Mark ready'**
-  String get graphOperationEnableReadiness;
-
-  /// Вид операции отключения готовности в сообщении оболочки
-  ///
-  /// In en, this message translates to:
-  /// **'Mark not ready'**
-  String get graphOperationDisableReadiness;
 
   /// Вид операции архивирования намерения в сообщении оболочки
   ///
@@ -1856,11 +1910,11 @@ abstract class AppLocalizations {
   /// **'relation'**
   String get graphOperationRelation;
 
-  /// Безопасное обозначение дневного выбора в сообщении операции
+  /// Безопасное обозначение действия в сообщении операции
   ///
   /// In en, this message translates to:
-  /// **'daily choice'**
-  String get graphOperationDailyChoice;
+  /// **'action'**
+  String get graphOperationAction;
 
   /// Обозначение тега в общем сообщении операции
   ///
@@ -2012,14 +2066,14 @@ abstract class AppLocalizations {
   /// **'{share}'**
   String dataExportProgress(double share);
 
-  /// Состав будущего файла экспорта: числа всех намерений, долговременных связей, дневных выборов и тегов вместе с архивированными
+  /// Состав будущего файла экспорта: числа всех намерений, долговременных связей, действий и тегов вместе с архивированными
   ///
   /// In en, this message translates to:
-  /// **'{intentions, plural, one{{intentions} intention} other{{intentions} intentions}}, {relations, plural, one{{relations} relation} other{{relations} relations}}, {dailyChoices, plural, one{{dailyChoices} daily choice} other{{dailyChoices} daily choices}} and {tags, plural, one{{tags} tag} other{{tags} tags}} in one file'**
+  /// **'{intentions, plural, one{{intentions} intention} other{{intentions} intentions}}, {relations, plural, one{{relations} relation} other{{relations} relations}}, {actions, plural, one{{actions} action} other{{actions} actions}} and {tags, plural, one{{tags} tag} other{{tags} tags}} in one file'**
   String dataExportComposition(
     int intentions,
     int relations,
-    int dailyChoices,
+    int actions,
     int tags,
   );
 
@@ -2167,19 +2221,19 @@ abstract class AppLocalizations {
   /// **'Restore the copy from {date}, {time}'**
   String dataBackupRestoreMadeOn(String date, String time);
 
-  /// Часть сводки изменений: число добавленных намерений, тегов, долговременных связей и дневных выборов
+  /// Часть сводки изменений: число добавленных намерений, тегов, долговременных связей и действий
   ///
   /// In en, this message translates to:
   /// **'{count} added'**
   String dataBackupAdded(int count);
 
-  /// Часть сводки изменений: число изменённых намерений, тегов, долговременных связей и дневных выборов
+  /// Часть сводки изменений: число изменённых намерений, тегов, долговременных связей и действий
   ///
   /// In en, this message translates to:
   /// **'{count} changed'**
   String dataBackupChanged(int count);
 
-  /// Часть сводки изменений: число удалённых намерений, тегов, долговременных связей и дневных выборов
+  /// Часть сводки изменений: число удалённых намерений, тегов, долговременных связей и действий
   ///
   /// In en, this message translates to:
   /// **'{count} removed'**
@@ -2293,15 +2347,15 @@ abstract class AppLocalizations {
   /// **'Import this copy?'**
   String get dataImportConfirmationTitle;
 
-  /// Дата сохранения файла импорта по местному времени и числа его намерений, долговременных связей, дневных выборов и тегов из заголовка файла
+  /// Дата сохранения файла импорта по местному времени и числа его намерений, долговременных связей, действий и тегов из заголовка файла
   ///
   /// In en, this message translates to:
-  /// **'It was saved on {date} and holds {intentions, plural, one{{intentions} intention} other{{intentions} intentions}}, {relations, plural, one{{relations} relation} other{{relations} relations}}, {dailyChoices, plural, one{{dailyChoices} daily choice} other{{dailyChoices} daily choices}} and {tags, plural, one{{tags} tag} other{{tags} tags}}.'**
+  /// **'It was saved on {date} and holds {intentions, plural, one{{intentions} intention} other{{intentions} intentions}}, {relations, plural, one{{relations} relation} other{{relations} relations}}, {actions, plural, one{{actions} action} other{{actions} actions}} and {tags, plural, one{{tags} tag} other{{tags} tags}}.'**
   String dataImportConfirmationFacts(
     String date,
     int intentions,
     int relations,
-    int dailyChoices,
+    int actions,
     int tags,
   );
 
@@ -2512,7 +2566,7 @@ abstract class AppLocalizations {
   /// Текст подтверждения удаления после выделенного названия тега: полный охват удаления и что сохраняется
   ///
   /// In en, this message translates to:
-  /// **' and all its assignments to active and archived intentions. The intentions, relations, daily choices and their paths remain.'**
+  /// **' and all its assignments to active and archived intentions. The intentions, relations, actions and their paths remain.'**
   String get tagsPanelDeleteTextAfter;
 
   /// Отмена удаления тега
@@ -2821,107 +2875,430 @@ abstract class AppLocalizations {
   /// **'The tag operation failed because of an unexpected error.'**
   String get tagUnexpected;
 
-  /// Подтверждение создания дневного выбора
+  /// Подтверждение удаления действия
   ///
   /// In en, this message translates to:
-  /// **'Daily choice created.'**
-  String get dailyChoiceCreated;
+  /// **'Action deleted.'**
+  String get actionDeleted;
 
-  /// Подтверждение удаления дневного выбора
+  /// Успех создания действия
   ///
   /// In en, this message translates to:
-  /// **'Daily choice deleted.'**
-  String get dailyChoiceDeleted;
+  /// **'Action created.'**
+  String get actionCreated;
 
-  /// Пункт меню дневного выбора, открывающий изменение имеющегося описания
+  /// Конфликт пути действия
   ///
   /// In en, this message translates to:
-  /// **'Edit the description'**
-  String get dailyChoiceSheetOptionEditDescription;
+  /// **'The path no longer matches the graph. Check the path and try again.'**
+  String get actionPathConflict;
 
-  /// Пункт удаления дневного выбора
+  /// Ошибка описания действия
   ///
   /// In en, this message translates to:
-  /// **'Delete daily choice'**
-  String get dailyChoiceSheetOptionDelete;
+  /// **'Check the action description.'**
+  String get actionDescriptionInvalid;
 
-  /// Вопрос перед удалением дневного выбора
+  /// Действие отсутствует при выполнении команды
   ///
   /// In en, this message translates to:
-  /// **'Delete daily choice?'**
-  String get dailyChoiceDeleteDialogTitle;
+  /// **'This action no longer exists.'**
+  String get actionOperationNotFound;
 
-  /// Текст перед названием выбора
-  ///
-  /// In en, this message translates to:
-  /// **'The choice '**
-  String get dailyChoiceDeleteDialogBefore;
-
-  /// Дата и необратимость удаления
-  ///
-  /// In en, this message translates to:
-  /// **' for {date} will be deleted. This cannot be undone.'**
-  String dailyChoiceDeleteDialogAfter(String date);
-
-  /// Подтвердить удаление дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Delete'**
-  String get dailyChoiceDeleteDialogAction;
-
-  /// Ошибка исходного намерения дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Check the source intention of the daily choice.'**
-  String get dailyChoiceSourceInvalid;
-
-  /// Ошибка выбранного намерения дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Check the selected intention of the daily choice.'**
-  String get dailyChoiceSelectedInvalid;
-
-  /// Ошибка даты дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Check the daily choice date.'**
-  String get dailyChoiceDateInvalid;
-
-  /// Ошибка описания дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Check the daily choice description.'**
-  String get dailyChoiceDescriptionInvalid;
-
-  /// Дневной выбор отсутствует при выполнении команды
-  ///
-  /// In en, this message translates to:
-  /// **'This daily choice no longer exists.'**
-  String get dailyChoiceOperationNotFound;
-
-  /// Конфликт актуальности дневного выбора
+  /// Конфликт актуальности действия
   ///
   /// In en, this message translates to:
   /// **'The data changed. Refresh it and confirm again.'**
-  String get dailyChoiceOperationConflict;
+  String get actionOperationConflict;
 
-  /// Временная недоступность дневной команды
+  /// Временная недоступность команды действия
   ///
   /// In en, this message translates to:
-  /// **'Could not complete the daily choice operation. Try again.'**
-  String get dailyChoiceOperationUnavailable;
+  /// **'Could not complete the action operation. Try again.'**
+  String get actionOperationUnavailable;
 
-  /// Повреждение данных дневного выбора
+  /// Повреждение данных действия
   ///
   /// In en, this message translates to:
-  /// **'Stored data is damaged. The daily choice was not changed.'**
-  String get dailyChoiceOperationCorruption;
+  /// **'Stored data is damaged. The action was not changed.'**
+  String get actionOperationCorruption;
 
-  /// Неожиданный отказ команды дневного выбора
+  /// Неожиданный отказ команды действия
   ///
   /// In en, this message translates to:
-  /// **'The daily choice operation failed because of an unexpected error.'**
-  String get dailyChoiceOperationUnexpected;
+  /// **'The action operation failed because of an unexpected error.'**
+  String get actionOperationUnexpected;
+
+  /// Заголовок и доступное название панели действия
+  ///
+  /// In en, this message translates to:
+  /// **'Action'**
+  String get actionPanelTitle;
+
+  /// Доступное название ручки компактной панели действия
+  ///
+  /// In en, this message translates to:
+  /// **'Expand action sheet'**
+  String get actionPanelExpand;
+
+  /// Доступное название ручки раскрытой панели действия
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse action sheet'**
+  String get actionPanelCollapse;
+
+  /// Начальная загрузка панели действия
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the action…'**
+  String get actionPanelLoading;
+
+  /// Доказанно временный отказ чтения действия в панели
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the action. Try again.'**
+  String get actionPanelUnavailable;
+
+  /// Повреждённые данные действия в панели
+  ///
+  /// In en, this message translates to:
+  /// **'The saved action is corrupted and cannot be shown.'**
+  String get actionPanelCorruption;
+
+  /// Неизвестный отказ чтения действия в панели
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the action because of an unexpected error.'**
+  String get actionPanelUnexpected;
+
+  /// Доступное название флажка в шапке панели; состояние сообщает сам флажок
+  ///
+  /// In en, this message translates to:
+  /// **'Completion of the action. {action}. {priority}'**
+  String actionPanelCompletionLabel(String action, String priority);
+
+  /// Действие уведомления об отказе изменения выполнения без явного повтора: перечитывает действие и возвращает флажок
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh the action'**
+  String get actionRefresh;
+
+  /// Название поля даты действия
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get actionFieldDate;
+
+  /// Название поля времени действия
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get actionFieldTime;
+
+  /// Название поля приоритета действия
+  ///
+  /// In en, this message translates to:
+  /// **'Priority'**
+  String get actionFieldPriority;
+
+  /// Доступное название поля даты: название поля, полное значение и действие
+  ///
+  /// In en, this message translates to:
+  /// **'Date: {date}. Change date'**
+  String actionFieldDateLabel(String date);
+
+  /// Доступное название поля времени: название поля, значение и действие
+  ///
+  /// In en, this message translates to:
+  /// **'Time: {time}. Change time'**
+  String actionFieldTimeLabel(String time);
+
+  /// Планирование на весь день без конкретного времени
+  ///
+  /// In en, this message translates to:
+  /// **'All day'**
+  String get actionAllDay;
+
+  /// Вариант приоритета действия
+  ///
+  /// In en, this message translates to:
+  /// **'Priority {priority}'**
+  String actionPriorityOption(String priority);
+
+  /// Дата действия, совпадающая с текущим локальным днём устройства
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get actionDateToday;
+
+  /// Дата действия, которая наступит завтра
+  ///
+  /// In en, this message translates to:
+  /// **'Tomorrow'**
+  String get actionDateTomorrow;
+
+  /// Дата действия, которая была вчера
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get actionDateYesterday;
+
+  /// Доступное название листа даты действия
+  ///
+  /// In en, this message translates to:
+  /// **'Action date'**
+  String get actionDateSheetLabel;
+
+  /// Доступное название листа времени действия
+  ///
+  /// In en, this message translates to:
+  /// **'Action time'**
+  String get actionTimeSheetLabel;
+
+  /// Доступное название переключателя половины суток на 12-часовом циферблате
+  ///
+  /// In en, this message translates to:
+  /// **'Half of the day'**
+  String get actionTimeHalfSwitchLabel;
+
+  /// Доступное название половины суток до полудня
+  ///
+  /// In en, this message translates to:
+  /// **'Before noon'**
+  String get actionTimeAmLabel;
+
+  /// Доступное название половины суток после полудня
+  ///
+  /// In en, this message translates to:
+  /// **'After noon'**
+  String get actionTimePmLabel;
+
+  /// Команда просмотра предыдущего месяца в листе даты действия
+  ///
+  /// In en, this message translates to:
+  /// **'Previous month'**
+  String get actionCalendarPreviousMonth;
+
+  /// Команда просмотра следующего месяца в листе даты действия
+  ///
+  /// In en, this message translates to:
+  /// **'Next month'**
+  String get actionCalendarNextMonth;
+
+  /// Доступное состояние дня с отметкой: все действия этой даты выполнены
+  ///
+  /// In en, this message translates to:
+  /// **'All actions are completed'**
+  String get actionCalendarDayAllCompleted;
+
+  /// Доступное состояние дня с отметкой: на эту дату есть хотя бы одно невыполненное действие
+  ///
+  /// In en, this message translates to:
+  /// **'There is an incomplete action'**
+  String get actionCalendarDayHasIncomplete;
+
+  /// Доступное название кнопки параметров в шапке панели действия
+  ///
+  /// In en, this message translates to:
+  /// **'Action options'**
+  String get actionPanelOptionsLabel;
+
+  /// Пункт меню «Действие», открывающий изменение названия и описания действия
+  ///
+  /// In en, this message translates to:
+  /// **'Edit the name and description'**
+  String get actionOptionEditText;
+
+  /// Пункт меню «Действие», открывающий экран «Изменить путь»
+  ///
+  /// In en, this message translates to:
+  /// **'Edit the path'**
+  String get actionOptionEditPath;
+
+  /// Пояснение пункта изменения пути действия
+  ///
+  /// In en, this message translates to:
+  /// **'Intentions the action is done for'**
+  String get actionOptionEditPathHint;
+
+  /// Опасный пункт меню «Действие», открывающий подтверждение удаления
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the action'**
+  String get actionOptionDelete;
+
+  /// Пояснение пункта удаления действия
+  ///
+  /// In en, this message translates to:
+  /// **'Its intentions and relations stay'**
+  String get actionOptionDeleteHint;
+
+  /// Вопрос перед удалением действия
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the action?'**
+  String get actionDeleteDialogTitle;
+
+  /// Текст перед названием действия
+  ///
+  /// In en, this message translates to:
+  /// **'The action '**
+  String get actionDeleteDialogBefore;
+
+  /// Дата, необратимость удаления и то, что намерения и связи пути остаются
+  ///
+  /// In en, this message translates to:
+  /// **' for {date} will be deleted. This cannot be undone. The intentions and relations of its path stay.'**
+  String actionDeleteDialogAfter(String date);
+
+  /// Дата удаляемого действия, совпадающая с текущим локальным днём устройства
+  ///
+  /// In en, this message translates to:
+  /// **'today'**
+  String get actionDeleteDialogToday;
+
+  /// Подтвердить удаление действия
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get actionDeleteDialogAction;
+
+  /// Заголовок полосы изменения названия и описания действия
+  ///
+  /// In en, this message translates to:
+  /// **'Edit the action'**
+  String get actionTextEditTitle;
+
+  /// Доступное название стрелки назад из изменения названия и описания действия
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the action'**
+  String get actionTextEditBack;
+
+  /// Кнопка сохранения названия и описания действия
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get actionTextEditSave;
+
+  /// Доступное название и заполнитель поля названия действия при изменении
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get actionTextEditNameLabel;
+
+  /// Доступное название поля описания действия при изменении
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get actionTextEditDescriptionLabel;
+
+  /// Вопрос перед уходом с несохранёнными названием и описанием действия
+  ///
+  /// In en, this message translates to:
+  /// **'Discard changes?'**
+  String get actionTextEditDiscardTitle;
+
+  /// Пояснение вопроса перед уходом с несохранёнными названием и описанием действия
+  ///
+  /// In en, this message translates to:
+  /// **'Your changes to the name and description won’t be saved.'**
+  String get actionTextEditDiscardMessage;
+
+  /// Действие, которое отменяет изменение названия и описания действия
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get actionTextEditDiscardAction;
+
+  /// Действие, которое возвращает к изменению названия и описания действия
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get actionTextEditContinueAction;
+
+  /// Доступное название полосы вкладок панели действия
+  ///
+  /// In en, this message translates to:
+  /// **'Action sections'**
+  String get actionPanelTabsLabel;
+
+  /// Вкладка сохранённого пути действия
+  ///
+  /// In en, this message translates to:
+  /// **'Path'**
+  String get actionPanelPathTab;
+
+  /// Доступное название вкладки пути с числом намерений
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Path, {count} intention} other{Path, {count} intentions}}'**
+  String actionPanelPathTabLabel(int count);
+
+  /// Доступное название вкладки пути, в котором есть архивное намерение или связь
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Path, {count} intention, the path has archived items} other{Path, {count} intentions, the path has archived items}}'**
+  String actionPanelPathTabArchivedLabel(int count);
+
+  /// Доступное название кнопки корневого намерения с цепочкой в шапке панели, которая открывает вкладку пути
+  ///
+  /// In en, this message translates to:
+  /// **'Open the action path'**
+  String get actionPanelPathButtonLabel;
+
+  /// Метка после удалённого намерения или связи сохранённого пути и после удалённого корневого намерения в шапке
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted'**
+  String get actionPathDeletedBadge;
+
+  /// Строка под путём, в котором есть только архивные намерения или связи
+  ///
+  /// In en, this message translates to:
+  /// **'Archived intentions and relations stay in the saved path.'**
+  String get actionPathNoteArchived;
+
+  /// Строка под путём, в котором есть только удалённые намерения или связи
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted intentions and relations stay in the saved path as they were.'**
+  String get actionPathNoteDeleted;
+
+  /// Строка под путём, в котором есть и архивные, и удалённые намерения или связи
+  ///
+  /// In en, this message translates to:
+  /// **'Archived and deleted intentions and relations stay in the saved path.'**
+  String get actionPathNoteArchivedAndDeleted;
+
+  /// Роль первого намерения сохранённого пути в доступном названии его кнопки
+  ///
+  /// In en, this message translates to:
+  /// **'Root intention'**
+  String get actionPathRoleRoot;
+
+  /// Роль промежуточного намерения сохранённого пути в доступном названии его кнопки
+  ///
+  /// In en, this message translates to:
+  /// **'Intermediate intention'**
+  String get actionPathRoleIntermediate;
+
+  /// Роль последнего намерения сохранённого пути из двух и более в доступном названии его кнопки
+  ///
+  /// In en, this message translates to:
+  /// **'Final intention'**
+  String get actionPathRoleFinal;
+
+  /// Доступное название кнопки существующей связи сохранённого пути: тип, намерения звена и приоритет
+  ///
+  /// In en, this message translates to:
+  /// **'Relation {kind}. {source}, {related}. {priority}'**
+  String actionPathRelationLabel(
+    String kind,
+    String source,
+    String related,
+    String priority,
+  );
 
   /// Вид операции добавления связей
   ///
@@ -3061,18 +3438,6 @@ abstract class AppLocalizations {
   /// **'The related intention no longer exists. The relation wasn’t restored.'**
   String get relationRestoreRelatedNotFound;
 
-  /// Архивное состояние исходного участника при восстановлении связи
-  ///
-  /// In en, this message translates to:
-  /// **'Restore the source intention before restoring this relation.'**
-  String get relationRestoreSourceArchived;
-
-  /// Архивное состояние связанного участника при восстановлении связи
-  ///
-  /// In en, this message translates to:
-  /// **'Restore the related intention before restoring this relation.'**
-  String get relationRestoreRelatedArchived;
-
   /// Устранимая недоступность восстановления связи
   ///
   /// In en, this message translates to:
@@ -3109,12 +3474,6 @@ abstract class AppLocalizations {
   /// **'The relation couldn’t be deleted because its current state conflicts with the operation.'**
   String get relationDeleteConflict;
 
-  /// Конфликт удаления используемой дневным путём связи
-  ///
-  /// In en, this message translates to:
-  /// **'This relation is used by a saved daily path. Delete the daily choices that use it first.'**
-  String get relationDeleteReferencedByDailyPath;
-
   /// Устранимая недоступность удаления связи
   ///
   /// In en, this message translates to:
@@ -3132,12 +3491,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The relation couldn’t be deleted because of an unexpected error.'**
   String get relationDeleteUnexpected;
-
-  /// Назначение перехода к полному пути дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Open the full saved daily path'**
-  String get relationNeighborhoodOpenDailyChoice;
 
   /// Заголовок подробного просмотра связи
   ///
@@ -3204,12 +3557,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Priority'**
   String get relationDetailsPriorityLabel;
-
-  /// Причина недоступности удаления связи в подробностях
-  ///
-  /// In en, this message translates to:
-  /// **'This relation is used in a saved daily path, so it cannot be deleted.'**
-  String get relationDetailsPathProtection;
 
   /// Доступное название панели архивированной связи; phrase — полная формулировка связи
   ///
@@ -3301,6 +3648,60 @@ abstract class AppLocalizations {
   /// **'Relation options'**
   String get relationSheetOptionsLabel;
 
+  /// Последствия операции со связью
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting intentions archived with the relation: {count}'**
+  String relationArchiveIntentionsHint(int count);
+
+  /// Последствия операции со связью
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting intentions deleted with the relation: {count}'**
+  String relationDeleteIntentionsHint(int count);
+
+  /// Последствия операции со связью
+  ///
+  /// In en, this message translates to:
+  /// **'Remains in saved paths marked as archived'**
+  String get relationArchivePathsHint;
+
+  /// Последствия операции со связью
+  ///
+  /// In en, this message translates to:
+  /// **'No longer marked as archived in saved paths and available for new paths again'**
+  String get relationRestorePathsHint;
+
+  /// Последствия операции со связью
+  ///
+  /// In en, this message translates to:
+  /// **'Intentions restored with the relation: {count}'**
+  String relationRestoreIntentionsHint(int count);
+
+  /// Последствия операции со связью
+  ///
+  /// In en, this message translates to:
+  /// **'Archive relation?'**
+  String get relationCascadeArchiveTitle;
+
+  /// Последствия операции со связью
+  ///
+  /// In en, this message translates to:
+  /// **'Restore relation?'**
+  String get relationCascadeRestoreTitle;
+
+  /// Последствия операции со связью
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting intentions archived with it: {count}.'**
+  String relationCascadeArchiveQuestion(int count);
+
+  /// Последствия операции со связью
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting intentions restored with it: {count}.'**
+  String relationCascadeRestoreQuestion(int count);
+
   /// Пункт параметров панели активной связи: архивировать
   ///
   /// In en, this message translates to:
@@ -3318,12 +3719,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete'**
   String get relationSheetOptionDelete;
-
-  /// Причина недоступности восстановления связи, когда архивированы оба участника
-  ///
-  /// In en, this message translates to:
-  /// **'Restore the source and related intentions before restoring this relation.'**
-  String get relationSheetOptionRestoreBothArchived;
 
   /// Вопрос подтверждения удаления связи из параметров панели
   ///
@@ -3355,137 +3750,29 @@ abstract class AppLocalizations {
   /// **'Delete'**
   String get relationSheetDeleteDialogConfirm;
 
-  /// Чтение первой порции действий
-  ///
-  /// In en, this message translates to:
-  /// **'Loading actions…'**
-  String get actionPickerLoading;
-
-  /// Пустой выбор активных действий
-  ///
-  /// In en, this message translates to:
-  /// **'No active actions are available.'**
-  String get actionPickerEmpty;
-
-  /// Устранимый отказ чтения действий
-  ///
-  /// In en, this message translates to:
-  /// **'Actions couldn’t be loaded. Try again.'**
-  String get actionPickerUnavailable;
-
-  /// Повреждённые данные действий
-  ///
-  /// In en, this message translates to:
-  /// **'Saved action data is damaged and can’t be shown.'**
-  String get actionPickerCorruption;
-
-  /// Непредвиденный отказ чтения действий
-  ///
-  /// In en, this message translates to:
-  /// **'Actions couldn’t be loaded because of an unexpected error.'**
-  String get actionPickerUnexpected;
-
-  /// Пустой выбор активных намерений
-  ///
-  /// In en, this message translates to:
-  /// **'No active intentions are available.'**
-  String get sourcePickerEmpty;
-
-  /// Подзаголовок поиска исходного намерения при создании дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'New daily choice: source intention'**
-  String get dailyChoicePickerPurposeCreationSource;
-
-  /// Подзаголовок поиска действия при создании дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'New daily choice: selected action'**
-  String get dailyChoicePickerPurposeCreationAction;
-
-  /// Строка листа назначения: создание дневного выбора от намерения
-  ///
-  /// In en, this message translates to:
-  /// **'New daily choice, from an intention'**
-  String get dailyChoicePickerFlowCreationFromSource;
-
-  /// Строка листа назначения: создание дневного выбора от действия
-  ///
-  /// In en, this message translates to:
-  /// **'New daily choice, from an action'**
-  String get dailyChoicePickerFlowCreationFromAction;
-
-  /// Отметка текущего шага дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'You are here'**
-  String get dailyChoicePickerStepCurrent;
-
-  /// Шаг дневного выбора: исходное намерение
-  ///
-  /// In en, this message translates to:
-  /// **'Source intention'**
-  String get dailyChoicePickerStepSource;
-
-  /// Шаг дневного выбора: конечное действие
-  ///
-  /// In en, this message translates to:
-  /// **'Selected action'**
-  String get dailyChoicePickerStepAction;
-
-  /// Шаг дневного выбора от намерения: путь к действию
-  ///
-  /// In en, this message translates to:
-  /// **'Path down to an action'**
-  String get dailyChoicePickerStepPathDown;
-
-  /// Пояснение пути вниз к действию
-  ///
-  /// In en, this message translates to:
-  /// **'Each next step is what the previous one needs or can use'**
-  String get dailyChoicePickerStepPathDownNote;
-
-  /// Шаг дневного выбора от действия: путь к исходному намерению
-  ///
-  /// In en, this message translates to:
-  /// **'Path up to the source intention'**
-  String get dailyChoicePickerStepPathUp;
-
-  /// Пояснение пути вверх к исходному намерению
-  ///
-  /// In en, this message translates to:
-  /// **'At least one step is needed'**
-  String get dailyChoicePickerStepPathUpNote;
-
-  /// Последний шаг создания дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Date, time, priority, and description'**
-  String get dailyChoicePickerStepDetails;
-
   /// Архивное состояние намерения в доступном названии строки экрана выбора
   ///
   /// In en, this message translates to:
   /// **'archived'**
   String get intentionPickerArchived;
 
-  /// Вид намерения с готовностью к действию в доступном названии строки экрана выбора
+  /// Главный вид намерения в доступном названии строки каталога и экрана выбора
   ///
   /// In en, this message translates to:
-  /// **'action'**
-  String get intentionPickerKindAction;
+  /// **'main'**
+  String get intentionPickerKindMain;
 
-  /// Вид намерения без готовности к действию в доступном названии строки экрана выбора
+  /// Вспомогательный вид намерения в доступном названии строки каталога и экрана выбора, когда его удерживает главное намерение или удержание ещё не известно
   ///
   /// In en, this message translates to:
-  /// **'intention'**
-  String get intentionPickerKindIntention;
+  /// **'supporting'**
+  String get intentionPickerKindSupporting;
 
-  /// Доступное название стрелки строки экрана выбора, которая открывает страницу действия
+  /// Вспомогательный вид активного намерения, которого не удерживает ни одно главное, в доступном названии строки каталога и экрана выбора
   ///
   /// In en, this message translates to:
-  /// **'Open the page of action {title}'**
-  String intentionPickerOpenActionPage(String title);
+  /// **'supporting, no main intention holds it'**
+  String get intentionPickerKindSupportingUnheld;
 
   /// Доступное название стрелки строки экрана выбора, которая открывает страницу намерения
   ///
@@ -3559,35 +3846,29 @@ abstract class AppLocalizations {
   /// **'All, archived included'**
   String get intentionPickerScopeAll;
 
-  /// Название группы типа намерения
+  /// Название строки вида намерения в листе параметров показа каталога
   ///
   /// In en, this message translates to:
   /// **'Type'**
   String get intentionPickerTypeCaption;
 
-  /// Вариант без ограничения по типу в строке и меню листа параметров поиска
+  /// Вариант без ограничения по виду в строке и меню «Тип» листа параметров показа каталога
   ///
   /// In en, this message translates to:
-  /// **'Intentions and actions'**
-  String get intentionPickerTypeAll;
+  /// **'Main and supporting'**
+  String get intentionPickerKindMainAndSupporting;
 
-  /// Вариант намерений без готовности к действию в строке и меню листа параметров поиска
+  /// Вариант главных намерений в строке и меню «Тип» листа параметров показа каталога
   ///
   /// In en, this message translates to:
-  /// **'Intentions only'**
-  String get intentionPickerTypeIntentionsOnly;
+  /// **'Main only'**
+  String get intentionPickerKindMainOnly;
 
-  /// Вариант действий в строке и меню листа параметров поиска
+  /// Вариант вспомогательных намерений в строке и меню «Тип» листа параметров показа каталога
   ///
   /// In en, this message translates to:
-  /// **'Actions only'**
-  String get intentionPickerTypeActionsOnly;
-
-  /// Причина закреплённого типа в поиске действия
-  ///
-  /// In en, this message translates to:
-  /// **'Only an action can be the final intention of a daily choice'**
-  String get intentionPickerActionTypeNote;
+  /// **'Supporting only'**
+  String get intentionPickerKindSupportingOnly;
 
   /// Название группы поля сортировки
   ///
@@ -3646,12 +3927,6 @@ abstract class AppLocalizations {
     String nextOrder,
   );
 
-  /// Показываемый тип без ограничения в заголовке списка поиска для выбора
-  ///
-  /// In en, this message translates to:
-  /// **'All'**
-  String get intentionPickerAllHeader;
-
   /// Сводка сортировки в заголовке списка поиска для выбора
   ///
   /// In en, this message translates to:
@@ -3688,27 +3963,11 @@ abstract class AppLocalizations {
   /// **'Name, Z to A'**
   String get intentionPickerOrderTitleDescending;
 
-  /// Доступное название кнопки заголовка поиска до подтверждения количества
+  /// Охват и вид словами в заголовке списка каталога намерений; значения select — имена IntentionScope и IntentionKindFilter
   ///
   /// In en, this message translates to:
-  /// **'Show and sort. Type: {type}. Sorted by: {summary}.'**
-  String intentionPickerHeaderLabel(String type, String summary);
-
-  /// Доступное название кнопки заголовка поиска с подтверждённым количеством
-  ///
-  /// In en, this message translates to:
-  /// **'Show and sort. Type: {type}, {count}. Sorted by: {summary}.'**
-  String intentionPickerHeaderCountLabel(
-    String type,
-    int count,
-    String summary,
-  );
-
-  /// Охват и тип словами в заголовке списка каталога намерений; значения select — имена IntentionScope и IntentionTypeChoice
-  ///
-  /// In en, this message translates to:
-  /// **'{scope, select, active{{type, select, all{Active} intentions{Active intentions} actions{Active actions} other{}}} archived{{type, select, all{Archived} intentions{Archived intentions} actions{Archived actions} other{}}} all{{type, select, all{All} intentions{All intentions} actions{All actions} other{}}} other{}}'**
-  String intentionPickerScopeHeader(String scope, String type);
+  /// **'{scope, select, active{{kind, select, mainOnly{Active main} supportingOnly{Active supporting} mainAndSupporting{Active} other{}}} archived{{kind, select, mainOnly{Archived main} supportingOnly{Archived supporting} mainAndSupporting{Archived} other{}}} all{{kind, select, mainOnly{All main} supportingOnly{All supporting} mainAndSupporting{All} other{}}} other{}}'**
+  String intentionPickerScopeHeader(String scope, String kind);
 
   /// Доступное название кнопки заголовка списка каталога до подтверждения количества
   ///
@@ -3726,23 +3985,11 @@ abstract class AppLocalizations {
     String summary,
   );
 
-  /// Заголовок выдачи поиска действия на экране выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Actions'**
-  String get intentionPickerActionsHeader;
-
-  /// Заголовок выдачи поиска намерения на экране выбора
+  /// Заголовок выдачи поиска для выбора намерения на экране выбора
   ///
   /// In en, this message translates to:
   /// **'Intentions'**
   String get intentionPickerIntentionsHeader;
-
-  /// Доступное название подгрузки следующей порции в поиске действия
-  ///
-  /// In en, this message translates to:
-  /// **'Loading more actions'**
-  String get intentionPickerLoadingMoreActions;
 
   /// Доступное название подгрузки следующей порции в поиске намерения
   ///
@@ -3756,41 +4003,29 @@ abstract class AppLocalizations {
   /// **'Nothing to choose from'**
   String get intentionPickerEmptyScopeTitle;
 
-  /// Заголовок пустого выбранного типа, когда в допустимом охвате есть намерения другого типа
-  ///
-  /// In en, this message translates to:
-  /// **'No intentions of this type'**
-  String get intentionPickerEmptyTypeTitle;
-
-  /// Совет показать оба типа при пустом выбранном типе
-  ///
-  /// In en, this message translates to:
-  /// **'Show both types to choose from the available intentions.'**
-  String get intentionPickerEmptyTypeText;
-
-  /// Действие пустого выбранного типа, которое выбирает тип «Все»
+  /// Действие пустой выдачи каталога, которое выбирает вид «Главные и вспомогательные»
   ///
   /// In en, this message translates to:
   /// **'Show both types'**
   String get intentionPickerShowBothTypes;
 
-  /// Заголовок пустого выбранного типа в каталоге с открытым охватом, который называет охват; значения select — имена IntentionScope и IntentionTypeChoice
+  /// Заголовок пустого выбранного вида каталога, который называет охват и вид; значения select — имена IntentionScope и IntentionKind
   ///
   /// In en, this message translates to:
-  /// **'{scope, select, active{{type, select, actions{No active actions} intentions{No active intentions} other{}}} archived{{type, select, actions{No actions in the archive} intentions{No intentions in the archive} other{}}} all{{type, select, actions{No actions yet} intentions{No intentions yet} other{}}} other{}}'**
-  String intentionPickerEmptyScopedTypeTitle(String scope, String type);
+  /// **'{scope, select, active{{kind, select, main{No active main intentions} supporting{No active supporting intentions} other{}}} archived{{kind, select, main{No main intentions in the archive} supporting{No supporting intentions in the archive} other{}}} all{{kind, select, main{No main intentions yet} supporting{No supporting intentions yet} other{}}} other{}}'**
+  String intentionCatalogEmptyKindTitle(String scope, String kind);
 
-  /// Текст пустого выбранного типа «Только действия» в каталоге с открытым охватом
+  /// Пояснение пустого вида «Только главные» в каталоге: как намерение становится главным
   ///
   /// In en, this message translates to:
-  /// **'An intention marked as an action is shown here.'**
-  String get intentionPickerEmptyActionsText;
+  /// **'An intention becomes main when you mark it so on its page. Create a new one with the plus button below.'**
+  String get intentionCatalogEmptyMainText;
 
-  /// Текст пустого выбранного типа «Только намерения» в каталоге с открытым охватом
+  /// Пояснение пустого вида «Только вспомогательные» в каталоге: как намерение становится вспомогательным
   ///
   /// In en, this message translates to:
-  /// **'Everything here is marked as an action.'**
-  String get intentionPickerEmptyIntentionsText;
+  /// **'An intention becomes supporting when it is created in the Needs or Can use group of another intention, or when you mark it so on its page.'**
+  String get intentionCatalogEmptySupportingText;
 
   /// Заголовок пустого активного охвата каталога, когда в архиве есть намерения
   ///
@@ -3828,17 +4063,293 @@ abstract class AppLocalizations {
   /// **'An intention you archive leaves the active list and stays here.'**
   String get intentionCatalogEmptyArchiveText;
 
-  /// Заголовок шапки экрана выбора действия
-  ///
-  /// In en, this message translates to:
-  /// **'Choose an action'**
-  String get intentionPickerActionTitle;
-
-  /// Заголовок шапки экрана выбора намерения
+  /// Текст поиска начала пути
   ///
   /// In en, this message translates to:
   /// **'Choose an intention'**
-  String get intentionPickerIntentionTitle;
+  String get pathStartPickerTitle;
+
+  /// Текст поиска начала пути
+  ///
+  /// In en, this message translates to:
+  /// **'There are no intentions available to start a path.'**
+  String get pathStartPickerEmpty;
+
+  /// Отметка текущего корневого намерения в поиске начала пути, открытом для смены корня
+  ///
+  /// In en, this message translates to:
+  /// **'Current start of path'**
+  String get pathStartPickerCurrentRoot;
+
+  /// Текст поиска начала пути
+  ///
+  /// In en, this message translates to:
+  /// **'New action'**
+  String get pathStartNewAction;
+
+  /// Текст поиска начала пути
+  ///
+  /// In en, this message translates to:
+  /// **'Edit path'**
+  String get pathStartEditPath;
+
+  /// Подзаголовок поиска начала пути
+  ///
+  /// In en, this message translates to:
+  /// **'{flow}: where the path starts'**
+  String pathStartSubtitle(String flow);
+
+  /// Текст поиска начала пути
+  ///
+  /// In en, this message translates to:
+  /// **'The intention where the path starts'**
+  String get pathStartFirstStep;
+
+  /// Текст поиска начала пути
+  ///
+  /// In en, this message translates to:
+  /// **'Usually this is the goal behind the action. You can choose the immediate reason if it is clear enough.'**
+  String get pathStartFirstNote;
+
+  /// Текст поиска начала пути
+  ///
+  /// In en, this message translates to:
+  /// **'Further down'**
+  String get pathStartSecondStep;
+
+  /// Текст поиска начала пути
+  ///
+  /// In en, this message translates to:
+  /// **'This is optional: each next intention is something needed or possible for the previous one.'**
+  String get pathStartSecondNote;
+
+  /// Текст поиска начала пути
+  ///
+  /// In en, this message translates to:
+  /// **'You are here'**
+  String get pathStartCurrentStep;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Path'**
+  String get pathTitle;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Edit path'**
+  String get pathEditTitle;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get pathSave;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a reason'**
+  String get pathChooseReason;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a reason: the intention where the path starts'**
+  String get pathChooseReasonLabel;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Start from the goal this action serves and go down step by step, or start right from the nearest reason. One intention is enough.'**
+  String get pathEmptyHint;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Tap an intention to end the path at it.'**
+  String get pathShortenHint;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'New action'**
+  String get pathNewAction;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'The path leads to the action “{title}”'**
+  String pathActionLabel(String title);
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'The path leads to a new action'**
+  String get pathNewActionLabel;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Root intention “{title}”. Choose another start of the path'**
+  String pathRootLabel(String title);
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Intermediate intention “{title}”. End the path at it'**
+  String pathEndAtLabel(String title);
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Final intention “{title}”'**
+  String pathFinalLabel(String title);
+
+  /// Текст блока кандидатов пути
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing is needed yet'**
+  String get pathNeedEmptyTitle;
+
+  /// Текст блока кандидатов пути
+  ///
+  /// In en, this message translates to:
+  /// **'Add what is essential, or end the path here.'**
+  String get pathNeedEmptyText;
+
+  /// Текст блока кандидатов пути
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to use yet'**
+  String get pathCanEmptyTitle;
+
+  /// Текст блока кандидатов пути
+  ///
+  /// In en, this message translates to:
+  /// **'Add what helps but is not essential.'**
+  String get pathCanEmptyText;
+
+  /// Текст блока кандидатов пути
+  ///
+  /// In en, this message translates to:
+  /// **'Next intention'**
+  String get pathNextIntention;
+
+  /// Доступное имя кандидата связи «Нужно»
+  ///
+  /// In en, this message translates to:
+  /// **'To {source}, need {title}. Priority {priority}'**
+  String pathCandidateNeedLabel(String source, String title, String priority);
+
+  /// Доступное имя кандидата связи «Можно»
+  ///
+  /// In en, this message translates to:
+  /// **'To {source}, can use {title}. Priority {priority}'**
+  String pathCandidateCanLabel(String source, String title, String priority);
+
+  /// Текст блока кандидатов пути
+  ///
+  /// In en, this message translates to:
+  /// **'Loading next intentions…'**
+  String get pathCandidatesLoading;
+
+  /// Текст блока кандидатов пути
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load next intentions. Try again.'**
+  String get pathCandidatesUnavailable;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get pathAdd;
+
+  /// Доступное имя добавления в половину «Нужно»
+  ///
+  /// In en, this message translates to:
+  /// **'Add to Needs of {source}'**
+  String pathAddNeedLabel(String source);
+
+  /// Доступное имя добавления в половину «Можно»
+  ///
+  /// In en, this message translates to:
+  /// **'Add to Can use of {source}'**
+  String pathAddCanLabel(String source);
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the path…'**
+  String get pathLoading;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the path. Try again.'**
+  String get pathReadUnavailable;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Saved data is damaged, so the path can\'t be shown.'**
+  String get pathReadCorruption;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the path because of an unexpected error.'**
+  String get pathReadUnexpected;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Discard changes?'**
+  String get pathDiscardTitle;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Your changes to the path will not be saved.'**
+  String get pathDiscardMessage;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get pathDiscardAction;
+
+  /// Текст экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get pathContinueAction;
+
+  /// Связи, добавленные на экране пути, в вопросе об отмене
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{The added relation will remain.} other{The {count} added relations will remain.}}'**
+  String pathDiscardKeptRelations(int count);
+
+  /// Намерения, созданные в поисках экрана пути, в вопросе об отмене
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{The created intention will remain.} other{The {count} created intentions will remain.}}'**
+  String pathDiscardKeptIntentions(int count);
+
+  /// Связи и намерения, созданные с экрана пути, в вопросе об отмене
+  ///
+  /// In en, this message translates to:
+  /// **'{relations, plural, one{The added relation} other{The {relations} added relations}} and {intentions, plural, one{the created intention} other{the {intentions} created intentions}} will remain.'**
+  String pathDiscardKeptBoth(int relations, int intentions);
+
+  /// Отметка кандидата пути, связь к которому добавлена на экране
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get pathCandidateNew;
 
   /// Заголовок поиска участников связи
   ///
@@ -3876,29 +4387,23 @@ abstract class AppLocalizations {
   /// **'{count, plural, =0{Filter by tags} =1{Filter by tags, 1 condition} other{Filter by tags, {count} conditions}}'**
   String intentionPickerFilterLabel(int count);
 
-  /// Заголовок пустой выдачи выбора действия из-за фильтра названия
-  ///
-  /// In en, this message translates to:
-  /// **'No actions with this name'**
-  String get intentionPickerNoActionsByTitle;
-
   /// Заголовок пустой выдачи выбора намерения из-за фильтра названия
   ///
   /// In en, this message translates to:
   /// **'No intentions with this name'**
   String get intentionPickerNoIntentionsByTitle;
 
+  /// Подсказка о совпадениях другого вида при пустой выдаче каталога
+  ///
+  /// In en, this message translates to:
+  /// **'{kind, select, main{There are no matches among main intentions, but there are matches among supporting intentions.} supporting{There are no matches among supporting intentions, but there are matches among main intentions.} other{}}'**
+  String intentionCatalogOtherKindMatches(String kind);
+
   /// Совет пустой выдачи экрана выбора из-за фильтра названия
   ///
   /// In en, this message translates to:
   /// **'Try a shorter name.'**
   String get intentionPickerTryShorterTitle;
-
-  /// Заголовок пустой выдачи выбора действия из-за условий по тегам
-  ///
-  /// In en, this message translates to:
-  /// **'No actions match these tags'**
-  String get intentionPickerNoActionsByTags;
 
   /// Заголовок пустой выдачи выбора намерения из-за условий по тегам
   ///
@@ -3911,12 +4416,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Change the tags in the filter or reset it.'**
   String get intentionPickerChangeTags;
-
-  /// Заголовок пустой выдачи действий из-за фильтра названия и условий по тегам
-  ///
-  /// In en, this message translates to:
-  /// **'No actions found'**
-  String get intentionPickerNoActionsFound;
 
   /// Заголовок пустой выдачи намерений из-за фильтра названия и условий по тегам
   ///
@@ -3972,753 +4471,185 @@ abstract class AppLocalizations {
   /// **'Enter valid Unicode text without NUL.'**
   String get relationEditorDescriptionInvalidUnicode;
 
-  /// Заголовок верхнего обхода
+  /// Начальная загрузка экрана дня
   ///
   /// In en, this message translates to:
-  /// **'Choose a path to an action'**
-  String get choicePathTitle;
-
-  /// Заголовок нижнего обхода
-  ///
-  /// In en, this message translates to:
-  /// **'Choose a source for the action'**
-  String get choicePathBottomTitle;
-
-  /// Порядок нижнего обхода
-  ///
-  /// In en, this message translates to:
-  /// **'Exploration: from the action to a source'**
-  String get choicePathBottomTraversal;
-
-  /// Направление связей нижнего пути
-  ///
-  /// In en, this message translates to:
-  /// **'Relation direction: from the source to the action'**
-  String get choicePathBottomPathDirection;
-
-  /// Фиксированное действие нижнего обхода
-  ///
-  /// In en, this message translates to:
-  /// **'Selected action: {action}'**
-  String choicePathFixedAction(String action);
-
-  /// Загрузка действия нижнего обхода
-  ///
-  /// In en, this message translates to:
-  /// **'Loading the selected action…'**
-  String get choicePathActionPending;
-
-  /// Достигнутое основание нижнего пути
-  ///
-  /// In en, this message translates to:
-  /// **'Source: {source}'**
-  String choicePathCurrentSource(String source);
-
-  /// Состояние подтверждения основания
-  ///
-  /// In en, this message translates to:
-  /// **'Source confirmed'**
-  String get choicePathSourceSelected;
-
-  /// Явное подтверждение основания
-  ///
-  /// In en, this message translates to:
-  /// **'Confirm source “{source}”'**
-  String choicePathSelectSource(String source);
-
-  /// У выбранного действия нет входящего пути
-  ///
-  /// In en, this message translates to:
-  /// **'There are no valid incoming relations for this action right now. Choose another action.'**
-  String get choicePathBottomNoPath;
-
-  /// Направление верхнего обхода
-  ///
-  /// In en, this message translates to:
-  /// **'Path from the source intention to an action'**
-  String get choicePathDirection;
-
-  /// Исходное намерение пути
-  ///
-  /// In en, this message translates to:
-  /// **'Source intention: {source}'**
-  String choicePathSource(String source);
-
-  /// Загрузка исходного намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Loading the source intention…'**
-  String get choicePathSourcePending;
-
-  /// Возврат к выбранному префиксу пути
-  ///
-  /// In en, this message translates to:
-  /// **'Return to “{source}”'**
-  String choicePathReturnTo(String source);
-
-  /// Семантика направленного шага пути
-  ///
-  /// In en, this message translates to:
-  /// **'Step {index}: {phrase}. Priority {priority}'**
-  String choicePathStepSemantics(int index, String phrase, String priority);
-
-  /// Состояние выбора достигнутого действия
-  ///
-  /// In en, this message translates to:
-  /// **'Action selected'**
-  String get choicePathActionSelected;
-
-  /// Выбрать достигнутое действие
-  ///
-  /// In en, this message translates to:
-  /// **'Choose action “{action}”'**
-  String choicePathSelectAction(String action);
-
-  /// Выбор действия ещё не создаёт дневную связь
-  ///
-  /// In en, this message translates to:
-  /// **'The daily choice has not been created yet.'**
-  String get choicePathSelectionNotSaved;
-
-  /// Заголовок допустимых продолжений
-  ///
-  /// In en, this message translates to:
-  /// **'Available continuations'**
-  String get choicePathContinuations;
-
-  /// Загрузка допустимых продолжений
-  ///
-  /// In en, this message translates to:
-  /// **'Checking available continuations…'**
-  String get choicePathLoading;
-
-  /// Из исходного намерения нет допустимого пути
-  ///
-  /// In en, this message translates to:
-  /// **'There is no valid path from this intention to another action right now. Only relations leading to a ready action become continuations. Mark an intention as ready or link it to an action.'**
-  String get choicePathNoPath;
-
-  /// У достигнутого шага нет продолжений
-  ///
-  /// In en, this message translates to:
-  /// **'There are no further valid continuations.'**
-  String get choicePathNoFurtherPath;
-
-  /// У достигнутого шага сверху вниз нет продолжений
-  ///
-  /// In en, this message translates to:
-  /// **'There are no further valid continuations. Only relations leading to a ready action become continuations. Mark an intention as ready or link it to an action.'**
-  String get choicePathTopNoFurtherPath;
-
-  /// Переход к связям из тупика выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Open relations'**
-  String get choicePathOpenRelations;
-
-  /// Устаревший префикс пути
-  ///
-  /// In en, this message translates to:
-  /// **'The graph has changed. Refresh the path before continuing.'**
-  String get choicePathConflict;
-
-  /// Актуализировать путь после конфликта
-  ///
-  /// In en, this message translates to:
-  /// **'Refresh path'**
-  String get choicePathRefresh;
-
-  /// Намерение пути отсутствует
-  ///
-  /// In en, this message translates to:
-  /// **'An intention on this path no longer exists.'**
-  String get choicePathNotFound;
-
-  /// Временная недоступность продолжений
-  ///
-  /// In en, this message translates to:
-  /// **'Continuations are temporarily unavailable. Try again.'**
-  String get choicePathUnavailable;
-
-  /// Повреждение данных пути
-  ///
-  /// In en, this message translates to:
-  /// **'Saved path data is damaged. Continuation is unavailable.'**
-  String get choicePathCorruption;
-
-  /// Неизвестная ошибка чтения продолжений
-  ///
-  /// In en, this message translates to:
-  /// **'Continuations could not be checked because of an unexpected error.'**
-  String get choicePathUnexpected;
-
-  /// Загрузить следующую порцию продолжений
-  ///
-  /// In en, this message translates to:
-  /// **'Show more continuations'**
-  String get choicePathLoadMore;
-
-  /// Загрузка следующей порции продолжений
-  ///
-  /// In en, this message translates to:
-  /// **'Loading the next page…'**
-  String get choicePathLoadingMore;
-
-  /// Доступная связь для следующего шага
-  ///
-  /// In en, this message translates to:
-  /// **'Continue along relation: {phrase}. Priority {priority}'**
-  String choicePathContinueSemantics(String phrase, String priority);
-
-  /// Заголовок подтверждения дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Confirm daily choice'**
-  String get dailyChoiceCreationTitle;
-
-  /// Планирование на весь день без конкретного времени
-  ///
-  /// In en, this message translates to:
-  /// **'All day'**
-  String get dailyChoiceAllDay;
-
-  /// Собственный приоритет дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Priority'**
-  String get dailyChoicePriorityLabel;
-
-  /// Вариант приоритета дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Priority {priority}'**
-  String dailyChoicePriorityOption(String priority);
-
-  /// Заголовок раздела дневных выборов в соседстве намерения, пока их количество не получено
-  ///
-  /// In en, this message translates to:
-  /// **'Daily choices'**
-  String get dailyChoiceCatalogTitle;
-
-  /// Вход в создание дневного выбора от действия
-  ///
-  /// In en, this message translates to:
-  /// **'Create a choice from an action'**
-  String get dailyChoiceCreateFromAction;
-
-  /// Начальная загрузка дневного каталога
-  ///
-  /// In en, this message translates to:
-  /// **'Loading daily choices…'**
-  String get dailyChoiceCatalogLoading;
-
-  /// Доступное состояние дня календаря, совпадающего с текущим локальным днём устройства, а не с выбранной датой
-  ///
-  /// In en, this message translates to:
-  /// **'Today'**
-  String get dailyChoiceCalendarToday;
-
-  /// Доступное состояние дня с отметкой: все дневные выборы этой даты выполнены
-  ///
-  /// In en, this message translates to:
-  /// **'All daily choices are completed'**
-  String get dailyChoiceCalendarDayAllCompleted;
-
-  /// Доступное состояние дня с отметкой: на эту дату есть хотя бы один невыполненный дневной выбор
-  ///
-  /// In en, this message translates to:
-  /// **'There is an incomplete daily choice'**
-  String get dailyChoiceCalendarDayHasIncomplete;
+  /// **'Loading actions…'**
+  String get actionDayLoading;
 
   /// Единая пассивная строка отказа получения отметок дней под шапкой календаря, без предложения повтора или другого действия
   ///
   /// In en, this message translates to:
   /// **'Day marks could not be loaded.'**
-  String get dailyChoiceCalendarDayMarksUnavailable;
+  String get actionCalendarDayMarksUnavailable;
 
   /// Команда раскрытия календаря из недели в сетку месяца даты просмотра
   ///
   /// In en, this message translates to:
   /// **'Expand calendar'**
-  String get dailyChoiceCalendarExpand;
+  String get actionCalendarExpand;
 
   /// Команда сворачивания календаря из сетки месяца в неделю даты просмотра
   ///
   /// In en, this message translates to:
   /// **'Collapse calendar'**
-  String get dailyChoiceCalendarCollapse;
-
-  /// Команда просмотра предыдущего месяца в раскрытом календаре без выбора дня
-  ///
-  /// In en, this message translates to:
-  /// **'Previous month'**
-  String get dailyChoiceCalendarPreviousMonth;
-
-  /// Команда просмотра следующего месяца в раскрытом календаре без выбора дня
-  ///
-  /// In en, this message translates to:
-  /// **'Next month'**
-  String get dailyChoiceCalendarNextMonth;
+  String get actionCalendarCollapse;
 
   /// Доступное название команды заголовка месяца, открывающей выбор года и месяца
   ///
   /// In en, this message translates to:
   /// **'Choose year and month'**
-  String get dailyChoiceCalendarChooseYearAndMonth;
+  String get actionCalendarChooseYearAndMonth;
 
   /// Доступное название команды заголовка, закрывающей выбор года и месяца и возвращающей сетку дней месяца просмотра
   ///
   /// In en, this message translates to:
   /// **'Back to the days of the month'**
-  String get dailyChoiceCalendarBackToMonthDays;
+  String get actionCalendarBackToMonthDays;
 
   /// Доступное название команды перехода к предыдущей странице из двенадцати лет в выборе года
   ///
   /// In en, this message translates to:
   /// **'Previous years'**
-  String get dailyChoiceCalendarPreviousYears;
+  String get actionCalendarPreviousYears;
 
   /// Доступное название команды перехода к следующей странице из двенадцати лет в выборе года
   ///
   /// In en, this message translates to:
   /// **'Next years'**
-  String get dailyChoiceCalendarNextYears;
+  String get actionCalendarNextYears;
 
   /// Доступное название команды перехода к месяцам предыдущего года в выборе месяца
   ///
   /// In en, this message translates to:
   /// **'Previous year'**
-  String get dailyChoiceCalendarPreviousYear;
+  String get actionCalendarPreviousYear;
 
   /// Доступное название команды перехода к месяцам следующего года в выборе месяца
   ///
   /// In en, this message translates to:
   /// **'Next year'**
-  String get dailyChoiceCalendarNextYear;
+  String get actionCalendarNextYear;
 
-  /// Фильтр невыполненных выборов
+  /// Заголовок секции невыполненных действий дня
   ///
   /// In en, this message translates to:
   /// **'Not completed'**
-  String get dailyChoiceCatalogIncomplete;
+  String get actionDaySectionIncomplete;
 
-  /// Фильтр выполненных выборов
+  /// Заголовок секции выполненных действий дня
   ///
   /// In en, this message translates to:
   /// **'Completed'**
-  String get dailyChoiceCatalogCompleted;
+  String get actionDaySectionCompleted;
 
-  /// Заголовок пустого состояния дня без дневных выборов
+  /// Заголовок пустого состояния дня без действий
   ///
   /// In en, this message translates to:
-  /// **'No choices for this date'**
-  String get dailyChoiceCatalogEmptyTitle;
+  /// **'No actions for this date'**
+  String get actionDayEmptyTitle;
 
-  /// Текст пустого состояния дня без дневных выборов
+  /// Текст пустого состояния дня без действий
   ///
   /// In en, this message translates to:
-  /// **'Create a choice from an action and set this date. It will appear here.'**
-  String get dailyChoiceCatalogEmptyText;
+  /// **'Every action here serves one of your intentions.'**
+  String get actionDayEmptyText;
 
-  /// Обновление подтверждённого снимка каталога
+  /// Действие добавления на вкладке действий намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get detailsActionsAdd;
+
+  /// Доступное название добавления действия намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Add action'**
+  String get detailsActionsAddLabel;
+
+  /// Обновление подтверждённого снимка экрана дня
   ///
   /// In en, this message translates to:
   /// **'Refreshing…'**
-  String get dailyChoiceCatalogRefreshing;
+  String get actionDayRefreshing;
 
   /// Доступное название кнопки возврата выдачи к заголовку дня
   ///
   /// In en, this message translates to:
   /// **'Back to top'**
-  String get dailyChoiceCatalogScrollToTop;
+  String get actionDayScrollToTop;
 
   /// Загрузка следующей порции
   ///
   /// In en, this message translates to:
-  /// **'Loading more daily choices…'**
-  String get dailyChoiceCatalogLoadingMore;
+  /// **'Loading more actions…'**
+  String get actionDayLoadingMore;
 
-  /// Временная ошибка чтения дневного каталога
+  /// Временная ошибка чтения действий дня
   ///
   /// In en, this message translates to:
-  /// **'Could not load daily choices.'**
-  String get dailyChoiceCatalogUnavailable;
+  /// **'Could not load actions.'**
+  String get actionDayUnavailable;
 
-  /// Повреждение данных дневного каталога
+  /// Повреждение данных действий дня
   ///
   /// In en, this message translates to:
-  /// **'Stored daily choice data is damaged and cannot be shown.'**
-  String get dailyChoiceCatalogCorruption;
+  /// **'Stored action data is damaged and cannot be shown.'**
+  String get actionDayCorruption;
 
-  /// Устаревший снимок каталога
+  /// Устаревший снимок выдачи дня
   ///
   /// In en, this message translates to:
-  /// **'The catalog changed. Refresh it to continue.'**
-  String get dailyChoiceCatalogExpired;
+  /// **'The list changed. Refresh it to continue.'**
+  String get actionDayExpired;
 
-  /// Непредвиденная ошибка чтения дневного каталога
+  /// Непредвиденная ошибка чтения действий дня
   ///
   /// In en, this message translates to:
-  /// **'Could not load daily choices because of an unexpected error.'**
-  String get dailyChoiceCatalogUnexpected;
+  /// **'Could not load actions because of an unexpected error.'**
+  String get actionDayUnexpected;
 
-  /// Число шагов сохранённого пути в доступном названии карточки
+  /// Число намерений сохранённого пути в доступном названии строки
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, one{{count} step in path} other{{count} steps in path}}'**
-  String dailyChoiceCatalogPathStepCount(int count);
+  /// **'{count, plural, one{{count} intention in path} other{{count} intentions in path}}'**
+  String actionDayPathIntentionCount(int count);
 
-  /// Доступное название отдельного флажка с принадлежностью выбору и приоритетом; состояние сообщает сам флажок
+  /// Доступное название отдельного флажка с принадлежностью действию и приоритетом; состояние сообщает сам флажок
   ///
   /// In en, this message translates to:
-  /// **'Completion of choice #{number}. {action}. {priority}'**
-  String dailyChoiceCatalogCompletionLabel(
-    int number,
-    String action,
-    String priority,
-  );
-
-  /// Актуализация карточки после отказа без явного повтора перед новым подтверждением выполнения
-  ///
-  /// In en, this message translates to:
-  /// **'Refresh choice'**
-  String get dailyChoiceCompletionRefresh;
+  /// **'Completion of action #{number}. {action}. {priority}'**
+  String actionDayCompletionLabel(int number, String action, String priority);
 
   /// Начало доступного названия строки с порядковым номером текущей выдачи
   ///
   /// In en, this message translates to:
-  /// **'Choice #{number}. {action}'**
-  String dailyChoiceCatalogRowLabel(int number, String action);
+  /// **'Action #{number}. {action}'**
+  String actionDayRowLabel(int number, String action);
 
-  /// Исходное намерение в доступном названии карточки
+  /// Корневое намерение в доступном названии строки
   ///
   /// In en, this message translates to:
-  /// **'Source intention: {source}'**
-  String dailyChoiceCatalogRowSource(String source);
+  /// **'Root intention: {root}'**
+  String actionDayRowRoot(String root);
 
-  /// Запланированное время в доступном названии карточки
+  /// Запланированное время в доступном названии строки
   ///
   /// In en, this message translates to:
   /// **'At {time}'**
-  String dailyChoiceCatalogRowTime(String time);
+  String actionDayRowTime(String time);
 
-  /// Заголовок подробностей дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Daily choice'**
-  String get dailyChoiceDetailsTitle;
-
-  /// Загрузка подробностей дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Loading daily choice…'**
-  String get dailyChoiceDetailsLoading;
-
-  /// Дневной выбор отсутствует
-  ///
-  /// In en, this message translates to:
-  /// **'This daily choice no longer exists.'**
-  String get dailyChoiceDetailsNotFound;
-
-  /// Временный отказ чтения дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Could not load this daily choice. Try again.'**
-  String get dailyChoiceDetailsUnavailable;
-
-  /// Повреждённый сохранённый путь
-  ///
-  /// In en, this message translates to:
-  /// **'The stored path is damaged and cannot be shown.'**
-  String get dailyChoiceDetailsCorruption;
-
-  /// Неизвестный отказ чтения дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Could not load this daily choice because of an unexpected error.'**
-  String get dailyChoiceDetailsUnexpected;
-
-  /// Формулировка дневной связи из текущих названий
-  ///
-  /// In en, this message translates to:
-  /// **'To {source}, today I {selected}'**
-  String dailyChoiceDetailsPhrase(String source, String selected);
-
-  /// Дата дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Daily choice date: {date}'**
-  String dailyChoiceDetailsDate(String date);
-
-  /// Дневной выбор выполнен
+  /// Действие выполнено
   ///
   /// In en, this message translates to:
   /// **'Completed'**
-  String get dailyChoiceDetailsCompleted;
+  String get actionCompleted;
 
-  /// Дневной выбор не выполнен
+  /// Действие не выполнено
   ///
   /// In en, this message translates to:
   /// **'Not completed'**
-  String get dailyChoiceDetailsNotCompleted;
-
-  /// Роль исходного намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Source intention'**
-  String get dailyChoiceDetailsSource;
-
-  /// Роль промежуточного намерения
-  ///
-  /// In en, this message translates to:
-  /// **'Intermediate intention'**
-  String get dailyChoiceDetailsIntermediate;
-
-  /// Роль конечного выбранного действия
-  ///
-  /// In en, this message translates to:
-  /// **'Selected action'**
-  String get dailyChoiceDetailsSelectedAction;
-
-  /// Архивное состояние участника или связи
-  ///
-  /// In en, this message translates to:
-  /// **'Archived'**
-  String get dailyChoiceDetailsArchived;
-
-  /// Активное состояние участника или связи
-  ///
-  /// In en, this message translates to:
-  /// **'Active'**
-  String get dailyChoiceDetailsActive;
-
-  /// Порядковый номер перехода пути
-  ///
-  /// In en, this message translates to:
-  /// **'Transition {number}'**
-  String dailyChoiceDetailsStep(int number);
-
-  /// Доступное название ручки компактной панели дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Expand daily choice sheet'**
-  String get dailyChoiceSheetExpand;
-
-  /// Доступное название ручки раскрытой панели дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Collapse daily choice sheet'**
-  String get dailyChoiceSheetCollapse;
-
-  /// Доступное название флажка в шапке панели; состояние сообщает сам флажок
-  ///
-  /// In en, this message translates to:
-  /// **'Completion of the choice. {action}. {priority}'**
-  String dailyChoiceSheetCompletionLabel(String action, String priority);
-
-  /// Доступное название кнопки параметров в шапке панели дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Daily choice options'**
-  String get dailyChoiceSheetOptionsLabel;
-
-  /// Доступное название полосы вкладок панели дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Daily choice sections'**
-  String get dailyChoiceSheetTabsLabel;
-
-  /// Вкладка сохранённого пути в панели дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Path'**
-  String get dailyChoiceSheetPathTab;
-
-  /// Доступное название вкладки пути с числом шагов
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, one{Path, {count} step} other{Path, {count} steps}}'**
-  String dailyChoiceSheetPathTabLabel(int count);
-
-  /// Доступное название вкладки пути, в котором что-то архивировано
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, one{Path, {count} step, something in it is archived} other{Path, {count} steps, something in it is archived}}'**
-  String dailyChoiceSheetPathTabArchivedLabel(int count);
-
-  /// Пояснение под путём с архивированными намерениями или связями
-  ///
-  /// In en, this message translates to:
-  /// **'The path contains archived intentions or relations.'**
-  String get dailyChoiceSheetPathArchivedNote;
-
-  /// Заголовок полосы изменения описания дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Description'**
-  String get dailyChoiceSheetDescriptionTitle;
-
-  /// Доступное название стрелки назад из изменения описания дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Back to the daily choice'**
-  String get dailyChoiceSheetDescriptionBack;
-
-  /// Кнопка сохранения описания дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Save'**
-  String get dailyChoiceSheetDescriptionSave;
-
-  /// Вопрос перед уходом с несохранённым описанием дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Discard changes?'**
-  String get dailyChoiceSheetDescriptionDiscardTitle;
-
-  /// Пояснение вопроса перед уходом с несохранённым описанием дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Your changes to the description won’t be saved.'**
-  String get dailyChoiceSheetDescriptionDiscardMessage;
-
-  /// Действие, которое отменяет изменение описания дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Discard'**
-  String get dailyChoiceSheetDescriptionDiscardAction;
-
-  /// Действие, которое возвращает к изменению описания дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Keep editing'**
-  String get dailyChoiceSheetDescriptionContinueAction;
-
-  /// Название поля даты дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Date'**
-  String get dailyChoiceFieldDate;
-
-  /// Название поля времени дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Time'**
-  String get dailyChoiceFieldTime;
-
-  /// Доступное название поля даты: название поля, полное значение и действие
-  ///
-  /// In en, this message translates to:
-  /// **'Date: {date}. Change date'**
-  String dailyChoiceFieldDateLabel(String date);
-
-  /// Доступное название поля времени: название поля, значение и действие
-  ///
-  /// In en, this message translates to:
-  /// **'Time: {time}. Change time'**
-  String dailyChoiceFieldTimeLabel(String time);
-
-  /// Доступное название листа даты дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Daily choice date'**
-  String get dailyChoiceDateSheetLabel;
-
-  /// Доступное название листа времени дневного выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Daily choice time'**
-  String get dailyChoiceTimeSheetLabel;
-
-  /// Доступное название переключателя половины суток на 12-часовом циферблате
-  ///
-  /// In en, this message translates to:
-  /// **'Half of the day'**
-  String get dailyChoiceTimeHalfSwitchLabel;
-
-  /// Доступное название половины суток до полудня
-  ///
-  /// In en, this message translates to:
-  /// **'Before noon'**
-  String get dailyChoiceTimeAmLabel;
-
-  /// Доступное название половины суток после полудня
-  ///
-  /// In en, this message translates to:
-  /// **'After noon'**
-  String get dailyChoiceTimePmLabel;
-
-  /// Дата выбора, которая наступит завтра
-  ///
-  /// In en, this message translates to:
-  /// **'Tomorrow'**
-  String get dailyChoiceDateTomorrow;
-
-  /// Дата выбора, которая была вчера
-  ///
-  /// In en, this message translates to:
-  /// **'Yesterday'**
-  String get dailyChoiceDateYesterday;
-
-  /// Заголовок подтверждаемого пути
-  ///
-  /// In en, this message translates to:
-  /// **'Path to confirm'**
-  String get dailyChoiceCreationPath;
-
-  /// Конечное выбранное действие
-  ///
-  /// In en, this message translates to:
-  /// **'Selected action: {action}'**
-  String dailyChoiceCreationAction(String action);
-
-  /// Подпись необязательного описания
-  ///
-  /// In en, this message translates to:
-  /// **'Description (optional)'**
-  String get dailyChoiceCreationDescription;
-
-  /// Явная отметка выполнения
-  ///
-  /// In en, this message translates to:
-  /// **'Already completed'**
-  String get dailyChoiceCreationCompleted;
-
-  /// Пояснение отметки выполнения
-  ///
-  /// In en, this message translates to:
-  /// **'Mark if the action was already done for this date'**
-  String get dailyChoiceCreationCompletedHint;
-
-  /// Подтверждение сохранения выбора
-  ///
-  /// In en, this message translates to:
-  /// **'Save daily choice'**
-  String get dailyChoiceCreationSave;
-
-  /// Сохранение выбора выполняется
-  ///
-  /// In en, this message translates to:
-  /// **'Saving…'**
-  String get dailyChoiceCreationSaving;
-
-  /// Отмена без изменения графа
-  ///
-  /// In en, this message translates to:
-  /// **'Cancel'**
-  String get dailyChoiceCreationCancel;
-
-  /// Возврат к актуализации пути после конфликта
-  ///
-  /// In en, this message translates to:
-  /// **'Return to the path and refresh it'**
-  String get dailyChoiceCreationRefreshPath;
-
-  /// Переход от выбранного действия к форме подтверждения
-  ///
-  /// In en, this message translates to:
-  /// **'Continue to choice confirmation'**
-  String get choicePathOpenConfirmation;
+  String get actionNotCompleted;
 
   /// Отмена всего создания до принятия команды или после отказа
   ///
@@ -4791,6 +4722,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The intention whose page you came from'**
   String get batchAnchorNote;
+
+  /// Подпись карточки якоря в поиске участника, открытом с экрана пути
+  ///
+  /// In en, this message translates to:
+  /// **'The last intention of the path'**
+  String get batchPathEndAnchorNote;
 
   /// Текст поиска участников группы
   ///
@@ -4869,6 +4806,378 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Continue selecting'**
   String get batchContinueAction;
+
+  /// Заголовок листа нового действия
+  ///
+  /// In en, this message translates to:
+  /// **'New action'**
+  String get actionEditorTitle;
+
+  /// Кнопка создания действия в листе нового действия
+  ///
+  /// In en, this message translates to:
+  /// **'Create action'**
+  String get actionEditorCreate;
+
+  /// Вопрос перед закрытием листа нового действия с введённым текстом
+  ///
+  /// In en, this message translates to:
+  /// **'Discard the new action?'**
+  String get actionEditorDiscardTitle;
+
+  /// Пояснение вопроса перед закрытием листа нового действия
+  ///
+  /// In en, this message translates to:
+  /// **'The entered name and description won’t be saved.'**
+  String get actionEditorDiscardMessage;
+
+  /// Подсказка под пустым свёрнутым путём листа нового действия
+  ///
+  /// In en, this message translates to:
+  /// **'An action needs at least one intention it serves.'**
+  String get actionEditorPathEmptyHint;
+
+  /// Число промежуточных намерений свёрнутого пути
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{{count} intention between} other{{count} intentions between}}'**
+  String actionEditorPathBetween(int count);
+
+  /// Соединение намерений в доступном названии свёрнутого пути
+  ///
+  /// In en, this message translates to:
+  /// **'{previous}, then {next}'**
+  String actionEditorPathThen(String previous, String next);
+
+  /// Доступное название непустого свёрнутого пути
+  ///
+  /// In en, this message translates to:
+  /// **'Path: {path}. Change the path'**
+  String actionEditorPathLabel(String path);
+
+  /// Архивная связь в доступном названии свёрнутого пути листа нового действия
+  ///
+  /// In en, this message translates to:
+  /// **'A link is archived'**
+  String get actionEditorPathLinkArchived;
+
+  /// Удалённая связь в доступном названии свёрнутого пути листа нового действия
+  ///
+  /// In en, this message translates to:
+  /// **'A link is deleted'**
+  String get actionEditorPathLinkDeleted;
+
+  /// Доступное название значения приоритета в листе нового действия
+  ///
+  /// In en, this message translates to:
+  /// **'Priority {priority}. Change the priority'**
+  String actionEditorPriorityLabel(String priority);
+
+  /// Пояснение P1 в листе приоритета
+  ///
+  /// In en, this message translates to:
+  /// **'The highest'**
+  String get actionPriorityHighest;
+
+  /// Пояснение P4 в листе приоритета
+  ///
+  /// In en, this message translates to:
+  /// **'The lowest'**
+  String get actionPriorityLowest;
+
+  /// Сообщение об исходе каскадной операции
+  ///
+  /// In en, this message translates to:
+  /// **'Archived with {count, plural, one{{count} supporting intention} other{{count} supporting intentions}}'**
+  String cascadeArchiveIntentionSupporting(int count);
+
+  /// Сообщение об исходе каскадной операции
+  ///
+  /// In en, this message translates to:
+  /// **'Archived, {count, plural, one{{count} intention became main} other{{count} intentions became main}}'**
+  String cascadeArchiveIntentionPromoted(int count);
+
+  /// Сообщение об исходе каскадной операции
+  ///
+  /// In en, this message translates to:
+  /// **'Relation archived with {count, plural, one{{count} supporting intention} other{{count} supporting intentions}}'**
+  String cascadeArchiveRelationSupporting(int count);
+
+  /// Сообщение об исходе каскадной операции
+  ///
+  /// In en, this message translates to:
+  /// **'Relation archived, intention became main'**
+  String get cascadeArchiveRelationPromoted;
+
+  /// Сообщение об исходе каскадной операции
+  ///
+  /// In en, this message translates to:
+  /// **'Intention deleted with {count, plural, one{{count} supporting intention} other{{count} supporting intentions}}'**
+  String cascadeDeleteIntentionSupporting(int count);
+
+  /// Сообщение об исходе каскадной операции
+  ///
+  /// In en, this message translates to:
+  /// **'Intention deleted, {count, plural, one{{count} intention became main} other{{count} intentions became main}}'**
+  String cascadeDeleteIntentionPromoted(int count);
+
+  /// Сообщение об исходе каскадной операции
+  ///
+  /// In en, this message translates to:
+  /// **'Relation deleted with {count, plural, one{{count} supporting intention} other{{count} supporting intentions}}'**
+  String cascadeDeleteRelationSupporting(int count);
+
+  /// Сообщение об исходе каскадной операции
+  ///
+  /// In en, this message translates to:
+  /// **'Relation deleted, intention became main'**
+  String get cascadeDeleteRelationPromoted;
+
+  /// Удаление намерения с архивированием по инварианту
+  ///
+  /// In en, this message translates to:
+  /// **'Intention deleted; {count, plural, one{{count} intention was archived} other{{count} intentions were archived}}'**
+  String cascadeDeleteIntentionArchived(int count);
+
+  /// Удаление связи с архивированием по инварианту
+  ///
+  /// In en, this message translates to:
+  /// **'Relation deleted; {count, plural, one{{count} intention was archived} other{{count} intentions were archived}}'**
+  String cascadeDeleteRelationArchived(int count);
+
+  /// Сообщение об исходе каскадной операции
+  ///
+  /// In en, this message translates to:
+  /// **'; {count, plural, one{{count} intention was archived} other{{count} intentions were archived}}'**
+  String cascadeDeleteArchived(int count);
+
+  /// Сообщение об исходе каскадной операции
+  ///
+  /// In en, this message translates to:
+  /// **'Restored with {count, plural, one{{count} supporting intention} other{{count} supporting intentions}}'**
+  String cascadeRestoreIntentionSupporting(int count);
+
+  /// Сообщение об исходе каскадной операции
+  ///
+  /// In en, this message translates to:
+  /// **'Restored as main'**
+  String get cascadeRestoreIntentionMain;
+
+  /// Сообщение об исходе каскадной операции
+  ///
+  /// In en, this message translates to:
+  /// **'Restored as main with {count, plural, one{{count} supporting intention} other{{count} supporting intentions}}'**
+  String cascadeRestoreIntentionMainSupporting(int count);
+
+  /// Сообщение об исходе каскадной операции
+  ///
+  /// In en, this message translates to:
+  /// **'Relation restored with {count, plural, one{{count} intention} other{{count} intentions}}'**
+  String cascadeRestoreRelation(int count);
+
+  /// Сообщение об исходе каскадной операции
+  ///
+  /// In en, this message translates to:
+  /// **'Relation restored, intention returned as main'**
+  String get cascadeRestoreRelationMain;
+
+  /// Сообщение об исходе каскадной операции
+  ///
+  /// In en, this message translates to:
+  /// **'Relation restored with {count, plural, one{{count} intention} other{{count} intentions}}, one as main'**
+  String cascadeRestoreRelationMainOthers(int count);
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Archive intention?'**
+  String get detailsCascadeArchiveTitle;
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Restore intention?'**
+  String get detailsCascadeRestoreTitle;
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting intentions archived with it: {count}.'**
+  String detailsCascadeArchiveQuestion(int count);
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting intentions restored with it: {count}.'**
+  String detailsCascadeRestoreQuestion(int count);
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'With supporting intentions'**
+  String get detailsCascadeWithSupporting;
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Only this'**
+  String get detailsCascadeOnlyThis;
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting intentions archived with it: {count}'**
+  String detailsCascadeArchiveHint(int count);
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting intentions restored with it: {count}'**
+  String detailsCascadeRestoreHint(int count);
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting intentions deleted with it: {count}'**
+  String detailsCascadeDeleteHint(int count);
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Intentions archived: {count}'**
+  String detailsCascadeDeleteArchiveHint(int count);
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'It stays in saved paths marked “Deleted”'**
+  String get detailsOptionDeleteKeepsPaths;
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {count, plural, one{{count} intention} other{{count} intentions}}?'**
+  String detailsDeleteCascadeTitle(int count);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting intentions no longer held by any main intention will be deleted with “{title}”.'**
+  String detailsDeleteCascadeText(String title);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'The intention “{title}” and its description will be deleted. Its tags stay.'**
+  String detailsDeleteSingleText(String title);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{{count} relation will be deleted} other{{count} relations will be deleted}}.'**
+  String detailsDeleteRelations(int count);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Deletion cannot be undone.'**
+  String get detailsDeleteIrreversible;
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Action paths retain deleted items marked “Deleted”.'**
+  String get detailsDeletePaths;
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'These intentions and their relations will be archived.'**
+  String get detailsDeleteArchiveText;
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting, deleted with it · {count}'**
+  String detailsDeleteSupportingList(int count);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Main, only lose their relation · {count}'**
+  String detailsDeleteMainsList(int count);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Will be archived · {count}'**
+  String detailsDeleteArchivedList(int count);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Show all {count}'**
+  String detailsDeleteShowAll(int count);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{{count} becomes main} other{{count} become main}}'**
+  String detailsDeletePromoted(int count);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'{count} will be archived'**
+  String detailsDeleteArchivedCount(int count);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Only this: {effects}'**
+  String detailsDeleteOnlyEffects(String effects);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {count}'**
+  String detailsDeleteCount(int count);
+
+  /// Подтверждение удаления связи
+  ///
+  /// In en, this message translates to:
+  /// **'Delete relation and {count, plural, one{{count} intention} other{{count} intentions}}?'**
+  String relationDeleteCascadeTitle(int count);
+
+  /// Подтверждение удаления связи
+  ///
+  /// In en, this message translates to:
+  /// **'“{title}” is a supporting intention and will no longer be held by any main intention after deleting the relation.'**
+  String relationDeleteCascadeText(String title);
+
+  /// Подтверждение удаления связи
+  ///
+  /// In en, this message translates to:
+  /// **'and {count} more'**
+  String relationDeleteAndMore(int count);
+
+  /// Подтверждение удаления связи
+  ///
+  /// In en, this message translates to:
+  /// **'Keep as main: the intention will become main'**
+  String get relationDeleteKeepMainEffect;
+
+  /// Подтверждение удаления связи
+  ///
+  /// In en, this message translates to:
+  /// **'Keep as main'**
+  String get relationDeleteKeepMain;
+
+  /// Подтверждение удаления связи
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all'**
+  String get relationDeleteAll;
 }
 
 class _AppLocalizationsDelegate

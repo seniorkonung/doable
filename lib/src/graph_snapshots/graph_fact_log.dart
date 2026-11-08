@@ -84,6 +84,13 @@ final class IntentionOrderKey extends GraphRecordOrderKey {
   final IntentionId id;
 }
 
+/// Надгробия упорядочены ключом.
+final class DeletedIntentionOrderKey extends GraphRecordOrderKey {
+  const DeletedIntentionOrderKey(this.id);
+
+  final IntentionId id;
+}
+
 final class TagAssignmentOrderKey extends GraphRecordOrderKey {
   const TagAssignmentOrderKey(this.creationSequence);
 
@@ -96,8 +103,18 @@ final class LongTermRelationOrderKey extends GraphRecordOrderKey {
   final int creationSequence;
 }
 
-final class DailyChoiceOrderKey extends GraphRecordOrderKey {
-  const DailyChoiceOrderKey(this.creationSequence);
+final class DeletedRelationPairOrderKey extends GraphRecordOrderKey {
+  const DeletedRelationPairOrderKey({
+    required this.sourceIntentionId,
+    required this.relatedIntentionId,
+  });
+
+  final IntentionId sourceIntentionId;
+  final IntentionId relatedIntentionId;
+}
+
+final class ActionOrderKey extends GraphRecordOrderKey {
+  const ActionOrderKey(this.creationSequence);
 
   final int creationSequence;
 }

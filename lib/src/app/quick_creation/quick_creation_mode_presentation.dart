@@ -8,22 +8,21 @@ import 'quick_creation_mode.dart';
 extension QuickCreationModePresentation on QuickCreationMode {
   String title(AppLocalizations localizations) => switch (this) {
     QuickCreationMode.intention => localizations.quickCreationModeIntention,
-    QuickCreationMode.dailyChoice => localizations.quickCreationModeDailyChoice,
+    QuickCreationMode.action => localizations.quickCreationModeAction,
   };
 
   String hint(AppLocalizations localizations) => switch (this) {
     QuickCreationMode.intention => localizations.quickCreationModeIntentionHint,
-    QuickCreationMode.dailyChoice =>
-      localizations.quickCreationModeDailyChoiceHint,
+    QuickCreationMode.action => localizations.quickCreationModeActionHint,
   };
 
   DoableIconData get icon => switch (this) {
     QuickCreationMode.intention => DoableIconData.intention,
-    QuickCreationMode.dailyChoice => DoableIconData.calendar,
+    QuickCreationMode.action => DoableIconData.calendar,
   };
 
   DoableIconData get miniIcon => switch (this) {
     QuickCreationMode.intention => DoableIconData.intentionMini,
-    QuickCreationMode.dailyChoice => DoableIconData.calendarMini,
+    QuickCreationMode.action => DoableIconData.calendarMini,
   };
 }

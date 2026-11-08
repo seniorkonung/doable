@@ -1,12 +1,6 @@
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
-import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
-
-import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
-import 'package:doable/src/design_system/components/option_tiles.dart';
+import 'package:doable/src/design_system/components/segmented_control.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/tag/application/tag_catalog.dart';
 import 'package:auto_route/auto_route.dart';
@@ -20,6 +14,7 @@ import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/intention/application/cascade/intention_cascade.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
@@ -41,17 +36,20 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_root_pages.dart';
+import '../support/intention_cascade_execution.dart';
 import '../support/intention_catalog_controls.dart';
-import '../support/intention_type_counts.dart';
+import '../support/intention_kind_counts.dart';
 import '../support/in_memory_diagnostics_sink.dart';
 import '../support/intention_options.dart';
 import '../support/tag_read_contract_test_fallback.dart';
+import '../support/action_read_contract_test_fallback.dart';
 import '../support/statistics_read_contract_test_fallback.dart';
 import '../support/in_memory_quick_creation_mode_store.dart';
 import '../support/quick_creation.dart';
 import '../support/intention_description_preview.dart';
 import '../support/intention_edit_screen.dart';
 import '../support/intention_title_order_key.dart';
+import '../support/intention_holding_read_contract_test_fallback.dart';
 
 void main() {
   testWidgets(
@@ -179,13 +177,14 @@ void main() {
         created.title,
       );
       expect(find.text(updated.title), findsNothing);
+      repository.hasIncoming = true;
       repository.emitDetail(2, updated);
       await tester.pumpAndSettle();
       expect(find.byType(SnackBar), findsNothing);
 
       final actionTile = find.descendant(
-        of: find.byType(OptionTiles<IntentionReadiness>),
-        matching: find.text('Action'),
+        of: find.byType(SegmentedControl<IntentionKind>),
+        matching: find.text('Supporting'),
       );
       await Scrollable.ensureVisible(
         tester.element(actionTile),
@@ -196,7 +195,7 @@ void main() {
       await tester.pump();
       final ready = _copyIntention(
         updated,
-        readiness: IntentionReadiness.ready,
+        kind: IntentionKind.supporting,
         updatedDay: 3,
       );
       repository.completeCommand(
@@ -209,11 +208,11 @@ void main() {
       await _scrollCurrentPageToTop(tester);
       expect(
         tester
-            .widget<OptionTiles<IntentionReadiness>>(
-              find.byType(OptionTiles<IntentionReadiness>),
+            .widget<SegmentedControl<IntentionKind>>(
+              find.byType(SegmentedControl<IntentionKind>),
             )
             .value,
-        IntentionReadiness.ready,
+        IntentionKind.supporting,
       );
       await _closeOperationMessage(tester);
 
@@ -237,10 +236,26 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
       expect(find.text('No active intentions'), findsOneWidget);
-      await selectIntentionCatalogScope(tester, IntentionScope.archived);
+      // Архивированное намерение вспомогательное: каталог показывает оба вида.
+      await selectIntentionCatalogKind(
+        tester,
+        IntentionKindFilter.mainAndSupporting,
+      );
       await _pumpUntil(tester, () => repository.pageQueries.length == 2);
       repository.completePage(
         1,
+        IntentionCatalogFirstPage(
+          items: const [],
+          totalCount: 0,
+          nextCursor: null,
+          revision: const _Revision(4),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await selectIntentionCatalogScope(tester, IntentionScope.archived);
+      await _pumpUntil(tester, () => repository.pageQueries.length == 3);
+      repository.completePage(
+        2,
         IntentionCatalogFirstPage(
           items: [_summary(archived)],
           totalCount: 1,
@@ -260,6 +275,7 @@ void main() {
       final restored = _copyIntention(
         archived,
         archiveState: IntentionArchiveState.active,
+        kind: IntentionKind.main,
         updatedDay: 5,
       );
       repository.completeCommand(
@@ -267,6 +283,7 @@ void main() {
         _saved(restored, before: archived, revision: 5),
       );
       await _pumpUntil(tester, () => repository.detailRequests.length == 6);
+      repository.hasIncoming = false;
       repository.emitDetail(5, restored);
       await tester.pumpAndSettle();
       await _scrollCurrentPageToTop(tester);
@@ -277,9 +294,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Nothing in the archive'), findsOneWidget);
       await selectIntentionCatalogScope(tester, IntentionScope.active);
-      await _pumpUntil(tester, () => repository.pageQueries.length == 3);
+      await _pumpUntil(tester, () => repository.pageQueries.length == 4);
       repository.completePage(
-        2,
+        3,
         IntentionCatalogFirstPage(
           items: [_summary(restored)],
           totalCount: 1,
@@ -512,7 +529,7 @@ Future<String> _failOtherIntentionDelete(
   final other = _intention(uuid: uuid, title: title, description: null);
   final index = repository.commands.length;
   final accepted = runtime.commandCoordinator.acceptExisting(
-    DeleteIntention(other.id),
+    givenDeleteIntention(other.id),
     presentationTitle: other.title,
   ) as IntentionCommandAccepted;
   runtime.commandCoordinator.releaseInitiatorPresentation(accepted.token);
@@ -586,8 +603,10 @@ enum _SheetTransition {
         expect(find.text('Discard the draft?'), findsOneWidget);
       case _SheetTransition.chooser:
         // Сообщение временно перекрывает нижний край полей. Из названия
-        // переходим через описание к выбору тегов клавиатурой, сохраняя
+        // переходим через описание и вид к выбору тегов клавиатурой, сохраняя
         // сообщение на экране и его место в очереди.
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
         await tester.sendKeyEvent(LogicalKeyboardKey.tab);
         await tester.pump();
         await tester.sendKeyEvent(LogicalKeyboardKey.tab);
@@ -630,7 +649,7 @@ enum _SheetTransition {
 enum _FormOverlay {
   chooser('панель тегов'),
   editor('лист тега над панелью тегов'),
-  dialog('диалог объяснения готовности');
+  dialog('диалог подтверждения закрытия');
 
   const _FormOverlay(this.description);
 
@@ -646,12 +665,10 @@ enum _FormOverlay {
         await _FormOverlay.chooser.cover(tester);
         await _openNewTagSheet(tester);
       case _FormOverlay.dialog:
-        await tester.tap(
-          find.byKey(const ValueKey('intention-editor-readiness')),
-        );
+        await tester.tap(find.byKey(_close));
         await tester.pumpAndSettle();
         expect(
-          find.byKey(const ValueKey('intention-editor-readiness-confirmation')),
+          find.byKey(const ValueKey('intention-editor-close-confirmation')),
           findsOneWidget,
         );
     }
@@ -676,7 +693,7 @@ enum _FormOverlay {
         await tester.tap(find.text('Done'));
       case _FormOverlay.dialog:
         await tester.tap(
-          find.byKey(const ValueKey('intention-editor-readiness-cancel')),
+          find.byKey(const ValueKey('intention-editor-close-continue')),
         );
     }
     await tester.pumpAndSettle();
@@ -759,7 +776,11 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
 }
 
 final class _DelayedPersonalGraphRepository
-    with StatisticsReadContractTestFallback, TagReadContractTestFallback
+    with
+        IntentionHoldingReadContractTestFallback,
+        ActionReadContractTestFallback,
+        StatisticsReadContractTestFallback,
+        TagReadContractTestFallback
     implements PersonalGraphRepository {
   /// Панель тегов над панелью создания показывает пустой каталог и строку
   /// создания по запросу.
@@ -769,32 +790,18 @@ final class _DelayedPersonalGraphRepository
         TagCatalogSnapshot(items: const [], revision: const _Revision(0)),
       );
 
+  /// Предпросмотр, не затрагивающий другие намерения: запуск операции из
+  /// приложения читает его до принятия команды.
   @override
-  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
-    DailyChoiceDayStatusQuery query,
-  ) => throw UnsupportedError(
-    'Чтение состояний дней не используется в этом тесте.',
-  );
+  Future<CascadePreviewResult> previewCascade(
+    CascadeSubject subject,
+    CascadeOperation operation,
+  ) async => givenCascadePreview(subject, operation, const _Revision(0));
 
-  @override
-  Future<ChoicePathContinuationResult> getChoicePathContinuations(
-    ChoicePathContinuationQuery query,
-  ) => throw UnimplementedError();
-
-  @override
-  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Чтение дневного выбора не используется этим тестом.',
-      );
-
-  @override
-  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Наблюдение дневного выбора не используется этим тестом.',
-      );
+  bool hasIncoming = false;
 
   RelationCounts _countsFor(IntentionId id) => RelationCounts(
-    activeNeedIncoming: 0,
+    activeNeedIncoming: hasIncoming ? 1 : 0,
     activeNeedOutgoing: 0,
     activeCanIncoming: 0,
     activeCanOutgoing: 0,
@@ -824,15 +831,8 @@ final class _DelayedPersonalGraphRepository
   }
 
   @override
-  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
-    DailyChoiceCatalogQuery query,
-  ) => throw UnsupportedError(
-    'Каталог дневных выборов не используется в этом тесте.',
-  );
-
-  @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) => Future.value(
     GraphResultSuccess(
       RelationGroupFirstPage(
@@ -943,7 +943,7 @@ Intention _intention({
     id: id,
     title: title,
     description: description,
-    readiness: IntentionReadiness.notReady,
+    kind: IntentionKind.main,
     archiveState: IntentionArchiveState.active,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -954,14 +954,14 @@ Intention _copyIntention(
   Intention source, {
   String? title,
   String? description,
-  IntentionReadiness? readiness,
+  IntentionKind? kind,
   IntentionArchiveState? archiveState,
   required int updatedDay,
 }) => Intention(
   id: source.id,
   title: title ?? source.title,
   description: description ?? source.description,
-  readiness: readiness ?? source.readiness,
+  kind: kind ?? source.kind,
   archiveState: archiveState ?? source.archiveState,
   createdAt: source.createdAt,
   updatedAt: IntentionTimestamp(DateTime.utc(2026, 1, updatedDay)),
@@ -971,7 +971,7 @@ IntentionSummary _summary(Intention intention) => IntentionSummary(
   id: intention.id,
   title: intention.title,
   descriptionPreview: testDescriptionPreview(intention.description),
-  readiness: intention.readiness,
+  kind: intention.kind,
   archiveState: intention.archiveState,
   createdAt: intention.createdAt,
   updatedAt: intention.updatedAt,

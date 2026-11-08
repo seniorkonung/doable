@@ -34,7 +34,8 @@ void main() {
     expect(_values(result), [for (var id = 5; id >= 1; id--) (_id(id), 7, 4)]);
   });
 
-  test('Архивированные шаги различают основания одного действия и сохраняют дубликаты', () {
+  test('Неактивные звенья различают основания одного пути и сохраняют '
+      'дубликаты', () {
     final relations = [
       _relation(1, 2),
       _relation(2, 3, archived: true),
@@ -45,12 +46,12 @@ void main() {
       _relation(8, 4, archived: true),
       _relation(9, 3),
     ];
-    final choices = <ContributionReferenceChoice>[
-      (path: relations.sublist(0, 3), completed: true),
-      (path: relations.sublist(0, 3), completed: true),
-      (path: [relations[3]], completed: false),
+    final actions = <ContributionReferenceAction>[
+      (path: _ids([1, 2, 3, 4]), completed: true),
+      (path: _ids([1, 2, 3, 4]), completed: true),
+      (path: _ids([5, 4]), completed: false),
     ];
-    final result = _computeChoices(relations, choices);
+    final result = _computeActions(relations, actions);
 
     expect(_values(result), [
       for (final id in [9, 4, 3]) (_id(id), 3, 2),
@@ -58,29 +59,42 @@ void main() {
       (_id(7), 1, 0),
       (_id(5), 1, 0),
     ]);
-    _expectReference(result, relations, choices);
+    _expectReference(result, relations, actions);
   });
 
   test(
-    'Архивирование действия убирает неявный вклад и сохраняет явный путь',
+    'Архивирование конечного намерения с его связями сохраняет явный путь',
     () {
       final relations = [
         _relation(1, 2, archived: true),
-        _relation(2, 3, archived: true),
-        _relation(4, 3, archived: true),
+        _relation(3, 2, archived: true),
         _relation(5, 1),
       ];
-      final choices = <ContributionReferenceChoice>[
-        (path: relations.sublist(0, 2), completed: true),
+      final actions = <ContributionReferenceAction>[
+        (path: _ids([1, 2]), completed: true),
       ];
-      final result = _computeChoices(relations, choices);
+      final result = _computeActions(relations, actions);
 
       expect(_values(result), [
-        for (final id in [5, 3, 2, 1]) (_id(id), 1, 1),
+        for (final id in [5, 2, 1]) (_id(id), 1, 1),
       ]);
-      _expectReference(result, relations, choices);
+      _expectReference(result, relations, actions);
     },
   );
+
+  test('Удалённое намерение пути не засчитывается и не ведёт к вкладу', () {
+    final relations = [_relation(4, 3), _relation(5, 1)];
+    final actions = <ContributionReferenceAction>[
+      (path: _ids([1, 7, 3]), completed: true),
+      (path: _ids([7]), completed: true),
+    ];
+    final result = _computeActions(relations, actions, deleted: {_id(7)});
+
+    expect(_values(result), [
+      for (final id in [5, 4, 3, 1]) (_id(id), 1, 1),
+    ]);
+    _expectReference(result, relations, actions, deleted: {_id(7)});
+  });
 
   for (final groupCount in [63, 64, 65, 129]) {
     test('Суммирует все байты и пачки при числе групп $groupCount', () {
@@ -105,13 +119,13 @@ void main() {
     });
   }
 
-  test('Новая активная связь меняет вклад уже сохранённого выбора', () {
+  test('Новая активная связь меняет вклад уже сохранённого действия', () {
     final original = [_relation(1, 2)];
-    final choices = <ContributionReferenceChoice>[
-      (path: original, completed: true),
+    final actions = <ContributionReferenceAction>[
+      (path: _ids([1, 2]), completed: true),
     ];
-    final before = _computeChoices(original, choices);
-    final after = _computeChoices([...original, _relation(3, 2)], choices);
+    final before = _computeActions(original, actions);
+    final after = _computeActions([...original, _relation(3, 2)], actions);
 
     expect(_values(before), [(_id(2), 1, 1), (_id(1), 1, 1)]);
     expect(_values(after), [(_id(3), 1, 1), (_id(2), 1, 1), (_id(1), 1, 1)]);
@@ -121,39 +135,47 @@ void main() {
     final random = Random(2303);
     for (var sample = 0; sample < 120; sample++) {
       final nodeCount = 4 + random.nextInt(24);
+      final deleted = {
+        for (var node = 1; node <= nodeCount; node++)
+          if (random.nextInt(8) == 0) _id(node),
+      };
       final relations = <ContributionReferenceRelation>[
         for (var source = 1; source <= nodeCount; source++)
           for (var target = 1; target <= nodeCount; target++)
-            if (source != target && random.nextInt(6) == 0)
+            if (source != target &&
+                !deleted.contains(_id(source)) &&
+                !deleted.contains(_id(target)) &&
+                random.nextInt(6) == 0)
               _relation(source, target, archived: random.nextInt(4) == 0),
       ];
-      final choices = <ContributionReferenceChoice>[];
-      for (var choice = 0; choice < 140; choice++) {
-        var current = _id(1 + random.nextInt(nodeCount));
-        final visited = {current};
-        final path = <ContributionReferenceRelation>[];
+      final actions = <ContributionReferenceAction>[];
+      for (var action = 0; action < 140; action++) {
+        // Звенья сохранённого пути не обязаны совпадать с текущими связями.
+        final path = <IntentionId>[];
         for (var step = 0; step < 1 + random.nextInt(6); step++) {
-          final outgoing = relations
-              .where(
-                (edge) =>
-                    edge.source == current && !visited.contains(edge.target),
-              )
-              .toList();
-          if (outgoing.isEmpty) break;
-          final edge = outgoing[random.nextInt(outgoing.length)];
-          path.add(edge);
-          current = edge.target;
-          visited.add(current);
+          final linked = path.isEmpty
+              ? const <ContributionReferenceRelation>[]
+              : relations
+                    .where(
+                      (edge) =>
+                          edge.source == path.last &&
+                          !path.contains(edge.target),
+                    )
+                    .toList();
+          final next = linked.isNotEmpty && random.nextBool()
+              ? linked[random.nextInt(linked.length)].target
+              : _id(1 + random.nextInt(nodeCount));
+          if (!path.contains(next)) path.add(next);
         }
-        if (path.isEmpty) continue;
         final saved = (path: path, completed: random.nextBool());
-        choices.add(saved);
-        if (random.nextInt(5) == 0) choices.add(saved);
+        actions.add(saved);
+        if (random.nextInt(5) == 0) actions.add(saved);
       }
       _expectReference(
-        _computeChoices(relations, choices),
+        _computeActions(relations, actions, deleted: deleted),
         relations,
-        choices,
+        actions,
+        deleted: deleted,
         reason: 'Случайный граф $sample, seed 2303',
       );
     }
@@ -166,21 +188,29 @@ ContributionReferenceRelation _relation(
   bool archived = false,
 }) => (source: _id(source), target: _id(target), archived: archived);
 
-List<ContributionReachabilityEntry> _computeChoices(
+/// Опорные намерения действия выбираются так же, как при подготовке групп
+/// Главной: существующие намерения пути, кроме тех, за которыми в пути идёт
+/// следующее по активной связи их пары.
+List<ContributionReachabilityEntry> _computeActions(
   List<ContributionReferenceRelation> relations,
-  List<ContributionReferenceChoice> choices,
-) {
-  final graph = _idGraph([
+  List<ContributionReferenceAction> actions, {
+  Set<IntentionId> deleted = const {},
+}) {
+  final active = {
     for (final relation in relations)
       if (!relation.archived) (relation.source, relation.target),
-  ]);
+  };
+  final graph = _idGraph(active.toList());
   final grouped = <String, ContributionSeedGroup>{};
-  for (final choice in choices) {
-    final seeds = {
-      choice.path.last.target,
-      for (final step in choice.path)
-        if (step.archived) step.source,
-    }.toList()..sort();
+  for (final action in actions) {
+    final path = action.path;
+    final seeds = [
+      for (var i = 0; i < path.length; i++)
+        if (!deleted.contains(path[i]) &&
+            !(i + 1 < path.length && active.contains((path[i], path[i + 1]))))
+          path[i],
+    ]..sort();
+    if (seeds.isEmpty) continue;
     final key = seeds.map((id) => id.toCanonicalString()).join(',');
     final previous = grouped[key]?.counts;
     grouped[key] = ContributionSeedGroup(
@@ -188,7 +218,7 @@ List<ContributionReachabilityEntry> _computeChoices(
       counts: ContributionCounts(
         planned: (previous?.planned ?? 0) + 1,
         contribution:
-            (previous?.contribution ?? 0) + (choice.completed ? 1 : 0),
+            (previous?.contribution ?? 0) + (action.completed ? 1 : 0),
       ),
     );
   }
@@ -198,12 +228,14 @@ List<ContributionReachabilityEntry> _computeChoices(
 void _expectReference(
   List<ContributionReachabilityEntry> result,
   List<ContributionReferenceRelation> relations,
-  List<ContributionReferenceChoice> choices, {
+  List<ContributionReferenceAction> actions, {
+  Set<IntentionId> deleted = const {},
   String? reason,
 }) {
-  final reference = referenceContributionCounts(
+  final reference = referenceActionContributionCounts(
     relations: relations,
-    choices: choices,
+    actions: actions,
+    deleted: deleted,
   );
   final expected = [
     for (final entry in reference.entries)
@@ -213,10 +245,10 @@ void _expectReference(
 }
 
 int _compareValues((IntentionId, int, int) a, (IntentionId, int, int) b) {
-  final byContribution = b.$3.compareTo(a.$3);
-  if (byContribution != 0) return byContribution;
   final byPlanned = b.$2.compareTo(a.$2);
-  return byPlanned != 0 ? byPlanned : b.$1.compareTo(a.$1);
+  if (byPlanned != 0) return byPlanned;
+  final byContribution = b.$3.compareTo(a.$3);
+  return byContribution != 0 ? byContribution : b.$1.compareTo(a.$1);
 }
 
 ContributionSeedGroup _group(
@@ -266,6 +298,8 @@ List<(IntentionId, int, int)> _values(
   for (final entry in entries)
     (entry.intentionId, entry.counts.planned, entry.counts.contribution),
 ];
+
+List<IntentionId> _ids(List<int> numbers) => numbers.map(_id).toList();
 
 IntentionId _id(int number) => switch (IntentionId.decode(
   '00000000-0000-4000-8000-${number.toRadixString(16).padLeft(12, '0')}',

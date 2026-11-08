@@ -18,6 +18,7 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/application/intention_holding.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/catalog_paging_policy.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
@@ -45,6 +46,7 @@ import 'catalog_test_support.dart';
 import 'catalog_reconciliation_test_support.dart';
 import '../../../support/tag_condition_cycles.dart';
 import '../../../support/tag_positions.dart';
+import '../../../support/intention_cascade_execution.dart';
 
 void main() {
   testWidgets('показывает загрузку до подтверждённой первой страницы', (
@@ -70,9 +72,8 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('показывает подтверждённые сводки и точное количество', (
-    tester,
-  ) async {
+  testWidgets('показывает подтверждённые сводки, точное количество и метку '
+      'вспомогательного намерения по прочитанному удержанию', (tester) async {
     final repository = ControlledCatalogRepository();
     await tester.pumpWidget(_testApp(repository));
     repository.queryAt(0);
@@ -85,7 +86,7 @@ void main() {
               index: 1,
               title: 'Позвонить врачу',
               description: 'Описание',
-              readiness: IntentionReadiness.ready,
+              kind: IntentionKind.supporting,
             ),
             testSummary(index: 2, title: 'Выбрать страховку'),
           ],
@@ -106,7 +107,19 @@ void main() {
     expect(find.text('Описание'), findsOneWidget);
     expect(find.text('Ready for action'), findsNothing);
     expect(find.text('Has description'), findsNothing);
-    expect(_shownMarks(tester), [DoableIconData.bolt]);
+    expect(_shownMarks(tester), [(DoableIconData.supporting, BadgeTone.muted)]);
+
+    repository.completeHolding(
+      0,
+      IntentionHoldingRead(
+        revision: const TestCatalogRevision(3),
+        holdings: {testSummary(index: 1).id: IntentionHolding.notHeld},
+      ),
+    );
+    await tester.pump();
+    expect(_shownMarks(tester), [
+      (DoableIconData.supporting, BadgeTone.accent),
+    ]);
   });
 
   testWidgets('явно сообщает архивное состояние строки в охвате всех', (
@@ -149,10 +162,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Архивное намерение'), findsOneWidget);
-    expect(_shownMarks(tester), [DoableIconData.archive]);
+    expect(_shownMarks(tester), [(DoableIconData.archive, BadgeTone.muted)]);
     expect(
       find.bySemanticsLabel(
-        'Open: Архивное намерение, archived, intention, No tags',
+        'Open: Архивное намерение, main, archived, No tags',
       ),
       findsOneWidget,
     );
@@ -170,11 +183,7 @@ void main() {
       ResultSuccess(
         IntentionCatalogFirstPage(
           items: [
-            testSummary(
-              title: 'Доступное намерение',
-              description: 'Описание',
-              readiness: IntentionReadiness.ready,
-            ),
+            testSummary(title: 'Доступное намерение', description: 'Описание'),
           ],
           totalCount: 1,
           nextCursor: null,
@@ -224,7 +233,7 @@ void main() {
     }
   });
 
-  testWidgets('заголовок списка открывает лист с числами охватов и типов', (
+  testWidgets('заголовок списка открывает лист с числами охватов и видов', (
     tester,
   ) async {
     final repository = ControlledCatalogRepository();
@@ -235,9 +244,9 @@ void main() {
         IntentionCatalogFirstPage(
           items: [for (var i = 1; i <= 7; i++) testSummary(index: i)],
           totalCount: 7,
-          counts: IntentionCountsByScopeAndType(
-            active: IntentionTypeCounts(all: 7, actions: 4),
-            archived: IntentionTypeCounts(all: 3, actions: 2),
+          counts: IntentionCountsByScopeAndKind(
+            active: IntentionKindCounts(main: 7, supporting: 4),
+            archived: IntentionKindCounts(main: 3, supporting: 2),
           ),
           nextCursor: null,
           revision: const TestCatalogRevision(1),
@@ -264,16 +273,16 @@ void main() {
     await tester.tap(find.text('Type'));
     await tester.pumpAndSettle();
     expect(_shownMenu(tester), [
-      'Intentions and actions',
+      'Main only',
       '7',
-      'Intentions only',
-      '3',
-      'Actions only',
+      'Supporting only',
       '4',
+      'Main and supporting',
+      '11',
     ]);
   });
 
-  testWidgets('смена типа в листе начинает новую выдачу с верхней позиции', (
+  testWidgets('смена вида в листе начинает новую выдачу с верхней позиции', (
     tester,
   ) async {
     final repository = ControlledCatalogRepository();
@@ -283,18 +292,46 @@ void main() {
     _catalogScrollPosition(tester).jumpTo(100);
     await tester.pump();
 
-    await selectIntentionCatalogType(tester, IntentionTypeChoice.actions);
+    await selectIntentionCatalogKind(
+      tester,
+      IntentionKindFilter.supportingOnly,
+    );
     expect(
-      repository.queryAt(1).readinessFilter,
-      IntentionReadinessFilter.readyOnly,
+      repository.queryAt(1).kindFilter,
+      IntentionKindFilter.supportingOnly,
     );
     repository.complete(1, _firstPage(_taggedSummaries(const [], last: 31)));
     await tester.pumpAndSettle();
 
     expect(_catalogScrollPosition(tester).pixels, 0);
     expect(
-      shownIntentionCatalogParameters(tester).type,
-      IntentionTypeChoice.actions,
+      shownIntentionCatalogParameters(tester).kind,
+      IntentionKindFilter.supportingOnly,
+    );
+  });
+
+  testWidgets('первое открытие каталога выбирает активные главные и просит '
+      'числа по охватам и видам', (tester) async {
+    final repository = ControlledCatalogRepository();
+    await tester.pumpWidget(_testApp(repository, locale: const Locale('ru')));
+    repository.complete(0, _firstPage(const []));
+    await tester.pumpAndSettle();
+
+    final query = repository.queryAt(0);
+    expect(query.scope, IntentionScope.active);
+    expect(query.kindFilter, IntentionKindFilter.mainOnly);
+    expect(query.counting, IntentionCatalogCounting.byScopeAndKind);
+    final shown = shownIntentionCatalogParameters(tester);
+    expect(
+      (shown.scope, shown.kind),
+      (IntentionScope.active, IntentionKindFilter.mainOnly),
+    );
+    expect(
+      find.descendant(
+        of: find.byType(CatalogHeader),
+        matching: find.text('Активные главные'),
+      ),
+      findsOneWidget,
     );
   });
 
@@ -539,7 +576,7 @@ void main() {
       tester,
       container,
       repository,
-      DeleteIntention(movedBeforeAnchor.id),
+      givenDeleteIntention(movedBeforeAnchor.id),
       IntentionDeleted(
         movedBeforeAnchor.id,
         catalogMutation: IntentionCatalogDeleted(
@@ -558,7 +595,7 @@ void main() {
       tester,
       container,
       repository,
-      DeleteIntention(anchorSummary.id),
+      givenDeleteIntention(anchorSummary.id),
       IntentionDeleted(
         anchorSummary.id,
         catalogMutation: IntentionCatalogDeleted(
@@ -1005,13 +1042,11 @@ void main() {
 
     expect(find.byIcon(Icons.star), findsNothing);
     expect(_shownMarks(tester), [
-      DoableIconData.archive,
-      DoableIconData.archive,
+      (DoableIconData.archive, BadgeTone.muted),
+      (DoableIconData.archive, BadgeTone.muted),
     ]);
     expect(
-      find.bySemanticsLabel(
-        'Open: Архивное первое, archived, intention, No tags',
-      ),
+      find.bySemanticsLabel('Open: Архивное первое, main, archived, No tags'),
       findsOneWidget,
     );
     expect(intentionCatalogTotal(2), findsOneWidget);
@@ -1136,25 +1171,25 @@ void main() {
   });
 
   group('пустая выдача каталога', () {
-    final none = IntentionTypeCounts(all: 0, actions: 0);
-    final intentionsOnly = IntentionTypeCounts(all: 3, actions: 0);
+    final none = IntentionKindCounts(main: 0, supporting: 0);
+    final mainOnly = IntentionKindCounts(main: 3, supporting: 0);
 
-    for (final (name, scope, type, counts, icon, title, text) in [
+    for (final (name, scope, kind, counts, icon, title, text) in [
       (
         'все намерения в архиве',
         IntentionScope.active,
-        IntentionTypeChoice.all,
-        IntentionCountsByScopeAndType(active: none, archived: intentionsOnly),
+        IntentionKindFilter.mainOnly,
+        IntentionCountsByScopeAndKind(active: none, archived: mainOnly),
         DoableIconData.intention,
         'Нет активных намерений',
         'Новое создаётся кнопкой с плюсом внизу, а архивированные показывает '
             'строка «Показать».',
       ),
       (
-        'при типе «Только действия» в архиве только намерения',
+        'при виде «Только вспомогательные» в архиве только главные',
         IntentionScope.active,
-        IntentionTypeChoice.actions,
-        IntentionCountsByScopeAndType(active: none, archived: intentionsOnly),
+        IntentionKindFilter.supportingOnly,
+        IntentionCountsByScopeAndKind(active: none, archived: mainOnly),
         DoableIconData.intention,
         'Нет активных намерений',
         'Новое создаётся кнопкой с плюсом внизу, а архивированные показывает '
@@ -1163,8 +1198,8 @@ void main() {
       (
         'активный охват без намерений',
         IntentionScope.active,
-        IntentionTypeChoice.all,
-        IntentionCountsByScopeAndType(active: none, archived: none),
+        IntentionKindFilter.mainAndSupporting,
+        IntentionCountsByScopeAndKind(active: none, archived: none),
         DoableIconData.intention,
         'Намерений пока нет',
         'Ваши намерения появятся здесь. Первое создаётся кнопкой с плюсом '
@@ -1173,8 +1208,8 @@ void main() {
       (
         'охват всех без намерений',
         IntentionScope.all,
-        IntentionTypeChoice.all,
-        IntentionCountsByScopeAndType(active: none, archived: none),
+        IntentionKindFilter.mainAndSupporting,
+        IntentionCountsByScopeAndKind(active: none, archived: none),
         DoableIconData.intention,
         'Намерений пока нет',
         'Ваши намерения появятся здесь. Первое создаётся кнопкой с плюсом '
@@ -1183,8 +1218,8 @@ void main() {
       (
         'пустой архив',
         IntentionScope.archived,
-        IntentionTypeChoice.all,
-        IntentionCountsByScopeAndType(active: intentionsOnly, archived: none),
+        IntentionKindFilter.mainAndSupporting,
+        IntentionCountsByScopeAndKind(active: mainOnly, archived: none),
         DoableIconData.archive,
         'В архиве ничего нет',
         'Архивированное намерение уходит из активного списка и остаётся здесь.',
@@ -1195,7 +1230,7 @@ void main() {
         await _openEmptyCatalog(
           tester,
           scope: scope,
-          type: type,
+          kind: kind,
           counts: counts,
         );
 
@@ -1208,27 +1243,100 @@ void main() {
       });
     }
 
-    testWidgets('пустой тип в архиве называет охват и предлагает оба типа', (
-      tester,
-    ) async {
-      await _openEmptyCatalog(
+    for (final (name, scope, kind, counts, icon, title, text) in [
+      (
+        'пустой вид «Только главные» в активном охвате',
+        IntentionScope.active,
+        IntentionKindFilter.mainOnly,
+        IntentionCountsByScopeAndKind(
+          active: IntentionKindCounts(main: 0, supporting: 2),
+          archived: none,
+        ),
+        DoableIconData.intention,
+        'Нет активных главных намерений',
+        'Намерение становится главным, когда его так отмечают на его '
+            'странице. Новое создаётся кнопкой с плюсом внизу.',
+      ),
+      (
+        'пустой вид «Только вспомогательные» в архиве',
+        IntentionScope.archived,
+        IntentionKindFilter.supportingOnly,
+        IntentionCountsByScopeAndKind(active: none, archived: mainOnly),
+        DoableIconData.supporting,
+        'В архиве нет вспомогательных намерений',
+        'Вспомогательным становится намерение, созданное в группах «Нужно» '
+            'или «Можно использовать» другого намерения, и то, которое так '
+            'отметили на его странице.',
+      ),
+    ]) {
+      testWidgets('$name называет охват и вид и предлагает оба типа', (
         tester,
-        scope: IntentionScope.archived,
-        type: IntentionTypeChoice.actions,
-        counts: IntentionCountsByScopeAndType(
-          active: none,
-          archived: intentionsOnly,
+      ) async {
+        await _openEmptyCatalog(
+          tester,
+          scope: scope,
+          kind: kind,
+          counts: counts,
+        );
+
+        final shown = shownIntentionCatalogParameters(tester);
+        expect((shown.scope, shown.kind), (scope, kind));
+        expect(intentionCatalogTotal(0), findsOneWidget);
+        expect(_inEmptyState(find.text(title)), findsOneWidget);
+        expect(_inEmptyState(find.text(text)), findsOneWidget);
+        expect(_inEmptyState(_icon(icon)), findsOneWidget);
+        expect(_inEmptyState(find.byType(Button)), findsOneWidget);
+        expect(_inEmptyState(find.text('Показать оба типа')), findsOneWidget);
+      });
+    }
+
+    testWidgets('«Показать оба типа» начинает новую выдачу с видом «Главные и '
+        'вспомогательные» и меняет заголовок', (tester) async {
+      final repository = await _openEmptyCatalog(
+        tester,
+        scope: IntentionScope.active,
+        kind: IntentionKindFilter.mainOnly,
+        counts: IntentionCountsByScopeAndKind(
+          active: IntentionKindCounts(main: 0, supporting: 2),
+          archived: none,
         ),
       );
+      expect(find.text('Активные главные'), findsOneWidget);
 
-      final shown = shownIntentionCatalogParameters(tester);
-      expect(
-        (shown.scope, shown.type),
-        (IntentionScope.archived, IntentionTypeChoice.actions),
+      await tester.tap(_inEmptyState(find.text('Показать оба типа')));
+      await tester.pump();
+
+      expect(repository.queries, hasLength(2));
+      final query = repository.queryAt(1);
+      expect(query.kindFilter, IntentionKindFilter.mainAndSupporting);
+      expect(query.scope, IntentionScope.active);
+      repository.completeVerbatim(
+        1,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: [
+              testSummary(index: 1, kind: IntentionKind.supporting),
+              testSummary(index: 2, kind: IntentionKind.supporting),
+            ],
+            totalCount: 2,
+            counts: IntentionCountsByScopeAndKind(
+              active: IntentionKindCounts(main: 0, supporting: 2),
+              archived: none,
+            ),
+            nextCursor: null,
+            revision: const TestCatalogRevision(0),
+          ),
+        ),
       );
-      expect(intentionCatalogTotal(0), findsOneWidget);
-      expect(_inEmptyState(find.text('Нет действий в архиве')), findsOneWidget);
-      expect(_inEmptyState(find.text('Показать оба типа')), findsOneWidget);
+      await tester.pumpAndSettle();
+
+      expect(
+        shownIntentionCatalogParameters(tester).kind,
+        IntentionKindFilter.mainAndSupporting,
+      );
+      expect(find.text('Активные'), findsOneWidget);
+      expect(find.text('Активные главные'), findsNothing);
+      expect(intentionCatalogRows, findsNWidgets(2));
     });
 
     testWidgets('фильтр названия без совпадений называет причину вместо '
@@ -1240,7 +1348,22 @@ void main() {
 
       await enterIntentionCatalogTitle(tester, 'плавать');
       await _pumpUntilQueries(tester, repository, 2);
-      repository.complete(1, _firstPage(const []));
+      // Совпадения другого вида есть только за пределами выбранного охвата.
+      repository.completeVerbatim(
+        1,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: const [],
+            totalCount: 0,
+            counts: IntentionCountsByScopeAndKind(
+              active: IntentionKindCounts(main: 0, supporting: 0),
+              archived: IntentionKindCounts(main: 0, supporting: 2),
+            ),
+            nextCursor: null,
+            revision: const TestCatalogRevision(0),
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(intentionCatalogTotal(0), findsOneWidget);
@@ -1255,17 +1378,92 @@ void main() {
         findsOneWidget,
       );
       expect(_inEmptyState(find.text('Сбросить фильтры')), findsOneWidget);
+      expect(_inEmptyState(find.text('Показать оба типа')), findsNothing);
+    });
+
+    testWidgets('совпадение другого вида сохраняет название и теги при '
+        'показе обоих типов', (tester) async {
+      final repository = ControlledCatalogRepository();
+      final container = reconciliationCatalogContainer(repository);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        _testAppWithContainer(container, locale: const Locale('ru')),
+      );
+      repository.complete(0, _firstPage(const []));
+      await tester.pumpAndSettle();
+      final tag = _tag(1, 'Здоровье');
+      await _selectCondition(
+        tester,
+        container,
+        tag,
+        IntentionTagRequirement.mustBePresent,
+      );
+      await _pumpUntilQueries(tester, repository, 2);
+      await enterIntentionCatalogTitle(tester, 'парк');
+      await _pumpUntilQueries(tester, repository, 3);
+      final counts = IntentionCountsByScopeAndKind(
+        active: IntentionKindCounts(main: 0, supporting: 1),
+        archived: IntentionKindCounts(main: 0, supporting: 0),
+      );
+      repository.completeVerbatim(
+        2,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: const [],
+            totalCount: 0,
+            counts: counts,
+            nextCursor: null,
+            revision: const TestCatalogRevision(0),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(intentionCatalogTotal(0), findsOneWidget);
+      expect(find.textContaining('среди вспомогательных'), findsOneWidget);
+      expect(_inEmptyState(find.text('Показать оба типа')), findsOneWidget);
+      expect(_inEmptyState(find.text('Сбросить фильтры')), findsOneWidget);
+      await tester.tap(_inEmptyState(find.text('Показать оба типа')));
+      await tester.pump();
+      final query = repository.queries.last;
+      expect(query.scope, IntentionScope.active);
+      expect(query.kindFilter, IntentionKindFilter.mainAndSupporting);
+      expect(query.titleFilter?.map((value) => value), 'парк');
+      expect(query.tagFilter, IntentionTagFilter(requiredTagIds: [tag.id]));
+      repository.completeVerbatim(
+        repository.queries.length - 1,
+        ResultSuccess(
+          IntentionCatalogFirstPage(
+            items: [
+              testSummary(
+                index: 1,
+                title: 'Пройти до парка',
+                kind: IntentionKind.supporting,
+              ),
+            ],
+            totalCount: 1,
+            counts: counts,
+            nextCursor: null,
+            revision: const TestCatalogRevision(0),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Пройти до парка'), findsOneWidget);
     });
 
     testWidgets('«Сбросить фильтры» очищает поле и снимает условия, сохраняя '
-        'тип', (tester) async {
+        'вид', (tester) async {
       final repository = ControlledCatalogRepository();
       final container = reconciliationCatalogContainer(repository);
       addTearDown(container.dispose);
       await tester.pumpWidget(_testAppWithContainer(container));
       repository.complete(0, _firstPage(const []));
       await tester.pumpAndSettle();
-      await selectIntentionCatalogType(tester, IntentionTypeChoice.actions);
+      await selectIntentionCatalogKind(
+        tester,
+        IntentionKindFilter.supportingOnly,
+      );
       await _pumpUntilQueries(tester, repository, 2);
       repository.complete(1, _firstPage(const []));
       await tester.pumpAndSettle();
@@ -1294,11 +1492,11 @@ void main() {
       final query = repository.queries.last;
       expect(query.titleFilter, isNull);
       expect(query.tagFilter, IntentionTagFilter.empty);
-      expect(query.readinessFilter, IntentionReadinessFilter.readyOnly);
+      expect(query.kindFilter, IntentionKindFilter.supportingOnly);
       final shown = shownIntentionCatalogParameters(tester);
       expect(shown.titleFilter, isEmpty);
       expect(shown.tagConditions, 0);
-      expect(shown.type, IntentionTypeChoice.actions);
+      expect(shown.kind, IntentionKindFilter.supportingOnly);
       expect(intentionCatalogRows, findsNWidgets(3));
     });
   });
@@ -1442,12 +1640,13 @@ Finder _icon(DoableIconData icon) => find.byWidgetPredicate(
   (widget) => widget is DoableIcon && widget.icon == icon,
 );
 
-/// Открывает на русском каталог с охватом [scope] и типом [type], в котором
-/// подтверждена пустая первая порция с числами [counts].
-Future<void> _openEmptyCatalog(
+/// Открывает на русском каталог с охватом [scope] и видом [kind], в котором
+/// подтверждена пустая первая порция с числами [counts]. Возвращает
+/// репозиторий, чтобы сценарий мог ответить на следующие запросы.
+Future<ControlledCatalogRepository> _openEmptyCatalog(
   WidgetTester tester, {
   required IntentionScope scope,
-  required IntentionTypeChoice type,
+  required IntentionKindFilter kind,
   required IntentionCatalogCounts counts,
 }) async {
   final repository = ControlledCatalogRepository();
@@ -1461,9 +1660,9 @@ Future<void> _openEmptyCatalog(
           .notifier,
     )
     ..changeScope(scope)
-    ..changeType(type);
+    ..changeKind(kind);
   await tester.pump();
-  repository.complete(
+  repository.completeVerbatim(
     repository.queries.length - 1,
     ResultSuccess(
       IntentionCatalogFirstPage(
@@ -1476,6 +1675,7 @@ Future<void> _openEmptyCatalog(
     ),
   );
   await tester.pumpAndSettle();
+  return repository;
 }
 
 ScrollPosition _catalogScrollPosition(WidgetTester tester) => tester
@@ -1614,9 +1814,9 @@ List<String?> _shownMenu(WidgetTester tester) => [
 ];
 
 /// Значки меток построенных строк каталога в порядке показа.
-List<DoableIconData> _shownMarks(WidgetTester tester) => [
+List<(DoableIconData, BadgeTone)> _shownMarks(WidgetTester tester) => [
   for (final badge in tester.widgetList<BadgeMark>(find.byType(BadgeMark)))
-    badge.icon,
+    (badge.icon, badge.tone),
 ];
 
 Future<void> _completeCatalogWidgetCommand(

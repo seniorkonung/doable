@@ -83,8 +83,9 @@ sealed class IntentionPickerRowBehavior {
 }
 
 final class IntentionPickerSingle extends IntentionPickerRowBehavior {
-  const IntentionPickerSingle({required this.onPick});
+  const IntentionPickerSingle({required this.onPick, this.onCreate});
   final void Function(GraphSnapshot<IntentionSummary>) onPick;
+  final void Function(String title, VoidCallback clearTitle)? onCreate;
 }
 
 final class IntentionPickerCheckable extends IntentionPickerRowBehavior {
@@ -142,7 +143,7 @@ final class _IntentionPickerViewState
     final title = kind.title(l10n);
     final purposeDescription = widget.purposeDescription;
     final onCreate = switch (widget.rowBehavior) {
-      IntentionPickerSingle() => null,
+      IntentionPickerSingle(:final onCreate) => onCreate,
       IntentionPickerCheckable(:final onCreate) => onCreate,
     };
     return Scaffold(
@@ -219,11 +220,16 @@ final class _IntentionPickerViewState
                   return switch (widget.rowBehavior) {
                     IntentionPickerSingle(:final onPick) => IntentionPickerRow(
                       key: key,
-                      purpose: widget.purpose,
                       summary: summary,
                       requiredTagIds: results.query.tagFilter.requiredTagIds,
+                      holding: results.holdings[summary.id],
                       onPick: () => onPick(snapshot),
                       onOpenPage: openPage,
+                      currentPathStart: switch (widget.purpose) {
+                        SelectPathStart(:final currentRoot) =>
+                          summary.id == currentRoot,
+                        SelectRelationParticipant() => false,
+                      },
                     ),
                     IntentionPickerCheckable(
                       :final group,
@@ -233,17 +239,16 @@ final class _IntentionPickerViewState
                       occupant == null
                           ? IntentionPickerRow.checkable(
                               key: key,
-                              purpose: widget.purpose,
                               summary: summary,
                               requiredTagIds:
                                   results.query.tagFilter.requiredTagIds,
+                              holding: results.holdings[summary.id],
                               chosen: selectedIds.contains(summary.id),
                               onPick: () => onToggle(snapshot),
                               onOpenPage: openPage,
                             )
                           : IntentionPickerRow.occupied(
                               key: key,
-                              purpose: widget.purpose,
                               summary: summary,
                               reason: relationPairReasonName(
                                 l10n,

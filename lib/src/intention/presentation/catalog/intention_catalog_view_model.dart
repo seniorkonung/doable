@@ -13,6 +13,7 @@ import '../../../tag/application/tag_change.dart';
 import '../../../tag/domain/tag.dart';
 import '../../../tag/domain/tag_id.dart';
 import '../../application/intention_catalog.dart';
+import '../../application/intention_holding.dart';
 import '../../application/intention_result.dart';
 import '../../domain/intention.dart';
 import '../../domain/intention_id.dart';
@@ -32,7 +33,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   /// Начальные параметры показа: при запуске, после замены графа и после
   /// сброса.
   static const _initialScope = IntentionScope.active;
-  static const _initialType = IntentionTypeChoice.all;
+  static const _initialKind = IntentionKindFilter.mainOnly;
   static const _initialOrder = IntentionCatalogOrder.createdAtDescending;
 
   late IntentionCatalogPurpose _purpose;
@@ -40,12 +41,10 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   /// Поколение графа, для которого заданы параметры просмотра.
   GraphGeneration? _graphGeneration;
 
-  /// Выбранный охват; действует, только когда назначение открывает выбор
-  /// охвата.
+  /// Выбранные охват и вид; действуют, только когда назначение открывает их
+  /// выбор.
   late IntentionScope _scope;
-
-  /// Выбранный тип; действует, только когда назначение открывает выбор типа.
-  late IntentionTypeChoice _type;
+  late IntentionKindFilter _kind;
   late String _titleFilterText;
   late IntentionTagFilter _tagFilter;
   late IntentionCatalogOrder _order;
@@ -60,20 +59,22 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   IntentionSummary? _cursorBoundary;
   _PendingCatalogContinuation? _pendingContinuation;
 
+  /// Поколение чтений удержания: меняется с выдачей и с каждым применённым
+  /// изменением удержания, и ответ прежнего поколения отбрасывается.
+  int _holdingGeneration = 0;
+
+  /// Строки, удержание которых уже запрошено в текущем поколении. Отказавшее
+  /// чтение не повторяется до следующего поколения: метка остаётся серой.
+  final _requestedHoldings = <IntentionId>{};
+
   IntentionCatalogSelection get selection => IntentionCatalogSelection(
-    scope: switch (_purpose) {
-      BrowseIntentionCatalog() => IntentionScopeOpen(_scope),
-      SelectDailyChoiceAction() ||
-      SelectDailyChoiceSource() ||
-      SelectRelationParticipant() => const IntentionScopeFixed(
-        IntentionScope.active,
+    show: switch (_purpose) {
+      BrowseIntentionCatalog() => IntentionShowChosen(
+        scope: _scope,
+        kind: _kind,
       ),
-    },
-    type: switch (_purpose) {
-      SelectDailyChoiceAction() => const IntentionTypePinnedToActions(),
-      BrowseIntentionCatalog() ||
-      SelectDailyChoiceSource() ||
-      SelectRelationParticipant() => IntentionTypeOpen(_type),
+      SelectRelationParticipant() ||
+      SelectPathStart() => const IntentionShowFixed(),
     },
     titleFilterText: _titleFilterText,
     tagFilter: _tagFilter,
@@ -115,46 +116,34 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         .listen(_handleCompletion);
     ref.onDispose(() => unawaited(completionSubscription.cancel()));
     ref.onCancel(() => _filterTimer?.cancel());
+    listenSelf((_, next) {
+      if (next case AsyncData(:final value)) {
+        _readMissingHoldings(value);
+      }
+    });
 
     if (_isDebouncingFilter) {
       return Future.value(IntentionCatalogDebouncing(selection: selection));
     }
 
-    final catalogScope = switch (selection.scope) {
-      IntentionScopeOpen(:final selected) => selected,
-      IntentionScopeFixed(:final scope) => scope,
-    };
-    final type = selection.type;
+    final show = selection.show;
     late final IntentionCatalogQuery query;
     try {
       query = IntentionCatalogQuery(
-        scope: catalogScope,
-        readinessFilter: switch (type) {
-          IntentionTypePinnedToActions() => IntentionReadinessFilter.readyOnly,
-          IntentionTypeOpen(selected: IntentionTypeChoice.all) =>
-            IntentionReadinessFilter.all,
-          IntentionTypeOpen(selected: IntentionTypeChoice.intentions) =>
-            IntentionReadinessFilter.notReadyOnly,
-          IntentionTypeOpen(selected: IntentionTypeChoice.actions) =>
-            IntentionReadinessFilter.readyOnly,
-        },
+        scope: show.scope,
+        kindFilter: show.kind,
         titleFilter: _titleFilterText,
         tagFilter: _tagFilter,
         pairProbe: switch (purpose) {
           SelectRelationParticipant(:final pairProbe) => pairProbe,
-          BrowseIntentionCatalog() ||
-          SelectDailyChoiceAction() ||
-          SelectDailyChoiceSource() => null,
+          BrowseIntentionCatalog() || SelectPathStart() => null,
         },
+        countExactActiveTitle: purpose is SelectPathStart,
         order: _order,
         pageSize: _policy.pageSize,
-        counting: switch ((selection.scope, type)) {
-          (IntentionScopeOpen(), IntentionTypeOpen()) =>
-            IntentionCatalogCounting.byScopeAndType,
-          (IntentionScopeFixed(), IntentionTypeOpen()) =>
-            IntentionCatalogCounting.byType,
-          (_, IntentionTypePinnedToActions()) =>
-            IntentionCatalogCounting.totalOnly,
+        counting: switch (show) {
+          IntentionShowChosen() => IntentionCatalogCounting.byScopeAndKind,
+          IntentionShowFixed() => IntentionCatalogCounting.totalOnly,
         },
       );
     } on IntentionCatalogQueryValidationException catch (error) {
@@ -182,19 +171,19 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 
   /// Применяет выбор охвата, только когда назначение открывает выбор охвата.
   void changeScope(IntentionScope scope) {
-    if (selection.scope is! IntentionScopeOpen || _scope == scope) {
+    if (selection.show is! IntentionShowChosen || _scope == scope) {
       return;
     }
     _scope = scope;
     _applyParametersImmediately();
   }
 
-  /// Применяет выбор типа, только когда назначение открывает выбор типа.
-  void changeType(IntentionTypeChoice type) {
-    if (selection.type is! IntentionTypeOpen || _type == type) {
+  /// Применяет выбор вида, только когда назначение открывает выбор вида.
+  void changeKind(IntentionKindFilter kind) {
+    if (selection.show is! IntentionShowChosen || _kind == kind) {
       return;
     }
-    _type = type;
+    _kind = kind;
     _applyParametersImmediately();
   }
 
@@ -208,13 +197,13 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 
   /// Есть ли параметр показа, отличный от начального.
   ///
-  /// Закреплённые охват и тип не меняются выбором, поэтому всегда начальные.
+  /// Закреплённые охват и вид не меняются выбором, поэтому всегда начальные.
   bool get canResetShowParameters =>
       _scope != _initialScope ||
-      _type != _initialType ||
+      _kind != _initialKind ||
       _order != _initialOrder;
 
-  /// Возвращает охват, тип и порядок к начальным одной новой выдачей с первой
+  /// Возвращает охват, вид и порядок к начальным одной новой выдачей с первой
   /// порции; фильтр названия и условия по тегам сохраняет.
   void resetShowParameters() {
     if (!canResetShowParameters) {
@@ -356,14 +345,12 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     }
     final countsAgree = switch ((query.counting, page.counts)) {
       (IntentionCatalogCounting.totalOnly, IntentionCountsTotalOnly()) => true,
-      (IntentionCatalogCounting.byType, IntentionCountsByType(:final counts)) =>
-        page.totalCount == counts.matching(query.readinessFilter),
       (
-        IntentionCatalogCounting.byScopeAndType,
-        final IntentionCountsByScopeAndType counts,
+        IntentionCatalogCounting.byScopeAndKind,
+        final IntentionCountsByScopeAndKind counts,
       ) =>
         page.totalCount ==
-            counts.inScope(query.scope).matching(query.readinessFilter),
+            counts.inScope(query.scope).matching(query.kindFilter),
       _ => false,
     };
     final pairOccupants = _pairOccupantsFor(query, page);
@@ -436,10 +423,8 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       selection: selection,
       query: query,
     ),
-    IntentionHasBlockingRelationsFailure() => IntentionCatalogUnexpected(
-      selection: selection,
-      query: query,
-    ),
+    IntentionCascadeConflictFailure() || IntentionCascadePreviewFailure() =>
+      IntentionCatalogUnexpected(selection: selection, query: query),
   };
 
   Future<void> _loadNextPage(IntentionCatalogLoaded confirmed) async {
@@ -547,6 +532,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       nextCursor: page.nextCursor,
       revision: confirmed.revision,
       pairOccupants: pairOccupants,
+      holdings: confirmed.holdings,
     );
   }
 
@@ -601,14 +587,15 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     IntentionUnexpectedFailure() ||
     IntentionNotFoundFailure() ||
     IntentionConflictFailure() ||
-    IntentionHasBlockingRelationsFailure() =>
+    IntentionCascadeConflictFailure() ||
+    IntentionCascadePreviewFailure() =>
       const IntentionCatalogContinuationUnexpected(),
   };
 
   IntentionCatalogQuery _continuationQuery(IntentionCatalogLoaded confirmed) =>
       IntentionCatalogQuery(
         scope: confirmed.query.scope,
-        readinessFilter: confirmed.query.readinessFilter,
+        kindFilter: confirmed.query.kindFilter,
         titleFilter: confirmed.query.titleFilter?.map((value) => value),
         tagFilter: confirmed.query.tagFilter,
         pairProbe: confirmed.query.pairProbe,
@@ -630,6 +617,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     nextCursor: confirmed.nextCursor,
     revision: confirmed.revision,
     pairOccupants: confirmed.pairOccupants,
+    holdings: confirmed.holdings,
     continuation: continuation,
   );
 
@@ -641,11 +629,77 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   void _invalidatePageRequest() {
     _queryGeneration += 1;
     _activePageRequest = null;
+    _resetHoldingReads();
   }
+
+  void _resetHoldingReads() {
+    _holdingGeneration += 1;
+    _requestedHoldings.clear();
+  }
+
+  /// Читает удержание загруженных активных вспомогательных строк, которое ещё
+  /// не запрошено в текущем поколении: метки остальных строк от удержания не
+  /// зависят.
+  void _readMissingHoldings(IntentionCatalogState state) {
+    if (state is! IntentionCatalogLoaded) {
+      return;
+    }
+    final ids = <IntentionId>{};
+    for (final item in state.items) {
+      if (item.kind == IntentionKind.supporting &&
+          item.archiveState == IntentionArchiveState.active &&
+          !state.holdings.containsKey(item.id) &&
+          _requestedHoldings.add(item.id)) {
+        ids.add(item.id);
+      }
+    }
+    if (ids.isNotEmpty) {
+      unawaited(_readHoldings(ids, _holdingGeneration));
+    }
+  }
+
+  Future<void> _readHoldings(Set<IntentionId> ids, int generation) async {
+    final result = await ref
+        .read(personalGraphRepositoryProvider)
+        .getIntentionHolding(ids);
+    if (!ref.mounted || generation != _holdingGeneration) {
+      return;
+    }
+    switch (result) {
+      case IntentionHoldingRead(:final holdings):
+        if (state case AsyncData(value: final IntentionCatalogLoaded current)) {
+          state = AsyncData(
+            _withHoldings(current, {...current.holdings, ...holdings}),
+          );
+        }
+      // Истёкшее чтение перечитает пакет с изменением удержания, который
+      // ещё придёт, а отказ уже записан в диагностику: до тех пор метка
+      // остаётся серой (D5).
+      case IntentionHoldingExpired() || IntentionHoldingFailed():
+        return;
+    }
+  }
+
+  IntentionCatalogLoaded _withHoldings(
+    IntentionCatalogLoaded confirmed,
+    Map<IntentionId, IntentionHolding> holdings,
+  ) => IntentionCatalogLoaded(
+    selection: confirmed.selection,
+    query: confirmed.query,
+    items: confirmed.items,
+    totalCount: confirmed.totalCount,
+    counts: confirmed.counts,
+    exactTitleCount: confirmed.exactTitleCount,
+    nextCursor: confirmed.nextCursor,
+    revision: confirmed.revision,
+    pairOccupants: confirmed.pairOccupants,
+    holdings: holdings,
+    continuation: confirmed.continuation,
+  );
 
   void _restoreInitialShowParameters() {
     _scope = _initialScope;
-    _type = _initialType;
+    _kind = _initialKind;
     _order = _initialOrder;
   }
 
@@ -665,7 +719,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     ref.invalidateSelf();
   }
 
-  /// Принимает подтверждённые изменения намерений, долговременных и дневных связей.
+  /// Принимает подтверждённые изменения намерений, долговременных связей и действий.
   ///
   /// Отказ не согласует данные: подтверждённого пакета у него нет.
   void _handleCompletion(GraphCommandCompletion completion) {
@@ -711,6 +765,12 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       return;
     }
 
+    if (package.changesHolding &&
+        package.revision.compareTo(current.revision) ==
+            GraphRevisionOrder.newer) {
+      // Удержание прежней ревизии и запоздалые ответы о нём больше не годны.
+      _resetHoldingReads();
+    }
     final reconciled = _applyPackage(current, package);
     if (reconciled == null) {
       _restartFromFirstPage();
@@ -811,7 +871,13 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       reconciled = _applyDeletedTagContent(reconciled, deletedTagId);
     }
     reconciled = _applyRelationChanges(reconciled, package.relationChanges);
-    return _withRevision(reconciled, package.revision);
+    reconciled = _withRevision(reconciled, package.revision);
+    return switch (reconciled) {
+      // Строки, оставшиеся в выдаче, ждут удержания новой ревизии серыми.
+      final IntentionCatalogLoaded loaded when package.changesHolding =>
+        _withHoldings(loaded, const {}),
+      _ => reconciled,
+    };
   }
 
   /// Согласует занимающие связи загруженных строк с фактами о связях.
@@ -843,6 +909,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
         rowIds: confirmed.items.map((item) => item.id).toSet(),
         changes: changes,
       ),
+      holdings: confirmed.holdings,
       continuation: confirmed.continuation,
     );
   }
@@ -876,6 +943,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       nextCursor: confirmed.nextCursor,
       revision: confirmed.revision,
       pairOccupants: confirmed.pairOccupants,
+      holdings: confirmed.holdings,
       continuation: confirmed.continuation,
     );
   }
@@ -910,6 +978,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       nextCursor: confirmed.nextCursor,
       revision: confirmed.revision,
       pairOccupants: confirmed.pairOccupants,
+      holdings: confirmed.holdings,
       continuation: confirmed.continuation,
     );
   }
@@ -928,6 +997,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       IntentionCatalogLoaded(
         :final items,
         :final pairOccupants,
+        :final holdings,
         :final continuation,
       ) =>
         IntentionCatalogLoaded(
@@ -940,6 +1010,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
           nextCursor: confirmed.nextCursor,
           revision: revision,
           pairOccupants: pairOccupants,
+          holdings: holdings,
           continuation: continuation,
         ),
       IntentionCatalogEmpty() => IntentionCatalogEmpty(
@@ -1032,6 +1103,10 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
       nextCursor: confirmed.nextCursor,
       revision: mutation.revision,
       pairOccupants: pairOccupants,
+      holdings: switch (confirmed) {
+        IntentionCatalogLoaded(:final holdings) => holdings,
+        IntentionCatalogEmpty() => const {},
+      },
       continuation: switch (confirmed) {
         IntentionCatalogLoaded(:final continuation) => continuation,
         IntentionCatalogEmpty() => const IntentionCatalogContinuationIdle(),
@@ -1042,9 +1117,10 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
   /// Поправляет числа на подтверждённую мутацию; `null` — числа стали
   /// несогласуемыми.
   ///
-  /// Числа не зависят от условий, которые они разбирают: числа типов считают
-  /// снимки выдачи без условия готовности, а матрица — без условий охвата и
-  /// готовности, с ячейкой по архивному состоянию снимка.
+  /// Числа не зависят от условий, которые они разбирают: матрицу считают
+  /// снимки выдачи без условий охвата и вида, с ячейкой по архивному
+  /// состоянию и виду снимка. Поэтому смена вида или архивного состояния
+  /// строки переносит её из одной ячейки в другую.
   IntentionCatalogCounts? _reconcileCounts(
     IntentionCatalogCounts counts,
     IntentionCatalogQuery query,
@@ -1053,69 +1129,48 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
     switch (counts) {
       case IntentionCountsTotalOnly():
         return counts;
-      case IntentionCountsByType(:final counts):
-        final anyTypeQuery = query.withAnyReadiness();
-        final reconciled = _reconcileTypeCounts(
-          counts,
-          mutation,
-          (snapshot) => snapshot.matches(anyTypeQuery),
-        );
-        return reconciled == null ? null : IntentionCountsByType(reconciled);
-      case IntentionCountsByScopeAndType(:final active, :final archived):
-        final anyCellQuery = query.withAnyScopeAndReadiness();
-        IntentionTypeCounts? reconcileCell(
-          IntentionTypeCounts cell,
-          IntentionArchiveState archiveState,
-        ) => _reconcileTypeCounts(
-          cell,
-          mutation,
-          (snapshot) =>
-              snapshot.summary.archiveState == archiveState &&
-              snapshot.matches(anyCellQuery),
-        );
-        final reconciledActive = reconcileCell(
-          active,
-          IntentionArchiveState.active,
-        );
-        final reconciledArchived = reconcileCell(
-          archived,
-          IntentionArchiveState.archived,
-        );
-        if (reconciledActive == null || reconciledArchived == null) {
+      case IntentionCountsByScopeAndKind(:final active, :final archived):
+        final anyCellQuery = query.withAnyScopeAndKind();
+        var activeMain = active.main;
+        var activeSupporting = active.supporting;
+        var archivedMain = archived.main;
+        var archivedSupporting = archived.supporting;
+        void count(IntentionCatalogEntrySnapshot? snapshot, int delta) {
+          if (snapshot == null || !snapshot.matches(anyCellQuery)) {
+            return;
+          }
+          final summary = snapshot.summary;
+          switch ((summary.archiveState, summary.kind)) {
+            case (IntentionArchiveState.active, IntentionKind.main):
+              activeMain += delta;
+            case (IntentionArchiveState.active, IntentionKind.supporting):
+              activeSupporting += delta;
+            case (IntentionArchiveState.archived, IntentionKind.main):
+              archivedMain += delta;
+            case (IntentionArchiveState.archived, IntentionKind.supporting):
+              archivedSupporting += delta;
+          }
+        }
+
+        count(mutation.before, -1);
+        count(mutation.after, 1);
+        if (activeMain < 0 ||
+            activeSupporting < 0 ||
+            archivedMain < 0 ||
+            archivedSupporting < 0) {
           return null;
         }
-        return IntentionCountsByScopeAndType(
-          active: reconciledActive,
-          archived: reconciledArchived,
+        return IntentionCountsByScopeAndKind(
+          active: IntentionKindCounts(
+            main: activeMain,
+            supporting: activeSupporting,
+          ),
+          archived: IntentionKindCounts(
+            main: archivedMain,
+            supporting: archivedSupporting,
+          ),
         );
     }
-  }
-
-  /// Поправляет числа типов на разницу «после − до» среди снимков, которые
-  /// [counted] относит к этим числам; `null` — числа стали несогласуемыми.
-  IntentionTypeCounts? _reconcileTypeCounts(
-    IntentionTypeCounts counts,
-    IntentionCatalogMutation mutation,
-    bool Function(IntentionCatalogEntrySnapshot snapshot) counted,
-  ) {
-    var all = counts.all;
-    var actions = counts.actions;
-    void count(IntentionCatalogEntrySnapshot? snapshot, int delta) {
-      if (snapshot == null || !counted(snapshot)) {
-        return;
-      }
-      all += delta;
-      if (snapshot.summary.readiness == IntentionReadiness.ready) {
-        actions += delta;
-      }
-    }
-
-    count(mutation.before, -1);
-    count(mutation.after, 1);
-    if (actions < 0 || actions > all) {
-      return null;
-    }
-    return IntentionTypeCounts(all: all, actions: actions);
   }
 
   bool _belongsToLoadedPrefix(
@@ -1142,7 +1197,7 @@ final class IntentionCatalogViewModel extends _$IntentionCatalogViewModel {
 /// `TagAssignmentChanged` требует каталожную мутацию и сверяет её намерение
 /// с намерением пары, а `IntentionSaved` создания несёт факты всех начальных
 /// назначений вместе с одной `IntentionCatalogCreated`, окончательный снимок
-/// которой уже содержит теги и готовность. Поэтому созданное намерение
+/// которой уже содержит теги и вид. Поэтому созданное намерение
 /// согласуется одним изменением ревизии без ожидания самостоятельных команд.
 /// Модель каталога полагается на эти контракты и сама пакет с фактом без
 /// такой мутации не отклоняет.
@@ -1156,12 +1211,18 @@ final class _CatalogChangePackage {
       tagChanges = List.unmodifiable(changes.whereType<TagChange>()),
       relationChanges = List.unmodifiable(
         changes.whereType<LongTermRelationChange>(),
+      ),
+      changesHolding = changes.any(
+        (change) => change is IntentionHoldingChanged,
       );
 
   final GraphRevision revision;
   final List<IntentionCatalogMutation> mutations;
   final List<TagChange> tagChanges;
   final List<LongTermRelationChange> relationChanges;
+
+  /// Пакет изменил удержание: загруженные строки перечитывают его.
+  final bool changesHolding;
 
   /// Новые полные состояния тегов, отредактированных пакетом.
   Iterable<Tag> get updatedTags =>

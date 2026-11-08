@@ -177,7 +177,6 @@ void main() {
           id: neighborId,
           title: 'Сделать силовую тренировку',
           archiveState: IntentionArchiveState.active,
-          readiness: IntentionReadiness.ready,
         ),
         descriptionPreview: TextPreview.fromText(description),
       );
@@ -207,7 +206,7 @@ void main() {
       expect(row.label, l10n.detailsRelationsRowNeed('P1'));
       expect(row.name, 'Сделать силовую тренировку');
       expect(row.note, note);
-      expect(row.action, isTrue);
+      expect(row.action, isFalse);
       expect(row.archived, isFalse);
       expect(row.intentionArchived, isFalse);
       expect(find.text(l10n.detailsRelationsRowNeed('P1')), findsOneWidget);
@@ -223,7 +222,7 @@ void main() {
         note,
       ].join('. ');
       expect(row.semanticLabel, rowLabel);
-      final walkLabel = l10n.detailsRelationsWalkAction(
+      final walkLabel = l10n.detailsRelationsWalkIntention(
         'Сделать силовую тренировку',
       );
       expect(row.walkLabel, walkLabel);
@@ -263,7 +262,6 @@ void main() {
           id: base.neighbor.id,
           title: base.neighbor.title,
           archiveState: IntentionArchiveState.archived,
-          readiness: IntentionReadiness.notReady,
         ),
       );
       harness.repository.completePage(
@@ -586,23 +584,6 @@ void main() {
         expect(find.byKey(_addKey), findsOneWidget);
         expect(find.byType(CountTiles<IntentionRelationGroup>), findsOneWidget);
       }
-    });
-
-    testWidgets('[${locale.languageCode}] пустая группа «Нужно» действия '
-        'напоминает, что действие может обходиться без других', (tester) async {
-      final harness = await _Harness.pump(
-        tester,
-        locale: locale,
-        readiness: IntentionReadiness.ready,
-        target: const RelationsTarget(IntentionRelationGroup.needs),
-      );
-      harness.repository.completePage(0, _emptyPage(revision));
-      await tester.pumpAndSettle();
-
-      final empty = tester.widget<EmptyState>(find.byType(EmptyState));
-      expect(empty.title, l10n.detailsRelationsEmptyNeedsTitle);
-      expect(empty.text, l10n.detailsRelationsEmptyNeedsActionText);
-      expect(empty.pretty, isTrue);
     });
 
     testWidgets('[${locale.languageCode}] пустая группа архивированного '
@@ -1299,7 +1280,6 @@ final class _Harness {
     WidgetTester tester, {
     Locale locale = const Locale('en'),
     String ownerTitle = 'Намерение',
-    IntentionReadiness readiness = IntentionReadiness.notReady,
     IntentionArchiveState archiveState = IntentionArchiveState.active,
     RelationCounts? counts,
     IntentionPageTarget target = const OverviewTarget(),
@@ -1368,7 +1348,6 @@ final class _Harness {
       testGraphIntention(
         id: harness.ownerId,
         title: ownerTitle,
-        readiness: readiness,
         archiveState: archiveState,
       ),
       counts: counts ?? testRelationCounts(),

@@ -4,12 +4,8 @@ import 'dart:io';
 
 import 'package:doable/src/app/navigation/app_destination.dart';
 import 'package:doable/src/app/navigation/app_navigation_bar.dart';
-import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/settings/settings_page.dart';
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/data/local/app_database.dart' show AppDatabase;
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
@@ -36,61 +32,62 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/action_seed.dart';
 import '../support/app_flow_wait.dart' as app_flow;
 import '../support/app_root_pages.dart';
 import '../support/graph_import_app_harness.dart';
 import '../support/graph_import_files.dart';
+import '../support/graph_seed.dart';
+import '../support/intention_cascade_execution.dart';
 import '../support/intention_catalog_controls.dart';
-import '../support/quick_creation.dart';
 import '../support/temporary_import_document.dart';
 
 void main() {
-  testWidgets('сценарии «Импорт экспорта воспроизводит граф», «Настройки '
-      'установки не переносятся» и «Импорт в пустой граф без подтверждения»: '
-      'новая установка без подтверждения импортирует файл экспорта другой '
-      'установки с теми же сущностями, данными, включая синий тег и тег без '
-      'цвета, порядками и путём дневного выбора, а её режим быстрого создания '
-      'остаётся прежним', (tester) async {
-    late _ExportedGraph exported;
-    final source = await ImportAppHarness.start(
-      tester,
-      at: DateTime(2026, 10, 3, 12),
-      quickCreationMode: QuickCreationMode.dailyChoice,
-      seed: (graph) async => exported = await _seedExportedGraph(graph),
-    );
-    final sourceGraph = await source.graphState();
-    await source.openSettings();
-    expectQuickCreationMode(tester, QuickCreationMode.dailyChoice);
-    final file = await source.export();
-    await source.shutDown();
-
-    final target = await ImportAppHarness.start(
-      tester,
-      at: DateTime(2026, 10, 6, 9),
-      quickCreationMode: QuickCreationMode.intention,
-    );
-    await target.openSettings();
-    target.chooseForImport(file);
-    // Импорт в пустой граф не ждёт подтверждения: без него замена не
-    // началась бы, и сообщения об успехе не было бы.
-    await target.startImport();
-    await app_flow.until(tester, find.text('Данные импортированы'));
-
-    expect(find.byType(SettingsPage), findsOneWidget);
-    expect(await target.graphState(), sourceGraph);
-    expectQuickCreationMode(tester, QuickCreationMode.intention);
-    await _applyTagCondition(tester, exported.tag);
-    for (final (title, finds) in [
-      (exported.assignedFirst, findsOneWidget),
-      (exported.assignedSecond, findsOneWidget),
-      ('Здоровье', findsNothing),
-    ]) {
-      expect(
-        find.descendant(of: intentionCatalogList, matching: find.text(title)),
-        finds,
+  testWidgets(
+    'сценарии «Импорт экспорта воспроизводит граф» и «Импорт в пустой '
+    'граф без подтверждения»: '
+    'новая установка без подтверждения импортирует файл экспорта другой '
+    'установки с теми же сущностями, данными, включая синий тег и тег без '
+    'цвета, порядками и путём действия',
+    (tester) async {
+      late _ExportedGraph exported;
+      final source = await ImportAppHarness.start(
+        tester,
+        at: DateTime(2026, 10, 3, 12),
+        seed: (graph, database) async =>
+            exported = await _seedExportedGraph(graph, database),
       );
-    }
-  });
+      final sourceGraph = await source.graphState();
+      await source.openSettings();
+      final file = await source.export();
+      await source.shutDown();
+
+      final target = await ImportAppHarness.start(
+        tester,
+        at: DateTime(2026, 10, 6, 9),
+      );
+      await target.openSettings();
+      target.chooseForImport(file);
+      // Импорт в пустой граф не ждёт подтверждения: без него замена не
+      // началась бы, и сообщения об успехе не было бы.
+      await target.startImport();
+      await app_flow.until(tester, find.text('Данные импортированы'));
+
+      expect(find.byType(SettingsPage), findsOneWidget);
+      expect(await target.graphState(), sourceGraph);
+      await _applyTagCondition(tester, exported.tag);
+      for (final (title, finds) in [
+        (exported.assignedFirst, findsOneWidget),
+        (exported.assignedSecond, findsOneWidget),
+        ('Здоровье', findsNothing),
+      ]) {
+        expect(
+          find.descendant(of: intentionCatalogList, matching: find.text(title)),
+          finds,
+        );
+      }
+    },
+  );
 
   testWidgets('сценарии «Подтверждение показывает дату и состав файла», '
       '«Копия после замены графа» и «Ошибочный импорт отменяется '
@@ -101,7 +98,7 @@ void main() {
     final app = await ImportAppHarness.start(
       tester,
       at: DateTime(2026, 10, 5, 9),
-      seed: (graph) => _createTag(graph, 'Дом'),
+      seed: (graph, _) => _createTag(graph, 'Дом'),
     );
     await app.waitForBackups(1);
     app.now = DateTime(2026, 10, 5, 14);
@@ -125,7 +122,7 @@ void main() {
     expect(
       find.text(
         'Она сохранена 3 октября 2026 года и содержит 4 намерения, 3 связи, '
-        '2 дневных выбора и 2 тега.',
+        '3 действия и 2 тега.',
       ),
       findsOneWidget,
     );
@@ -172,7 +169,7 @@ void main() {
     final app = await ImportAppHarness.start(
       tester,
       at: DateTime(2026, 10, 6, 8, 15),
-      seed: (graph) async {
+      seed: (graph, _) async {
         health = await _createTag(graph, 'Здоровье');
         for (var number = 1; number <= 40; number++) {
           await _createIntention(graph, 'Намерение $number', tags: {health.id});
@@ -296,44 +293,33 @@ typedef _ExportedGraph = ({
 /// Создаёт командами граф сценария «Импорт экспорта воспроизводит граф»:
 /// архивированное намерение «Читать», две связи «нужно» намерения «Здоровье»
 /// с P2, созданные одна за другой, сначала к «Бегать», затем к созданному
-/// раньше «Плавать», дневной выбор, путь которого проходит через ныне
+/// раньше «Плавать», действие, путь которого проходит через ныне
 /// архивированную связь «Здоровье» → «Бегать», синий тег «Утро», назначенный
 /// сначала «Бегать», затем «Плавать», и отдельный тег «Вечер» без цвета.
-Future<_ExportedGraph> _seedExportedGraph(PersonalGraphRepository graph) async {
+/// Команды создания действия нет, поэтому действие записывается в [database]
+/// с фактом создания в логе.
+Future<_ExportedGraph> _seedExportedGraph(
+  PersonalGraphRepository graph,
+  AppDatabase database,
+) async {
   final health = await _createIntention(graph, 'Здоровье');
-  final swimming = await _createIntention(
-    graph,
-    'Плавать',
-    readiness: IntentionReadiness.ready,
-  );
-  final running = await _createIntention(
-    graph,
-    'Бегать',
-    readiness: IntentionReadiness.ready,
-  );
+  final swimming = await _createIntention(graph, 'Плавать');
+  final running = await _createIntention(graph, 'Бегать');
   final reading = await _createIntention(graph, 'Читать');
-  await _execute(graph, ArchiveIntention(reading.id));
+  await _execute(graph, await previewedArchiveIntention(graph, reading.id));
   final needsRunning = await _createNeed(graph, health, running);
   await _createNeed(graph, health, swimming);
-  await _confirm<DailyChoiceCreated>(
-    graph,
-    CreateDailyChoice(
-      sourceIntentionId: health.id,
-      selectedIntentionId: running.id,
-      path: ConfirmedChoicePath([
-        ConfirmedChoicePathStep(
-          relationId: needsRunning.id,
-          sourceIntentionId: health.id,
-          type: LongTermRelationType.need,
-          relatedIntentionId: running.id,
-        ),
-      ]),
-      date: CalendarDate.fromParts(2026, 10, 3),
-      description: null,
-      isCompleted: false,
+  await recordGraphChange(
+    database,
+    () => insertAction(
+      database,
+      id: seedUuid(1),
+      path: [health.id.toCanonicalString(), running.id.toCanonicalString()],
+      date: '2026-10-03',
     ),
+    recordedAt: DateTime.utc(2026, 10, 3, 9),
   );
-  await _execute(graph, ArchiveLongTermRelation(needsRunning.id));
+  await _execute(graph, await previewedArchiveRelation(graph, needsRunning.id));
   final morning = await _createTag(graph, 'Утро', color: TagColor.blue);
   await _execute(graph, AssignTag(tagId: morning.id, intentionId: running.id));
   await _execute(graph, AssignTag(tagId: morning.id, intentionId: swimming.id));
@@ -397,14 +383,12 @@ Future<Tag> _createTag(
 Future<Intention> _createIntention(
   PersonalGraphRepository graph,
   String title, {
-  IntentionReadiness readiness = IntentionReadiness.notReady,
   Set<TagId> tags = const {},
 }) async => (await _confirm<IntentionSaved>(
   graph,
   CreateIntention.withInitialState(
     title: title,
     description: null,
-    readiness: readiness,
     tagIds: tags,
   ),
 )).intention;

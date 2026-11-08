@@ -46,6 +46,8 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
         progress,
         cancellation,
       );
+      await _verifyInsertedActionPaths();
+      await _verifyIntentionKinds();
       if (!_sameRecordCounts(await _selectRecordCounts(), snapshot.counts)) {
         throw const GraphReplacementRecordsRejected();
       }
@@ -123,11 +125,11 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
   ///
   /// Номер изменения продолжает расти: курсоры и загрузка снимка связей
   /// статистики, которые сверяют только его, тоже устаревают. Кэши
-  /// статистики сбрасываются, а наблюдатели сущностей перечитывают их:
-  /// ревизии прежней эпохи с новой несравнимы. Наблюдатели тегов узнают о
-  /// замене от обновлений таблиц Drift, наблюдатели состава и лога — по
-  /// позиции пакета «сброс» [resetPosition], а наблюдатели списка копий —
-  /// если замена добавила копию перед заменой.
+  /// статистики и индекс удержания сбрасываются, а наблюдатели сущностей
+  /// перечитывают их: ревизии прежней эпохи с новой несравнимы. Наблюдатели
+  /// тегов узнают о замене от обновлений таблиц Drift, наблюдатели состава и
+  /// лога — по позиции пакета «сброс» [resetPosition], а наблюдатели списка
+  /// копий — если замена добавила копию перед заменой.
   ConfirmedGraphReplacement _startReplacedGraphEpoch(
     int resetPosition, {
     required bool addedBackup,
@@ -138,15 +140,14 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
     _statisticsRelationSnapshot = null;
     _throughRelationsResults.clear();
     _intentionStatisticsResults.clear();
+    _resetIntentionHoldingIndex();
     for (final watchers in List.of(_intentionWatchers.values)) {
       for (final watcher in List.of(watchers)) {
         watcher.add(null);
       }
     }
-    for (final registrations in List.of(_dailyChoiceWatchers.values)) {
-      for (final registration in List.of(registrations)) {
-        registration.invalidations.add(null);
-      }
+    for (final registration in List.of(_actionWatchers)) {
+      registration.invalidations.add(null);
     }
     for (final registrations in List.of(_relationWatchers.values)) {
       for (final registration in List.of(registrations)) {
@@ -163,21 +164,22 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
       .write(local.GraphLogControlCompanion(capture: Value(capture)));
 
   /// Удаляет прежний граф операторами не больше чем по
-  /// [_replacementBatchRowLimit] строк в порядке, обратном ссылкам: дневные
-  /// выборы вместе с шагами путей, которые каскадом удаляются с ними, затем
-  /// связи, назначения тегов, теги и намерения. Назначения удаляются
-  /// отдельно, а не каскадом тегов, поэтому [progress] получает число
-  /// удалённых записей каждого вида.
+  /// [_replacementBatchRowLimit] строк в порядке, обратном ссылкам:
+  /// надгробия, действия вместе со строками путей, затем связи, назначения
+  /// тегов, теги и намерения. Назначения удаляются отдельно, а не каскадом
+  /// тегов, а надгробия — отдельно, а не триггером освобождения после
+  /// удаления строк пути, поэтому [progress] получает число удалённых
+  /// записей каждого вида. Когда удаляются связи и намерения, строк путей
+  /// уже нет, поэтому триггеры не создают новых надгробий.
   Future<void> _deletePreviousGraph(
     _ReplacementProgress progress,
     GraphReplacementCancellation cancellation,
   ) async {
     final tables =
         <(TableInfo<Table, Object?>, Set<TableInfo<Table, Object?>>)>[
-          (
-            _database.dailyChoices,
-            {_database.dailyChoices, _database.dailyChoicePathSteps},
-          ),
+          (_database.deletedRelationPairs, {_database.deletedRelationPairs}),
+          (_database.deletedIntentions, {_database.deletedIntentions}),
+          (_database.actions, {_database.actions, _database.actionPathItems}),
           (_database.longTermRelations, {_database.longTermRelations}),
           (_database.tagAssignments, {_database.tagAssignments}),
           (_database.tags, {_database.tags}),
@@ -200,8 +202,8 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
   }
 
   /// Вставляет записи снимка [records] в порядке файла пакетами не больше
-  /// чем по [_replacementBatchRowLimit] строк: дневной выбор занимает строку
-  /// и по строке на каждый шаг пути. Пакет из одной записи может быть
+  /// чем по [_replacementBatchRowLimit] строк: действие занимает строку и по
+  /// строке на каждое намерение пути. Пакет из одной записи может быть
   /// больше: длина записи ограничена пределом записи формата.
   Future<void> _insertSnapshotRecords(
     Stream<GraphEntityRecord> records,
@@ -221,7 +223,7 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
 
     await for (final record in records) {
       final rows = switch (record) {
-        DailyChoiceRecord(:final path) => 1 + path.steps.length,
+        ActionRecord(:final path) => 1 + path.intentions.length,
         _ => 1,
       };
       if (batchRows + rows > _replacementBatchRowLimit) await flush();
@@ -232,10 +234,8 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
   }
 
   /// Вставляет [records] одним пакетом операторов. Ссылки, уникальность и
-  /// активность участников активной связи проверяет схема, а непрерывность
-  /// путей вставленных выборов — общая проверка сохранённого пути.
+  /// активность участников активной связи проверяет схема.
   Future<void> _insertRecordBatch(List<GraphEntityRecord> records) async {
-    final choices = <DailyChoice>[];
     await _database.batch((batch) {
       for (final record in records) {
         switch (record) {
@@ -256,9 +256,7 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
                 id: intention.id.toCanonicalString(),
                 title: intention.title,
                 description: Value(intention.description),
-                isActionReady: Value(
-                  intention.readiness == domain.IntentionReadiness.ready,
-                ),
+                kind: Value(intention.kind.name),
                 isArchived: Value(
                   intention.archiveState ==
                       domain.IntentionArchiveState.archived,
@@ -293,67 +291,142 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
                 updatedAt: record.updatedAt.value.microsecondsSinceEpoch,
               ),
             );
-          case DailyChoiceRecord(:final choice, :final path):
+          case DeletedIntentionRecord(:final id, :final title):
             batch.insert(
-              _database.dailyChoices,
-              local.DailyChoicesCompanion.insert(
-                id: choice.id.toCanonicalString(),
-                sourceIntentionId: choice.sourceIntentionId.toCanonicalString(),
-                selectedIntentionId: choice.selectedIntentionId
-                    .toCanonicalString(),
-                choiceDate: choice.date.toCanonicalString(),
-                description: Value(choice.description?.value),
-                isCompleted: choice.isCompleted,
-                scheduledMinute: Value(switch (choice.schedule) {
-                  DailyChoiceAllDay() => null,
-                  DailyChoiceTime(:final minuteOfDay) => minuteOfDay,
-                }),
-                priority: Value(choice.priority.level),
+              _database.deletedIntentions,
+              local.DeletedIntentionsCompanion.insert(
+                intentionId: id.toCanonicalString(),
+                title: title,
               ),
             );
-            batch.insertAll(_database.dailyChoicePathSteps, [
-              for (final step in path.steps)
-                local.DailyChoicePathStepsCompanion.insert(
-                  id: step.id.toCanonicalString(),
-                  dailyChoiceId: step.dailyChoiceId.toCanonicalString(),
-                  longTermRelationId: step.relationId.toCanonicalString(),
-                  previousStepId: Value(
-                    step.previousStepId?.toCanonicalString(),
-                  ),
-                ),
-            ]);
-            choices.add(choice);
+          case DeletedRelationPairRecord():
+            batch.insert(
+              _database.deletedRelationPairs,
+              local.DeletedRelationPairsCompanion.insert(
+                sourceIntentionId: record.sourceIntentionId.toCanonicalString(),
+                relatedIntentionId: record.relatedIntentionId
+                    .toCanonicalString(),
+                type: _storedRelationType(record.type),
+              ),
+            );
+          case ActionRecord():
+            final actionId = record.id.toCanonicalString();
+            batch.insert(
+              _database.actions,
+              local.ActionsCompanion.insert(
+                id: actionId,
+                title: record.title.value,
+                description: Value(record.description?.value),
+                date: record.date.toCanonicalString(),
+                scheduledHour: Value(switch (record.schedule) {
+                  ActionAllDay() => null,
+                  ActionAtHour(:final hour) => hour,
+                }),
+                priority: record.priority.level,
+                isCompleted: record.isCompleted,
+                createdAt: record.createdAt.value.microsecondsSinceEpoch,
+                updatedAt: record.updatedAt.value.microsecondsSinceEpoch,
+              ),
+            );
+            // Строки пути вставляются по порядку позиций: так их проверяет
+            // триггер продолжения предыдущей позиции. Копию ключа порядка
+            // вставка берёт из только что вставленного действия.
+            final intentions = record.path.intentions;
+            for (final (position, intention) in intentions.indexed) {
+              batch.customStatement(
+                '''INSERT INTO action_path_items
+                   (action_id, position, intention_id, previous_intention_id,
+                    role, order_date, order_hour, order_sequence)
+                   SELECT ?1, ?2, ?3, ?4, ?5,
+                          date, COALESCE(scheduled_hour, -1), creation_sequence
+                   FROM actions WHERE id = ?1''',
+                [
+                  actionId,
+                  position,
+                  intention.toCanonicalString(),
+                  position == 0
+                      ? null
+                      : intentions[position - 1].toCanonicalString(),
+                  _StoredActionPathRole.at(position, intentions.length).name,
+                ],
+              );
+            }
         }
       }
     });
-    if (choices.isNotEmpty) await _verifyInsertedChoicePaths(choices);
   }
 
-  /// Проверяет сохранённые пути вставленных выборов [choices] по их шагам
-  /// и концам связей этих шагов: схема не выражает непрерывности пути.
-  Future<void> _verifyInsertedChoicePaths(List<DailyChoice> choices) async {
-    final paths = await readStoredChoicePaths(
-      _database,
-      choiceIds: List.filled(choices.length, '?').join(', '),
-      variables: [
-        for (final choice in choices)
-          Variable.withString(choice.id.toCanonicalString()),
-      ],
-      readsFrom: const {},
-    );
-    try {
-      for (final choice in choices) {
-        verifyStoredChoicePath(
-          choice: choice,
-          steps: paths.steps[choice.id] ?? const [],
-          relations: paths.relations,
-        );
-      }
-    } on StoredGraphCorruption catch (_, stackTrace) {
-      Error.throwWithStackTrace(
-        const GraphReplacementRecordsRejected(),
-        stackTrace,
-      );
+  /// Проверяет правила целостности сохранённых путей действий, которых не
+  /// выражают триггеры вставки: у каждого звена пути есть связь его пары
+  /// или надгробие пары, а каждое надгробие нужно хоть одному пути. Чтение
+  /// одно на весь вставленный граф: прежний граф к этому моменту удалён.
+  Future<void> _verifyInsertedActionPaths() async {
+    final row = await _database
+        .customSelect(
+          '''SELECT
+            EXISTS (
+              SELECT 1 FROM action_path_items AS item
+              WHERE
+                item.previous_intention_id IS NOT NULL AND
+                NOT EXISTS (
+                  SELECT 1 FROM long_term_relations AS relation
+                  WHERE
+                    relation.source_intention_id =
+                      item.previous_intention_id AND
+                    relation.related_intention_id = item.intention_id
+                ) AND
+                NOT EXISTS (
+                  SELECT 1 FROM deleted_relation_pairs AS pair
+                  WHERE
+                    pair.source_intention_id = item.previous_intention_id AND
+                    pair.related_intention_id = item.intention_id
+                )
+            ) OR
+            EXISTS (
+              SELECT 1 FROM deleted_intentions AS tombstone
+              WHERE NOT EXISTS (
+                SELECT 1 FROM action_path_items AS item
+                WHERE item.intention_id = tombstone.intention_id
+              )
+            ) OR
+            EXISTS (
+              SELECT 1 FROM deleted_relation_pairs AS pair
+              WHERE NOT EXISTS (
+                SELECT 1 FROM action_path_items AS item
+                WHERE
+                  item.previous_intention_id = pair.source_intention_id AND
+                  item.intention_id = pair.related_intention_id
+              )
+            ) AS is_violated''',
+          readsFrom: {
+            _database.actionPathItems,
+            _database.longTermRelations,
+            _database.deletedIntentions,
+            _database.deletedRelationPairs,
+          },
+        )
+        .getSingle();
+    if (row.read<bool>('is_violated')) {
+      throw const GraphReplacementRecordsRejected();
+    }
+  }
+
+  Future<void> _verifyIntentionKinds() async {
+    final row = await _database
+        .customSelect(
+          '''SELECT EXISTS (
+        SELECT 1 FROM intentions AS intention
+        WHERE intention.kind = 'supporting' AND NOT EXISTS (
+          SELECT 1 FROM long_term_relations AS relation
+          WHERE relation.related_intention_id = intention.id
+            AND (intention.is_archived = 1 OR relation.is_archived = 0)
+        )
+      ) AS is_violated''',
+          readsFrom: {_database.intentions, _database.longTermRelations},
+        )
+        .getSingle();
+    if (row.read<bool>('is_violated')) {
+      throw const GraphReplacementRecordsRejected();
     }
   }
 
@@ -364,24 +437,31 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
           '''SELECT
             (SELECT count(*) FROM tags) AS tags,
             (SELECT count(*) FROM intentions) AS intentions,
+            (SELECT count(*) FROM deleted_intentions) AS deleted_intentions,
             (SELECT count(*) FROM tag_assignments) AS tag_assignments,
             (SELECT count(*) FROM long_term_relations) AS long_term_relations,
-            (SELECT count(*) FROM daily_choices) AS daily_choices''',
+            (SELECT count(*) FROM deleted_relation_pairs)
+              AS deleted_relation_pairs,
+            (SELECT count(*) FROM actions) AS actions''',
           readsFrom: {
             _database.tags,
             _database.intentions,
+            _database.deletedIntentions,
             _database.tagAssignments,
             _database.longTermRelations,
-            _database.dailyChoices,
+            _database.deletedRelationPairs,
+            _database.actions,
           },
         )
         .getSingle();
     return GraphRecordCounts(
       tags: row.read<int>('tags'),
       intentions: row.read<int>('intentions'),
+      deletedIntentions: row.read<int>('deleted_intentions'),
       tagAssignments: row.read<int>('tag_assignments'),
       longTermRelations: row.read<int>('long_term_relations'),
-      dailyChoices: row.read<int>('daily_choices'),
+      deletedRelationPairs: row.read<int>('deleted_relation_pairs'),
+      actions: row.read<int>('actions'),
     );
   }
 }
@@ -389,16 +469,20 @@ extension _GraphReplacementWriting on DriftPersonalGraphRepository {
 int _recordTotal(GraphRecordCounts counts) =>
     counts.tags +
     counts.intentions +
+    counts.deletedIntentions +
     counts.tagAssignments +
     counts.longTermRelations +
-    counts.dailyChoices;
+    counts.deletedRelationPairs +
+    counts.actions;
 
 bool _sameRecordCounts(GraphRecordCounts a, GraphRecordCounts b) =>
     a.tags == b.tags &&
     a.intentions == b.intentions &&
+    a.deletedIntentions == b.deletedIntentions &&
     a.tagAssignments == b.tagAssignments &&
     a.longTermRelations == b.longTermRelations &&
-    a.dailyChoices == b.dailyChoices;
+    a.deletedRelationPairs == b.deletedRelationPairs &&
+    a.actions == b.actions;
 
 /// Ход замены графа: доля обработанных записей от [_total], которая
 /// сообщается, когда достигает следующей сотой доли.

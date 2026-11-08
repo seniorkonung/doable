@@ -6,7 +6,6 @@ import '../../intention/domain/intention_text.dart';
 import '../../shared/domain/text_preview.dart';
 import '../domain/long_term_relation.dart';
 import '../domain/long_term_relation_description.dart';
-import 'long_term_relation_permissions.dart';
 
 final class RelationParticipantSummary {
   factory RelationParticipantSummary({
@@ -36,25 +35,21 @@ final class RelationNeighbor {
     required IntentionId id,
     required String title,
     required IntentionArchiveState archiveState,
-    required IntentionReadiness readiness,
   }) => RelationNeighbor._(
     id: id,
     title: IntentionText.normalizeTitle(title),
     archiveState: archiveState,
-    readiness: readiness,
   );
 
   const RelationNeighbor._({
     required this.id,
     required this.title,
     required this.archiveState,
-    required this.readiness,
   });
 
   final IntentionId id;
   final String title;
   final IntentionArchiveState archiveState;
-  final IntentionReadiness readiness;
 }
 
 enum LongTermRelationProjectionValidationFailure { participantMismatch }
@@ -135,8 +130,6 @@ final class LongTermRelationDetails {
     required RelationParticipantSummary source,
     required RelationParticipantSummary related,
     required LongTermRelationDescription? description,
-    LongTermRelationPermissions permissions =
-        const LongTermRelationPermissions.unknown(),
   }) {
     _ensureMatchingParticipants(relation, source, related);
     return LongTermRelationDetails._(
@@ -144,7 +137,6 @@ final class LongTermRelationDetails {
       source: source,
       related: related,
       description: description,
-      permissions: permissions,
     );
   }
 
@@ -153,14 +145,12 @@ final class LongTermRelationDetails {
     required this.source,
     required this.related,
     required this.description,
-    required this.permissions,
   });
 
   final LongTermRelation relation;
   final RelationParticipantSummary source;
   final RelationParticipantSummary related;
   final LongTermRelationDescription? description;
-  final LongTermRelationPermissions permissions;
 
   bool get hasDescription => description != null;
 }

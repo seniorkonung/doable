@@ -2,8 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/action/application/action_day_statuses.dart';
 import 'package:doable/src/data/local/app_database.dart' hide Tags;
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -14,10 +13,10 @@ import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
 import 'package:doable/src/statistics/application/intention_statistics_calendar.dart';
 import 'package:doable/src/statistics/application/intention_statistics_read_contract.dart';
@@ -29,10 +28,14 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../support/contribution_statistics_fixture.dart';
 import '../support/benchmark.dart';
 import '../support/intention_statistics_fixture.dart';
+import '../../test/support/intention_cascade_execution.dart';
 import '../../test/support/graph_seed.dart';
 import '../../test/support/local_database_harness.dart';
 
 const _readZone = #intentionStatisticsCostRead;
+
+/// Действия трёх лет фикстуры, с 2025 по 2027 год.
+const _totalActions = 1095 * statisticsActionsPerDay;
 
 enum _SectionState { cold, warm, rebuilt, readRace, computeRace }
 
@@ -54,24 +57,38 @@ void main() {
       preparation.stop();
       expect(_scalar(raw, 'SELECT COUNT(*) FROM intentions'), 50000);
       expect(_scalar(raw, 'SELECT COUNT(*) FROM long_term_relations'), 150000);
-      expect(_scalar(raw, 'SELECT COUNT(*) FROM daily_choices'), 109500);
-      final totalSteps = _scalar(
+      expect(_scalar(raw, 'SELECT COUNT(*) FROM actions'), _totalActions);
+      final totalPathItems = _scalar(
         raw,
-        'SELECT COUNT(*) FROM daily_choice_path_steps',
+        'SELECT COUNT(*) FROM action_path_items',
       );
-      expect(totalSteps, switch (profile) {
-        IntentionStatisticsProfile.shortPaths => 382370,
-        IntentionStatisticsProfile.longPaths => 3285000,
-        IntentionStatisticsProfile.manyBreakdowns => 146000,
+      expect(totalPathItems, switch (profile) {
+        IntentionStatisticsProfile.shortPaths => 300378,
+        IntentionStatisticsProfile.longPaths => 2062980,
+        IntentionStatisticsProfile.manyBreakdowns => 155052,
       });
+      final deletedIntentions = _scalar(
+        raw,
+        'SELECT COUNT(*) FROM deleted_intentions',
+      );
+      expect(deletedIntentions, switch (profile) {
+        IntentionStatisticsProfile.shortPaths => 40,
+        IntentionStatisticsProfile.longPaths => 2,
+        IntentionStatisticsProfile.manyBreakdowns => 20,
+      });
+      expect(
+        _scalar(raw, 'SELECT COUNT(*) FROM deleted_relation_pairs'),
+        deletedIntentions,
+      );
       _report({
         'profile': profile.name,
         'preparationMs': preparation.elapsedMilliseconds,
         'databaseBytes': harness.databaseFile.lengthSync(),
         'intentions': 50000,
         'relations': 150000,
-        'choices': 109500,
-        'steps': totalSteps,
+        'actions': _totalActions,
+        'pathItems': totalPathItems,
+        'deletedIntentions': deletedIntentions,
         'warmups': benchmarkWarmups,
         'repetitions': benchmarkSamples,
         ...await _environment(raw, harness),
@@ -117,9 +134,11 @@ void main() {
             raw,
             'SELECT COUNT(*) FROM long_term_relations WHERE is_archived = 1',
           ),
-          'archivedSteps': _scalar(raw, '''SELECT COUNT(*)
-              FROM daily_choice_path_steps s JOIN long_term_relations r
-                ON r.id = s.long_term_relation_id WHERE r.is_archived = 1'''),
+          'archivedLinks': _scalar(raw, '''SELECT COUNT(*)
+              FROM action_path_items p JOIN long_term_relations r
+                ON r.source_intention_id = p.previous_intention_id
+               AND r.related_intention_id = p.intention_id
+              WHERE r.is_archived = 1'''),
         });
         for (final period in [StatisticsMonth(2026, 6), StatisticsYear(2026)]) {
           final referenceWatch = Stopwatch()..start();
@@ -175,13 +194,13 @@ void main() {
             );
           });
           referenceWatch.stop();
-          final choices = _periodCount(raw, 'daily_choices', period);
-          final steps = _periodCount(raw, 'daily_choice_path_steps', period);
-          expect(expected.values.first.periodCounts.planned, choices);
-          expect(choices, period is StatisticsMonth ? 3000 : 36500);
-          if (profile == IntentionStatisticsProfile.longPaths) {
-            expect(steps, period is StatisticsMonth ? 90000 : 1095000);
-          }
+          final actions = _periodCount(raw, 'actions', period);
+          final pathItems = _periodCount(raw, 'action_path_items', period);
+          expect(expected.values.first.periodCounts.planned, actions);
+          expect(
+            actions,
+            (period is StatisticsMonth ? 30 : 365) * statisticsActionsPerDay,
+          );
           if (profile == IntentionStatisticsProfile.manyBreakdowns) {
             for (final section in expected.values) {
               expect(
@@ -195,8 +214,8 @@ void main() {
             'archived': archived,
             'period': period is StatisticsMonth ? 'month' : 'year',
             'referenceMs': referenceWatch.elapsedMilliseconds,
-            'choices': choices,
-            'steps': steps,
+            'actions': actions,
+            'pathItems': pathItems,
             ...reference.distribution,
             'breakdownSizes': {
               for (final entry in expected.entries)
@@ -211,7 +230,6 @@ void main() {
               intentionId: _intentionId(fixture.intention),
               period: period,
               view: view,
-              localDate: CalendarDate.fromParts(2026, 6, 15),
               pageSize: 100,
             );
             for (final state in _SectionState.values) {
@@ -248,10 +266,16 @@ void main() {
                   case _SectionState.rebuilt:
                     final result = relationArchived
                         ? await repository.execute(
-                            RestoreLongTermRelation(changedRelationId),
+                            await previewedRestoreRelation(
+                              repository,
+                              changedRelationId,
+                            ),
                           )
                         : await repository.execute(
-                            ArchiveLongTermRelation(changedRelationId),
+                            await previewedArchiveRelation(
+                              repository,
+                              changedRelationId,
+                            ),
                           );
                     expect(result, isA<GraphCommandSucceeded>());
                     relationArchived = !relationArchived;
@@ -387,8 +411,14 @@ void main() {
                 expect(
                   await repository.execute(
                     originalRelationArchived
-                        ? ArchiveLongTermRelation(changedRelationId)
-                        : RestoreLongTermRelation(changedRelationId),
+                        ? await previewedArchiveRelation(
+                            repository,
+                            changedRelationId,
+                          )
+                        : await previewedRestoreRelation(
+                            repository,
+                            changedRelationId,
+                          ),
                   ),
                   isA<GraphCommandSucceeded>(),
                 );
@@ -534,27 +564,27 @@ StatisticsBreakdownContinuationPage<T> _continuation<T>(
 Map<StatisticsBreakdown, StatisticsBreakdownFirstPage<Object>> _firstPages(
   IntentionStatisticsViewDetails details,
 ) => switch (details) {
-  IntentionStatisticsSourceDetails(:final selectedActions) => {
-    StatisticsBreakdown.selectedActions: selectedActions,
+  IntentionStatisticsRootDetails(:final terminalIntentions) => {
+    StatisticsBreakdown.terminalIntentions: terminalIntentions,
   },
   IntentionStatisticsIntermediateDetails(
-    :final sourceIntentions,
-    :final selectedActions,
+    :final rootIntentions,
+    :final terminalIntentions,
   ) =>
     {
-      StatisticsBreakdown.sourceIntentions: sourceIntentions,
-      StatisticsBreakdown.selectedActions: selectedActions,
+      StatisticsBreakdown.rootIntentions: rootIntentions,
+      StatisticsBreakdown.terminalIntentions: terminalIntentions,
     },
-  IntentionStatisticsSelectedDetails(:final sourceIntentions) => {
-    StatisticsBreakdown.sourceIntentions: sourceIntentions,
+  IntentionStatisticsTerminalDetails(:final rootIntentions) => {
+    StatisticsBreakdown.rootIntentions: rootIntentions,
   },
   IntentionStatisticsThroughRelationsDetails(
     :final relations,
-    :final selectedActions,
+    :final terminalIntentions,
   ) =>
     {
       StatisticsBreakdown.relations: relations,
-      StatisticsBreakdown.selectedActions: selectedActions,
+      StatisticsBreakdown.terminalIntentions: terminalIntentions,
     },
 };
 
@@ -575,12 +605,10 @@ void _expectSection(
       (counts.planned, counts.contribution),
     );
   }
-  expect(section.details.uncompleted.missed, expected.uncompleted.missed);
-  expect(section.details.uncompleted.upcoming, expected.uncompleted.upcoming);
   if (section.details case IntentionStatisticsThroughRelationsDetails(
-    :final explicitPathChoices,
+    :final explicitPathActions,
   )) {
-    expect(explicitPathChoices, expected.explicitPathChoices);
+    expect(explicitPathActions, expected.explicitPathActions);
   }
   switch (section.calendar) {
     case IntentionStatisticsMonthCalendar(:final statuses):
@@ -592,8 +620,8 @@ void _expectSection(
         {
           for (final entry in expected.days.entries)
             entry.key: entry.value.planned == entry.value.contribution
-                ? DailyChoiceDayStatus.allCompleted
-                : DailyChoiceDayStatus.hasIncomplete,
+                ? ActionDayStatus.allCompleted
+                : ActionDayStatus.hasIncomplete,
         },
       );
     case IntentionStatisticsYearCalendar(:final months):
@@ -697,9 +725,9 @@ int _periodCount(
   StatisticsPeriod period,
 ) => _scalar(
   db,
-  table == 'daily_choices'
-      ? "SELECT COUNT(*) FROM daily_choices WHERE choice_date BETWEEN '${period.firstDate.toCanonicalString()}' AND '${period.lastDate.toCanonicalString()}'"
-      : "SELECT COUNT(*) FROM daily_choice_path_steps s JOIN daily_choices c ON c.id = s.daily_choice_id WHERE c.choice_date BETWEEN '${period.firstDate.toCanonicalString()}' AND '${period.lastDate.toCanonicalString()}'",
+  table == 'actions'
+      ? "SELECT COUNT(*) FROM actions WHERE date BETWEEN '${period.firstDate.toCanonicalString()}' AND '${period.lastDate.toCanonicalString()}'"
+      : "SELECT COUNT(*) FROM action_path_items p JOIN actions a ON a.id = p.action_id WHERE a.date BETWEEN '${period.firstDate.toCanonicalString()}' AND '${period.lastDate.toCanonicalString()}'",
 );
 
 void _collect(

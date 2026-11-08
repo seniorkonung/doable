@@ -7,16 +7,16 @@ import 'package:doable/src/app/app_runtime.dart';
 import 'package:doable/src/app/home/home_page.dart';
 import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/settings/settings_page.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import 'package:doable/src/data/local/app_database.dart'
-    show openFileBackedLocalDatabase;
+    show AppDatabase, openFileBackedLocalDatabase;
 import 'package:doable/src/graph/application/personal_graph_repository.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/graph_backups/graph_backup_registry.dart';
 import 'package:doable/src/graph_backups/graph_backups_provider.dart';
 import 'package:doable/src/graph_format/graph_format_codec.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,8 +24,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'app_flow_wait.dart' as app_flow;
-import 'daily_choice_durability_fixture.dart';
 import 'file_document_access.dart';
+import 'graph_durability_fixture.dart';
 import 'graph_log_completeness_reference.dart';
 import 'in_memory_diagnostics_sink.dart';
 import 'in_memory_quick_creation_mode_store.dart';
@@ -66,13 +66,15 @@ final class ImportAppHarness {
   List<GraphBackupEntry> _backups = const [];
 
   /// Запускает приложение новой установки в момент [at] с режимом быстрого
-  /// создания [quickCreationMode]. [seed] создаёт граф командами, поэтому он
-  /// полностью отражён в логе фактов; без [seed] граф пуст.
+  /// создания [quickCreationMode]. [seed] создаёт граф командами [graph] и
+  /// записями `recordGraphChange` в [database], поэтому он полностью отражён
+  /// в логе фактов; без [seed] граф пуст.
   static Future<ImportAppHarness> start(
     WidgetTester tester, {
     required DateTime at,
     QuickCreationMode quickCreationMode = QuickCreationMode.intention,
-    Future<void> Function(PersonalGraphRepository graph)? seed,
+    Future<void> Function(PersonalGraphRepository graph, AppDatabase database)?
+    seed,
   }) async {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
@@ -88,13 +90,15 @@ final class ImportAppHarness {
     );
     if (seed != null) {
       await tester.runAsync(() async {
+        final database = await harness.openReadyDatabase();
         await seed(
           DriftPersonalGraphRepository(
-            await harness.openReadyDatabase(),
+            database,
             UuidV7IntentionIdGenerator(),
             () => app.now.toUtc(),
             InMemoryDiagnosticsSink(),
           ),
+          database,
         );
         await harness.closePersistenceObjectGraph();
       });
@@ -120,7 +124,7 @@ final class ImportAppHarness {
       diagnosticsSink: diagnostics,
       quickCreationModeStore: _modes,
       graphFilesFactory: _files.create,
-      dailyChoiceLocalDateSource: () => DailyChoiceLocalDay(
+      localDateSource: () => LocalDay(
         date: CalendarDate.fromParts(now.year, now.month, now.day),
         untilNextDate: const Duration(hours: 12),
       ),

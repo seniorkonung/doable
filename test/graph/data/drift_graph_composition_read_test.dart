@@ -1,10 +1,7 @@
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice.dart';
+import 'package:doable/src/action/application/action_command.dart';
+import 'package:doable/src/action/domain/action_id.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show
         LocalDatabaseConnectionObserver,
@@ -29,7 +26,10 @@ import 'package:doable/src/tag/domain/tag_name.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/action_seed.dart';
+import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/local_database_harness.dart';
 
 void main() {
@@ -37,11 +37,15 @@ void main() {
   late _ReadFailureProbe probe;
   late InMemoryDiagnosticsSink diagnostics;
   late DriftPersonalGraphRepository repository;
+  late sqlite.Database raw;
 
   setUp(() async {
     harness = LocalDatabaseHarness.inMemory();
     probe = _ReadFailureProbe();
-    final database = await harness.openReadyDatabase(observer: probe);
+    final database = await harness.openReadyDatabase(
+      setup: (connection) => raw = connection,
+      observer: probe,
+    );
     diagnostics = InMemoryDiagnosticsSink();
     var now = DateTime.utc(2026, 10, 18, 9);
     repository = DriftPersonalGraphRepository(
@@ -73,17 +77,14 @@ void main() {
     ),
   )).tag;
 
-  Future<Intention> createIntention(
-    String title, {
-    IntentionReadiness readiness = IntentionReadiness.notReady,
-  }) async => (await confirm<IntentionSaved>(
-    CreateIntention.withInitialState(
-      title: title,
-      description: null,
-      readiness: readiness,
-      tagIds: const {},
-    ),
-  )).intention;
+  Future<Intention> createIntention(String title) async =>
+      (await confirm<IntentionSaved>(
+        CreateIntention.withInitialState(
+          title: title,
+          description: null,
+          tagIds: const {},
+        ),
+      )).intention;
 
   Future<LongTermRelation> relate(
     Intention source,
@@ -97,24 +98,16 @@ void main() {
     ),
   )).relations.single;
 
-  Future<DailyChoice> choose(LongTermRelation relation) async =>
-      (await confirm<DailyChoiceCreated>(
-        CreateDailyChoice(
-          sourceIntentionId: relation.sourceIntentionId,
-          selectedIntentionId: relation.relatedIntentionId,
-          path: ConfirmedChoicePath([
-            ConfirmedChoicePathStep(
-              relationId: relation.id,
-              sourceIntentionId: relation.sourceIntentionId,
-              type: relation.type,
-              relatedIntentionId: relation.relatedIntentionId,
-            ),
-          ]),
-          date: CalendarDate.fromParts(2026, 10, 18),
-          description: null,
-          isCompleted: false,
-        ),
-      )).choice;
+  /// Действие с путём [path]. Команды создания действия пока нет, поэтому
+  /// действие вставляется в хранилище напрямую, без пакета лога.
+  void seedPathAction(String id, List<Intention> path) => seedRawGraph(
+    raw,
+    () => seedAction(
+      raw,
+      id: id,
+      path: [for (final intention in path) intention.id.toCanonicalString()],
+    ),
+  );
 
   Future<GraphComposition> currentComposition() async {
     final read = await repository.watchComposition().first;
@@ -139,22 +132,33 @@ void main() {
   });
 
   test('числа состава включают архивированные намерения и долговременные '
-      'связи и дневные выборы', () async {
+      'связи и действия', () async {
     final health = await createIntention('Здоровье');
-    final running = await createIntention(
-      'Бегать',
-      readiness: IntentionReadiness.ready,
-    );
+    final running = await createIntention('Бегать');
     final swimming = await createIntention('Плавать');
     final needRunning = await relate(health, running);
     await relate(swimming, health, group: IntentionRelationGroup.canUse);
-    await choose(needRunning);
-    await confirm(ArchiveIntention(swimming.id));
-    await confirm(ArchiveLongTermRelation(needRunning.id));
+    seedPathAction(seedUuid(11), [health, running]);
+    await confirm(await previewedArchiveIntention(repository, swimming.id));
+    await confirm(await previewedArchiveRelation(repository, needRunning.id));
 
     final composition = await currentComposition();
 
     expect(composition, _composition(3, 2, 1, 0));
+    expect(composition.isEmpty, isFalse);
+  });
+
+  test('сценарий «Данные графа с одними действиями не пусты»: граф без '
+      'намерений и тегов, в котором остались действия с путями из удалённых '
+      'намерений, не пуст, а надгробия в состав не входят', () async {
+    final health = await createIntention('Здоровье');
+    seedPathAction(seedUuid(11), [health]);
+    seedPathAction(seedUuid(12), [health]);
+    await confirm(await previewedDeleteIntention(repository, health.id));
+
+    final composition = await currentComposition();
+
+    expect(composition, _composition(0, 0, 2, 0));
     expect(composition.isEmpty, isFalse);
   });
 
@@ -173,14 +177,10 @@ void main() {
     expect(await next(), _composition(0, 0, 0, 1));
     final health = await createIntention('Здоровье');
     expect(await next(), _composition(1, 0, 0, 1));
-    final running = await createIntention(
-      'Бегать',
-      readiness: IntentionReadiness.ready,
-    );
-    expect(await next(), _composition(2, 0, 0, 1));
+    seedPathAction(seedUuid(11), [health]);
+    final running = await createIntention('Бегать');
+    expect(await next(), _composition(2, 0, 1, 1));
     final needRunning = await relate(health, running);
-    expect(await next(), _composition(2, 1, 0, 1));
-    final choice = await choose(needRunning);
     expect(await next(), _composition(2, 1, 1, 1));
 
     await confirm(
@@ -190,11 +190,15 @@ void main() {
         color: home.color,
       ),
     );
-    await confirm(DeleteDailyChoice(choice.id));
+    await confirm(
+      DeleteAction(
+        (ActionId.decode(seedUuid(11)) as ActionIdDecodingSuccess).id,
+      ),
+    );
     expect(await next(), _composition(2, 1, 0, 1));
-    await confirm(DeleteLongTermRelation(needRunning.id));
+    await confirm(await previewedDeleteRelation(repository, needRunning.id));
     expect(await next(), _composition(2, 0, 0, 1));
-    await confirm(DeleteIntention(running.id));
+    await confirm(await previewedDeleteIntention(repository, running.id));
     expect(await next(), _composition(1, 0, 0, 1));
     await confirm(DeleteTag(home.id));
     expect(await next(), _composition(1, 0, 0, 0));
@@ -229,12 +233,12 @@ void main() {
 GraphComposition _composition(
   int intentions,
   int relations,
-  int dailyChoices,
+  int actions,
   int tags,
 ) => GraphComposition(
   intentionCount: intentions,
   relationCount: relations,
-  dailyChoiceCount: dailyChoices,
+  actionCount: actions,
   tagCount: tags,
 );
 

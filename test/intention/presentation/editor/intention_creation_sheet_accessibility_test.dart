@@ -77,8 +77,7 @@ void main() {
         await tester.enterText(find.byKey(_description), _userDescription);
         sessions.notifier(tester)
           ..draftTagSet.add(_home)
-          ..draftTagSet.add(_work)
-          ..confirmReadiness();
+          ..draftTagSet.add(_work);
         await tester.pumpAndSettle();
         expect(_traversal(tester), _panel(l10n, tags: ['Дом', 'Работа']));
         _expectNoSizeActions();
@@ -87,8 +86,8 @@ void main() {
           _description,
           _tagRemove(_home),
           _tagRemove(_work),
+          _kind,
           _chooseTags,
-          _readiness,
           _submit,
           _closeButton,
         ]) {
@@ -150,7 +149,7 @@ void main() {
     );
 
     testWidgets(
-      'экранный диктор без жестов открывает панель, готовит все четыре поля черновика через панель тегов и объяснение готовности и возвращается в ту же панель — $code',
+      'экранный диктор без жестов открывает панель, заполняет все четыре поля черновика через панель тегов и выбор вида намерения и возвращается в ту же панель — $code',
       (tester) async {
         final semantics = tester.ensureSemantics();
         _usePhone(tester);
@@ -198,13 +197,23 @@ void main() {
           ),
         );
         expect(_traversal(tester), _panel(l10n));
-        _expectOption(
-          tester,
-          _readiness,
-          label: l10n.editorReadinessOption,
-          tooltip: l10n.editorReadinessOptionOff,
-          isOn: false,
-          icon: Icons.check_circle_outline,
+        expect(
+          find.semantics
+              .byLabel(l10n.intentionKindMainSemantics)
+              .evaluate()
+              .single,
+          isSemantics(hasCheckedState: true, isChecked: true, isEnabled: true),
+        );
+        expect(
+          find.semantics
+              .byLabel(l10n.intentionKindSupportingUnavailable)
+              .evaluate()
+              .single,
+          isSemantics(
+            hasCheckedState: true,
+            isChecked: false,
+            isEnabled: false,
+          ),
         );
 
         // Пользовательский текст объявляется как введён, без перевода.
@@ -258,41 +267,6 @@ void main() {
         expect(_traversal(tester), _panel(l10n, tags: ['Дом', 'Работа']));
         _expectNoSizeActions();
 
-        // Объяснение готовности — верхняя поверхность: диктор слышит оба
-        // критерия, а фокус остаётся в объяснении до ответа.
-        tester.semantics.tap(_nodeOf(tester, find.byKey(_readiness)));
-        await tester.pumpAndSettle();
-        final readinessDialog = _readinessDialog(tester, l10n);
-        expect(_traversal(tester), readinessDialog);
-        expect(_isFocusInRouteOf(tester, find.byType(AlertDialog)), isTrue);
-        tester.semantics.tap(
-          find.semantics.byLabel(l10n.editorReadinessCancelAction),
-        );
-        await tester.pumpAndSettle();
-        expect(find.byType(AlertDialog), findsNothing);
-        expect(_isFocusedIn(tester, find.byKey(_description)), isTrue);
-        expect(
-          sessions.state(tester).draft.readiness,
-          IntentionReadiness.notReady,
-        );
-
-        tester.semantics.tap(_nodeOf(tester, find.byKey(_readiness)));
-        await tester.pumpAndSettle();
-        expect(_traversal(tester), readinessDialog);
-        tester.semantics.tap(
-          find.semantics.byLabel(l10n.editorReadinessConfirmAction),
-        );
-        await tester.pumpAndSettle();
-        expect(_isFocusedIn(tester, find.byKey(_description)), isTrue);
-        _expectOption(
-          tester,
-          _readiness,
-          label: l10n.editorReadinessOption,
-          tooltip: l10n.editorReadinessOptionOn,
-          isOn: true,
-          icon: Icons.check_circle,
-        );
-
         tester.semantics.tap(_byTooltip(l10n.editorRemoveDraftTag('Работа')));
         await tester.pumpAndSettle();
         expect(_traversal(tester), _panel(l10n, tags: ['Дом']));
@@ -301,7 +275,7 @@ void main() {
         expect(draft.title, _userTitle);
         expect(draft.description, _userDescription);
         expect(draft.tagIds, [_home.id]);
-        expect(draft.readiness, IntentionReadiness.ready);
+        expect(draft.kind, IntentionKind.main);
         expect(repository.commands, isEmpty);
         expect(repository.tagCommands, isEmpty);
         expect(tester.takeException(), isNull);
@@ -327,8 +301,7 @@ void main() {
         await tester.enterText(find.byKey(_description), _userDescription);
         sessions.notifier(tester)
           ..draftTagSet.add(_home)
-          ..draftTagSet.add(_work)
-          ..confirmReadiness();
+          ..draftTagSet.add(_work);
         await tester.pumpAndSettle();
         final tags = ['Дом', 'Работа'];
 
@@ -374,7 +347,7 @@ void main() {
             hasTapAction: false,
           ),
         );
-        for (final control in [_readiness, _chooseTags, _tagRemove(_home)]) {
+        for (final control in [_chooseTags, _tagRemove(_home)]) {
           expect(
             tester.getSemantics(find.byKey(control)),
             isSemantics(
@@ -489,12 +462,7 @@ void main() {
                 'описание',
                 _userDescription,
               )
-              .having((command) => command.tagIds, 'теги', [_work.id])
-              .having(
-                (command) => command.readiness,
-                'готовность',
-                IntentionReadiness.ready,
-              ),
+              .having((command) => command.tagIds, 'теги', [_work.id]),
         );
 
         // Успех открывает намерение; возврат делает каталог снова доступным.
@@ -565,8 +533,8 @@ void main() {
         // Порядок обхода совпадает с порядком чтения и замыкается в панели.
         expect(await _tabOrder(tester, steps: 7), [
           _description,
+          _kind,
           _chooseTags,
-          _readiness,
           _submit,
           _closeButton,
           _title,
@@ -576,40 +544,6 @@ void main() {
           _title,
           _closeButton,
         ]);
-
-        // Объяснение готовности удерживает обход в себе; Escape закрывает
-        // его без включения, а фокус возвращается к отметке.
-        await _tabTo(tester, find.byKey(_readiness));
-        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-        await tester.pumpAndSettle();
-        expect(find.byKey(_readinessConfirmation), findsOneWidget);
-        expect(await _tabOrder(tester, steps: 3), [
-          _readinessCancel,
-          _readinessConfirm,
-          _readinessCancel,
-        ]);
-        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-        await tester.pumpAndSettle();
-        expect(find.byKey(_readinessConfirmation), findsNothing);
-        expect(
-          sessions.state(tester).draft.readiness,
-          IntentionReadiness.notReady,
-        );
-        expect(_isFocusedIn(tester, find.byKey(_readiness)), isTrue);
-        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-        await tester.pumpAndSettle();
-        await _tabTo(
-          tester,
-          find.byKey(_readinessConfirm),
-          within: find.byType(AlertDialog),
-        );
-        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-        await tester.pumpAndSettle();
-        expect(
-          sessions.state(tester).draft.readiness,
-          IntentionReadiness.ready,
-        );
-        expect(_isFocusedIn(tester, find.byKey(_readiness)), isTrue);
 
         // Панель тегов принимает фокус целиком и возвращает его к действию
         // выбора в той же панели создания.
@@ -665,12 +599,7 @@ void main() {
           repository.commands.single,
           isA<CreateIntention>()
               .having((command) => command.title, 'название', _userTitle)
-              .having((command) => command.tagIds, 'теги', isEmpty)
-              .having(
-                (command) => command.readiness,
-                'готовность',
-                IntentionReadiness.ready,
-              ),
+              .having((command) => command.tagIds, 'теги', isEmpty),
         );
         expect(_isFocusedIn(tester, find.byType(IntentionEditorPage)), isTrue);
         expect(tester.takeException(), isNull);
@@ -697,18 +626,9 @@ void main() {
         await tester.enterText(find.byKey(_description), _userDescription);
         sessions.notifier(tester)
           ..draftTagSet.add(_home)
-          ..draftTagSet.add(_work)
-          ..confirmReadiness();
+          ..draftTagSet.add(_work);
         await tester.pumpAndSettle();
         await _expectGuidelines(tester, 'заполненная компактная панель');
-
-        sessions.notifier(tester).disableReadiness();
-        await tester.pumpAndSettle();
-        await tester.tap(find.byKey(_readiness));
-        await tester.pumpAndSettle();
-        await _expectGuidelines(tester, 'объяснение готовности');
-        await tester.tap(find.byKey(_readinessConfirm));
-        await tester.pumpAndSettle();
 
         await tester.tap(find.byKey(_closeButton));
         await tester.pumpAndSettle();
@@ -763,15 +683,10 @@ const _heading = ValueKey('intention-editor-heading');
 const _title = ValueKey('intention-editor-title');
 const _description = ValueKey('intention-editor-description');
 const _chooseTags = ValueKey('intention-editor-choose-tags');
-const _readiness = ValueKey('intention-editor-readiness');
+const _kind = ValueKey('intention-editor-kind');
 const _submit = ValueKey('intention-editor-submit');
 const _failure = ValueKey('intention-editor-failure');
 const _closeButton = ValueKey('intention-editor-close');
-const _readinessConfirmation = ValueKey(
-  'intention-editor-readiness-confirmation',
-);
-const _readinessCancel = ValueKey('intention-editor-readiness-cancel');
-const _readinessConfirm = ValueKey('intention-editor-readiness-confirm');
 const _closeConfirmation = ValueKey('intention-editor-close-confirmation');
 const _closeContinue = ValueKey('intention-editor-close-continue');
 const _closeDiscard = ValueKey('intention-editor-close-discard');
@@ -828,21 +743,12 @@ List<String> _panel(AppLocalizations l10n, {List<String> tags = const []}) => [
   l10n.editorTitle,
   l10n.editorTitleLabel,
   l10n.editorDescriptionLabel,
+  l10n.intentionKindLabel,
+  l10n.intentionKindMainSemantics,
+  l10n.intentionKindSupportingUnavailable,
   for (final tag in tags) ...[tag, l10n.editorRemoveDraftTag(tag)],
   l10n.editorChooseTags,
-  l10n.editorReadinessOption,
   l10n.editorSaveAction,
-];
-
-/// Что экранный диктор объявляет в объяснении готовности: оба критерия
-/// действия и ответы.
-List<String> _readinessDialog(WidgetTester tester, AppLocalizations l10n) => [
-  _barrierLabel(tester),
-  l10n.editorReadinessConfirmationTitle,
-  l10n.editorReadinessOneDayCriterion,
-  l10n.editorReadinessClarityCriterion,
-  l10n.editorReadinessCancelAction,
-  l10n.editorReadinessConfirmAction,
 ];
 
 /// Доступное название модального фона диалога.
@@ -938,45 +844,6 @@ FinderBase<SemanticsNode> _byTooltip(String tooltip) =>
       describeMatch: (_) => 'узел с подсказкой «$tooltip»',
     );
 
-/// Быстрая отметка объявляет назначение и включённость, а включённое
-/// состояние отличается формой значка и текстом подсказки, а не только
-/// цветом.
-void _expectOption(
-  WidgetTester tester,
-  Key option, {
-  required String label,
-  required String tooltip,
-  required bool isOn,
-  required IconData icon,
-}) {
-  expect(
-    tester.getSemantics(find.byKey(option)),
-    isSemantics(
-      label: label,
-      isButton: true,
-      hasToggledState: true,
-      isToggled: isOn,
-      hasEnabledState: true,
-      isEnabled: true,
-      hasTapAction: true,
-    ),
-  );
-  expect(
-    find.descendant(of: find.byKey(option), matching: find.byIcon(icon)),
-    findsOneWidget,
-  );
-  expect(
-    tester
-        .widget<Tooltip>(
-          find
-              .ancestor(of: find.byKey(option), matching: find.byType(Tooltip))
-              .first,
-        )
-        .message,
-    tooltip,
-  );
-}
-
 /// Основной фокус ввода находится в [finder] или в его потомке.
 bool _isFocusedIn(WidgetTester tester, Finder finder) {
   final focused = FocusManager.instance.primaryFocus?.context;
@@ -1008,11 +875,9 @@ const _focusTargets = [
   _title,
   _description,
   _chooseTags,
-  _readiness,
+  _kind,
   _submit,
   _closeButton,
-  _readinessCancel,
-  _readinessConfirm,
   _closeContinue,
   _closeDiscard,
 ];
@@ -1202,9 +1067,7 @@ Result<IntentionCommandSuccess> _savedResult() {
       intention,
       catalogMutation: IntentionCatalogCreated(
         revision: const TestCatalogRevision(1),
-        entry: TestCatalogEntrySnapshot(
-          testSummary(title: _userTitle, readiness: IntentionReadiness.ready),
-        ),
+        entry: TestCatalogEntrySnapshot(testSummary(title: _userTitle)),
       ),
     ),
   );

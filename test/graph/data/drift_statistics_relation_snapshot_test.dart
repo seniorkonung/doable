@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
+import 'package:doable/src/action/application/action_command.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -14,8 +14,10 @@ import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../support/daily_choice_durability_fixture.dart';
+import '../../support/action_seed.dart';
+import '../../support/graph_durability_fixture.dart';
 import '../../support/graph_seed.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/local_database_harness.dart';
 
 void main() {
@@ -33,49 +35,61 @@ void main() {
   });
   tearDown(() => harness.dispose());
 
-  for (final (name, command) in <(String, LongTermRelationCommand)>[
-    (
-      'создание',
-      AddLongTermRelations(
-        pageIntentionId: durabilityIntention(5),
-        group: IntentionRelationGroup.canUse,
-        candidateIds: [durabilityIntention(1)],
-      ),
-    ),
-    (
-      'смена типа',
-      UpdateLongTermRelation(
-        relationId: durabilityRelation(101),
-        patch: const LongTermRelationPatch(
-          type: LongTermRelationFieldSet(LongTermRelationType.can),
+  for (final (name, command)
+      in <(String, Future<LongTermRelationCommand> Function())>[
+        (
+          'создание',
+          () async => AddLongTermRelations(
+            pageIntentionId: durabilityIntention(5),
+            group: IntentionRelationGroup.canUse,
+            candidateIds: [durabilityIntention(1)],
+          ),
         ),
-      ),
-    ),
-    (
-      'смена приоритета',
-      UpdateLongTermRelation(
-        relationId: durabilityRelation(101),
-        patch: const LongTermRelationPatch(
-          priority: LongTermRelationFieldSet(RelationPriority.p4),
+        (
+          'смена типа',
+          () async => UpdateLongTermRelation(
+            relationId: durabilityRelation(101),
+            patch: const LongTermRelationPatch(
+              type: LongTermRelationFieldSet(LongTermRelationType.can),
+            ),
+          ),
         ),
-      ),
-    ),
-    (
-      'смена описания',
-      UpdateLongTermRelation(
-        relationId: durabilityRelation(101),
-        patch: LongTermRelationPatch(
-          description: LongTermRelationDescriptionPatch.fromInput('Описание'),
+        (
+          'смена приоритета',
+          () async => UpdateLongTermRelation(
+            relationId: durabilityRelation(101),
+            patch: const LongTermRelationPatch(
+              priority: LongTermRelationFieldSet(RelationPriority.p4),
+            ),
+          ),
         ),
-      ),
-    ),
-    ('архивирование', ArchiveLongTermRelation(durabilityRelation(101))),
-    ('удаление', DeleteLongTermRelation(durabilityRelation(101))),
-  ]) {
+        (
+          'смена описания',
+          () async => UpdateLongTermRelation(
+            relationId: durabilityRelation(101),
+            patch: LongTermRelationPatch(
+              description: LongTermRelationDescriptionPatch.fromInput(
+                'Описание',
+              ),
+            ),
+          ),
+        ),
+        (
+          'архивирование',
+          () => previewedArchiveRelation(repository, durabilityRelation(101)),
+        ),
+        (
+          'удаление',
+          () => previewedDeleteRelation(repository, durabilityRelation(101)),
+        ),
+      ]) {
     test('$name связи требует новой ленивой загрузки', () async {
       await repository.loadStatisticsRelationSnapshot();
       final reads = probe.reads;
-      expect(await repository.execute(command), isA<GraphCommandSucceeded>());
+      expect(
+        await repository.execute(await command()),
+        isA<GraphCommandSucceeded>(),
+      );
       expect(probe.reads, reads);
       final graph = await repository.loadStatisticsRelationSnapshot();
       expect(probe.reads, greaterThan(reads));
@@ -85,12 +99,14 @@ void main() {
   }
 
   test('восстановление связи требует новой загрузки', () async {
-    await repository.execute(ArchiveLongTermRelation(durabilityRelation(101)));
+    await repository.execute(
+      await previewedArchiveRelation(repository, durabilityRelation(101)),
+    );
     await repository.loadStatisticsRelationSnapshot();
     final reads = probe.reads;
     expect(
       await repository.execute(
-        RestoreLongTermRelation(durabilityRelation(101)),
+        await previewedRestoreRelation(repository, durabilityRelation(101)),
       ),
       isA<GraphCommandSucceeded>(),
     );
@@ -106,7 +122,7 @@ void main() {
     final reads = probe.reads;
     for (final id in [durabilityRelation(101), durabilityRelation(103)]) {
       expect(
-        await repository.execute(DeleteLongTermRelation(id)),
+        await repository.execute(await previewedDeleteRelation(repository, id)),
         isA<GraphCommandSucceeded>(),
       );
     }
@@ -117,18 +133,32 @@ void main() {
     expect(probe.reads, greaterThan(reads));
   });
 
-  test('изменения выборов и данных намерений не перечитывают связи', () async {
+  test('изменения действий и данных намерений не перечитывают связи', () async {
+    await seedGraph(database, () async {
+      await database.customStatement(
+        '''INSERT INTO actions
+         (id, title, date, priority, is_completed, created_at, updated_at)
+         VALUES (?, 'Пробежка', '2026-09-23', 4, 1, 1, 1)''',
+        [seedUuid(201)],
+      );
+      for (final (position, number) in [1, 2, 3].indexed) {
+        await database.customStatement(insertActionPathItem, [
+          seedUuid(201),
+          position,
+          seedUuid(number),
+          position == 0 ? null : seedUuid(number - 1),
+          actionPathRole(position, 3),
+        ]);
+      }
+    });
     await repository.loadStatisticsRelationSnapshot();
     final reads = probe.reads;
-    for (final command in <DailyChoiceCommand>[
-      durabilityCreate(),
-      UpdateDailyChoiceFields(
-        choiceId: durabilityChoice(201),
-        patch: const DailyChoiceFieldsPatch(
-          isCompleted: DailyChoiceFieldSet(false),
-        ),
+    for (final command in <ActionCommand>[
+      UpdateActionFields(
+        actionId: seedActionId(201),
+        patch: const ActionFieldsPatch(isCompleted: ActionFieldSet(false)),
       ),
-      DeleteDailyChoice(durabilityChoice(201)),
+      DeleteAction(seedActionId(201)),
     ]) {
       expect(await repository.execute(command), isA<GraphCommandSucceeded>());
       await repository.loadStatisticsRelationSnapshot();
@@ -140,23 +170,27 @@ void main() {
         title: 'Название',
         description: 'Описание',
       ),
-      EnableIntentionReadiness(durabilityIntention(1)),
-      DisableIntentionReadiness(durabilityIntention(1)),
     ]) {
       expect(await repository.execute(command), isA<GraphCommandSucceeded>());
       await repository.loadStatisticsRelationSnapshot();
       expect(probe.reads, reads);
     }
-    await repository.execute(DeleteLongTermRelation(durabilityRelation(104)));
+    await repository.execute(
+      await previewedDeleteRelation(repository, durabilityRelation(104)),
+    );
     await repository.loadStatisticsRelationSnapshot();
     final afterDeletion = probe.reads;
-    for (final command in <IntentionCommand>[
-      ArchiveIntention(durabilityIntention(5)),
-      RestoreIntention(durabilityIntention(5)),
-      DeleteIntention(durabilityIntention(5)),
-      const CreateIntention(title: 'Новое намерение', description: null),
+    for (final command in <Future<IntentionCommand> Function()>[
+      () => previewedArchiveIntention(repository, durabilityIntention(5)),
+      () => previewedRestoreIntention(repository, durabilityIntention(5)),
+      () => previewedDeleteIntention(repository, durabilityIntention(5)),
+      () async =>
+          const CreateIntention(title: 'Новое намерение', description: null),
     ]) {
-      expect(await repository.execute(command), isA<GraphCommandSucceeded>());
+      expect(
+        await repository.execute(await command()),
+        isA<GraphCommandSucceeded>(),
+      );
       await repository.loadStatisticsRelationSnapshot();
       expect(probe.reads, afterDeletion);
     }
@@ -181,7 +215,7 @@ void main() {
       probe.failNextRelationUpdate = true;
       expect(
         await repository.execute(
-          ArchiveLongTermRelation(durabilityRelation(101)),
+          await previewedArchiveRelation(repository, durabilityRelation(101)),
         ),
         isA<GraphCommandFailed>(),
       );
@@ -205,7 +239,9 @@ void main() {
   });
 
   test('снимок содержит только активные связи в обоих направлениях', () async {
-    await repository.execute(ArchiveLongTermRelation(durabilityRelation(104)));
+    await repository.execute(
+      await previewedArchiveRelation(repository, durabilityRelation(104)),
+    );
     final graph = await repository.loadStatisticsRelationSnapshot();
     expect(_edges(graph), {(1, 2), (2, 3), (1, 4)});
     expect(graph.children, hasLength(3));
@@ -220,8 +256,12 @@ void main() {
   });
 
   test('пустой снимок тоже переиспользуется', () async {
-    await repository.execute(ArchiveIntention(durabilityIntention(1)));
-    await repository.execute(ArchiveIntention(durabilityIntention(2)));
+    await repository.execute(
+      await previewedArchiveIntention(repository, durabilityIntention(1)),
+    );
+    await repository.execute(
+      await previewedArchiveIntention(repository, durabilityIntention(2)),
+    );
     expect(
       (await repository.loadStatisticsRelationSnapshot()).children,
       isEmpty,
@@ -236,6 +276,10 @@ void main() {
 
   test('изменение связей между порциями завершает одну попытку', () async {
     await _addRelations(database, 520);
+    final archive = await previewedArchiveRelation(
+      repository,
+      durabilityRelation(101),
+    );
     probe.pauseNextRead();
     final loading = repository.loadStatisticsRelationSnapshot();
     final expired = expectLater(
@@ -243,9 +287,7 @@ void main() {
       throwsA(isA<StatisticsSnapshotExpired>()),
     );
     await probe.entered!.future;
-    final command = repository.execute(
-      ArchiveLongTermRelation(durabilityRelation(101)),
-    );
+    final command = repository.execute(archive);
     probe.release!.complete();
     expect(await command, isA<GraphCommandSucceeded>());
     await expired;
@@ -300,12 +342,11 @@ void main() {
         ['  Описание связи\n'],
       );
     });
-    await repository.execute(durabilityCreate());
     await repository.loadStatisticsRelationSnapshot();
     final reads = probe.reads;
     probe.cascadedRelationRows = [];
     final result = await repository.execute(
-      ArchiveIntention(durabilityIntention(2)),
+      await previewedArchiveIntention(repository, durabilityIntention(2)),
     );
     expect(result, isA<GraphCommandSucceeded>());
     final rows = probe.cascadedRelationRows!;
@@ -341,12 +382,11 @@ void main() {
         durabilityRelation(105),
       ]),
     );
-    for (final (number, source, related, type, priority, sequence, referenced)
-        in [
-          (101, 1, 2, LongTermRelationType.need, RelationPriority.p2, 1, true),
-          (102, 2, 3, LongTermRelationType.can, RelationPriority.p2, 2, true),
-          (105, 4, 2, LongTermRelationType.need, RelationPriority.p4, 5, false),
-        ]) {
+    for (final (number, source, related, type, priority, sequence) in [
+      (101, 1, 2, LongTermRelationType.need, RelationPriority.p2, 1),
+      (102, 2, 3, LongTermRelationType.can, RelationPriority.p2, 2),
+      (105, 4, 2, LongTermRelationType.need, RelationPriority.p4, 5),
+    ]) {
       final change = changes.singleWhere(
         (change) => change.id == durabilityRelation(number),
       );
@@ -360,10 +400,6 @@ void main() {
       }
       expect(change.before.scope, RelationScope.active);
       expect(change.after.scope, RelationScope.archived);
-      expect(change.permissions.isConfirmed, isTrue);
-      expect(change.permissions.canDelete, !referenced);
-      expect(change.permissions.canEditDescriptionAndPriority, isTrue);
-      expect(change.permissions.canChangeArchiveState, isTrue);
     }
     expect(probe.reads, reads, reason: 'Пересборка ленивая');
     final graph = await repository.loadStatisticsRelationSnapshot();
@@ -471,14 +507,13 @@ final class _SnapshotProbe extends LocalDatabaseConnectionObserver {
     LocalDatabaseSqlStatement statement,
     List<Map<String, Object?>> rows,
   ) async {
-    if (cascadedRelationRows case final captured?) {
+    if (cascadedRelationRows case final captured?
+        when statement.statements.single.contains(
+          'WHERE relation.is_archived = 0',
+        )) {
       for (final row in rows) {
-        if (row.containsKey('source_intention_id') &&
-            row.containsKey('related_intention_id') &&
-            row.containsKey('is_referenced')) {
-          expect(_inTransaction, isTrue);
-          captured.add(Map.of(row));
-        }
+        expect(_inTransaction, isTrue);
+        captured.add(Map.of(row));
       }
     }
     if (!statement.statements.single.startsWith(

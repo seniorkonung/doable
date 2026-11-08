@@ -5,11 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
-import '../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
-import '../../daily_choice/presentation/catalog/daily_choice_local_day_observer.dart';
 import '../../design_system/doable_colors.dart';
 import '../../design_system/doable_icon.dart';
 import '../../intention/presentation/details/intention_page_target.dart';
+import '../../shared/presentation/local_day/local_date_provider.dart';
+import '../../shared/presentation/local_day/local_day_observer.dart';
 import '../../statistics/application/intention_statistics_target.dart';
 import '../../statistics/presentation/home_statistics_content.dart';
 import '../../statistics/presentation/home_statistics_period_selector.dart';
@@ -26,14 +26,14 @@ final class HomePage extends ConsumerStatefulWidget {
 }
 
 final class _HomePageState extends ConsumerState<HomePage> {
-  late final DailyChoiceLocalDayObserver _localDay;
+  late final LocalDayObserver _localDay;
   var _visible = false;
 
   @override
   void initState() {
     super.initState();
-    _localDay = DailyChoiceLocalDayObserver(
-      readLocalDay: ref.read(dailyChoiceLocalDateSourceProvider),
+    _localDay = LocalDayObserver(
+      readLocalDay: ref.read(localDateSourceProvider),
       onTodayChanged: () => ref
           .read(homeStatisticsViewModelProvider.notifier)
           .setLocalDate(_localDay.today),

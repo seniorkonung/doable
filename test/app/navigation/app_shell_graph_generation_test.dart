@@ -14,11 +14,11 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/app/settings/settings_page.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_calendar_viewport.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/action/presentation/day/action_day_calendar_viewport.dart';
+import 'package:doable/src/action/presentation/day/action_day_root_page.dart';
 import 'package:doable/src/data/local/app_database.dart';
 import 'package:doable/src/data_transfer/application/graph_replacement.dart';
+import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph_format/graph_format_records.dart';
@@ -26,8 +26,8 @@ import 'package:doable/src/graph_snapshots/graph_snapshot_store.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
-import 'package:doable/src/intention/presentation/catalog/intention_catalog_state.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/statistics/application/statistics_period.dart';
 import 'package:doable/src/statistics/application/statistics_read_contract.dart';
 import 'package:doable/src/statistics/presentation/home_statistics_state.dart';
@@ -38,9 +38,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/action_seed.dart';
 import '../../support/app_root_pages.dart';
-import '../../support/daily_choice_catalog_controls.dart';
-import '../../support/daily_choice_local_date.dart';
+import '../../support/controlled_local_date.dart';
+import '../../support/action_day_controls.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/in_memory_quick_creation_mode_store.dart';
@@ -65,11 +66,11 @@ const _firstReplaced = 101;
 /// Местное сегодня до замены графа.
 final _today = CalendarDate.fromParts(2026, 10, 19);
 
-/// Прошлый день, который выбран в каталоге дневных выборов до замены.
+/// Прошлый день, который выбран на экране дня до замены.
 final _pastDay = CalendarDate.fromParts(2026, 10, 14);
 
 /// Местное сегодня к замене графа: корневые страницы открываются на нём, а
-/// каталог дневных выборов — не на дне своего первого открытия.
+/// экран дня — не на дне своего первого открытия.
 final _replacementDay = CalendarDate.fromParts(2026, 10, 20);
 
 final _l10n = lookupAppLocalizations(const Locale('ru'));
@@ -80,7 +81,7 @@ void main() {
       'как при новом запуске', (tester) async {
     final app = await _start(tester);
     await _prepareIntentionCatalog(tester);
-    await _prepareDailyChoiceCatalog(tester);
+    await _prepareActionDay(tester);
     await _prepareHome(tester, app);
     await _open(tester, find.byTooltip(_l10n.settingsTitle), SettingsPage);
     app.localDate.today = _replacementDay;
@@ -109,7 +110,7 @@ void main() {
         today: _replacementDay,
         tab: HomeStatisticsTab.month,
         period: StatisticsMonth(2026, 10),
-        view: StatisticsView.sourceIntentions,
+        view: StatisticsView.rootIntentions,
         expanded: false,
       ),
     );
@@ -119,7 +120,7 @@ void main() {
     await _settle(tester);
     expect(shownIntentionCatalogParameters(tester), (
       scope: IntentionScope.active,
-      type: IntentionTypeChoice.all,
+      kind: IntentionKindFilter.mainOnly,
       order: IntentionCatalogOrder.createdAtDescending,
       titleFilter: '',
       tagConditions: 0,
@@ -131,13 +132,13 @@ void main() {
       findsOneWidget,
     );
 
-    await _select(tester, AppDestination.dailyChoices);
-    expect(shownDailyChoiceCatalogDate(tester), _replacementDay);
+    await _select(tester, AppDestination.actions);
+    expect(shownActionDayDate(tester), _replacementDay);
     expect(
-      shownDailyChoiceCatalogViewport(tester),
-      DailyChoiceCalendarViewport(
+      shownActionDayViewport(tester),
+      ActionDayCalendarViewport(
         focusedDate: _replacementDay,
-        mode: DailyChoiceCalendarMode.week,
+        mode: ActionDayCalendarMode.week,
       ),
     );
     expect(tester.takeException(), isNull);
@@ -150,7 +151,7 @@ final class _App {
 
   final ProviderContainer container;
   final TemporaryGraphFiles files;
-  final ControlledDailyChoiceLocalDate localDate;
+  final ControlledLocalDate localDate;
 
   AppRouter get router => container.read(appRouterProvider);
 }
@@ -165,14 +166,14 @@ Future<_App> _start(WidgetTester tester) async {
   addTearDown(tester.view.reset);
   late sqlite.Database raw;
   final files = TemporaryGraphFiles();
-  final localDate = ControlledDailyChoiceLocalDate(_today);
+  final localDate = ControlledLocalDate(_today);
   final runtime = AppRuntime(
     connectionFactory: () =>
         openInMemoryLocalDatabase(setup: (database) => raw = database),
     diagnosticsSink: InMemoryDiagnosticsSink(),
     quickCreationModeStore: InMemoryQuickCreationModeStore(),
     graphFilesFactory: files.create,
-    dailyChoiceLocalDateSource: localDate.read,
+    localDateSource: localDate.read,
   );
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());
@@ -191,7 +192,7 @@ Future<_App> _start(WidgetTester tester) async {
 }
 
 /// Прежний граф: тег «Здоровье» и намерения «Намерение 01» … «Намерение 40»
-/// с этим тегом.
+/// с этим тегом и действие 2025 года.
 void _seed(sqlite.Database database) {
   database.execute('BEGIN');
   seedRawGraph(database, () {
@@ -204,15 +205,22 @@ void _seed(sqlite.Database database) {
       final id = tagFixtureId(_firstPrevious + number - 1);
       database
         ..execute(
-          'INSERT INTO intentions (id, title, is_action_ready, is_archived, '
+          'INSERT INTO intentions (id, title, kind, is_archived, '
           'created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-          [id, _previousTitle(number), 1, 0, number, number],
+          [id, _previousTitle(number), 'main', 0, number, number],
         )
         ..execute(
           'INSERT INTO tag_assignments (tag_id, intention_id) VALUES (?, ?)',
           [tagFixtureId(_previousTag), id],
         );
     }
+    // Действие прошлого года: без действий периода Главная не показывает выбор вида.
+    seedAction(
+      database,
+      id: seedUuid(900),
+      path: [tagFixtureId(_firstPrevious)],
+      date: '2025-06-01',
+    );
   });
   database.execute('COMMIT');
 }
@@ -223,15 +231,15 @@ String _previousTitle(int number) =>
 String _replacedTitle(int number) =>
     'Новое ${number.toString().padLeft(2, '0')}';
 
-/// Каталог намерений: все намерения, только действия, фильтр названия, условие
-/// по тегу, порядок от старых к новым и прокрученные выдача и страница.
+/// Каталог намерений: все намерения обоих видов, фильтр названия, условие по
+/// тегу, порядок от старых к новым и прокрученные выдача и страница.
 Future<void> _prepareIntentionCatalog(WidgetTester tester) async {
   await _select(tester, AppDestination.intentionGraph);
   await selectIntentionCatalogScope(tester, IntentionScope.all, tap: _tap);
   await _settle(tester);
-  await selectIntentionCatalogType(
+  await selectIntentionCatalogKind(
     tester,
-    IntentionTypeChoice.actions,
+    IntentionKindFilter.mainAndSupporting,
     tap: _tap,
   );
   await _settle(tester);
@@ -256,7 +264,7 @@ Future<void> _prepareIntentionCatalog(WidgetTester tester) async {
 
   expect(shownIntentionCatalogParameters(tester), (
     scope: IntentionScope.all,
-    type: IntentionTypeChoice.actions,
+    kind: IntentionKindFilter.mainAndSupporting,
     order: IntentionCatalogOrder.createdAtAscending,
     titleFilter: 'Намерение',
     tagConditions: 1,
@@ -264,19 +272,16 @@ Future<void> _prepareIntentionCatalog(WidgetTester tester) async {
   expect(shownIntentionCatalogOffsets(tester), everyElement(greaterThan(0)));
 }
 
-/// Каталог дневных выборов: выбран прошлый день, а календарь раскрыт.
-Future<void> _prepareDailyChoiceCatalog(WidgetTester tester) async {
-  await _select(tester, AppDestination.dailyChoices);
-  await selectDailyChoiceCatalogDate(tester, _pastDay, tap: _tap);
+/// Экран дня: выбран прошлый день, а календарь раскрыт.
+Future<void> _prepareActionDay(WidgetTester tester) async {
+  await _select(tester, AppDestination.actions);
+  await selectActionDayDate(tester, _pastDay, tap: _tap);
   await _settle(tester);
-  await expandDailyChoiceCatalogCalendar(tester, tap: _tap);
+  await expandActionDayCalendar(tester, tap: _tap);
   await _settle(tester);
 
-  expect(shownDailyChoiceCatalogDate(tester), _pastDay);
-  expect(
-    shownDailyChoiceCatalogViewport(tester).mode,
-    DailyChoiceCalendarMode.month,
-  );
+  expect(shownActionDayDate(tester), _pastDay);
+  expect(shownActionDayViewport(tester).mode, ActionDayCalendarMode.month);
 }
 
 /// Главная: вкладка «Год», прошлый год и вид «Выбранные действия».
@@ -284,7 +289,11 @@ Future<void> _prepareHome(WidgetTester tester, _App app) async {
   await _select(tester, AppDestination.home);
   await _tap(tester, find.text(_l10n.statisticsYearTab));
   await _tap(tester, find.byTooltip(_l10n.statisticsPreviousYear));
-  await _tap(tester, find.text(_l10n.statisticsSelectedActions));
+  await _tap(tester, find.text(_l10n.statisticsRootIntentions));
+  await _tap(
+    tester,
+    find.widgetWithText(OptionRow, _l10n.statisticsTerminalIntentions),
+  );
   await _settle(tester);
 
   final home = app.container.read(homeStatisticsViewModelProvider).selection;
@@ -293,7 +302,7 @@ Future<void> _prepareHome(WidgetTester tester, _App app) async {
     (
       tab: HomeStatisticsTab.year,
       period: StatisticsYear(2025),
-      view: StatisticsView.selectedActions,
+      view: StatisticsView.terminalIntentions,
     ),
   );
 }
@@ -338,9 +347,11 @@ Future<UnregisteredGraphSnapshot> _writeReplacementSnapshot(
   final counts = GraphRecordCounts(
     tags: 1,
     intentions: _intentionCount,
+    deletedIntentions: 0,
     tagAssignments: _intentionCount,
     longTermRelations: 0,
-    dailyChoices: 0,
+    deletedRelationPairs: 0,
+    actions: 0,
   );
   final records = [
     {
@@ -350,9 +361,11 @@ Future<UnregisteredGraphSnapshot> _writeReplacementSnapshot(
       'counts': {
         'tags': counts.tags,
         'intentions': counts.intentions,
+        'deletedIntentions': counts.deletedIntentions,
         'tagAssignments': counts.tagAssignments,
         'longTermRelations': counts.longTermRelations,
-        'dailyChoices': counts.dailyChoices,
+        'deletedRelationPairs': counts.deletedRelationPairs,
+        'actions': counts.actions,
       },
     },
     {
@@ -368,7 +381,7 @@ Future<UnregisteredGraphSnapshot> _writeReplacementSnapshot(
         'id': intentionId(number),
         'title': _replacedTitle(number),
         'description': null,
-        'actionReady': true,
+        'intentionKind': 'main',
         'archived': false,
         'createdAt': moment(number),
         'updatedAt': moment(number),
@@ -404,7 +417,7 @@ AppDestination _selected(WidgetTester tester) =>
 /// Корневая страница каждого пункта.
 const _rootPages = {
   AppDestination.home: HomePage,
-  AppDestination.dailyChoices: DailyChoiceCatalogPage,
+  AppDestination.actions: ActionDayRootPage,
   AppDestination.intentionGraph: IntentionCatalogPage,
 };
 

@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../intention/presentation/details/details_test_support.dart';
+import '../../support/intention_cascade_execution.dart';
 
 void main() {
   test('подготовка импорта не мешает командам, а на время замены новые '
@@ -50,7 +50,7 @@ void main() {
       isA<GraphImportCompletion>().having(
         (completion) => completion.confirmedChange?.changes,
         'изменения',
-        [isA<GraphReplaced>()],
+        [isA<GraphReplaced>(), isA<IntentionHoldingChanged>()],
       ),
     ]);
     final afterImport = harness.startDeleteOf(5);
@@ -228,7 +228,7 @@ final class _Harness {
     final intention = testDetailsIntention(index: index);
     final commandIndex = repository.commands.length;
     final start = coordinator.acceptExisting(
-      DeleteIntention(intention.id),
+      givenDeleteIntention(intention.id),
       presentationTitle: intention.title,
     );
     if (start case IntentionCommandAccepted(:final token)) {

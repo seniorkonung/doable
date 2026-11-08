@@ -1,3 +1,5 @@
+import 'package:doable/src/action/presentation/path_start/path_start_picker_page.dart';
+
 import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
@@ -12,26 +14,17 @@ import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/app/settings/settings_page.dart';
-import 'package:doable/src/daily_choice/application/choice_path_draft.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/action_picker/daily_choice_action_picker_page.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_date_catalog_page.dart';
-import 'package:doable/src/daily_choice/presentation/editor/daily_choice_creation_page.dart';
-import 'package:doable/src/daily_choice/presentation/path/choice_path_page.dart';
-import 'package:doable/src/daily_choice/presentation/path/choice_path_view_model.dart';
-import 'package:doable/src/daily_choice/presentation/source_picker/daily_choice_source_picker_page.dart';
+import 'package:doable/src/action/presentation/day/action_day_root_page.dart';
+import 'package:doable/src/action/presentation/day/action_day_date_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/design_system/components/docked_footer.dart';
-import 'package:doable/src/design_system/components/option_tiles.dart';
+import 'package:doable/src/design_system/components/segmented_control.dart';
 import 'package:doable/src/design_system/components/picker_row.dart';
 import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
-import 'package:doable/src/intention/domain/intention.dart'
-    show IntentionReadiness;
-import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/intention/domain/intention.dart' show IntentionKind;
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_page.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/search/intention_search_bar.dart';
@@ -40,16 +33,15 @@ import 'package:doable/src/intention/presentation/details/intention_options.dart
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
 import 'package:doable/src/intention/presentation/editor/intention_editor_page.dart';
 import 'package:doable/src/long_term_relation/presentation/batch_picker/relation_batch_picker_page.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
-import '../../daily_choice/presentation/daily_choice_picker_launch_test_support.dart'
-    show TestDailyChoicePickerLaunch;
-import '../../intention/presentation/picker/intention_picker_test_support.dart';
+import '../../support/action_seed.dart';
 import '../../support/app_root_pages.dart';
-import '../../support/daily_choice_local_date.dart';
+import '../../support/controlled_local_date.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/intention_catalog_controls.dart';
@@ -59,32 +51,32 @@ import '../../support/intention_edit_screen.dart';
 import '../../support/intention_options.dart';
 import '../../support/quick_creation.dart';
 import '../../support/temporary_graph_files.dart';
-import '../../support/intention_choices_tab.dart';
+import '../../support/intention_actions_tab.dart';
 import '../../support/tag_positions.dart';
 
 part 'app_shell_page_matrix.dart';
 part 'app_shell_unnamed_page_scenarios.dart';
 
-/// Активное готовое намерение «Читать» с тегом «Дом»: исходный
-/// участник связи и исходное намерение дневного выбора.
+/// Активное главное намерение «Читать» с тегом «Дом»: исходный
+/// участник связи и первое намерение пути действия.
 const _read = 1;
 
-/// Активное готовое намерение «Бегать»: связанный участник связи и выбранное
-/// действие дневного выбора.
+/// Активное главное намерение «Бегать»: связанный участник связи и
+/// последнее намерение пути действия.
 const _run = 2;
 
-/// Активное намерение «Гулять» без связей и дневных выборов: его удаление
+/// Активное намерение «Гулять» без связей: его удаление
 /// доступно в параметрах.
 const _walk = 3;
 
-/// Связь «Читать» → «Бегать» — единственный шаг пути дневного выбора.
+/// Связь «Читать» → «Бегать» — единственный шаг пути действия.
 const _relation = 101;
-const _choice = 201;
+const _action = 201;
 const _tag = 301;
 
-/// День дневного выбора — локальное сегодня приложения: каталог дневных
-/// выборов открывается на дне с его строкой.
-final _choiceDate = CalendarDate.fromParts(2026, 9, 25);
+/// День действия — локальное сегодня приложения: каталог дня
+/// открывается на дне с его строкой.
+final _actionDate = CalendarDate.fromParts(2026, 9, 25);
 
 void main() {
   _registerPageMatrixTests();
@@ -142,55 +134,12 @@ void main() {
       }
     }
   });
-
-  // Выбор любого пункта сбрасывает историю одним путём.
-  const destination = AppDestination.dailyChoices;
-  testWidgets(
-    'выбор пункта со страницы участника закрывает поиск действия без команды',
-    (tester) async {
-      final router = await _start(tester);
-      await _select(tester, AppDestination.intentionGraph);
-      unawaited(
-        router.push(
-          DailyChoiceActionPickerRoute(launch: TestDailyChoicePickerLaunch()),
-        ),
-      );
-      final filter = find.byKey(const ValueKey('daily-choice-action-filter'));
-      await _until(tester, filter);
-      await tester.enterText(filter, 'Гулять');
-      final row = _summary(DailyChoiceActionPickerPage, 'Гулять');
-      await _until(tester, row);
-      await _open(tester, intentionPickerArrow(row), IntentionDetailsPage);
-      _expectAboveShell(
-        tester,
-        IntentionDetailsPage,
-        AppDestination.intentionGraph,
-      );
-
-      await _select(tester, destination);
-
-      _expectRootPage(tester, router, destination);
-      expect(find.byType(AlertDialog), findsNothing);
-      expect(
-        find.byType(DailyChoiceActionPickerPage, skipOffstage: false),
-        findsNothing,
-      );
-      expect(
-        find.byType(IntentionDetailsPage, skipOffstage: false),
-        findsNothing,
-      );
-      await tester.pump(const Duration(seconds: 1));
-      await tester.pumpAndSettle();
-      _expectRootPage(tester, router, destination);
-      expect(tester.takeException(), isNull);
-    },
-  );
 }
 
 /// Корневая страница каждого пункта.
 const _rootPages = {
   AppDestination.home: HomePage,
-  AppDestination.dailyChoices: DailyChoiceCatalogPage,
+  AppDestination.actions: ActionDayRootPage,
   AppDestination.intentionGraph: IntentionCatalogPage,
 };
 
@@ -204,14 +153,6 @@ final _outgoingNeedGroup = find.byKey(
 final _relationRow = find.byKey(
   ValueKey('intention-relations-row-${tagFixtureId(_relation)}'),
 );
-
-/// Продолжение пути по связи «Читать» → «Бегать».
-final _continuePath = find.byKey(
-  ValueKey('choice-path-continue-${tagFixtureId(_relation)}'),
-);
-
-IntentionId _intentionId(int number) =>
-    (IntentionId.decode(tagFixtureId(number)) as IntentionIdDecodingSuccess).id;
 
 /// Пункты панели, включая панель под открытой страницей.
 final _destinations = appNavigationDestinations(skipOffstage: false);
@@ -332,6 +273,7 @@ void _expectCreationSheetAboveCatalog(WidgetTester tester) {
 Future<AppRouter> _start(
   WidgetTester tester, {
   TemporaryGraphFiles? graphFiles,
+  bool incomingForRead = false,
 }) async {
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   tester.binding.platformDispatcher.localesTestValue = const [Locale('en')];
@@ -347,8 +289,7 @@ Future<AppRouter> _start(
     connectionFactory: () =>
         openInMemoryLocalDatabase(setup: (database) => raw = database),
     diagnosticsSink: InMemoryDiagnosticsSink(),
-    dailyChoiceLocalDateSource: ControlledDailyChoiceLocalDate(_choiceDate)
-        .read,
+    localDateSource: ControlledLocalDate(_actionDate).read,
     graphFilesFactory: graphFiles?.create,
   );
   addTearDown(() async {
@@ -357,6 +298,22 @@ Future<AppRouter> _start(
   });
   final ready = (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
   _seed(raw);
+  if (incomingForRead) {
+    seedRawGraph(
+      raw,
+      () => raw.execute(
+        'INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, 0)',
+        [
+          tagFixtureId(102),
+          tagFixtureId(_walk),
+          tagFixtureId(_read),
+          'need',
+          2,
+          0,
+        ],
+      ),
+    );
+  }
   await tester.pumpWidget(MainApp(runtime: runtime));
   await _until(tester, find.byType(HomePage));
   await _waitFor(
@@ -367,7 +324,7 @@ Future<AppRouter> _start(
   return ready.container.read(appRouterProvider);
 }
 
-/// Два намерения, связь между ними, дневной выбор по этой связи, тег и
+/// Два намерения, связь между ними, действие с путём по этой связи, тег и
 /// свободное намерение: каждая страница приложения получает свои данные.
 void _seed(sqlite.Database database) {
   seedRawGraph(database, () {
@@ -377,9 +334,9 @@ void _seed(sqlite.Database database) {
       (_walk, 'Гулять'),
     ]) {
       database.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, '
+        'INSERT INTO intentions (id, title, kind, is_archived, '
         'created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [tagFixtureId(number), title, 1, 0, number, number],
+        [tagFixtureId(number), title, 'main', 0, number, number],
       );
     }
     database.execute(
@@ -395,21 +352,11 @@ void _seed(sqlite.Database database) {
         0,
       ],
     );
-    database.execute(
-      'INSERT INTO daily_choices (id, source_intention_id, '
-      'selected_intention_id, choice_date, is_completed) VALUES (?, ?, ?, ?, ?)',
-      [
-        tagFixtureId(_choice),
-        tagFixtureId(_read),
-        tagFixtureId(_run),
-        _choiceDate.toCanonicalString(),
-        0,
-      ],
-    );
-    database.execute(
-      'INSERT INTO daily_choice_path_steps (id, daily_choice_id, '
-      'long_term_relation_id) VALUES (?, ?, ?)',
-      [tagFixtureId(211), tagFixtureId(_choice), tagFixtureId(_relation)],
+    seedAction(
+      database,
+      id: tagFixtureId(_action),
+      path: [tagFixtureId(_read), tagFixtureId(_run)],
+      date: _actionDate.toCanonicalString(),
     );
     database.execute('INSERT INTO tags (id, name, position) VALUES (?, ?, ?)', [
       tagFixtureId(_tag),

@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/design_system/components/button.dart';
 import 'package:doable/src/design_system/components/dates_line.dart';
-import 'package:doable/src/design_system/components/option_tiles.dart';
+import 'package:doable/src/design_system/components/segmented_control.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_icon.dart';
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
@@ -43,6 +43,7 @@ import '../../../support/tag_positions.dart';
 import 'details_test_support.dart';
 
 import '../../../support/in_memory_quick_creation_mode_store.dart';
+import '../../../support/intention_cascade_execution.dart';
 
 void main() {
   setUp(() {
@@ -85,7 +86,6 @@ void main() {
     final intention = testDetailsIntention(
       title: 'Сохранить русский заголовок',
       description: '  Описание\nбез преобразования  ',
-      readiness: IntentionReadiness.ready,
     );
     await _pumpDetailsPage(tester, repository, intention.id);
     await waitForDetailRequests(repository, 1);
@@ -97,7 +97,7 @@ void main() {
 
     expect(find.text('Сохранить русский заголовок'), findsOneWidget);
     expect(find.text('  Описание\nбез преобразования  '), findsOneWidget);
-    expect(_selectedType(tester), IntentionReadiness.ready);
+    expect(_selectedType(tester), IntentionKind.main);
     expect(find.text('Archived'), findsNothing);
     _expectNavigation(tester);
   });
@@ -115,7 +115,6 @@ void main() {
     final intention = testDetailsIntention(
       title: 'Доступное намерение',
       description: 'Описание доступного намерения',
-      readiness: IntentionReadiness.ready,
       archiveState: IntentionArchiveState.archived,
     );
     await _pumpDetailsPage(tester, repository, intention.id);
@@ -283,7 +282,7 @@ void main() {
       graphCommandCoordinatorProvider.notifier,
     );
     final start = coordinator.acceptExisting(
-      DeleteIntention(intention.id),
+      givenDeleteIntention(intention.id),
       presentationTitle: intention.title,
     );
     expect(start, isA<IntentionCommandAccepted>());
@@ -448,7 +447,7 @@ void main() {
       ).read(graphCommandCoordinatorProvider.notifier);
       final other = testDetailsIntention(index: 91, title: 'Другое намерение');
       final busy = coordinator.acceptExisting(
-        DeleteIntention(other.id),
+        givenDeleteIntention(other.id),
         presentationTitle: other.title,
       ) as IntentionCommandAccepted;
       coordinator.releaseInitiatorPresentation(busy.token);
@@ -527,7 +526,7 @@ void main() {
       );
       final other = testDetailsIntention(index: 93, title: 'Другое намерение');
       final busy = coordinator.acceptExisting(
-        DeleteIntention(other.id),
+        givenDeleteIntention(other.id),
         presentationTitle: other.title,
       ) as IntentionCommandAccepted;
       coordinator.releaseInitiatorPresentation(busy.token);
@@ -770,9 +769,9 @@ Future<void> _sendTitleAndLeave(WidgetTester tester, String title) async {
   expect(find.byType(IntentionEditPage), findsNothing);
 }
 
-IntentionReadiness _selectedType(WidgetTester tester) => tester
-    .widget<OptionTiles<IntentionReadiness>>(
-      find.byType(OptionTiles<IntentionReadiness>, skipOffstage: false),
+IntentionKind _selectedType(WidgetTester tester) => tester
+    .widget<SegmentedControl<IntentionKind>>(
+      find.byType(SegmentedControl<IntentionKind>, skipOffstage: false),
     )
     .value;
 
@@ -782,8 +781,8 @@ void _expectPageControls(WidgetTester tester, {required bool enabled}) {
   expect(tester.widget<PageHead>(find.byType(PageHead)).onEdit, matcher);
   expect(
     tester
-        .widget<OptionTiles<IntentionReadiness>>(
-          find.byType(OptionTiles<IntentionReadiness>, skipOffstage: false),
+        .widget<SegmentedControl<IntentionKind>>(
+          find.byType(SegmentedControl<IntentionKind>, skipOffstage: false),
         )
         .onChange,
     matcher,

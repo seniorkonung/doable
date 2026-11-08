@@ -7,10 +7,10 @@ import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/data/drift_personal_graph_repository.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_details.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
+import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
@@ -23,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_cascade_execution.dart';
 
 void main() {
   late AppDatabase database;
@@ -257,25 +258,42 @@ void main() {
       },
     );
 
-    test('готовность участников не ограничивает связь и не меняется', () async {
-      await seedGraph(
-        database,
-        () =>
-            (database.update(database.intentions)
-                  ..where((row) => row.id.equals(pageId.toCanonicalString())))
-                .write(const IntentionsCompanion(isActionReady: Value(true))),
+    test('отмеченный кандидат исходящей группы становится вспомогательным вместе со связью', () async {
+      final result = await repository.execute(
+        AddLongTermRelations.outgoing(
+          pageIntentionId: pageId,
+          type: LongTermRelationType.need,
+          candidates: [
+            OutgoingRelationCandidate(firstId, becomesSupporting: true),
+            OutgoingRelationCandidate(secondId),
+          ],
+        ),
       );
-      final intentionsBefore = await database.select(database.intentions).get();
 
-      final result = await repository.execute(_addCommand(pageId, firstId));
+      final confirmed = _confirmed(result);
+      final added = confirmed.value as LongTermRelationsAdded;
+      final createdAt = added.relations.first.createdAt.value;
+      final stored = {
+        for (final row in await database.select(database.intentions).get())
+          row.id: row,
+      };
+      final first = stored[firstId.toCanonicalString()]!;
+      expect(first.kind, 'supporting');
+      expect(first.updatedAt, createdAt.microsecondsSinceEpoch);
+      expect(stored[secondId.toCanonicalString()]!.kind, 'main');
 
-      final added = _confirmed(result).value as LongTermRelationsAdded;
-      expect(added.relations.single.sourceIntentionId, pageId);
-      expect(added.relations.single.relatedIntentionId, firstId);
+      final catalogUpdate = added.changes
+          .whereType<IntentionCatalogUpdated>()
+          .single;
+      expect(catalogUpdate.before.summary.id, firstId);
+      expect(catalogUpdate.before.summary.kind, IntentionKind.main);
+      expect(catalogUpdate.after.summary.kind, IntentionKind.supporting);
+      expect(catalogUpdate.after.summary.updatedAt.value, createdAt);
       expect(
-        await database.select(database.intentions).get(),
-        intentionsBefore,
+        catalogUpdate.revision.compareTo(confirmed.revision),
+        GraphRevisionOrder.same,
       );
+      expect(added.changes.whereType<IntentionHoldingChanged>(), hasLength(1));
     });
   });
 
@@ -355,8 +373,12 @@ void main() {
     );
 
     test('создание перед архивированием попадает в атомарный каскад', () async {
+      final archiveCommand = await previewedArchiveIntention(
+        repository,
+        pageId,
+      );
       final creation = repository.execute(_addCommand(pageId, firstId));
-      final archival = repository.execute(ArchiveIntention(pageId));
+      final archival = repository.execute(archiveCommand);
 
       expect(await creation, isA<GraphCommandSucceeded>());
       expect(await archival, isA<ResultSuccess>());
@@ -366,36 +388,21 @@ void main() {
       expect(stored.isArchived, isTrue);
     });
 
-    test(
-      'создание перед удалением сохраняет обе сущности и возвращает конфликт',
-      () async {
-        final intentionsBefore = await database
-            .select(database.intentions)
-            .get();
+    test('создание перед удалением не блокирует удаление намерения', () async {
+      final deleteCommand = await previewedDeleteIntention(repository, pageId);
+      final creation = repository.execute(_addCommand(pageId, firstId));
+      final deletion = repository.execute(deleteCommand);
 
-        final creation = repository.execute(_addCommand(pageId, firstId));
-        final deletion = repository.execute(DeleteIntention(pageId));
-
-        expect(await creation, isA<GraphCommandSucceeded>());
-        expect(
-          await deletion,
-          isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
-              .having(
-                (result) => result.failure,
-                'failure',
-                isA<IntentionHasBlockingRelationsFailure>(),
-              ),
-        );
-        expect(
-          await database.select(database.intentions).get(),
-          hasLength(intentionsBefore.length),
-        );
-        expect(
-          await database.select(database.longTermRelations).get(),
-          hasLength(1),
-        );
-      },
-    );
+      expect(await creation, isA<GraphCommandSucceeded>());
+      expect(await deletion, isA<ResultSuccess>());
+      final remaining = [
+        for (final row in await database.select(database.intentions).get())
+          row.id,
+      ];
+      expect(remaining, isNot(contains(pageId.toCanonicalString())));
+      expect(remaining, contains(firstId.toCanonicalString()));
+      expect(await database.select(database.longTermRelations).get(), isEmpty);
+    });
   });
 
   group('отказ не оставляет следов', () {
@@ -533,7 +540,9 @@ void main() {
     });
 
     test('участник архивирован до сохранения', () async {
-      await repository.execute(ArchiveIntention(pageId));
+      await repository.execute(
+        await previewedArchiveIntention(repository, pageId),
+      );
       final before = await _snapshotOfGraph(database, repository, pageId);
 
       final result = await repository.execute(
@@ -560,7 +569,9 @@ void main() {
     test('участник удалён до сохранения', () async {
       final otherId = _intentionId(_uuid(9));
       await _insertIntention(database, otherId, title: 'Другое');
-      await repository.execute(DeleteIntention(pageId));
+      await repository.execute(
+        await previewedDeleteIntention(repository, pageId),
+      );
       final before = await _snapshotOfGraph(database, repository, otherId);
 
       final result = await repository.execute(
@@ -583,6 +594,39 @@ void main() {
       );
       await _expectGraphUnchanged(database, repository, otherId, before);
     });
+
+    test(
+      'отклонённое добавление оставляет отмеченного кандидата главным',
+      () async {
+        await _seedRelation(
+          database,
+          relationIds[3],
+          source: pageId,
+          related: secondId,
+          type: 'need',
+        );
+        final before = await _snapshotOfGraph(database, repository, pageId);
+
+        final result = await repository.execute(
+          AddLongTermRelations.outgoing(
+            pageIntentionId: pageId,
+            type: LongTermRelationType.can,
+            candidates: [
+              OutgoingRelationCandidate(firstId, becomesSupporting: true),
+              OutgoingRelationCandidate(secondId),
+            ],
+          ),
+        );
+
+        expect(_failure(result), isA<LongTermRelationPairOccupiedFailure>());
+        await _expectGraphUnchanged(database, repository, pageId, before);
+        final first =
+            await (database.select(database.intentions)
+                  ..where((row) => row.id.equals(firstId.toCanonicalString())))
+                .getSingle();
+        expect(first.kind, 'main');
+      },
+    );
 
     test('отказ записи второй связи откатывает первую', () async {
       repository = _repository(database, diagnostics, [

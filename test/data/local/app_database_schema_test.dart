@@ -18,6 +18,31 @@ void main() {
   tearDown(() => database.close());
 
   group('схема локальных намерений', () {
+    test('вид по умолчанию главный и отклоняет неизвестное значение', () async {
+      const id = '018f0b5d-6b2e-7c80-8000-000000000011';
+      await _insertIntention(
+        database,
+        id: id,
+        title: 'Намерение',
+        description: null,
+        createdAt: 1000000,
+        updatedAt: 1000000,
+      );
+      final row = await database
+          .customSelect('SELECT kind FROM intentions')
+          .getSingle();
+      expect(row.read<String>('kind'), 'main');
+      await expectLater(
+        seedGraph(
+          database,
+          () => database.customStatement(
+            'UPDATE intentions SET kind = ? WHERE id = ?',
+            ['unknown', id],
+          ),
+        ),
+        throwsA(isA<Exception>()),
+      );
+    });
     test(
       'отклоняет прямую запись search key и согласует Unicode-проекции',
       () async {
@@ -252,14 +277,13 @@ void main() {
           () => database.customStatement(
             '''
           INSERT INTO intentions (
-            id, title, is_action_ready, is_archived, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?)
+            id, title, is_archived, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?)
         ''',
             [
               '018f0b5d-6b2e-7c80-8000-000000000004',
               'Некорректное состояние',
               2,
-              0,
               1000000,
               1000000,
             ],

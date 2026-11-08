@@ -1,12 +1,5 @@
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_catalog.dart';
-
 import 'dart:async';
 
-import 'package:doable/src/daily_choice/application/choice_path_continuations.dart';
-
-import 'package:doable/src/daily_choice/application/daily_choice_details.dart';
-import 'package:doable/src/daily_choice/domain/daily_choice_id.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -30,11 +23,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/tag_read_contract_test_fallback.dart';
+import '../../../support/action_read_contract_test_fallback.dart';
 import '../../../support/statistics_read_contract_test_fallback.dart';
 import '../../../support/tag_positions.dart';
 import '../../../support/intention_title_order_key.dart';
 import '../details/details_test_support.dart'
     show testDetailsIntention, testDetailsSavedResult;
+import '../../../support/intention_holding_read_contract_test_fallback.dart';
+import '../../../support/intention_cascade_execution.dart';
 
 void main() {
   group('GraphCommandCoordinator', () {
@@ -90,11 +86,11 @@ void main() {
       final secondId = _id(_secondUuid);
 
       final first = coordinator.acceptExisting(
-        DeleteIntention(firstId),
+        givenDeleteIntention(firstId),
         presentationTitle: 'Первое намерение',
       ) as IntentionCommandAccepted;
       final second = coordinator.acceptExisting(
-        DeleteIntention(secondId),
+        givenDeleteIntention(secondId),
         presentationTitle: 'Второе намерение',
       ) as IntentionCommandAccepted;
 
@@ -146,7 +142,6 @@ void main() {
       final command = CreateIntention.withInitialState(
         title: 'Полное намерение',
         description: 'Описание',
-        readiness: IntentionReadiness.ready,
         tagIds: selectedTags,
       );
 
@@ -162,7 +157,6 @@ void main() {
           CreateIntention.withInitialState(
             title: 'Другой набор',
             description: null,
-            readiness: IntentionReadiness.notReady,
             tagIds: [_tagId(_secondTagUuid)],
           ),
         ),
@@ -181,16 +175,10 @@ void main() {
       expect(repository.commands, [same(command)]);
       expect(
         repository.commands.single,
-        isA<CreateIntention>()
-            .having(
-              (command) => command.readiness,
-              'готовность',
-              IntentionReadiness.ready,
-            )
-            .having((command) => command.tagIds, 'теги', {
-              _tagId(_firstTagUuid),
-              _tagId(_secondTagUuid),
-            }),
+        isA<CreateIntention>().having((command) => command.tagIds, 'теги', {
+          _tagId(_firstTagUuid),
+          _tagId(_secondTagUuid),
+        }),
       );
 
       // Уход инициатора не отменяет команду и не снимает ограничение формы.
@@ -217,7 +205,7 @@ void main() {
       expect(completion.target, isA<CreatingIntentionOperationTarget>());
       expect(completion.presentationTitle, 'Полное намерение');
       expect(completion.revision, same(revision));
-      // Готовность и назначения входят в один пакет создания на
+      // Назначения тегов входят в один пакет создания на
       // его ревизии, а не в отдельные завершения.
       final changes = completion.confirmedChange!.changes.toList();
       expect(changes, [
@@ -271,7 +259,6 @@ void main() {
           CreateIntention.withInitialState(
             title: 'Полное намерение',
             description: null,
-            readiness: IntentionReadiness.ready,
             tagIds: [_tagId(_firstTagUuid), missingTag],
           ),
         ) as IntentionCommandAccepted;
@@ -350,23 +337,23 @@ void main() {
 
         final first = _acceptExisting(
           coordinator,
-          EnableIntentionReadiness(firstId),
+          ChangeIntentionKind(firstId, IntentionKind.supporting),
         );
         final repeated = _acceptExisting(
           coordinator,
-          ArchiveIntention(firstId),
+          givenArchiveIntention(firstId),
         );
         final independent = _acceptExisting(
           coordinator,
-          EnableIntentionReadiness(secondId),
+          givenArchiveIntention(secondId),
         );
 
         expect(first, isA<IntentionCommandAccepted>());
         expect(repeated, isA<IntentionCommandAlreadyRunning>());
         expect(independent, isA<IntentionCommandAccepted>());
         expect(repository.commands, [
-          isA<EnableIntentionReadiness>(),
-          isA<EnableIntentionReadiness>(),
+          isA<ChangeIntentionKind>(),
+          isA<ArchiveIntention>(),
         ]);
 
         repository.complete(
@@ -375,13 +362,16 @@ void main() {
         );
         final firstCompletion =
             await (first as IntentionCommandAccepted).future;
-        expect(firstCompletion.kind, IntentionCommandKind.enableReadiness);
+        expect(firstCompletion.kind, IntentionCommandKind.changeKind);
         expect(
           firstCompletion.result,
           isA<ResultFailure<IntentionCommandSuccess>>(),
         );
 
-        final next = _acceptExisting(coordinator, ArchiveIntention(firstId));
+        final next = _acceptExisting(
+          coordinator,
+          givenArchiveIntention(firstId),
+        );
         expect(next, isA<IntentionCommandAccepted>());
         expect(repository.commands.last, isA<ArchiveIntention>());
 
@@ -416,7 +406,7 @@ void main() {
 
         final accepted = _acceptExisting(
           coordinator,
-          EnableIntentionReadiness(_id(_firstUuid)),
+          givenArchiveIntention(_id(_firstUuid)),
         ) as IntentionCommandAccepted;
         repository.complete(
           0,
@@ -451,7 +441,7 @@ void main() {
 
         final accepted = _acceptExisting(
           coordinator,
-          ArchiveIntention(_id(_firstUuid)),
+          givenArchiveIntention(_id(_firstUuid)),
         ) as IntentionCommandAccepted;
         final completion = await accepted.future;
 
@@ -464,7 +454,7 @@ void main() {
           ),
         );
         expect(
-          _acceptExisting(coordinator, RestoreIntention(_id(_firstUuid))),
+          _acceptExisting(coordinator, givenRestoreIntention(_id(_firstUuid))),
           isA<IntentionCommandAccepted>(),
         );
         repository.complete(
@@ -485,7 +475,7 @@ void main() {
 
         final accepted = _acceptExisting(
           coordinator,
-          DeleteIntention(id),
+          givenDeleteIntention(id),
         ) as IntentionCommandAccepted;
         repository.complete(0, _deletedResult(id));
         final completion = await accepted.future;
@@ -609,10 +599,12 @@ void main() {
     );
 
     for (final (name, command) in [
-      ('включение готовности', EnableIntentionReadiness.new),
-      ('выключение готовности', DisableIntentionReadiness.new),
-      ('архивирование', ArchiveIntention.new),
-      ('восстановление', RestoreIntention.new),
+      (
+        'изменение вида',
+        (IntentionId id) => ChangeIntentionKind(id, IntentionKind.supporting),
+      ),
+      ('архивирование', givenArchiveIntention),
+      ('восстановление', givenRestoreIntention),
     ]) {
       test('$name: успех не предъявляется никому, а отказ при открытой '
           'странице сразу предъявляет оболочка один раз', () async {
@@ -668,11 +660,11 @@ void main() {
 
       final failed = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_firstUuid)),
+        givenDeleteIntention(_id(_firstUuid)),
       ) as IntentionCommandAccepted;
       final succeeded = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_secondUuid)),
+        givenDeleteIntention(_id(_secondUuid)),
       ) as IntentionCommandAccepted;
       repository.complete(0, const ResultFailure(IntentionConflictFailure()));
       repository.complete(1, _deletedResult(_id(_secondUuid)));
@@ -716,15 +708,15 @@ void main() {
 
       final failed = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_firstUuid)),
+        givenDeleteIntention(_id(_firstUuid)),
       ) as IntentionCommandAccepted;
       final firstSuccess = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_secondUuid)),
+        givenDeleteIntention(_id(_secondUuid)),
       ) as IntentionCommandAccepted;
       final secondSuccess = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_thirdUuid)),
+        givenDeleteIntention(_id(_thirdUuid)),
       ) as IntentionCommandAccepted;
       repository.complete(
         0,
@@ -777,11 +769,11 @@ void main() {
 
         final first = _acceptExisting(
           coordinator,
-          DeleteIntention(_id(_firstUuid)),
+          givenDeleteIntention(_id(_firstUuid)),
         ) as IntentionCommandAccepted;
         final second = _acceptExisting(
           coordinator,
-          DeleteIntention(_id(_secondUuid)),
+          givenDeleteIntention(_id(_secondUuid)),
         ) as IntentionCommandAccepted;
         repository.complete(1, _deletedResult(_id(_secondUuid)));
         repository.complete(0, _deletedResult(_id(_firstUuid)));
@@ -814,15 +806,15 @@ void main() {
       final registration = coordinator.registerAppPresentation();
       final first = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_firstUuid)),
+        givenDeleteIntention(_id(_firstUuid)),
       ) as IntentionCommandAccepted;
       final second = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_secondUuid)),
+        givenDeleteIntention(_id(_secondUuid)),
       ) as IntentionCommandAccepted;
       final late = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_thirdUuid)),
+        givenDeleteIntention(_id(_thirdUuid)),
       ) as IntentionCommandAccepted;
       repository.complete(0, _deletedResult(_id(_firstUuid)));
       repository.complete(1, _deletedResult(_id(_secondUuid)));
@@ -872,11 +864,11 @@ void main() {
 
       final accepted = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_firstUuid)),
+        givenDeleteIntention(_id(_firstUuid)),
       ) as IntentionCommandAccepted;
       final second = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_secondUuid)),
+        givenDeleteIntention(_id(_secondUuid)),
       ) as IntentionCommandAccepted;
       repository.complete(0, _deletedResult(_id(_firstUuid)));
       repository.complete(1, _deletedResult(_id(_secondUuid)));
@@ -932,11 +924,11 @@ void main() {
 
       final withoutSubscriber = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_firstUuid)),
+        givenDeleteIntention(_id(_firstUuid)),
       ) as IntentionCommandAccepted;
       final duringRegistration = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_secondUuid)),
+        givenDeleteIntention(_id(_secondUuid)),
       ) as IntentionCommandAccepted;
       firstPresenter.release();
       expect(await idleRequest, isNull);
@@ -973,7 +965,7 @@ void main() {
 
       final accepted = _acceptExisting(
         coordinator,
-        DeleteIntention(_id(_firstUuid)),
+        givenDeleteIntention(_id(_firstUuid)),
       ) as IntentionCommandAccepted;
       repository.complete(0, _deletedResult(_id(_firstUuid)));
       await accepted.future;
@@ -995,12 +987,12 @@ void main() {
 
       final accepted = _acceptExisting(
         coordinator,
-        DeleteIntention(intentionId),
+        givenDeleteIntention(intentionId),
       ) as IntentionCommandAccepted;
       coordinator.releaseInitiatorPresentation(accepted.token);
       expect(coordinator.isRunning(intentionId), isTrue);
       expect(
-        _acceptExisting(coordinator, ArchiveIntention(intentionId)),
+        _acceptExisting(coordinator, givenArchiveIntention(intentionId)),
         isA<IntentionCommandAlreadyRunning>(),
       );
       repository.complete(0, const ResultFailure(IntentionConflictFailure()));
@@ -1041,13 +1033,13 @@ void main() {
         ) {
           acceptedFromCompletion = _acceptExisting(
             coordinator,
-            ArchiveIntention(intentionId),
+            givenArchiveIntention(intentionId),
           ) as IntentionCommandAccepted;
         });
 
         final first = _acceptExisting(
           coordinator,
-          EnableIntentionReadiness(intentionId),
+          ChangeIntentionKind(intentionId, IntentionKind.supporting),
         ) as IntentionCommandAccepted;
         repository.complete(
           0,
@@ -1057,7 +1049,7 @@ void main() {
 
         expect(acceptedFromCompletion, isNotNull);
         expect(
-          _acceptExisting(coordinator, RestoreIntention(intentionId)),
+          _acceptExisting(coordinator, givenRestoreIntention(intentionId)),
           isA<IntentionCommandAlreadyRunning>(),
         );
 
@@ -1080,11 +1072,11 @@ void main() {
         final coordinator = _graphCoordinator(repository);
         final first = _acceptExisting(
           coordinator,
-          ArchiveIntention(_id(_firstUuid)),
+          givenArchiveIntention(_id(_firstUuid)),
         ) as IntentionCommandAccepted;
         final second = _acceptExisting(
           coordinator,
-          ArchiveIntention(_id(_secondUuid)),
+          givenArchiveIntention(_id(_secondUuid)),
         ) as IntentionCommandAccepted;
 
         final shutdown = coordinator.shutdown();
@@ -1093,7 +1085,7 @@ void main() {
 
         expect(coordinator.shutdown(), same(shutdown));
         expect(
-          _acceptExisting(coordinator, RestoreIntention(_id(_thirdUuid))),
+          _acceptExisting(coordinator, givenRestoreIntention(_id(_thirdUuid))),
           isA<GraphCommandCoordinatorDraining>(),
         );
         expect(repository.commands, hasLength(2));
@@ -1144,8 +1136,8 @@ Result<ConfirmedGraphResult<IntentionCommandSuccess>> _confirmedDeletedResult(
   ),
 );
 
-/// Подтверждённое полное создание: одна каталожная мутация с готовностью
-/// и обоими тегами и по факту на каждое назначение, все на [revision].
+/// Подтверждённое полное создание: одна каталожная мутация с обоими
+/// тегами и по факту на каждое назначение, все на [revision].
 Result<ConfirmedGraphResult<IntentionCommandSuccess>>
 _confirmedFullCreatedResult(GraphRevision revision) {
   final id = _id(_firstUuid);
@@ -1172,7 +1164,7 @@ _confirmedFullCreatedResult(GraphRevision revision) {
           id: id,
           title: 'Полное намерение',
           description: 'Описание',
-          readiness: IntentionReadiness.ready,
+          kind: IntentionKind.main,
           archiveState: IntentionArchiveState.active,
           createdAt: timestamp,
           updatedAt: timestamp,
@@ -1182,7 +1174,6 @@ _confirmedFullCreatedResult(GraphRevision revision) {
           entry: _TestCatalogEntrySnapshot(
             id,
             title: 'Полное намерение',
-            readiness: IntentionReadiness.ready,
             tags: tags,
           ),
         ),
@@ -1213,32 +1204,12 @@ IntentionCommandStart _acceptExisting(
 ) => coordinator.acceptExisting(command, presentationTitle: 'Намерение');
 
 final class _ControlledGraphRepository
-    with StatisticsReadContractTestFallback, TagReadContractTestFallback
+    with
+        IntentionHoldingReadContractTestFallback,
+        ActionReadContractTestFallback,
+        StatisticsReadContractTestFallback,
+        TagReadContractTestFallback
     implements PersonalGraphRepository {
-  @override
-  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
-    DailyChoiceDayStatusQuery query,
-  ) => throw UnsupportedError(
-    'Чтение состояний дней не используется в этом тесте.',
-  );
-
-  @override
-  Future<ChoicePathContinuationResult> getChoicePathContinuations(
-    ChoicePathContinuationQuery query,
-  ) => throw UnimplementedError();
-
-  @override
-  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Чтение дневного выбора не используется этим тестом.',
-      );
-
-  @override
-  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Наблюдение дневного выбора не используется этим тестом.',
-      );
-
   final commands = <IntentionCommand>[];
   final _results =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
@@ -1288,15 +1259,8 @@ final class _ControlledGraphRepository
   ) => throw UnsupportedError('Каталог не используется в этих тестах.');
 
   @override
-  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
-    DailyChoiceCatalogQuery query,
-  ) => throw UnsupportedError(
-    'Каталог дневных выборов не используется в этом тесте.',
-  );
-
-  @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) => throw UnsupportedError('Группы связей не используются в этих тестах.');
 
   @override
@@ -1311,32 +1275,12 @@ final class _ControlledGraphRepository
 }
 
 final class _ControlledPersonalGraphRepository
-    with StatisticsReadContractTestFallback, TagReadContractTestFallback
+    with
+        IntentionHoldingReadContractTestFallback,
+        ActionReadContractTestFallback,
+        StatisticsReadContractTestFallback,
+        TagReadContractTestFallback
     implements PersonalGraphRepository {
-  @override
-  Future<DailyChoiceDayStatusesReadResult> getDailyChoiceDayStatuses(
-    DailyChoiceDayStatusQuery query,
-  ) => throw UnsupportedError(
-    'Чтение состояний дней не используется в этом тесте.',
-  );
-
-  @override
-  Future<ChoicePathContinuationResult> getChoicePathContinuations(
-    ChoicePathContinuationQuery query,
-  ) => throw UnimplementedError();
-
-  @override
-  Future<DailyChoiceReadResult> getDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Чтение дневного выбора не используется этим тестом.',
-      );
-
-  @override
-  Stream<DailyChoiceReadResult> watchDailyChoice(DailyChoiceId id) =>
-      throw UnsupportedError(
-        'Наблюдение дневного выбора не используется этим тестом.',
-      );
-
   final commands = <IntentionCommand>[];
   final _results =
       <Completer<Result<ConfirmedGraphResult<IntentionCommandSuccess>>>>[];
@@ -1375,15 +1319,8 @@ final class _ControlledPersonalGraphRepository
   ) => throw UnsupportedError('Каталог не используется в этих тестах.');
 
   @override
-  Future<DailyChoiceCatalogPageResult> getDailyChoiceCatalogPage(
-    DailyChoiceCatalogQuery query,
-  ) => throw UnsupportedError(
-    'Каталог дневных выборов не используется в этом тесте.',
-  );
-
-  @override
   Future<RelationGroupPageResult> getRelationGroupPage(
-    RelationGroupPageQuery query,
+    RelationGroupQuery query,
   ) => throw UnsupportedError('Группы связей не используются в этих тестах.');
 
   @override
@@ -1429,13 +1366,12 @@ final class _TestCatalogEntrySnapshot implements IntentionCatalogEntrySnapshot {
   _TestCatalogEntrySnapshot(
     IntentionId id, {
     String title = 'Намерение',
-    IntentionReadiness readiness = IntentionReadiness.notReady,
     List<Tag> tags = const [],
   }) : summary = IntentionSummary(
          id: id,
          title: title,
          descriptionPreview: null,
-         readiness: readiness,
+         kind: IntentionKind.main,
          archiveState: IntentionArchiveState.active,
          createdAt: IntentionTimestamp(DateTime.utc(2026)),
          updatedAt: IntentionTimestamp(DateTime.utc(2026)),

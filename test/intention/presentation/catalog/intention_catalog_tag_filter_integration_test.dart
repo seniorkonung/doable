@@ -33,8 +33,12 @@ import '../../../support/tag_storage_fixture.dart';
 import 'catalog_reconciliation_test_support.dart';
 import 'catalog_test_support.dart';
 
-final _actionSearchPurpose = SelectDailyChoiceAction(
+final _participantSearchPurpose = SelectRelationParticipant(
   session: IntentionSearchSession(),
+  pairProbe: RelationPairProbe(
+    counterpartId: _intentionId(2),
+    candidateRole: RelationParticipantRole.related,
+  ),
 );
 
 void main() {
@@ -84,18 +88,7 @@ void main() {
   for (final (name, purpose, expectedIds)
       in <(String, IntentionCatalogPurpose, List<int>)>[
         ('каталог', const BrowseIntentionCatalog(), [10, 2, 1]),
-        ('действие', _actionSearchPurpose, [10, 1]),
-        (
-          'участник связи',
-          SelectRelationParticipant(
-            session: IntentionSearchSession(),
-            pairProbe: RelationPairProbe(
-              counterpartId: _intentionId(2),
-              candidateRole: RelationParticipantRole.related,
-            ),
-          ),
-          [10, 1],
-        ),
+        ('участник связи', _participantSearchPurpose, [10, 1]),
       ]) {
     test('реальный совместный поиск сохраняет ограничения: $name', () async {
       final provider = intentionCatalogViewModelProvider(purpose);
@@ -488,7 +481,6 @@ void main() {
           CreateIntention.withInitialState(
             title: 'Ходить по лесу',
             description: 'Тропа у реки',
-            readiness: IntentionReadiness.ready,
             tagIds: [_tagId(303), _tagId(301)],
           ),
         );
@@ -516,7 +508,7 @@ void main() {
           final row = current.items.singleWhere((item) => item.id == createdId);
           expect(row.title, 'Ходить по лесу');
           expect(row.descriptionPreview, isNotNull);
-          expect(row.readiness, IntentionReadiness.ready);
+          expect(row.kind, IntentionKind.main);
           expect(row.tags.map((tag) => (tag.id, tag.name.value)), [
             (_tagId(301), 'Здоровье'),
             (_tagId(303), 'Отдых'),
@@ -569,7 +561,6 @@ void main() {
         CreateIntention.withInitialState(
           title: title,
           description: null,
-          readiness: IntentionReadiness.ready,
           tagIds: [for (final number in tagNumbers) _tagId(number)],
         ),
       );
@@ -603,59 +594,6 @@ void main() {
         isNot(contains(_createdId(completion))),
       );
     });
-
-    for (final (readiness, after) in [
-      (IntentionReadiness.ready, [_created, 10, 1]),
-      (IntentionReadiness.notReady, [10, 1]),
-    ]) {
-      test('начальная готовность определяет принадлежность выдаче выбора '
-          'действия: ${readiness.name}', () async {
-        final provider = intentionCatalogViewModelProvider(
-          _actionSearchPurpose,
-        );
-        final loaded = await loadFiltered(provider);
-        expect(loaded.items.map((item) => item.id), [
-          _intentionId(10),
-          _intentionId(1),
-        ]);
-        expect(loaded.totalCount, 2);
-        expect(loaded.nextCursor, isNull);
-        final states = <AsyncValue<IntentionCatalogState>>[];
-        final observer = container.listen(
-          provider,
-          (_, next) => states.add(next),
-        );
-        addTearDown(observer.close);
-
-        final completion = await _create(
-          container,
-          CreateIntention.withInitialState(
-            title: 'Ходить по лесу',
-            description: null,
-            readiness: readiness,
-            tagIds: [_tagId(301), _tagId(303)],
-          ),
-        );
-        final current = await _awaitRevisionAfter(
-          container,
-          provider,
-          loaded,
-        ) as IntentionCatalogLoaded;
-
-        final createdId = _createdId(completion);
-        expect(current.items.map((item) => item.id), [
-          for (final number in after)
-            number == _created ? createdId : _intentionId(number),
-        ]);
-        expect(current.totalCount, after.length);
-        expect(current.nextCursor, isNull);
-        expect(states.where((state) => state.isLoading), isEmpty);
-        expect(
-          _contents(current.items),
-          _contents(await _readWhole(repository, current.query)),
-        );
-      });
-    }
   });
 
   group('модель выбранных условий по тегам', () {
@@ -745,25 +683,28 @@ void main() {
     test('удаление снимает условие и в другом открытом поиске: каждый '
         'начинает новую выдачу одним чтением без промежуточной пустой '
         'выдачи', () async {
-      final action = intentionCatalogViewModelProvider(_actionSearchPurpose);
-      open(browse);
-      open(_actionSearchPurpose);
-      await confirmed();
-      await confirmed(action);
-      container.read(conditions.notifier).cycle(_tagId(302));
-      final actionConditions = container.read(
-        intentionTagConditionsViewModelProvider(_actionSearchPurpose).notifier,
+      final participant = intentionCatalogViewModelProvider(
+        _participantSearchPurpose,
       );
-      actionConditions
+      open(browse);
+      open(_participantSearchPurpose);
+      await confirmed();
+      await confirmed(participant);
+      container.read(conditions.notifier).cycle(_tagId(302));
+      final participantConditions = container.read(
+        intentionTagConditionsViewModelProvider(_participantSearchPurpose)
+            .notifier,
+      );
+      participantConditions
         ..cycle(_tagId(301))
         ..cycle(_tagId(302))
         ..cycle(_tagId(302));
       final browseBefore = await confirmed();
-      final actionBefore = await confirmed(action);
+      final participantBefore = await confirmed(participant);
       expect(browseBefore.totalCount, 1);
-      expect(actionBefore.totalCount, 4);
+      expect(participantBefore.totalCount, 4);
       final published = <IntentionCatalogConfirmedState>[];
-      for (final provider in [catalog, action]) {
+      for (final provider in [catalog, participant]) {
         addTearDown(
           container.listen(provider, (_, next) {
             // Перечитывание сохраняет прежнее значение до новой выдачи.
@@ -782,28 +723,28 @@ void main() {
         catalog,
         browseBefore,
       );
-      final actionAfter = await _awaitRevisionAfter(
+      final participantAfter = await _awaitRevisionAfter(
         container,
-        action,
-        actionBefore,
+        participant,
+        participantBefore,
       );
 
       expect(_shown(container, conditions), isEmpty);
       expect(
         _shown(
           container,
-          intentionTagConditionsViewModelProvider(_actionSearchPurpose),
+          intentionTagConditionsViewModelProvider(_participantSearchPurpose),
         ),
         [(_tagId(301), _present)],
       );
       expect(browseAfter.query.tagFilter, IntentionTagFilter.empty);
       expect(browseAfter.totalCount, 8);
       expect(
-        actionAfter.query.tagFilter,
+        participantAfter.query.tagFilter,
         IntentionTagFilter(requiredTagIds: [_tagId(301)]),
       );
-      expect(actionAfter.totalCount, 5);
-      expect(published, [browseAfter, actionAfter]);
+      expect(participantAfter.totalCount, 5);
+      expect(published, [browseAfter, participantAfter]);
       expect(_catalogPageReads(diagnostics), pageReadsBefore + 2);
     });
   });
@@ -858,23 +799,23 @@ Future<void> _completeTag(
 
 Future<void> _seedCatalog(AppDatabase database) =>
     seedGraph(database, () async {
-      for (final (number, title, ready, archived, tags) in [
-        (1, 'Ходить в парк', 1, 0, [301, 303]),
-        (2, 'Ходить в парк', 0, 0, [301, 303]),
-        (3, 'Ходить в парк', 1, 1, [301, 303]),
-        (4, 'Ходить в зал', 1, 0, [301, 302, 303]),
-        (5, 'Ходить до магазина', 1, 0, [301]),
-        (6, 'Читать в тишине', 1, 0, [301, 303]),
-        (7, 'Ходить без тегов', 0, 0, <int>[]),
-        (8, 'Ходить на работу', 1, 0, [304]),
-        (9, 'Ходить в парк', 0, 1, [301, 303]),
-        (10, 'Ходить в парк', 1, 0, [301, 303]),
+      for (final (number, title, archived, tags) in [
+        (1, 'Ходить в парк', 0, [301, 303]),
+        (2, 'Ходить в парк', 0, [301, 303]),
+        (3, 'Ходить в парк', 1, [301, 303]),
+        (4, 'Ходить в зал', 0, [301, 302, 303]),
+        (5, 'Ходить до магазина', 0, [301]),
+        (6, 'Читать в тишине', 0, [301, 303]),
+        (7, 'Ходить без тегов', 0, <int>[]),
+        (8, 'Ходить на работу', 0, [304]),
+        (9, 'Ходить в парк', 1, [301, 303]),
+        (10, 'Ходить в парк', 0, [301, 303]),
       ]) {
         await database.customStatement(
           '''INSERT INTO intentions
-         (id, title, is_action_ready, is_archived, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)''',
-          [tagFixtureId(number), title, ready, archived, number, number],
+         (id, title, kind, is_archived, created_at, updated_at)
+         VALUES (?, ?, 'main', ?, ?, ?)''',
+          [tagFixtureId(number), title, archived, number, number],
         );
         for (final tag in tags) {
           await database.customStatement(
@@ -895,8 +836,8 @@ Future<void> _seedExcludedMatches(AppDatabase database) =>
       for (final number in [11, 12, 13]) {
         await database.customStatement(
           '''INSERT INTO intentions
-         (id, title, is_action_ready, is_archived, created_at, updated_at)
-         VALUES (?, ?, 1, 0, ?, ?)''',
+         (id, title, kind, is_archived, created_at, updated_at)
+         VALUES (?, ?, 'main', 0, ?, ?)''',
           [tagFixtureId(number), 'Ходить в бассейн', number, number],
         );
         for (final tag in [301, 302]) {
@@ -957,7 +898,7 @@ IntentionId _createdId(IntentionCommandCompletion completion) =>
 /// состояния.
 List<List<Object?>> _contents(List<IntentionSummary> items) => [
   for (final item in items)
-    [item.id, item.title, item.readiness, ...item.tags.map((tag) => tag.id)],
+    [item.id, item.title, item.kind, ...item.tags.map((tag) => tag.id)],
 ];
 
 /// Читает всю выдачу [query] заново настоящим адаптером.
@@ -971,7 +912,7 @@ Future<List<IntentionSummary>> _readWhole(
     final result = await repository.getCatalogPage(
       IntentionCatalogQuery(
         scope: query.scope,
-        readinessFilter: query.readinessFilter,
+        kindFilter: query.kindFilter,
         titleFilter: query.titleFilter?.map((value) => value),
         tagFilter: query.tagFilter,
         pairProbe: query.pairProbe,

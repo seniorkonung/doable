@@ -66,7 +66,7 @@ final class OptionsMenu<T extends Object> extends StatelessWidget {
       children: [
         for (final item in items)
           OptionRow(
-            icon: item.icon,
+            icon: OptionRowIcon(item.icon),
             name: item.name,
             hint: item.hint,
             tone: item.tone,

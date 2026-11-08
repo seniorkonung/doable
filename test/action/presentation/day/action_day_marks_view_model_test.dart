@@ -1,0 +1,537 @@
+import 'dart:async';
+
+import 'package:doable/src/action/application/action_day_statuses.dart';
+import 'package:doable/src/action/presentation/day/action_day_calendar_viewport.dart';
+import 'package:doable/src/action/presentation/day/action_day_instance.dart';
+import 'package:doable/src/action/presentation/day/action_day_marks_state.dart';
+import 'package:doable/src/action/presentation/day/action_day_marks_view_model.dart';
+import 'package:doable/src/graph/application/graph_command_coordinator.dart';
+import 'package:doable/src/graph/application/graph_command_result.dart';
+import 'package:doable/src/graph/application/graph_revision.dart';
+import 'package:doable/src/graph/application/personal_graph_repository.dart';
+import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/tag/application/tag_change.dart';
+import 'package:doable/src/tag/application/tag_command.dart';
+import 'package:doable/src/tag/application/tag_result.dart';
+import 'package:doable/src/tag/domain/tag.dart';
+import 'package:doable/src/tag/domain/tag_id.dart';
+import 'package:doable/src/tag/domain/tag_name.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import '../../../support/tag_positions.dart';
+import '../../../support/intention_holding_read_contract_test_fallback.dart';
+
+void main() {
+  test(
+    'экраны дня с одинаковой начальной датой независимо читают разные '
+    'месяцы и сохраняют отметки при задержке и отказе одного чтения',
+    () async {
+      final harness = _Harness();
+      addTearDown(harness.dispose);
+      final secondInstance = ActionDayInstance(initialDate: _initialDate);
+      final secondProvider = actionDayMarksViewModelProvider(secondInstance);
+      final secondSubscription = harness.container.listen(
+        secondProvider,
+        (_, _) {},
+      );
+      addTearDown(secondSubscription.close);
+      expect(harness.repository.queries, hasLength(2));
+      for (final query in harness.repository.queries) {
+        expect(query.firstDate, _date(8, 31));
+        expect(query.lastDate, _date(12, 6));
+      }
+      harness.repository.succeed(0, {
+        _initialDate: ActionDayStatus.hasIncomplete,
+      });
+      harness.repository.succeed(1, {
+        _initialDate: ActionDayStatus.hasIncomplete,
+      });
+      await pumpEventQueue();
+
+      harness.model.setViewport(_viewport(11, 1));
+      harness.container
+          .read(secondProvider.notifier)
+          .setViewport(_viewport(12, 1));
+      expect(harness.repository.queries, hasLength(4));
+      expect(harness.repository.queries[2].firstDate, _date(9, 28));
+      expect(
+        harness.repository.queries[2].lastDate,
+        CalendarDate.fromParts(2027, 1, 10),
+      );
+      expect(harness.repository.queries[3].firstDate, _date(10, 26));
+      expect(
+        harness.repository.queries[3].lastDate,
+        CalendarDate.fromParts(2027, 2, 7),
+      );
+      harness.repository.succeed(3, {
+        _date(12, 15): ActionDayStatus.allCompleted,
+      });
+      await pumpEventQueue();
+      expect(harness.marks, {_initialDate: ActionDayStatus.hasIncomplete});
+      expect(harness.container.read(secondProvider).dayStatuses!.statuses, {
+        _date(12, 15): ActionDayStatus.allCompleted,
+      });
+
+      harness.repository.fail(2);
+      await pumpEventQueue();
+      expect(harness.state.hasReadFailure, isTrue);
+      expect(harness.marks, {_initialDate: ActionDayStatus.hasIncomplete});
+      expect(harness.container.read(secondProvider).hasReadFailure, isFalse);
+      expect(harness.container.read(secondProvider).dayStatuses!.statuses, {
+        _date(12, 15): ActionDayStatus.allCompleted,
+      });
+    },
+  );
+
+  test('новая ревизия обновляет отметки обоих экранов дня, закрытие одного '
+      'прекращает его чтения и не мешает согласованию другого', () async {
+    final harness = _Harness();
+    addTearDown(harness.dispose);
+    final secondInstance = ActionDayInstance(initialDate: _initialDate);
+    final secondProvider = actionDayMarksViewModelProvider(secondInstance);
+    final secondSubscription = harness.container.listen(
+      secondProvider,
+      (_, _) {},
+    );
+    addTearDown(secondSubscription.close);
+    expect(harness.repository.queries, hasLength(2));
+    harness.repository.succeed(0, {});
+    harness.repository.succeed(1, {});
+    await pumpEventQueue();
+    harness.model.setViewport(_viewport(11, 1));
+    harness.repository.succeed(2, {});
+    await pumpEventQueue();
+
+    await harness.renameTag(2);
+    expect(harness.repository.queries, hasLength(5));
+    final firstRead = harness.repository.queries.indexWhere(
+      (query) => query.firstDate == _date(9, 28),
+      3,
+    );
+    final secondRead = harness.repository.queries.indexWhere(
+      (query) => query.firstDate == _date(8, 31),
+      3,
+    );
+    harness.repository.succeed(secondRead, {
+      _initialDate: ActionDayStatus.hasIncomplete,
+    }, revision: 2);
+    await pumpEventQueue();
+    expect(harness.container.read(secondProvider).dayStatuses!.statuses, {
+      _initialDate: ActionDayStatus.hasIncomplete,
+    });
+
+    harness.subscription.close();
+    await harness.container.pump();
+    await harness.renameTag(3);
+    expect(harness.repository.queries, hasLength(6));
+    expect(harness.repository.queries.last.firstDate, _date(8, 31));
+    harness.repository.succeed(firstRead, {
+      _date(11, 10): ActionDayStatus.allCompleted,
+    }, revision: 2);
+    harness.repository.succeed(5, {
+      _initialDate: ActionDayStatus.allCompleted,
+    }, revision: 3);
+    await pumpEventQueue();
+    expect(harness.repository.queries, hasLength(6));
+    expect(harness.container.read(secondProvider).dayStatuses!.statuses, {
+      _initialDate: ActionDayStatus.allCompleted,
+    });
+  });
+
+  test('начальное окно задано выбранной датой, просмотр внутри месяца и '
+      'смена представления после успеха не перечитывают отметки', () async {
+    final harness = _Harness();
+    addTearDown(harness.dispose);
+    expect(harness.state.dayStatuses, isNull);
+    expect(harness.state.hasReadFailure, isFalse);
+    expect(harness.repository.queries.single.firstDate, _date(8, 31));
+    expect(harness.repository.queries.single.lastDate, _date(12, 6));
+
+    harness.repository.succeed(0, {
+      _initialDate: ActionDayStatus.hasIncomplete,
+    });
+    await pumpEventQueue();
+    expect(harness.marks, {_initialDate: ActionDayStatus.hasIncomplete});
+
+    harness.model.setViewport(_viewport(10, 13));
+    harness.model.setViewport(_viewport(10, 13, ActionDayCalendarMode.month));
+    await pumpEventQueue();
+    expect(harness.repository.queries, hasLength(1));
+  });
+
+  test('завершённый выбор показанного месяца после отказа повторяет чтение, '
+      'равная установка просмотра и повтор после успеха не читают', () async {
+    final harness = _Harness();
+    addTearDown(harness.dispose);
+    harness.repository.succeed(0, {
+      _initialDate: ActionDayStatus.hasIncomplete,
+    });
+    await pumpEventQueue();
+    final viewport = _viewport(11, 1, ActionDayCalendarMode.month);
+    harness.model.setViewport(viewport);
+    harness.repository.fail(1);
+    await pumpEventQueue();
+
+    harness.model.setViewport(viewport);
+    await pumpEventQueue();
+    expect(harness.repository.queries, hasLength(2));
+    expect(harness.state.hasReadFailure, isTrue);
+
+    harness.model.setViewport(
+      viewport,
+      reason: ActionDayCalendarViewportUpdateReason.monthSelectionCompleted,
+    );
+    expect(harness.repository.queries, hasLength(3));
+    expect(harness.repository.queries.last.firstDate, _date(9, 28));
+    expect(
+      harness.repository.queries.last.lastDate,
+      CalendarDate.fromParts(2027, 1, 10),
+    );
+    expect(harness.marks, {_initialDate: ActionDayStatus.hasIncomplete});
+    expect(harness.state.hasReadFailure, isTrue);
+
+    harness.repository.succeed(2, {_date(11, 8): ActionDayStatus.allCompleted});
+    await pumpEventQueue();
+    expect(harness.marks, {_date(11, 8): ActionDayStatus.allCompleted});
+    expect(harness.state.hasReadFailure, isFalse);
+    harness.model.setViewport(
+      viewport,
+      reason: ActionDayCalendarViewportUpdateReason.monthSelectionCompleted,
+    );
+    await pumpEventQueue();
+    expect(harness.repository.queries, hasLength(3));
+  });
+
+  test('завершённый выбор другого месяца после отказа читает новое окно '
+      'один раз и сохраняет подтверждённые отметки до ответа', () async {
+    final harness = _Harness();
+    addTearDown(harness.dispose);
+    harness.repository.succeed(0, {
+      _initialDate: ActionDayStatus.hasIncomplete,
+    });
+    await pumpEventQueue();
+    harness.model.setViewport(_viewport(11, 1, ActionDayCalendarMode.month));
+    harness.repository.fail(1);
+    await pumpEventQueue();
+
+    harness.model.setViewport(
+      _viewport(12, 1, ActionDayCalendarMode.month),
+      reason: ActionDayCalendarViewportUpdateReason.monthSelectionCompleted,
+    );
+    expect(harness.repository.queries, hasLength(3));
+    expect(harness.repository.queries.last.firstDate, _date(10, 26));
+    expect(
+      harness.repository.queries.last.lastDate,
+      CalendarDate.fromParts(2027, 2, 7),
+    );
+    expect(harness.marks, {_initialDate: ActionDayStatus.hasIncomplete});
+    expect(harness.state.hasReadFailure, isTrue);
+
+    harness.repository.succeed(2, {
+      _date(12, 15): ActionDayStatus.allCompleted,
+    });
+    await pumpEventQueue();
+    expect(harness.marks, {_date(12, 15): ActionDayStatus.allCompleted});
+    expect(harness.state.hasReadFailure, isFalse);
+    expect(harness.repository.queries, hasLength(3));
+  });
+
+  test(
+    'смена окна в полёте сохраняет прежние отметки, отбрасывает поздний '
+    'ответ и читает только последнее окно без параллельных запросов',
+    () async {
+      final harness = _Harness();
+      addTearDown(harness.dispose);
+      final novemberMark = _date(11, 30);
+      final decemberMark = _date(12, 15);
+      harness.repository.succeed(0, {
+        novemberMark: ActionDayStatus.hasIncomplete,
+      });
+      await pumpEventQueue();
+
+      harness.model.setViewport(_viewport(11, 1, ActionDayCalendarMode.month));
+      harness.model.setViewport(
+        _viewport(12, 1, ActionDayCalendarMode.month),
+        reason: ActionDayCalendarViewportUpdateReason.monthSelectionCompleted,
+      );
+      expect(harness.repository.queries, hasLength(2));
+      expect(harness.marks, {novemberMark: ActionDayStatus.hasIncomplete});
+      harness.repository.succeed(1, {
+        novemberMark: ActionDayStatus.allCompleted,
+      });
+      await pumpEventQueue();
+      expect(harness.repository.queries, hasLength(3));
+      expect(harness.repository.queries.last.firstDate, _date(10, 26));
+      expect(
+        harness.repository.queries.last.lastDate,
+        CalendarDate.fromParts(2027, 2, 7),
+      );
+      expect(harness.marks, {novemberMark: ActionDayStatus.hasIncomplete});
+
+      harness.repository.succeed(2, {
+        decemberMark: ActionDayStatus.hasIncomplete,
+      });
+      await pumpEventQueue();
+      expect(harness.marks, {decemberMark: ActionDayStatus.hasIncomplete});
+    },
+  );
+
+  test('новая ревизия от изменения тега обновляет отметки, а отказ команды '
+      'и подтверждение без изменения ревизии не перечитывают их', () async {
+    final harness = _Harness();
+    addTearDown(harness.dispose);
+    harness.repository.succeed(0, {
+      _initialDate: ActionDayStatus.hasIncomplete,
+    });
+    await pumpEventQueue();
+
+    await harness.renameTag(1, unchanged: true);
+    await harness.renameTag(1, failure: true);
+    expect(harness.repository.queries, hasLength(1));
+
+    await harness.renameTag(2);
+    expect(harness.repository.queries, hasLength(2));
+    expect(harness.marks, {_initialDate: ActionDayStatus.hasIncomplete});
+    expect(harness.state.hasReadFailure, isFalse);
+    harness.repository.succeed(1, {
+      _initialDate: ActionDayStatus.allCompleted,
+    }, revision: 2);
+    await pumpEventQueue();
+    expect(harness.marks, {_initialDate: ActionDayStatus.allCompleted});
+  });
+
+  test('ревизии, подтверждённые до первого ответа, объединяются в одно '
+      'последующее чтение, устаревшие отметки не публикуются', () async {
+    final harness = _Harness();
+    addTearDown(harness.dispose);
+    await harness.renameTag(2);
+    await harness.renameTag(3);
+    expect(harness.repository.queries, hasLength(1));
+
+    harness.repository.succeed(0, {
+      _initialDate: ActionDayStatus.hasIncomplete,
+    });
+    await pumpEventQueue();
+    expect(harness.marks, isNull);
+    expect(harness.repository.queries, hasLength(2));
+    harness.repository.succeed(1, {
+      _initialDate: ActionDayStatus.allCompleted,
+    }, revision: 3);
+    await pumpEventQueue();
+    expect(harness.marks, {_initialDate: ActionDayStatus.allCompleted});
+    expect(harness.repository.queries, hasLength(2));
+  });
+
+  test(
+    'отказ обновления сохраняет отметки, изменения недели и представления '
+    'повторяют чтение, успех целиком заменяет результат и снимает отказ',
+    () async {
+      final harness = _Harness();
+      addTearDown(harness.dispose);
+      harness.repository.succeed(0, {
+        _initialDate: ActionDayStatus.hasIncomplete,
+      });
+      await pumpEventQueue();
+      harness.model.setViewport(_viewport(11, 1));
+      harness.repository.fail(1);
+      await pumpEventQueue();
+      expect(harness.marks, {_initialDate: ActionDayStatus.hasIncomplete});
+      expect(harness.state.hasReadFailure, isTrue);
+      expect(harness.repository.queries, hasLength(2));
+
+      harness.model.setViewport(_viewport(11, 1));
+      expect(harness.repository.queries, hasLength(2));
+      harness.model.setViewport(_viewport(11, 8));
+      expect(harness.repository.queries, hasLength(3));
+      expect(harness.state.hasReadFailure, isTrue);
+      expect(harness.marks, {_initialDate: ActionDayStatus.hasIncomplete});
+      harness.repository.fail(2);
+      await pumpEventQueue();
+      harness.model.setViewport(_viewport(11, 8, ActionDayCalendarMode.month));
+      expect(harness.repository.queries, hasLength(4));
+      harness.repository.succeed(3, {});
+      await pumpEventQueue();
+      expect(harness.marks, isEmpty);
+      expect(harness.state.hasReadFailure, isFalse);
+    },
+  );
+
+  test('отказ первого чтения оставляет дни без отметок, новая ревизия '
+      'повторяет чтение и восстанавливает состояние', () async {
+    final harness = _Harness();
+    addTearDown(harness.dispose);
+    harness.repository.fail(0);
+    await pumpEventQueue();
+    expect(harness.marks, isNull);
+    expect(harness.state.hasReadFailure, isTrue);
+
+    await harness.renameTag(2);
+    expect(harness.repository.queries, hasLength(2));
+    expect(harness.state.hasReadFailure, isTrue);
+    harness.repository.succeed(1, {
+      _initialDate: ActionDayStatus.allCompleted,
+    }, revision: 2);
+    await pumpEventQueue();
+    expect(harness.marks, {_initialDate: ActionDayStatus.allCompleted});
+    expect(harness.state.hasReadFailure, isFalse);
+  });
+
+  test('освобождение модели прекращает подписку, поздний ответ не публикуется '
+      'и не продолжает чтение', () async {
+    final harness = _Harness();
+    addTearDown(harness.dispose);
+    harness.model.setViewport(_viewport(11, 1));
+    harness.subscription.close();
+    await harness.container.pump();
+    await harness.renameTag(2);
+    harness.repository.succeed(0, {
+      _initialDate: ActionDayStatus.hasIncomplete,
+    });
+    await pumpEventQueue();
+    expect(harness.repository.queries, hasLength(1));
+  });
+}
+
+final _initialDate = _date(10, 6);
+
+CalendarDate _date(int month, int day) =>
+    CalendarDate.fromParts(2026, month, day);
+
+ActionDayCalendarViewport _viewport(
+  int month,
+  int day, [
+  ActionDayCalendarMode mode = ActionDayCalendarMode.week,
+]) => ActionDayCalendarViewport(focusedDate: _date(month, day), mode: mode);
+
+final class _Harness {
+  _Harness() {
+    container = ProviderContainer(
+      overrides: [
+        personalGraphRepositoryProvider.overrideWith((ref) => repository),
+      ],
+    );
+    subscription = container.listen(provider, (_, _) {});
+  }
+
+  final repository = _Repository();
+  final provider = actionDayMarksViewModelProvider(
+    ActionDayInstance(initialDate: _initialDate),
+  );
+  late final ProviderContainer container;
+  late final ProviderSubscription<ActionDayMarksState> subscription;
+  var _tag = Tag(
+    id: (TagId.decode(
+      '00000000-0000-4000-8000-000000000001',
+    ) as TagIdDecodingSuccess).id,
+    name: TagName.fromInput('Дом'),
+    color: null,
+    position: tagPositionAt(1000),
+  );
+
+  ActionDayMarksViewModel get model => container.read(provider.notifier);
+  ActionDayMarksState get state => container.read(provider);
+  Map<CalendarDate, ActionDayStatus>? get marks => state.dayStatuses?.statuses;
+
+  Future<void> renameTag(
+    int revision, {
+    bool unchanged = false,
+    bool failure = false,
+  }) async {
+    final next = Tag(
+      id: _tag.id,
+      name: unchanged ? _tag.name : TagName.fromInput('Тег $revision'),
+      color: _tag.color,
+      position: _tag.position,
+    );
+    final graphRevision = _Revision(revision);
+    repository.commandResult = failure
+        ? const TagCommandFailed(TagUnavailableFailure())
+        : TagCommandSucceeded(
+            ConfirmedGraphResult(
+              revision: graphRevision,
+              value: unchanged
+                  ? TagUnchanged(
+                      TagUnchangedChange(revision: graphRevision, tag: _tag),
+                    )
+                  : TagUpdated(
+                      TagUpdatedChange(
+                        revision: graphRevision,
+                        before: _tag,
+                        after: next,
+                      ),
+                    ),
+            ),
+          );
+    final coordinator = container.read(
+      graphCommandCoordinatorProvider.notifier,
+    );
+    final accepted = coordinator.acceptTagUpdate(
+      UpdateTag(tagId: _tag.id, name: next.name, color: _tag.color),
+    ) as TagCommandAccepted;
+    await accepted.future;
+    if (!failure) _tag = next;
+    await pumpEventQueue();
+  }
+
+  void dispose() => container.dispose();
+}
+
+final class _Repository
+    with IntentionHoldingReadContractTestFallback
+    implements PersonalGraphRepository {
+  final queries = <ActionDayStatusQuery>[];
+  final _reads = <Completer<ActionDayStatusesReadResult>>[];
+  late TagCommandResult commandResult;
+
+  @override
+  Future<ActionDayStatusesReadResult> getActionDayStatuses(
+    ActionDayStatusQuery query,
+  ) {
+    queries.add(query);
+    final read = Completer<ActionDayStatusesReadResult>();
+    _reads.add(read);
+    return read.future;
+  }
+
+  void succeed(
+    int index,
+    Map<CalendarDate, ActionDayStatus> statuses, {
+    int revision = 1,
+  }) => _reads[index].complete(
+    ActionDayStatusesReadSuccess(
+      GraphSnapshot(
+        revision: _Revision(revision),
+        value: ActionDayStatuses(query: queries[index], statuses: statuses),
+      ),
+    ),
+  );
+
+  void fail(int index) => _reads[index].complete(
+    const ActionDayStatusesReadError(ActionDayStatusesUnexpectedFailure()),
+  );
+
+  @override
+  Future<GraphCommandResult<T, F>>
+  execute<T extends GraphCommandOutcome, F extends GraphCommandFailure>(
+    GraphCommand<T, F> command,
+  ) async => commandResult as GraphCommandResult<T, F>;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+final class _Revision implements GraphRevision {
+  const _Revision(this.value);
+  final int value;
+
+  @override
+  GraphRevisionOrder compareTo(GraphRevision other) => other is! _Revision
+      ? GraphRevisionOrder.differentEpoch
+      : value < other.value
+      ? GraphRevisionOrder.older
+      : value > other.value
+      ? GraphRevisionOrder.newer
+      : GraphRevisionOrder.same;
+}

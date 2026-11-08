@@ -108,12 +108,8 @@ void _registerAssignmentScenarios() {
             (await tester.runAsync(runtime.bootstrap)) as AppRuntimeReady;
         seedTagStorageFixture(raw);
         seedRawGraph(raw, () {
-          // Удаление получателя доступно в параметрах только без связей и
-          // дневных выборов.
-          raw
-            ..execute('DELETE FROM daily_choice_path_steps')
-            ..execute('DELETE FROM daily_choices')
-            ..execute('DELETE FROM long_term_relations');
+          // Удаление получателя доступно в параметрах только без связей.
+          raw.execute('DELETE FROM long_term_relations');
           for (var index = 0; index < 50; index++) {
             final id = tagFixtureId(10000 + index);
             raw.execute(
@@ -362,10 +358,9 @@ void _registerAssignmentScenarios() {
 
         await _tap(tester, intentionOptionsButton);
         await _tap(tester, intentionOption(IntentionOption.delete));
+        await _until(tester, intentionDeletionConfirm);
         await tester.pumpAndSettle();
-        final message =
-            '${l10n.detailsDeleteDialogTextBefore}Намерение $number'
-            '${l10n.detailsDeleteDialogTextAfter}';
+        final message = l10n.detailsDeleteSingleText('Намерение $number');
         expect(
           tester.getSemantics(find.textContaining(message)).label,
           contains(message),

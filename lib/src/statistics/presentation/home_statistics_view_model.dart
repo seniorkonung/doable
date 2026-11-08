@@ -3,12 +3,12 @@ import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../app/navigation/graph_generation.dart';
-import '../../daily_choice/domain/calendar_date.dart';
-import '../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import '../../graph/application/graph_command_coordinator.dart';
 import '../../graph/application/graph_command_result.dart';
 import '../../graph/application/graph_revision.dart';
 import '../../graph/application/personal_graph_repository_provider.dart';
+import '../../shared/domain/calendar_date.dart';
+import '../../shared/presentation/local_day/local_date_provider.dart';
 import '../application/statistics_period.dart';
 import '../application/statistics_read_contract.dart';
 import 'home_statistics_state.dart';
@@ -37,7 +37,7 @@ final class HomeStatisticsViewModel extends _$HomeStatisticsViewModel {
     if (graphGeneration != _graphGeneration) {
       _graphGeneration = graphGeneration;
       _selection = HomeStatisticsSelection.initial(
-        ref.read(dailyChoiceLocalDateSourceProvider)().date,
+        ref.read(localDateSourceProvider)().date,
       );
     }
     _reader = ref.watch(personalGraphRepositoryProvider);
@@ -85,11 +85,11 @@ final class HomeStatisticsViewModel extends _$HomeStatisticsViewModel {
     }
   }
 
-  /// Сигнал часов меняет только границу невыполненного и отметку текущего периода.
+  /// Сигнал часов меняет только отметку текущего периода: числа статистики
+  /// от местной даты не зависят.
   void setLocalDate(CalendarDate localDate) {
     if (localDate == _selection.localDate) return;
     _publishSelection(_selection.copyWith(localDate: localDate));
-    unawaited(_markStale());
   }
 
   void selectTab(HomeStatisticsTab tab) {
@@ -315,18 +315,20 @@ final class HomeStatisticsViewModel extends _$HomeStatisticsViewModel {
     _readingGeneration = null;
     _requiredRevision = first.revision;
     state = state.copyWith(
-      read: first.totalItems == 0
-          ? HomeStatisticsEmpty(
-              summary: first.summary,
-              revision: first.revision,
-            )
-          : HomeStatisticsData(
-              summary: first.summary,
-              totalItems: first.totalItems,
-              items: items,
-              revision: first.revision,
-              nextCursor: cursor,
-            ),
+      read: switch ((first.summary.planned, first.totalItems)) {
+        (0, _) => HomeStatisticsPeriodEmpty(revision: first.revision),
+        (_, 0) => HomeStatisticsViewEmpty(
+          summary: first.summary,
+          revision: first.revision,
+        ),
+        _ => HomeStatisticsData(
+          summary: first.summary,
+          totalItems: first.totalItems,
+          items: items,
+          revision: first.revision,
+          nextCursor: cursor,
+        ),
+      },
     );
   }
 
@@ -389,7 +391,6 @@ final class HomeStatisticsViewModel extends _$HomeStatisticsViewModel {
         StatisticsQuery(
           period: selection.period,
           view: selection.view,
-          localDate: selection.localDate,
           pageSize: 100,
           cursor: cursor,
         ),

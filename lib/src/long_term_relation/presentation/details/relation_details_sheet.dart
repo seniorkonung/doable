@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../../app/routing/app_router.gr.dart';
-import '../../../daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
 import '../../../design_system/components/confirm_dialog.dart';
 import '../../../design_system/components/list_state.dart';
 import '../../../design_system/components/notice.dart';
@@ -21,7 +20,9 @@ import '../../../design_system/doable_priority.dart';
 import '../../../design_system/doable_type.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/presentation/operation_failure_presentation.dart';
+import '../../../intention/application/cascade/intention_cascade.dart';
 import '../../../intention/domain/intention.dart';
+import '../../../shared/presentation/local_day/local_date_provider.dart';
 import '../../../shared/presentation/timestamp_dates_line.dart';
 import '../../application/long_term_relation_projection.dart';
 import '../../domain/long_term_relation.dart';
@@ -200,35 +201,102 @@ final class _RelationDetailsSheetState
     final viewModel = ref.read(provider.notifier);
     switch (option) {
       case RelationOption.archive:
-        viewModel.archive();
+        viewModel.archive((count) => _chooseCascade(count, restoring: false));
       case RelationOption.restore:
-        viewModel.restore();
+        viewModel.restore((count) => _chooseCascade(count, restoring: true));
       case RelationOption.delete:
-        await _confirmDeletion();
+        await _delete();
     }
   }
 
-  Future<void> _confirmDeletion() async {
-    final loaded = ref.read(_provider);
-    if (loaded is! RelationDetailsLoaded) return;
-    final localizations = AppLocalizations.of(context);
-    final confirmed = await showConfirmDialog(
+  Future<CascadeChoice?> _chooseCascade(
+    int count, {
+    required bool restoring,
+  }) async {
+    if (!mounted || !(ModalRoute.isCurrentOf(context) ?? false)) return null;
+    final l = AppLocalizations.of(context);
+    final answer = await showCascadeConfirmDialog(
       context: context,
-      title: localizations.relationSheetDeleteDialogTitle,
-      text: ConfirmDialogText(
-        before: localizations.relationSheetDeleteDialogTextBefore,
-        name: _relationPhrase(localizations, loaded.details),
-        after: localizations.relationSheetDeleteDialogTextAfter,
-      ),
-      cancelLabel: localizations.relationSheetDeleteDialogCancel,
-      actionLabel: localizations.relationSheetDeleteDialogConfirm,
+      title: restoring
+          ? l.relationCascadeRestoreTitle
+          : l.relationCascadeArchiveTitle,
+      text: restoring
+          ? l.relationCascadeRestoreQuestion(count)
+          : l.relationCascadeArchiveQuestion(count),
+      lists: const [],
+      cascadeLabel: l.detailsCascadeWithSupporting,
+      singleLabel: l.detailsCascadeOnlyThis,
+      cancelLabel: l.detailsDeleteDialogCancel,
+      actionStyle: CascadeActionStyle.primary,
     );
-    if (confirmed && mounted) await _delete();
+    return switch (answer) {
+      CascadeDialogResult.cascade => CascadeChoice.withSupporting,
+      CascadeDialogResult.single => CascadeChoice.onlyThis,
+      CascadeDialogResult.cancel => null,
+    };
+  }
+
+  Future<CascadeChoice?> _confirmDeletion(
+    RelationDeleteCascadePreview preview,
+  ) async {
+    if (!mounted || !(ModalRoute.isCurrentOf(context) ?? false)) return null;
+    final loaded = ref.read(_provider);
+    if (loaded is! RelationDetailsLoaded) return null;
+    final l = AppLocalizations.of(context);
+    final plan = preview.plan;
+    final cascade = plan.withSupporting;
+    final count = cascade.departing.length;
+    final answer = await showCascadeConfirmDialog(
+      context: context,
+      title: plan.asksQuestion
+          ? l.relationDeleteCascadeTitle(count)
+          : l.relationSheetDeleteDialogTitle,
+      text: plan.asksQuestion
+          ? '${l.relationDeleteCascadeText(preview.titles[cascade.departing.first]!)} ${l.detailsDeleteRelations(cascade.deletedRelationCount)} ${l.detailsDeleteIrreversible}${cascade.archivedByInvariant.isNotEmpty ? ' ${l.detailsDeleteArchiveText}' : ''}'
+          : '${l.relationSheetDeleteDialogTextBefore}${_relationPhrase(l, loaded.details)}${l.relationSheetDeleteDialogTextAfter} ${l.detailsDeletePaths}${cascade.archivedByInvariant.isNotEmpty ? ' ${l.detailsDeleteArchiveText}' : ''}',
+      lists: [
+        if (cascade.departing.isNotEmpty)
+          CascadeDialogList(
+            title: '',
+            items: [for (final id in cascade.departing) preview.titles[id]!],
+            marker: CascadeListMarker.intention,
+            display: CascadeListSummary(l.relationDeleteAndMore(count - 4)),
+          ),
+        if (cascade.archivedByInvariant.isNotEmpty)
+          CascadeDialogList(
+            title: l.detailsDeleteArchivedList(
+              cascade.archivedByInvariant.length,
+            ),
+            items: [
+              for (final id in cascade.archivedByInvariant) preview.titles[id]!,
+            ],
+            marker: CascadeListMarker.intention,
+            display: CascadeListSummary(
+              l.relationDeleteAndMore(cascade.archivedByInvariant.length - 4),
+            ),
+          ),
+      ],
+      footer: plan.asksQuestion ? l.relationDeleteKeepMainEffect : null,
+      cascadeLabel: plan.asksQuestion
+          ? l.relationDeleteAll
+          : l.relationSheetDeleteDialogConfirm,
+      singleLabel: plan.asksQuestion ? l.relationDeleteKeepMain : null,
+      cancelLabel: l.relationSheetDeleteDialogCancel,
+      actionStyle: CascadeActionStyle.danger,
+    );
+    return switch (answer) {
+      CascadeDialogResult.cascade => CascadeChoice.withSupporting,
+      CascadeDialogResult.single => CascadeChoice.onlyThis,
+      CascadeDialogResult.cancel => null,
+    };
   }
 
   Future<void> _delete() async {
     final viewModel = ref.read(_provider.notifier);
-    final deleted = await viewModel.delete(_deletionInitiator);
+    final deleted = await viewModel.delete(
+      _deletionInitiator,
+      confirmDeletion: _confirmDeletion,
+    );
     // Закрытие принадлежит принявшей команду панели, а не общему Deleted. После
     // ожидания сброшенный или перекрытый маршрут теряет это право.
     // https://api.flutter.dev/flutter/widgets/Route/isCurrent.html
@@ -253,7 +321,7 @@ final class _RelationDetailsSheetState
     )) {
       unawaited(_delete());
     } else {
-      ref.read(_provider.notifier).retryLifecycleChange();
+      ref.read(_provider.notifier).retryLifecycleChange(_chooseCascade);
     }
   }
 
@@ -628,24 +696,36 @@ final class _LoadedRelation extends ConsumerWidget {
             ),
           ),
         ],
-        if (state.lifecycleChange case RelationDetailsLifecycleFailed(
-          :final kind,
-          :final failure,
-          :final failurePresentation,
-          :final canRetry,
-        )) ...[
+        if (state.lifecycleChange
+            case final RelationDetailsLifecycleFailed lifecycleFailure) ...[
           const SizedBox(height: DoableMetrics.space2),
           Notice.content(
-            message: OperationFailurePresentation(
-              claim: failurePresentation,
-              message: longTermRelationCommandFailureMessage(
-                localizations,
-                _commandKind(kind),
-                failure,
-              ),
-              inheritsColor: true,
-            ),
-            action: canRetry && !isOperationRunning
+            message: switch (lifecycleFailure) {
+              RelationDetailsLifecycleCommandFailed(
+                :final kind,
+                :final failure,
+                :final failurePresentation,
+              ) =>
+                OperationFailurePresentation(
+                  claim: failurePresentation,
+                  message: longTermRelationCommandFailureMessage(
+                    localizations,
+                    _commandKind(kind),
+                    failure,
+                  ),
+                  inheritsColor: true,
+                ),
+              RelationDetailsLifecyclePreviewFailed(
+                :final kind,
+                :final failure,
+              ) =>
+                OperationFailurePresentation(
+                  claim: null,
+                  message: _previewFailureMessage(localizations, kind, failure),
+                  inheritsColor: true,
+                ),
+            },
+            action: lifecycleFailure.canRetry && !isOperationRunning
                 ? (
                     label: localizations.commonRetry,
                     onPressed: onRetryLifecycleChange,
@@ -668,10 +748,7 @@ final class _LoadedRelation extends ConsumerWidget {
                   createdAt: relation.createdAt.value,
                   updatedAt: relation.updatedAt.value,
                   // Строка называет год по дню показа панели.
-                  currentYear: ref
-                      .watch(dailyChoiceLocalDateSourceProvider)()
-                      .date
-                      .year,
+                  currentYear: ref.watch(localDateSourceProvider)().date.year,
                 ),
                 ?operationStatus,
               ],
@@ -710,6 +787,39 @@ LongTermRelationCommandKind _commandKind(
   RelationDetailsLifecycleKind.archive => LongTermRelationCommandKind.archive,
   RelationDetailsLifecycleKind.restore => LongTermRelationCommandKind.restore,
   RelationDetailsLifecycleKind.delete => LongTermRelationCommandKind.delete,
+};
+
+/// Текст отказа операции, предпросмотр каскада которой не прочитан при
+/// запуске (D7).
+String _previewFailureMessage(
+  AppLocalizations localizations,
+  RelationDetailsLifecycleKind kind,
+  CascadePreviewFailure failure,
+) => switch (kind) {
+  RelationDetailsLifecycleKind.archive => switch (failure) {
+    CascadePreviewSubjectNotFound() => localizations.relationArchiveNotFound,
+    CascadePreviewOperationInapplicable() ||
+    CascadePreviewExpired() => localizations.relationArchiveConflict,
+    CascadePreviewUnavailable() => localizations.relationArchiveUnavailable,
+    CascadePreviewCorruption() => localizations.relationArchiveCorruption,
+    CascadePreviewUnexpected() => localizations.relationArchiveUnexpected,
+  },
+  RelationDetailsLifecycleKind.restore => switch (failure) {
+    CascadePreviewSubjectNotFound() => localizations.relationRestoreNotFound,
+    CascadePreviewOperationInapplicable() ||
+    CascadePreviewExpired() => localizations.relationRestoreConflict,
+    CascadePreviewUnavailable() => localizations.relationRestoreUnavailable,
+    CascadePreviewCorruption() => localizations.relationRestoreCorruption,
+    CascadePreviewUnexpected() => localizations.relationRestoreUnexpected,
+  },
+  RelationDetailsLifecycleKind.delete => switch (failure) {
+    CascadePreviewSubjectNotFound() => localizations.relationDeleteNotFound,
+    CascadePreviewOperationInapplicable() ||
+    CascadePreviewExpired() => localizations.relationDeleteConflict,
+    CascadePreviewUnavailable() => localizations.relationDeleteUnavailable,
+    CascadePreviewCorruption() => localizations.relationDeleteCorruption,
+    CascadePreviewUnexpected() => localizations.relationDeleteUnexpected,
+  },
 };
 
 LongTermRelationType _relationType(RelationHeadKind kind) => switch (kind) {

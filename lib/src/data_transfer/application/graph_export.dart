@@ -1,10 +1,10 @@
 import 'dart:io';
 
-import '../../daily_choice/domain/calendar_date.dart';
 import '../../graph/application/graph_command_coordinator.dart';
 import '../../graph_snapshots/graph_log_compaction.dart';
 import '../../graph_snapshots/graph_snapshot_store.dart';
 import '../../shared/diagnostics/diagnostics_sink.dart';
+import '../../shared/domain/calendar_date.dart';
 import 'document_access.dart';
 
 /// Имя временного файла экспорта. Координатор принимает не больше одного

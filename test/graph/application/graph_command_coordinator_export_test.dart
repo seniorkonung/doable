@@ -2,11 +2,11 @@ import 'dart:async';
 
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
-import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../intention/presentation/details/details_test_support.dart';
+import '../../support/intention_cascade_execution.dart';
 
 void main() {
   test('второй экспорт во время первого не принимается, а повтор из '
@@ -172,7 +172,7 @@ final class _Harness {
     final intention = testDetailsIntention(index: index);
     final commandIndex = repository.commands.length;
     final accepted = coordinator.acceptExisting(
-      DeleteIntention(intention.id),
+      givenDeleteIntention(intention.id),
       presentationTitle: intention.title,
     ) as IntentionCommandAccepted;
     coordinator.releaseInitiatorPresentation(accepted.token);

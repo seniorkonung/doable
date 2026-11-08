@@ -134,7 +134,7 @@ void main() {
       container.read(previousProvider.notifier)
         ..changeTitle('Прежний черновик')
         ..changeDescription('Прежнее описание')
-        ..confirmReadiness()
+        ..changeKind(IntentionKind.supporting)
         ..draftTagSet.add(_tag(1, 'Дом'));
       previousSubscription.close();
       await _deliverEvents(container);
@@ -149,7 +149,7 @@ void main() {
       expect(state.draft.title, isEmpty);
       expect(state.draft.description, isEmpty);
       expect(state.draft.tagIds, isEmpty);
-      expect(state.draft.readiness, IntentionReadiness.notReady);
+      expect(state.draft.kind, IntentionKind.main);
       expect(state.draft.isChanged, isFalse);
       expect(state.selectedTags, isEmpty);
       expect(state.operation, isA<OperationIdle<Intention>>());
@@ -158,7 +158,7 @@ void main() {
       expect(repository.tagCommands, isEmpty);
     });
 
-    test('каждое из четырёх полей отдельно делает черновик изменённым, а возврат к началу снимает изменённость', () {
+    test('каждое из трёх полей отдельно делает черновик изменённым, а возврат к началу снимает изменённость', () {
       final repository = ControlledCatalogRepository();
       final container = _container(repository);
       final provider = intentionEditorViewModelProvider(
@@ -182,7 +182,6 @@ void main() {
           () => editor.draftTagSet.add(_tag(1, 'Дом')),
           () => editor.removeTag(_tagId(1)),
         ),
-        'готовность': (editor.confirmReadiness, editor.disableReadiness),
       };
       for (final MapEntry(key: field, value: (change, revert))
           in edits.entries) {
@@ -191,6 +190,12 @@ void main() {
         revert();
         expect(isChanged(), isFalse, reason: field);
       }
+
+      editor.changeKind(IntentionKind.supporting);
+      expect(container.read(provider).draft.kind, IntentionKind.supporting);
+      expect(isChanged(), isFalse);
+      editor.changeKind(IntentionKind.main);
+      expect(isChanged(), isFalse);
 
       expect(container.read(provider).draft.tagIds, isEmpty);
       expect(container.read(provider).selectedTags, isEmpty);
@@ -295,7 +300,7 @@ void main() {
       final tagSet =
           (container.read(provider.notifier)
                 ..changeTitle('Намерение')
-                ..confirmReadiness())
+                ..changeKind(IntentionKind.supporting))
               .draftTagSet
             ..add(_tag(1, 'Дом'))
             ..add(_tag(2, 'Выходные'));
@@ -311,7 +316,7 @@ void main() {
       expect(state.draft.tagIds, [_tagId(2)]);
       expect(_tagNames(state), {_tagId(2): 'Выходные'});
       expect(state.draft.title, 'Намерение');
-      expect(state.draft.readiness, IntentionReadiness.ready);
+      expect(state.draft.kind, IntentionKind.supporting);
       expect(published, [
         [_tagId(2)],
       ]);
@@ -366,7 +371,7 @@ void main() {
 
       container.read(firstProvider.notifier)
         ..changeTitle('Первое')
-        ..confirmReadiness()
+        ..changeKind(IntentionKind.supporting)
         ..draftTagSet.add(_tag(1, 'Дом'));
       container
           .read(secondProvider.notifier)
@@ -378,7 +383,7 @@ void main() {
       expect(first.draft.tagIds, [_tagId(1)]);
       expect(second.draft.tagIds, [_tagId(2)]);
       expect(second.draft.title, isEmpty);
-      expect(second.draft.readiness, IntentionReadiness.notReady);
+      expect(second.draft.kind, IntentionKind.main);
       expect(container.read(secondProvider.notifier).draftTagSet.current, [
         _tagId(2),
       ]);
@@ -448,7 +453,7 @@ void main() {
         editor
           ..changeTitle('Поздняя правка')
           ..changeDescription('Поздняя правка')
-          ..confirmReadiness()
+          ..changeKind(IntentionKind.supporting)
           ..removeTag(_tagId(1));
 
         expect(container.read(provider).draft.title, 'Намерение');
@@ -472,7 +477,7 @@ void main() {
       final editor = container.read(provider.notifier)
         ..changeTitle('Название')
         ..changeDescription('Описание')
-        ..confirmReadiness();
+        ..changeKind(IntentionKind.supporting);
       // Общий выбор получил контракт набора до отправки и вызывает его позже.
       final tagSet = editor.draftTagSet..add(_tag(1, 'Дом'));
       await _deliverEvents(container);
@@ -490,7 +495,7 @@ void main() {
         ..changeTitle('Правка во время отправки')
         ..changeDescription('Правка во время отправки')
         ..removeTag(_tagId(1))
-        ..disableReadiness()
+        ..changeKind(IntentionKind.main)
         ..submit();
       await _deliverEvents(container);
 
@@ -498,7 +503,7 @@ void main() {
       expect(submitted.draft.title, 'Название');
       expect(submitted.draft.description, 'Описание');
       expect(submitted.draft.tagIds, [_tagId(1)]);
-      expect(submitted.draft.readiness, IntentionReadiness.ready);
+      expect(submitted.draft.kind, IntentionKind.supporting);
       expect(
         submitted.draftAvailability,
         IntentionDraftAvailability.submitting,
@@ -509,7 +514,6 @@ void main() {
       expect(command.title, 'Название');
       expect(command.description, 'Описание');
       expect(command.tagIds, {_tagId(1)});
-      expect(command.readiness, IntentionReadiness.ready);
       expect(repository.tagCommands, isEmpty);
 
       // Результат снимает фиксацию черновика, но не меняет принятую команду.
@@ -663,7 +667,7 @@ void main() {
       final firstSubscription = container.listen(provider, (_, _) {});
       final editor = container.read(provider.notifier)
         ..changeTitle('Полное намерение')
-        ..confirmReadiness();
+        ..changeKind(IntentionKind.supporting);
       editor.draftTagSet.add(_tag(1, 'Дом'));
       editor.submit();
       final command = repository.commands.single;
@@ -682,11 +686,6 @@ void main() {
         command,
         isA<CreateIntention>()
             .having((command) => command.title, 'название', 'Полное намерение')
-            .having(
-              (command) => command.readiness,
-              'готовность',
-              IntentionReadiness.ready,
-            )
             .having((command) => command.tagIds, 'теги', {_tagId(1)}),
       );
 
@@ -733,7 +732,7 @@ void main() {
         expect(failed.draft.title, _rawTitle, reason: name);
         expect(failed.draft.description, _rawDescription, reason: name);
         expect(failed.draft.tagIds, tagIds, reason: name);
-        expect(failed.draft.readiness, IntentionReadiness.ready, reason: name);
+        expect(failed.draft.kind, IntentionKind.supporting, reason: name);
         expect(failed.selectedTags.keys, tagIds, reason: name);
         expect(
           failed.operation,
@@ -765,7 +764,7 @@ void main() {
         'повторное добавление включённого тега с новым названием': (editor) =>
             editor.draftTagSet.add(_tag(2, 'Отдых')),
         'снятие тега': (editor) => editor.removeTag(_tagId(2)),
-        'готовность': (editor) => editor.disableReadiness(),
+        'вид': (editor) => editor.changeKind(IntentionKind.main),
       };
       _Recovery expected(IntentionFailure failure, String edit) =>
           switch (failure) {
@@ -789,9 +788,11 @@ void main() {
                   ? _Recovery.correctable
                   : _Recovery.resubmittable,
             IntentionUnavailableFailure() => _Recovery.retryable,
+            IntentionMissingIncomingRelationFailure() ||
             IntentionNotFoundFailure() ||
             IntentionConflictFailure() ||
-            IntentionHasBlockingRelationsFailure() ||
+            IntentionCascadeConflictFailure() ||
+            IntentionCascadePreviewFailure() ||
             IntentionCorruptionFailure() ||
             IntentionUnexpectedFailure() => _Recovery.blocked,
           };
@@ -852,7 +853,7 @@ void main() {
       expect(_tagNames(failed), {_tagId(2): 'Выходные'});
       expect(failed.draft.title, _rawTitle);
       expect(failed.draft.description, _rawDescription);
-      expect(failed.draft.readiness, IntentionReadiness.ready);
+      expect(failed.draft.kind, IntentionKind.supporting);
       expect(
         failed.operation,
         isA<OperationFailed<Intention>>().having(
@@ -879,12 +880,7 @@ void main() {
               'описание',
               _rawDescription,
             )
-            .having((command) => command.tagIds, 'теги', {_tagId(2)})
-            .having(
-              (command) => command.readiness,
-              'готовность',
-              IntentionReadiness.ready,
-            ),
+            .having((command) => command.tagIds, 'теги', {_tagId(2)}),
       );
       session.repository.completeCommand(1, _savedResult());
       await _settle(session.container);
@@ -956,7 +952,7 @@ void main() {
       final editor = container.read(provider.notifier)
         ..changeTitle(_rawTitle)
         ..changeDescription(_rawDescription)
-        ..confirmReadiness();
+        ..changeKind(IntentionKind.supporting);
       editor.draftTagSet
         ..add(_tag(1, 'Дом'))
         ..add(_tag(2, 'Выходные'));
@@ -978,7 +974,7 @@ void main() {
       expect(failed.draft.title, _rawTitle);
       expect(failed.draft.description, _rawDescription);
       expect(failed.draft.tagIds, [_tagId(1), _tagId(2)]);
-      expect(failed.draft.readiness, IntentionReadiness.ready);
+      expect(failed.draft.kind, IntentionKind.supporting);
       expect(_tagNames(failed), {_tagId(1): 'Дом', _tagId(2): 'Выходные'});
       expect(failed.draftAvailability, IntentionDraftAvailability.editable);
       expect(failed.canSubmit, isFalse);
@@ -1004,7 +1000,7 @@ void main() {
       final first = container.read(firstProvider.notifier)
         ..changeTitle('Первое')
         ..changeDescription('Описание первого')
-        ..confirmReadiness();
+        ..changeKind(IntentionKind.supporting);
       first.draftTagSet.add(_tag(1, 'Дом'));
       final second = container.read(secondProvider.notifier)
         ..changeTitle('  Второе  ');
@@ -1041,7 +1037,7 @@ void main() {
       expect(firstFailed.draft.title, 'Первое');
       expect(firstFailed.draft.description, 'Описание первого');
       expect(firstFailed.draft.tagIds, isEmpty);
-      expect(firstFailed.draft.readiness, IntentionReadiness.ready);
+      expect(firstFailed.draft.kind, IntentionKind.supporting);
       // Отказ первой сессии не убирает тот же тег из набора второй и не
       // снимает фиксацию её принятой отправки.
       final secondRunning = container.read(secondProvider);
@@ -1066,12 +1062,10 @@ void main() {
         isA<CreateIntention>()
             .having((command) => command.title, 'название', '  Второе  ')
             .having((command) => command.description, 'описание', isNull)
-            .having((command) => command.tagIds, 'теги', {_tagId(2), _tagId(1)})
-            .having(
-              (command) => command.readiness,
-              'готовность',
-              IntentionReadiness.notReady,
-            ),
+            .having((command) => command.tagIds, 'теги', {
+              _tagId(2),
+              _tagId(1),
+            }),
       ]);
       expect(firstCommand.tagIds, {_tagId(1)});
       expect(repository.tagCommands, isEmpty);
@@ -1091,7 +1085,7 @@ void main() {
       addTearDown(subscription.close);
       final editor = container.read(provider.notifier)
         ..changeTitle('Намерение')
-        ..confirmReadiness();
+        ..changeKind(IntentionKind.supporting);
       editor.draftTagSet
         ..add(_tag(1, 'Дом'))
         ..add(_tag(2, 'Работа'));
@@ -1106,7 +1100,7 @@ void main() {
       expect(kept.draft.tagIds, [_tagId(2)]);
       expect(_tagNames(kept), {_tagId(2): 'Работа'});
       expect(kept.draft.title, 'Намерение');
-      expect(kept.draft.readiness, IntentionReadiness.ready);
+      expect(kept.draft.kind, IntentionKind.supporting);
       expect(kept.operation, isA<OperationIdle<Intention>>());
       expect(editor.draftTagSet.current, [_tagId(2)]);
       expect(deletedWatch.isReleased, isTrue);
@@ -1174,7 +1168,7 @@ void main() {
       addTearDown(subscription.close);
       final editor = container.read(provider.notifier)
         ..changeTitle('Намерение')
-        ..confirmReadiness();
+        ..changeKind(IntentionKind.supporting);
       editor.draftTagSet
         ..add(_tag(1, 'Дом'))
         ..add(_tag(2, 'Выходные'))
@@ -1207,7 +1201,7 @@ void main() {
       expect(kept.draft.tagIds, [_tagId(3)]);
       expect(_tagNames(kept), {_tagId(3): 'Работа'});
       expect(kept.draft.title, 'Намерение');
-      expect(kept.draft.readiness, IntentionReadiness.ready);
+      expect(kept.draft.kind, IntentionKind.supporting);
       expect(kept.operation, isA<OperationIdle<Intention>>());
       expect(editor.draftTagSet.current, [_tagId(3)]);
       expect(watches.single(_tagId(3)).isReleased, isFalse);
@@ -1751,7 +1745,7 @@ void main() {
       final editor = container.read(provider.notifier)
         ..changeTitle('Оставленный черновик')
         ..changeDescription('Описание')
-        ..confirmReadiness();
+        ..changeKind(IntentionKind.supporting);
       editor.draftTagSet.add(_tag(1, 'Дом'));
       editor.submit();
       expect(
@@ -1783,7 +1777,7 @@ void main() {
       expect(reopened.draft.title, isEmpty);
       expect(reopened.draft.description, isEmpty);
       expect(reopened.draft.tagIds, isEmpty);
-      expect(reopened.draft.readiness, IntentionReadiness.notReady);
+      expect(reopened.draft.kind, IntentionKind.main);
       expect(reopened.selectedTags, isEmpty);
       expect(reopened.closing, isA<IntentionCreationCloseNotRequested>());
       expect(reopened.draftAvailability, IntentionDraftAvailability.editable);
@@ -2152,7 +2146,7 @@ Future<_FailedSession> _failedFullDraftSession(
   final editor = container.read(provider.notifier)
     ..changeTitle(_rawTitle)
     ..changeDescription(_rawDescription)
-    ..confirmReadiness();
+    ..changeKind(IntentionKind.supporting);
   for (final tag in tags ?? [_tag(1, 'Дом'), _tag(2, 'Выходные')]) {
     editor.draftTagSet.add(tag);
   }
@@ -2273,7 +2267,7 @@ Result<IntentionCommandSuccess> _savedResult({Intention? intention}) {
             id: intention.id,
             title: intention.title,
             descriptionPreview: testDescriptionPreview(intention.description),
-            readiness: intention.readiness,
+            kind: intention.kind,
             archiveState: intention.archiveState,
             createdAt: intention.createdAt,
             updatedAt: intention.updatedAt,

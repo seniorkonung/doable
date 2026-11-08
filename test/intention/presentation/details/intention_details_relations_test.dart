@@ -5,7 +5,7 @@ import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/design_system/components/archived_fold.dart';
-import 'package:doable/src/design_system/components/option_tiles.dart';
+import 'package:doable/src/design_system/components/segmented_control.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
@@ -34,59 +34,49 @@ import '../../../support/in_memory_quick_creation_mode_store.dart';
 import 'details_test_support.dart';
 
 void main() {
-  for (final (scenario, readiness, group) in [
-    (
-      'Открытие намерения загружает только активную группу «нужно»',
-      IntentionReadiness.notReady,
-      IntentionRelationGroup.needs,
-    ),
-    (
-      'Действие открывает группу «Нужно для»',
-      IntentionReadiness.ready,
-      IntentionRelationGroup.neededFor,
-    ),
-  ]) {
-    _testWidgets(scenario, (tester) async {
-      final graph = _Graph();
-      final owner = graph.addIntention(1, 'Быть здоровым', readiness);
-      for (final (index, type, direction, scope) in [
-        (1, LongTermRelationType.need, RelationDirection.outgoing, null),
-        (2, LongTermRelationType.can, RelationDirection.outgoing, null),
-        (3, LongTermRelationType.can, RelationDirection.outgoing, null),
-        (4, LongTermRelationType.need, RelationDirection.incoming, null),
-        (
-          5,
-          LongTermRelationType.need,
-          RelationDirection.outgoing,
-          RelationScope.archived,
-        ),
-      ]) {
-        graph.addRelation(
-          owner,
-          index: index,
-          type: type,
-          direction: direction,
-          scope: scope ?? RelationScope.active,
-        );
-      }
-      await _openPage(tester, graph, owner);
-      await _chooseTab(tester, 'Relations');
-
-      final query = graph.repository.relationGroupQueries.single;
-      expect(query.intentionId, owner.id);
-      expect(query.type, group.type);
-      expect(query.direction, group.direction);
-      expect(query.scope, RelationScope.active);
-      expect(query.cursor, isNull);
-      _expectSelectedGroup(tester, group);
-      // Числа остальных групп доступны без чтения их содержимого.
-      expect(find.bySemanticsLabel('Can use: 2 active'), findsOneWidget);
-      expect(
-        find.bySemanticsLabel('Needs: 1 active, some archived'),
-        findsOneWidget,
+  _testWidgets('Открытие намерения загружает только активную группу «нужно»', (
+    tester,
+  ) async {
+    const group = IntentionRelationGroup.needs;
+    final graph = _Graph();
+    final owner = graph.addIntention(1, 'Быть здоровым');
+    for (final (index, type, direction, scope) in [
+      (1, LongTermRelationType.need, RelationDirection.outgoing, null),
+      (2, LongTermRelationType.can, RelationDirection.outgoing, null),
+      (3, LongTermRelationType.can, RelationDirection.outgoing, null),
+      (4, LongTermRelationType.need, RelationDirection.incoming, null),
+      (
+        5,
+        LongTermRelationType.need,
+        RelationDirection.outgoing,
+        RelationScope.archived,
+      ),
+    ]) {
+      graph.addRelation(
+        owner,
+        index: index,
+        type: type,
+        direction: direction,
+        scope: scope ?? RelationScope.active,
       );
-    });
-  }
+    }
+    await _openPage(tester, graph, owner);
+    await _chooseTab(tester, 'Relations');
+
+    final query = graph.repository.relationGroupQueries.single;
+    expect(query.intentionId, owner.id);
+    expect(query.type, group.type);
+    expect(query.direction, group.direction);
+    expect(query.scope, RelationScope.active);
+    expect(query.cursor, isNull);
+    _expectSelectedGroup(tester, group);
+    // Числа остальных групп доступны без чтения их содержимого.
+    expect(find.bySemanticsLabel('Can use: 2 active'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Needs: 1 active, some archived'),
+      findsOneWidget,
+    );
+  });
 
   _testWidgets('Возвращение к связям сохраняет настройки и начинает список '
       'заново', (tester) async {
@@ -172,17 +162,13 @@ void main() {
   _testWidgets('Стрелка открывает соседа на той же группе', (tester) async {
     final graph = _Graph();
     final owner = graph.addIntention(1, 'Быть здоровым');
-    // Действие без цели открылось бы на группе «Нужно для».
-    final neighbor = graph.addIntention(
-      2,
-      'Наращивать силу',
-      IntentionReadiness.ready,
-    );
+    // Без заданной группы сосед открыл бы входящую группу «Нужно для».
+    final neighbor = graph.addIntention(2, 'Наращивать силу');
     graph.addRelation(owner, index: 1, neighbor: neighbor);
     await _openPage(tester, graph, owner);
     await _chooseTab(tester, 'Relations');
 
-    await _walk(tester, 'Open the action page: Наращивать силу');
+    await _walk(tester, 'Open the intention page: Наращивать силу');
 
     final page = tester.widget<IntentionDetailsPage>(
       find.byType(IntentionDetailsPage),
@@ -262,29 +248,31 @@ void main() {
     expect(_row(created), findsOneWidget);
   });
 
-  _testWidgets('смена готовности на «Обзоре» не меняет группу «Связей»', (
+  _testWidgets('смена вида на «Обзоре» не меняет группу «Связей»', (
     tester,
   ) async {
     final graph = _Graph();
     final before = graph.addIntention(1, 'Быть здоровым');
+    graph.addRelation(before, index: 1, direction: RelationDirection.incoming);
     await _openPage(tester, graph, before);
     await _chooseTab(tester, 'Relations');
-    _expectSelectedGroup(tester, IntentionRelationGroup.needs);
+    _expectSelectedGroup(tester, IntentionRelationGroup.neededFor);
 
     await _chooseTab(tester, 'Overview');
     await tester.tap(
       find.descendant(
-        of: find.byType(OptionTiles<IntentionReadiness>),
-        matching: find.text('Action'),
+        of: find.byType(SegmentedControl<IntentionKind>),
+        matching: find.text('Supporting'),
       ),
     );
     await tester.pump();
-    expect(graph.repository.commands.single, isA<EnableIntentionReadiness>());
-    final saved = graph.addIntention(
-      1,
-      'Быть здоровым',
-      IntentionReadiness.ready,
+    expect(graph.repository.commands.single, isA<ChangeIntentionKind>());
+    final saved = testDetailsIntention(
+      index: 1,
+      title: 'Быть здоровым',
+      kind: IntentionKind.supporting,
     );
+    graph._intentions[saved.id] = saved;
     graph.repository.completeCommand(
       0,
       testDetailsSavedResult(
@@ -297,15 +285,18 @@ void main() {
     graph.confirmChange(saved.id);
     await tester.pumpAndSettle();
     expect(
-      find.descendant(of: find.byType(TopBar), matching: find.text('Action')),
+      find.descendant(
+        of: find.byType(TopBar),
+        matching: find.text('Intention'),
+      ),
       findsOneWidget,
     );
 
     await _chooseTab(tester, 'Relations');
-    _expectSelectedGroup(tester, IntentionRelationGroup.needs);
+    _expectSelectedGroup(tester, IntentionRelationGroup.neededFor);
     final query = graph.repository.relationGroupQueries.last;
     expect(query.type, LongTermRelationType.need);
-    expect(query.direction, RelationDirection.outgoing);
+    expect(query.direction, RelationDirection.incoming);
   });
 
   _testWidgets('нажатие на строку открывает панель связи над страницей, и '
@@ -380,15 +371,11 @@ final class _Graph {
   final _watches = <(IntentionId, ControlledDetailRequest)>[];
   var _revision = 0;
 
-  Intention addIntention(
-    int index,
-    String title, [
-    IntentionReadiness readiness = IntentionReadiness.notReady,
-  ]) => _intentions[testDetailsIntentionId(index)] = testDetailsIntention(
-    index: index,
-    title: title,
-    readiness: readiness,
-  );
+  Intention addIntention(int index, String title) =>
+      _intentions[testDetailsIntentionId(index)] = testDetailsIntention(
+        index: index,
+        title: title,
+      );
 
   /// Добавляет связь [owner] с соседом и возвращает её строку для [owner].
   RelationGroupEntry addRelation(
@@ -407,7 +394,6 @@ final class _Graph {
       scope: scope,
       neighborId: neighbor?.id,
       neighborTitle: neighbor?.title,
-      neighborReadiness: neighbor?.readiness ?? IntentionReadiness.notReady,
     );
     _relations.add(row.relation);
     return row;
@@ -507,7 +493,6 @@ final class _Graph {
         id: neighborId,
         title: neighbor?.title ?? 'Сосед',
         archiveState: IntentionArchiveState.active,
-        readiness: neighbor?.readiness ?? IntentionReadiness.notReady,
       ),
     );
   }

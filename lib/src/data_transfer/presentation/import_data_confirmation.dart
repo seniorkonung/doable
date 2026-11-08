@@ -9,7 +9,7 @@ import '../../graph_format/graph_format_records.dart';
 
 /// Открывает над страницей подтверждение «Импортировать эту копию?»: когда
 /// сохранён файл с заголовком [header], сколько в нём намерений,
-/// долговременных связей, дневных выборов и тегов, и что импорт заменит
+/// долговременных связей, действий и тегов, и что импорт заменит
 /// весь граф.
 ///
 /// Возвращает `true`, только если выбрано «Импортировать и заменить»;
@@ -54,7 +54,7 @@ final class _ImportDataConfirmation extends StatelessWidget {
               savedOn,
               counts.intentions,
               counts.longTermRelations,
-              counts.dailyChoices,
+              counts.actions,
               counts.tags,
             ),
             style: DoableType.body.copyWith(color: colors.muted),

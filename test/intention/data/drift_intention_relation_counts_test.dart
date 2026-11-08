@@ -9,10 +9,10 @@ import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
-import 'package:doable/src/shared/diagnostics/diagnostics_sink.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/graph_seed.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 
 void main() {
@@ -48,140 +48,6 @@ void main() {
     expect(existingSnapshot.value!.relationCounts.total, 0);
     expect(missingSnapshot.value, isNull);
   });
-
-  test('блокирует удаление связью любой группы и сохраняет ревизию', () async {
-    // Блокирует любая связь по любому из двух концов, активная или в архиве;
-    // тип связи на проверку не влияет. Два случая проходят оба направления,
-    // оба типа и оба состояния архива.
-    final groups = [
-      (incoming: true, type: 'need', archived: false),
-      (incoming: false, type: 'can', archived: true),
-    ];
-
-    for (var index = 0; index < groups.length; index++) {
-      final group = groups[index];
-      final owner = _id(_uuid(300 + index * 2));
-      final neighbor = _id(_uuid(301 + index * 2));
-      await _insertIntention(database, owner);
-      await _insertIntention(database, neighbor);
-      await _insertRelation(
-        database,
-        id: _uuid(400 + index),
-        sourceId: group.incoming ? neighbor : owner,
-        relatedId: group.incoming ? owner : neighbor,
-        type: group.type,
-        isArchived: group.archived,
-      );
-      final revisionBefore = _successfulSnapshot(
-        await repository.watchIntention(owner).first,
-      ).revision;
-
-      final result = await repository.execute(DeleteIntention(owner));
-
-      expect(
-        result,
-        isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
-            .having(
-              (failure) => failure.failure,
-              'failure',
-              isA<IntentionHasBlockingRelationsFailure>().having(
-                (failure) => failure.intentionId,
-                'intentionId',
-                owner,
-              ),
-            ),
-      );
-      final revisionAfter = _successfulSnapshot(
-        await repository.watchIntention(owner).first,
-      ).revision;
-      expect(revisionBefore.compareTo(revisionAfter), GraphRevisionOrder.same);
-      expect(
-        await (database.select(database.intentions)
-              ..where((row) => row.id.equals(owner.toCanonicalString())))
-            .getSingleOrNull(),
-        isNotNull,
-      );
-    }
-
-    expect(
-      diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>(),
-      hasLength(groups.length),
-    );
-    expect(
-      diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().map(
-        (event) => event.status,
-      ),
-      everyElement(
-        isA<DiagnosticsFailed>().having(
-          (status) => status.code,
-          'code',
-          DiagnosticsFailureCode.conflict,
-        ),
-      ),
-    );
-  });
-
-  test(
-    'не доверяет прежнему нулю и блокирует удаление связями за первой порцией',
-    () async {
-      final owner = _id(_uuid(500));
-      final neighbors = [
-        for (var index = 0; index < 51; index++) _id(_uuid(501 + index)),
-      ];
-      await _insertIntention(database, owner);
-      for (final neighbor in neighbors) {
-        await _insertIntention(database, neighbor);
-      }
-      final emptySnapshot = _successfulSnapshot(
-        await repository.watchIntention(owner).first,
-      );
-      expect(emptySnapshot.value!.relationCounts.total, 0);
-      for (var index = 0; index < neighbors.length; index++) {
-        await _insertRelation(
-          database,
-          id: _uuid(600 + index),
-          sourceId: neighbors[index],
-          relatedId: owner,
-          type: 'can',
-          isArchived: true,
-        );
-      }
-
-      final result = await repository.execute(DeleteIntention(owner));
-
-      expect(
-        result,
-        isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
-            .having(
-              (failure) => failure.failure,
-              'failure',
-              isA<IntentionHasBlockingRelationsFailure>().having(
-                (failure) => failure.intentionId,
-                'intentionId',
-                owner,
-              ),
-            ),
-      );
-      final currentSnapshot = _successfulSnapshot(
-        await repository.watchIntention(owner).first,
-      );
-      expect(currentSnapshot.value!.relationCounts.activeNeedOutgoing, 0);
-      expect(currentSnapshot.value!.relationCounts.archivedCanIncoming, 51);
-      expect(
-        emptySnapshot.revision.compareTo(currentSnapshot.revision),
-        GraphRevisionOrder.same,
-      );
-      expect(
-        await database
-            .customSelect(
-              'SELECT COUNT(*) AS relation_count FROM long_term_relations',
-            )
-            .getSingle()
-            .then((row) => row.read<int>('relation_count')),
-        51,
-      );
-    },
-  );
 
   test('наблюдает подробные поля и сводку на одной ревизии', () async {
     final owner = _id(_uuid(30));
@@ -321,7 +187,9 @@ void main() {
       isArchived: false,
     );
 
-    final result = await repository.execute(ArchiveIntention(owner));
+    final result = await repository.execute(
+      await previewedArchiveIntention(repository, owner),
+    );
 
     final confirmed = _confirmedCommand(result);
     final countChanges = {
@@ -370,18 +238,35 @@ void main() {
     );
 
     final restore = _confirmedCommand(
-      await repository.execute(RestoreIntention(owner)),
+      await repository.execute(
+        await previewedRestoreIntention(repository, owner),
+      ),
     );
 
+    // Восстановление возвращает все связи владельца с активными
+    // намерениями, в том числе отдельно архивированную 183.
+    final restoredCounts = {
+      for (final change
+          in restore.changes.whereType<IntentionRelationCountsChanged>())
+        change.intentionId: change.counts,
+    };
     expect(
-      restore.changes.whereType<IntentionRelationCountsChanged>(),
-      isEmpty,
+      restoredCounts.keys,
+      unorderedEquals([owner, firstNeighbor, secondNeighbor, archivedNeighbor]),
     );
+    expect(restoredCounts[owner]?.active, 3);
+    expect(restoredCounts[owner]?.archived, 0);
+    expect(restoredCounts[firstNeighbor]?.active, 2);
+    expect(restoredCounts[firstNeighbor]?.archived, 0);
+    expect(restoredCounts[secondNeighbor]?.active, 2);
+    expect(restoredCounts[secondNeighbor]?.archived, 0);
+    expect(restoredCounts[archivedNeighbor]?.active, 2);
+    expect(restoredCounts[archivedNeighbor]?.archived, 0);
     expect(await _relationArchiveStates(database), {
-      _uuid(180): true,
-      _uuid(181): true,
+      _uuid(180): false,
+      _uuid(181): false,
       _uuid(182): false,
-      _uuid(183): true,
+      _uuid(183): false,
       _uuid(184): false,
     });
     final restoredOwner = await (database.select(
@@ -448,7 +333,9 @@ void main() {
       }
 
       final archived = _confirmedCommand(
-        await repository.execute(ArchiveIntention(owner)),
+        await repository.execute(
+          await previewedArchiveIntention(repository, owner),
+        ),
       );
       await untilPublished(owner, 2);
       await untilPublished(activeNeighbor, 2);
@@ -476,37 +363,48 @@ void main() {
       expect(neighborSnapshot.value?.relationCounts.archived, 1);
       expect(published(), [2, 2, 1, 1]);
 
-      // Восстановление не возвращает связи: меняется только владелец.
+      // Восстановление возвращает обе связи с активными соседями, поэтому
+      // меняются владелец и оба соседа.
       final restored = _confirmedCommand(
-        await repository.execute(RestoreIntention(owner)),
+        await repository.execute(
+          await previewedRestoreIntention(repository, owner),
+        ),
       );
       await untilPublished(owner, 3);
+      await untilPublished(activeNeighbor, 3);
+      await untilPublished(archivedNeighbor, 2);
       await pumpEventQueue();
+      final restoredOwner = _successfulSnapshot(snapshots[owner]!.last);
       expect(
-        _successfulSnapshot(snapshots[owner]!.last).revision
-            .compareTo(restored.revision),
+        restoredOwner.revision.compareTo(restored.revision),
         GraphRevisionOrder.same,
       );
-      expect(published(), [3, 2, 1, 1]);
+      expect(restoredOwner.value?.relationCounts.active, 2);
+      expect(restoredOwner.value?.relationCounts.archived, 0);
+      expect(published(), [3, 3, 2, 1]);
 
-      // Повторное архивирование без активных связей меняет только владельца.
-      final archivedWithoutActiveRelations = _confirmedCommand(
-        await repository.execute(ArchiveIntention(owner)),
+      // Повторное архивирование уносит вернувшиеся связи.
+      final archivedAgain = _confirmedCommand(
+        await repository.execute(
+          await previewedArchiveIntention(repository, owner),
+        ),
       );
       await untilPublished(owner, 4);
+      await untilPublished(activeNeighbor, 4);
+      await untilPublished(archivedNeighbor, 3);
       await pumpEventQueue();
-      expect(published(), [4, 2, 1, 1]);
+      expect(published(), [4, 4, 3, 1]);
 
       // Повтор без изменений ничего не публикует.
       final noOp = _confirmedCommand(
-        await repository.execute(ArchiveIntention(owner)),
+        await repository.execute(givenArchiveIntention(owner)),
       );
       await pumpEventQueue();
       expect(
-        archivedWithoutActiveRelations.revision.compareTo(noOp.revision),
+        archivedAgain.revision.compareTo(noOp.revision),
         GraphRevisionOrder.same,
       );
-      expect(published(), [4, 2, 1, 1]);
+      expect(published(), [4, 4, 3, 1]);
     },
   );
 }

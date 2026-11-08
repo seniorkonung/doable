@@ -45,8 +45,8 @@ void main() {
     for (final table in [
       'intentions',
       'long_term_relations',
-      'daily_choices',
-      'daily_choice_path_steps',
+      'actions',
+      'action_path_items',
       'tags',
       'tag_assignments',
     ])
@@ -105,8 +105,8 @@ void main() {
     seedTagStorageFixture(raw);
     seedRawGraph(raw, () {
       raw.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [tagFixtureId(4), 'Свободное намерение', 1, 0, 104, 204],
+        'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', ?, ?, ?)',
+        [tagFixtureId(4), 'Свободное намерение', 0, 104, 204],
       );
     });
     reader = sqlite.sqlite3.open(harness.databaseFile.path);

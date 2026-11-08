@@ -10,6 +10,27 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get intentionKindLabel => 'Intention kind';
+
+  @override
+  String get intentionKindMain => 'Main';
+
+  @override
+  String get intentionKindSupporting => 'Supporting';
+
+  @override
+  String get intentionKindMainSemantics =>
+      'Main. Matters on its own and remains when what needs it goes away';
+
+  @override
+  String get intentionKindSupportingSemantics =>
+      'Supporting. Exists while a main intention needs it and goes away with it';
+
+  @override
+  String get intentionKindSupportingUnavailable =>
+      'Supporting. Available when another intention needs it or can use it';
+
+  @override
   String get appTitle => 'Doable';
 
   @override
@@ -22,22 +43,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appDestinationHome => 'Home';
 
   @override
-  String get appDestinationDailyChoices => 'Daily choices';
+  String get appDestinationActions => 'Actions';
 
   @override
   String get appDestinationIntentionGraph => 'Intention graph';
 
   @override
-  String get statisticsSourceIntentions => 'Source intentions';
+  String get statisticsRootIntentions => 'Root intentions';
 
   @override
   String get statisticsIntermediateIntentions => 'Intermediate intentions';
 
   @override
-  String get statisticsSelectedActions => 'Selected actions';
+  String get statisticsTerminalIntentions => 'Final intentions';
 
   @override
-  String get statisticsThroughRelations => 'Total contribution';
+  String get statisticsThroughRelations => 'Through relations';
+
+  @override
+  String get statisticsViewSheetTitle => 'Count actions by';
+
+  @override
+  String get statisticsRootIntentionsHint => 'Where each path starts';
+
+  @override
+  String get statisticsIntermediateIntentionsHint =>
+      'Links between the root and the final intention';
+
+  @override
+  String get statisticsTerminalIntentionsHint =>
+      'The last reason right above the action';
+
+  @override
+  String get statisticsThroughRelationsHint =>
+      'Every intention the action serves';
+
+  @override
+  String get statisticsThroughRelationsNote =>
+      'This view counts by the relations as they are now and changes with them.';
 
   @override
   String get statisticsMonthTab => 'Month';
@@ -112,39 +155,30 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String statisticsPlannedContribution(int count) {
+  String statisticsPeriodActions(int count) {
     final intl.NumberFormat countNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
     final String countString = countNumberFormat.format(count);
 
-    return 'Planned contribution: $countString';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString actions',
+      one: '$countString action',
+    );
+    return '$_temp0';
   }
 
   @override
-  String statisticsContribution(int count) {
-    final intl.NumberFormat countNumberFormat =
+  String statisticsPeriodCompleted(int completed, int planned) {
+    final intl.NumberFormat completedNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
-
-    return 'Contribution: $countString';
-  }
-
-  @override
-  String statisticsMissed(int count) {
-    final intl.NumberFormat countNumberFormat =
+    final String completedString = completedNumberFormat.format(completed);
+    final intl.NumberFormat plannedNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
+    final String plannedString = plannedNumberFormat.format(planned);
 
-    return 'Missed: $countString';
-  }
-
-  @override
-  String statisticsUpcoming(int count) {
-    final intl.NumberFormat countNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
-
-    return 'Upcoming: $countString';
+    return '$completedString of $plannedString completed';
   }
 
   @override
@@ -176,24 +210,61 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String statisticsContributionShare(num share) {
+  String statisticsPeriodActionsShare(num share) {
     final intl.NumberFormat shareNumberFormat =
         intl.NumberFormat.percentPattern(localeName);
     final String shareString = shareNumberFormat.format(share);
 
-    return 'Share of the period’s contribution: $shareString';
+    return 'Share of the period’s actions: $shareString';
   }
-
-  @override
-  String get statisticsNoContributionShare =>
-      'No share: the period’s contribution is zero';
 
   @override
   String get statisticsLoading => 'Loading statistics…';
 
   @override
-  String get statisticsEmpty =>
-      'No daily choices are credited to this view for the selected period.';
+  String get statisticsPeriodEmpty =>
+      'There are no actions in this period. Actions dated within it will be counted here.';
+
+  @override
+  String statisticsViewEmpty(String view) {
+    return 'There are no items in the “$view” view for this period.';
+  }
+
+  @override
+  String statisticsIntentionEmptyRootTitle(String period) {
+    return 'No actions with it as the root in $period';
+  }
+
+  @override
+  String statisticsIntentionEmptyIntermediateTitle(String period) {
+    return 'No actions through it in $period';
+  }
+
+  @override
+  String statisticsIntentionEmptyTerminalTitle(String period) {
+    return 'No actions with it as the final one in $period';
+  }
+
+  @override
+  String statisticsIntentionEmptyThroughRelationsTitle(String period) {
+    return 'No actions through relations in $period';
+  }
+
+  @override
+  String get statisticsIntentionEmptyRootText =>
+      'An action of the selected period whose path starts from this intention will be counted here.';
+
+  @override
+  String get statisticsIntentionEmptyIntermediateText =>
+      'An action of the selected period whose path passes through this intention between the root and the final one will be counted here.';
+
+  @override
+  String get statisticsIntentionEmptyTerminalText =>
+      'An action of the selected period whose path ends at this intention will be counted here.';
+
+  @override
+  String get statisticsIntentionEmptyThroughRelationsText =>
+      'An action of the selected period that this intention serves through its relations will be counted here.';
 
   @override
   String get statisticsRefreshing => 'Updating statistics…';
@@ -240,16 +311,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statisticsSectionTitle => 'Statistics';
 
   @override
-  String get statisticsBreakdownSourceIntentions => 'By source intentions';
+  String get statisticsBreakdownRelations => 'Comes through';
 
   @override
-  String get statisticsBreakdownSelectedActions => 'By selected actions';
-
-  @override
-  String get statisticsBreakdownRelations => 'By relations';
-
-  @override
-  String statisticsExplicitPathChoices(int count, int planned) {
+  String statisticsExplicitPathActions(int count, int planned) {
     final intl.NumberFormat countNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
     final String countString = countNumberFormat.format(count);
@@ -257,21 +322,17 @@ class AppLocalizationsEn extends AppLocalizations {
         intl.NumberFormat.decimalPattern(localeName);
     final String plannedString = plannedNumberFormat.format(planned);
 
-    return 'Daily choices with this intention on the saved selection path: $countString of $plannedString';
+    return 'With this intention on the saved path: $countString of $plannedString';
   }
 
   @override
-  String statisticsBreakdownContributionShare(num share) {
+  String statisticsBreakdownActionsShare(num share) {
     final intl.NumberFormat shareNumberFormat =
         intl.NumberFormat.percentPattern(localeName);
     final String shareString = shareNumberFormat.format(share);
 
-    return 'Share of this intention’s contribution in this view: $shareString';
+    return 'Share of this view’s actions: $shareString';
   }
-
-  @override
-  String get statisticsBreakdownNoContributionShare =>
-      'No share: this intention’s contribution in this view is zero';
 
   @override
   String get statisticsRefreshUnavailableShort => 'Update unavailable.';
@@ -284,14 +345,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statisticsCalendarDayAllCompleted =>
-      'All credited daily choices are completed';
+      'All actions of this view are completed';
 
   @override
   String get statisticsCalendarDayHasIncomplete =>
-      'There is an incomplete credited daily choice';
+      'There is an incomplete action of this view';
 
   @override
-  String get statisticsCalendarDayNoChoices => 'No credited daily choices';
+  String get statisticsCalendarDayNoActions => 'No actions of this view';
 
   @override
   String statisticsCalendarDaySemantics(DateTime date, String dayStatus) {
@@ -312,13 +373,42 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String statisticsViewCardSemantics(
-    String view,
-    String period,
-    String counts,
-  ) {
-    return '$view. $period. $counts';
+  String get statisticsTilesLabel =>
+      'How the actions are counted for this intention';
+
+  @override
+  String get statisticsTileRoot => 'Root';
+
+  @override
+  String get statisticsTileIntermediate => 'Intermediate';
+
+  @override
+  String get statisticsTileTerminal => 'Final';
+
+  @override
+  String get statisticsTileThroughRelations =>
+      'Through relations, as they are now';
+
+  @override
+  String statisticsTileSemantics(String view, String actions, String period) {
+    return '$view: $actions in $period';
   }
+
+  @override
+  String get statisticsIntentionRootHint =>
+      'Actions whose path starts from this intention.';
+
+  @override
+  String get statisticsIntentionIntermediateHint =>
+      'Actions whose path passes through this intention between the root and the final one.';
+
+  @override
+  String get statisticsIntentionTerminalHint =>
+      'Actions whose path ends at this intention: it is their final one.';
+
+  @override
+  String get statisticsIntentionThroughRelationsHint =>
+      'Actions that this intention serves through its relations. The count changes when the relations do.';
 
   @override
   String get quickCreationLabel => 'Quick create';
@@ -337,35 +427,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quickCreationLongPressHint => 'Touch and hold to change mode';
 
   @override
+  String get quickCreationModeAction => 'New action';
+
+  @override
+  String get quickCreationModeActionHint => 'A one-time task for the day';
+
+  @override
   String get quickCreationModeIntention => 'New intention';
 
   @override
   String get quickCreationModeIntentionHint =>
       'Something you want to do or change';
-
-  @override
-  String get quickCreationModeDailyChoice => 'New daily choice';
-
-  @override
-  String get quickCreationModeDailyChoiceHint =>
-      'An action for an intention on a chosen day';
-
-  @override
-  String get quickCreationDailyChoiceStartPrompt => 'Choose where to start';
-
-  @override
-  String get quickCreationDailyChoiceFromIntention => 'From an intention';
-
-  @override
-  String get quickCreationDailyChoiceFromIntentionHint =>
-      'Pick an intention, then an action for it';
-
-  @override
-  String get quickCreationDailyChoiceFromAction => 'From an action';
-
-  @override
-  String get quickCreationDailyChoiceFromActionHint =>
-      'Pick an action, then the intention it serves';
 
   @override
   String get commonLoading => 'Loading…';
@@ -444,17 +516,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Loading relations and summary…';
 
   @override
-  String relationNeighborhoodDailyTotal(int count) {
-    return 'Daily choices: $count';
-  }
-
-  @override
-  String get relationNeighborhoodDailySourceRole => 'Source intention';
-
-  @override
-  String get relationNeighborhoodDailySelectedRole => 'Selected action';
-
-  @override
   String get relationNeighborhoodTypeNeed => 'Need';
 
   @override
@@ -479,10 +540,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get relationNeighborhoodIntentionNotFound =>
       'The intention whose relations were being viewed no longer exists.';
-
-  @override
-  String get relationNeighborhoodEmpty =>
-      'There are no relations in this group.';
 
   @override
   String get relationNeighborhoodLoadingMore => 'Loading more relations…';
@@ -608,11 +665,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String detailsRelationsWalkAction(String title) {
-    return 'Open the action page: $title';
-  }
-
-  @override
   String get detailsRelationsNeedsHint =>
       'To get there, you need each of these.';
 
@@ -652,10 +704,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Add what this intention cannot do without.';
 
   @override
-  String get detailsRelationsEmptyNeedsActionText =>
-      'An action can stand alone. Add what it needs if it has steps of its own.';
-
-  @override
   String get detailsRelationsEmptyCanUseTitle => 'Nothing to use yet';
 
   @override
@@ -689,46 +737,81 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get detailsChoicesTab => 'Choices';
+  String get detailsActionsTab => 'Actions';
 
   @override
-  String get detailsChoicesSourceHint =>
-      'Daily choices that start from this intention.';
+  String detailsActionsTabSemantic(int count) {
+    return 'Actions: $count';
+  }
 
   @override
-  String get detailsChoicesSelectedHint =>
-      'Daily choices that end in this intention.';
+  String get detailsActionsRolesLabel =>
+      'Part of the intention in action paths';
 
   @override
-  String get detailsChoicesAdd => 'Add';
+  String get detailsActionsRoleRoot => 'Root';
 
   @override
-  String get detailsChoicesAddSourceLabel =>
-      'Create a daily choice that starts from this intention';
+  String get detailsActionsRoleIntermediate => 'Intermediate';
 
   @override
-  String get detailsChoicesAddSelectedLabel =>
-      'Create a daily choice that ends in this action';
+  String get detailsActionsRoleFinal => 'Final';
+
+  @override
+  String detailsActionsRoleTileSemantic(String role, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count actions',
+      one: '$count action',
+    );
+    return '$role: $_temp0';
+  }
+
+  @override
+  String get detailsActionsEmptyTitle => 'No actions yet';
+
+  @override
+  String get detailsActionsEmptyRoot =>
+      'An action whose path starts with this intention will appear here.';
+
+  @override
+  String get detailsActionsEmptyIntermediate =>
+      'An action whose path goes through this intention will appear here.';
+
+  @override
+  String get detailsActionsEmptyFinal =>
+      'An action whose path ends with this intention will appear here.';
+
+  @override
+  String get detailsActionsTodayAndLater => 'Today and later';
+
+  @override
+  String get detailsActionsLoading => 'Loading actions…';
+
+  @override
+  String get detailsActionsLoadingMore => 'Loading more actions…';
+
+  @override
+  String get detailsActionsRefreshing => 'Refreshing…';
+
+  @override
+  String get detailsActionsUnavailable => 'Could not load the actions.';
+
+  @override
+  String get detailsActionsCorruption =>
+      'The stored action data is damaged and cannot be shown.';
+
+  @override
+  String get detailsActionsExpired =>
+      'The list has changed. Refresh it to continue.';
+
+  @override
+  String get detailsActionsUnexpected =>
+      'Could not load the actions because of an unexpected error.';
 
   @override
   String get detailsTitle => 'Intention details';
-
-  @override
-  String get detailsTypeIntention => 'Intention';
-
-  @override
-  String get detailsTypeAction => 'Action';
-
-  @override
-  String get detailsTypeChoiceLabel => 'Intention or action';
-
-  @override
-  String get detailsTypeIntentionHint =>
-      'Any size. It may take more than a day.';
-
-  @override
-  String get detailsTypeActionHint =>
-      'Doable within one day, and clear what to do.';
 
   @override
   String get detailsArchivedBadge => 'Archived';
@@ -765,7 +848,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get detailsOptionRestoreWithRelations =>
-      'Its relations stay archived until you restore them';
+      'Its relations with active intentions will be restored with it';
 
   @override
   String get detailsOptionRestoreAlone => 'New paths can use it again';
@@ -774,28 +857,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailsOptionDeleteKeepsTags => 'Its tags stay';
 
   @override
-  String get detailsOptionDeleteRelationsFirst => 'Delete its relations first';
-
-  @override
-  String get detailsOptionDeleteDailyChoicesFirst =>
-      'Delete its daily choices first';
-
-  @override
-  String get detailsOptionDeleteRelationsAndDailyChoicesFirst =>
-      'Delete its relations and daily choices first';
-
-  @override
   String get detailsOptionWait => 'Wait for the current change to finish';
 
   @override
   String get detailsDeleteDialogTitle => 'Delete intention?';
-
-  @override
-  String get detailsDeleteDialogTextBefore => 'This removes the intention ';
-
-  @override
-  String get detailsDeleteDialogTextAfter =>
-      ' with its description and cannot be undone. Its tags stay.';
 
   @override
   String get detailsDeleteDialogCancel => 'Cancel';
@@ -865,6 +930,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'The intention changed elsewhere. Its state wasn’t changed.';
 
   @override
+  String get detailsStateChangeCascadeConflict =>
+      'The intention state wasn’t changed: related intentions changed, so the operation would affect them differently. Try again.';
+
+  @override
   String get detailsStateChangeUnavailable =>
       'The intention state couldn’t be changed. Try again.';
 
@@ -888,8 +957,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'The intention changed elsewhere. It wasn’t deleted.';
 
   @override
-  String get detailsDeleteBlockedByRelations =>
-      'The intention wasn’t deleted: its relations still block deletion. Archived relations and relations that aren’t loaded yet block it too.';
+  String get detailsDeleteCascadeConflict =>
+      'The intention wasn’t deleted: related intentions changed, so deletion would affect them differently. Try again.';
 
   @override
   String get detailsDeleteUnavailable =>
@@ -1018,6 +1087,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editorCreatedAndChosen => 'Intention created and selected.';
 
   @override
+  String get editorCreatedAndChosenPathStart =>
+      'Intention created and selected as the start of the path.';
+
+  @override
   String get editorCloseDiscardTitle => 'Discard the draft?';
 
   @override
@@ -1045,32 +1118,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get editorCloseFormAction => 'Close the form';
-
-  @override
-  String get editorReadinessOption => 'Create as ready for action';
-
-  @override
-  String get editorReadinessOptionOn => 'Create as ready for action: on';
-
-  @override
-  String get editorReadinessOptionOff => 'Create as ready for action: off';
-
-  @override
-  String get editorReadinessConfirmationTitle => 'Create as ready for action?';
-
-  @override
-  String get editorReadinessOneDayCriterion =>
-      'It can be completed fully within one day.';
-
-  @override
-  String get editorReadinessClarityCriterion =>
-      'It is clear enough for a person to carry out.';
-
-  @override
-  String get editorReadinessCancelAction => 'Cancel';
-
-  @override
-  String get editorReadinessConfirmAction => 'Mark as ready';
 
   @override
   String get editorChooseTags => 'Choose tags';
@@ -1114,13 +1161,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationCreate => 'Create';
 
   @override
+  String get graphOperationChangeKind => 'Change kind';
+
+  @override
   String get graphOperationUpdate => 'Edit';
-
-  @override
-  String get graphOperationEnableReadiness => 'Mark ready';
-
-  @override
-  String get graphOperationDisableReadiness => 'Mark not ready';
 
   @override
   String get graphOperationArchive => 'Archive';
@@ -1155,7 +1199,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get graphOperationRelation => 'relation';
 
   @override
-  String get graphOperationDailyChoice => 'daily choice';
+  String get graphOperationAction => 'action';
 
   @override
   String get graphOperationTag => 'tag';
@@ -1250,7 +1294,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String dataExportComposition(
     int intentions,
     int relations,
-    int dailyChoices,
+    int actions,
     int tags,
   ) {
     final intl.NumberFormat intentionsNumberFormat =
@@ -1259,11 +1303,9 @@ class AppLocalizationsEn extends AppLocalizations {
     final intl.NumberFormat relationsNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
     final String relationsString = relationsNumberFormat.format(relations);
-    final intl.NumberFormat dailyChoicesNumberFormat =
+    final intl.NumberFormat actionsNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
-    final String dailyChoicesString = dailyChoicesNumberFormat.format(
-      dailyChoices,
-    );
+    final String actionsString = actionsNumberFormat.format(actions);
     final intl.NumberFormat tagsNumberFormat = intl.NumberFormat.decimalPattern(
       localeName,
     );
@@ -1282,10 +1324,10 @@ class AppLocalizationsEn extends AppLocalizations {
       one: '$relationsString relation',
     );
     String _temp2 = intl.Intl.pluralLogic(
-      dailyChoices,
+      actions,
       locale: localeName,
-      other: '$dailyChoicesString daily choices',
-      one: '$dailyChoicesString daily choice',
+      other: '$actionsString actions',
+      one: '$actionsString action',
     );
     String _temp3 = intl.Intl.pluralLogic(
       tags,
@@ -1490,7 +1532,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String date,
     int intentions,
     int relations,
-    int dailyChoices,
+    int actions,
     int tags,
   ) {
     final intl.NumberFormat intentionsNumberFormat =
@@ -1499,11 +1541,9 @@ class AppLocalizationsEn extends AppLocalizations {
     final intl.NumberFormat relationsNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
     final String relationsString = relationsNumberFormat.format(relations);
-    final intl.NumberFormat dailyChoicesNumberFormat =
+    final intl.NumberFormat actionsNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
-    final String dailyChoicesString = dailyChoicesNumberFormat.format(
-      dailyChoices,
-    );
+    final String actionsString = actionsNumberFormat.format(actions);
     final intl.NumberFormat tagsNumberFormat = intl.NumberFormat.decimalPattern(
       localeName,
     );
@@ -1522,10 +1562,10 @@ class AppLocalizationsEn extends AppLocalizations {
       one: '$relationsString relation',
     );
     String _temp2 = intl.Intl.pluralLogic(
-      dailyChoices,
+      actions,
       locale: localeName,
-      other: '$dailyChoicesString daily choices',
-      one: '$dailyChoicesString daily choice',
+      other: '$actionsString actions',
+      one: '$actionsString action',
     );
     String _temp3 = intl.Intl.pluralLogic(
       tags,
@@ -1656,7 +1696,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tagsPanelDeleteTextAfter =>
-      ' and all its assignments to active and archived intentions. The intentions, relations, daily choices and their paths remain.';
+      ' and all its assignments to active and archived intentions. The intentions, relations, actions and their paths remain.';
 
   @override
   String get tagsPanelDeleteCancel => 'Cancel';
@@ -1831,65 +1871,258 @@ class AppLocalizationsEn extends AppLocalizations {
       'The tag operation failed because of an unexpected error.';
 
   @override
-  String get dailyChoiceCreated => 'Daily choice created.';
+  String get actionDeleted => 'Action deleted.';
 
   @override
-  String get dailyChoiceDeleted => 'Daily choice deleted.';
+  String get actionCreated => 'Action created.';
 
   @override
-  String get dailyChoiceSheetOptionEditDescription => 'Edit the description';
+  String get actionPathConflict =>
+      'The path no longer matches the graph. Check the path and try again.';
 
   @override
-  String get dailyChoiceSheetOptionDelete => 'Delete daily choice';
+  String get actionDescriptionInvalid => 'Check the action description.';
 
   @override
-  String get dailyChoiceDeleteDialogTitle => 'Delete daily choice?';
+  String get actionOperationNotFound => 'This action no longer exists.';
 
   @override
-  String get dailyChoiceDeleteDialogBefore => 'The choice ';
-
-  @override
-  String dailyChoiceDeleteDialogAfter(String date) {
-    return ' for $date will be deleted. This cannot be undone.';
-  }
-
-  @override
-  String get dailyChoiceDeleteDialogAction => 'Delete';
-
-  @override
-  String get dailyChoiceSourceInvalid =>
-      'Check the source intention of the daily choice.';
-
-  @override
-  String get dailyChoiceSelectedInvalid =>
-      'Check the selected intention of the daily choice.';
-
-  @override
-  String get dailyChoiceDateInvalid => 'Check the daily choice date.';
-
-  @override
-  String get dailyChoiceDescriptionInvalid =>
-      'Check the daily choice description.';
-
-  @override
-  String get dailyChoiceOperationNotFound =>
-      'This daily choice no longer exists.';
-
-  @override
-  String get dailyChoiceOperationConflict =>
+  String get actionOperationConflict =>
       'The data changed. Refresh it and confirm again.';
 
   @override
-  String get dailyChoiceOperationUnavailable =>
-      'Could not complete the daily choice operation. Try again.';
+  String get actionOperationUnavailable =>
+      'Could not complete the action operation. Try again.';
 
   @override
-  String get dailyChoiceOperationCorruption =>
-      'Stored data is damaged. The daily choice was not changed.';
+  String get actionOperationCorruption =>
+      'Stored data is damaged. The action was not changed.';
 
   @override
-  String get dailyChoiceOperationUnexpected =>
-      'The daily choice operation failed because of an unexpected error.';
+  String get actionOperationUnexpected =>
+      'The action operation failed because of an unexpected error.';
+
+  @override
+  String get actionPanelTitle => 'Action';
+
+  @override
+  String get actionPanelExpand => 'Expand action sheet';
+
+  @override
+  String get actionPanelCollapse => 'Collapse action sheet';
+
+  @override
+  String get actionPanelLoading => 'Loading the action…';
+
+  @override
+  String get actionPanelUnavailable => 'Could not load the action. Try again.';
+
+  @override
+  String get actionPanelCorruption =>
+      'The saved action is corrupted and cannot be shown.';
+
+  @override
+  String get actionPanelUnexpected =>
+      'Could not load the action because of an unexpected error.';
+
+  @override
+  String actionPanelCompletionLabel(String action, String priority) {
+    return 'Completion of the action. $action. $priority';
+  }
+
+  @override
+  String get actionRefresh => 'Refresh the action';
+
+  @override
+  String get actionFieldDate => 'Date';
+
+  @override
+  String get actionFieldTime => 'Time';
+
+  @override
+  String get actionFieldPriority => 'Priority';
+
+  @override
+  String actionFieldDateLabel(String date) {
+    return 'Date: $date. Change date';
+  }
+
+  @override
+  String actionFieldTimeLabel(String time) {
+    return 'Time: $time. Change time';
+  }
+
+  @override
+  String get actionAllDay => 'All day';
+
+  @override
+  String actionPriorityOption(String priority) {
+    return 'Priority $priority';
+  }
+
+  @override
+  String get actionDateToday => 'Today';
+
+  @override
+  String get actionDateTomorrow => 'Tomorrow';
+
+  @override
+  String get actionDateYesterday => 'Yesterday';
+
+  @override
+  String get actionDateSheetLabel => 'Action date';
+
+  @override
+  String get actionTimeSheetLabel => 'Action time';
+
+  @override
+  String get actionTimeHalfSwitchLabel => 'Half of the day';
+
+  @override
+  String get actionTimeAmLabel => 'Before noon';
+
+  @override
+  String get actionTimePmLabel => 'After noon';
+
+  @override
+  String get actionCalendarPreviousMonth => 'Previous month';
+
+  @override
+  String get actionCalendarNextMonth => 'Next month';
+
+  @override
+  String get actionCalendarDayAllCompleted => 'All actions are completed';
+
+  @override
+  String get actionCalendarDayHasIncomplete => 'There is an incomplete action';
+
+  @override
+  String get actionPanelOptionsLabel => 'Action options';
+
+  @override
+  String get actionOptionEditText => 'Edit the name and description';
+
+  @override
+  String get actionOptionEditPath => 'Edit the path';
+
+  @override
+  String get actionOptionEditPathHint => 'Intentions the action is done for';
+
+  @override
+  String get actionOptionDelete => 'Delete the action';
+
+  @override
+  String get actionOptionDeleteHint => 'Its intentions and relations stay';
+
+  @override
+  String get actionDeleteDialogTitle => 'Delete the action?';
+
+  @override
+  String get actionDeleteDialogBefore => 'The action ';
+
+  @override
+  String actionDeleteDialogAfter(String date) {
+    return ' for $date will be deleted. This cannot be undone. The intentions and relations of its path stay.';
+  }
+
+  @override
+  String get actionDeleteDialogToday => 'today';
+
+  @override
+  String get actionDeleteDialogAction => 'Delete';
+
+  @override
+  String get actionTextEditTitle => 'Edit the action';
+
+  @override
+  String get actionTextEditBack => 'Back to the action';
+
+  @override
+  String get actionTextEditSave => 'Save';
+
+  @override
+  String get actionTextEditNameLabel => 'Name';
+
+  @override
+  String get actionTextEditDescriptionLabel => 'Description';
+
+  @override
+  String get actionTextEditDiscardTitle => 'Discard changes?';
+
+  @override
+  String get actionTextEditDiscardMessage =>
+      'Your changes to the name and description won’t be saved.';
+
+  @override
+  String get actionTextEditDiscardAction => 'Discard';
+
+  @override
+  String get actionTextEditContinueAction => 'Keep editing';
+
+  @override
+  String get actionPanelTabsLabel => 'Action sections';
+
+  @override
+  String get actionPanelPathTab => 'Path';
+
+  @override
+  String actionPanelPathTabLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Path, $count intentions',
+      one: 'Path, $count intention',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String actionPanelPathTabArchivedLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Path, $count intentions, the path has archived items',
+      one: 'Path, $count intention, the path has archived items',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get actionPanelPathButtonLabel => 'Open the action path';
+
+  @override
+  String get actionPathDeletedBadge => 'Deleted';
+
+  @override
+  String get actionPathNoteArchived =>
+      'Archived intentions and relations stay in the saved path.';
+
+  @override
+  String get actionPathNoteDeleted =>
+      'Deleted intentions and relations stay in the saved path as they were.';
+
+  @override
+  String get actionPathNoteArchivedAndDeleted =>
+      'Archived and deleted intentions and relations stay in the saved path.';
+
+  @override
+  String get actionPathRoleRoot => 'Root intention';
+
+  @override
+  String get actionPathRoleIntermediate => 'Intermediate intention';
+
+  @override
+  String get actionPathRoleFinal => 'Final intention';
+
+  @override
+  String actionPathRelationLabel(
+    String kind,
+    String source,
+    String related,
+    String priority,
+  ) {
+    return 'Relation $kind. $source, $related. $priority';
+  }
 
   @override
   String get graphOperationAddRelations => 'Add';
@@ -1986,14 +2219,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'The related intention no longer exists. The relation wasn’t restored.';
 
   @override
-  String get relationRestoreSourceArchived =>
-      'Restore the source intention before restoring this relation.';
-
-  @override
-  String get relationRestoreRelatedArchived =>
-      'Restore the related intention before restoring this relation.';
-
-  @override
   String get relationRestoreUnavailable =>
       'The relation couldn’t be restored. Try again.';
 
@@ -2016,10 +2241,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'The relation couldn’t be deleted because its current state conflicts with the operation.';
 
   @override
-  String get relationDeleteReferencedByDailyPath =>
-      'This relation is used by a saved daily path. Delete the daily choices that use it first.';
-
-  @override
   String get relationDeleteUnavailable =>
       'The relation couldn’t be deleted. Try again.';
 
@@ -2030,10 +2251,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get relationDeleteUnexpected =>
       'The relation couldn’t be deleted because of an unexpected error.';
-
-  @override
-  String get relationNeighborhoodOpenDailyChoice =>
-      'Open the full saved daily path';
 
   @override
   String get relationDetailsTitle => 'Relation';
@@ -2073,10 +2290,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get relationDetailsPriorityLabel => 'Priority';
-
-  @override
-  String get relationDetailsPathProtection =>
-      'This relation is used in a saved daily path, so it cannot be deleted.';
 
   @override
   String relationSheetArchivedLabel(String phrase) {
@@ -2136,6 +2349,45 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationSheetOptionsLabel => 'Relation options';
 
   @override
+  String relationArchiveIntentionsHint(int count) {
+    return 'Supporting intentions archived with the relation: $count';
+  }
+
+  @override
+  String relationDeleteIntentionsHint(int count) {
+    return 'Supporting intentions deleted with the relation: $count';
+  }
+
+  @override
+  String get relationArchivePathsHint =>
+      'Remains in saved paths marked as archived';
+
+  @override
+  String get relationRestorePathsHint =>
+      'No longer marked as archived in saved paths and available for new paths again';
+
+  @override
+  String relationRestoreIntentionsHint(int count) {
+    return 'Intentions restored with the relation: $count';
+  }
+
+  @override
+  String get relationCascadeArchiveTitle => 'Archive relation?';
+
+  @override
+  String get relationCascadeRestoreTitle => 'Restore relation?';
+
+  @override
+  String relationCascadeArchiveQuestion(int count) {
+    return 'Supporting intentions archived with it: $count.';
+  }
+
+  @override
+  String relationCascadeRestoreQuestion(int count) {
+    return 'Supporting intentions restored with it: $count.';
+  }
+
+  @override
   String get relationSheetOptionArchive => 'Archive';
 
   @override
@@ -2143,10 +2395,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get relationSheetOptionDelete => 'Delete';
-
-  @override
-  String get relationSheetOptionRestoreBothArchived =>
-      'Restore the source and related intentions before restoring this relation.';
 
   @override
   String get relationSheetDeleteDialogTitle => 'Delete relation?';
@@ -2166,81 +2414,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationSheetDeleteDialogConfirm => 'Delete';
 
   @override
-  String get actionPickerLoading => 'Loading actions…';
-
-  @override
-  String get actionPickerEmpty => 'No active actions are available.';
-
-  @override
-  String get actionPickerUnavailable =>
-      'Actions couldn’t be loaded. Try again.';
-
-  @override
-  String get actionPickerCorruption =>
-      'Saved action data is damaged and can’t be shown.';
-
-  @override
-  String get actionPickerUnexpected =>
-      'Actions couldn’t be loaded because of an unexpected error.';
-
-  @override
-  String get sourcePickerEmpty => 'No active intentions are available.';
-
-  @override
-  String get dailyChoicePickerPurposeCreationSource =>
-      'New daily choice: source intention';
-
-  @override
-  String get dailyChoicePickerPurposeCreationAction =>
-      'New daily choice: selected action';
-
-  @override
-  String get dailyChoicePickerFlowCreationFromSource =>
-      'New daily choice, from an intention';
-
-  @override
-  String get dailyChoicePickerFlowCreationFromAction =>
-      'New daily choice, from an action';
-
-  @override
-  String get dailyChoicePickerStepCurrent => 'You are here';
-
-  @override
-  String get dailyChoicePickerStepSource => 'Source intention';
-
-  @override
-  String get dailyChoicePickerStepAction => 'Selected action';
-
-  @override
-  String get dailyChoicePickerStepPathDown => 'Path down to an action';
-
-  @override
-  String get dailyChoicePickerStepPathDownNote =>
-      'Each next step is what the previous one needs or can use';
-
-  @override
-  String get dailyChoicePickerStepPathUp => 'Path up to the source intention';
-
-  @override
-  String get dailyChoicePickerStepPathUpNote => 'At least one step is needed';
-
-  @override
-  String get dailyChoicePickerStepDetails =>
-      'Date, time, priority, and description';
-
-  @override
   String get intentionPickerArchived => 'archived';
 
   @override
-  String get intentionPickerKindAction => 'action';
+  String get intentionPickerKindMain => 'main';
 
   @override
-  String get intentionPickerKindIntention => 'intention';
+  String get intentionPickerKindSupporting => 'supporting';
 
   @override
-  String intentionPickerOpenActionPage(String title) {
-    return 'Open the page of action $title';
-  }
+  String get intentionPickerKindSupportingUnheld =>
+      'supporting, no main intention holds it';
 
   @override
   String intentionPickerOpenIntentionPage(String title) {
@@ -2288,17 +2472,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerTypeCaption => 'Type';
 
   @override
-  String get intentionPickerTypeAll => 'Intentions and actions';
+  String get intentionPickerKindMainAndSupporting => 'Main and supporting';
 
   @override
-  String get intentionPickerTypeIntentionsOnly => 'Intentions only';
+  String get intentionPickerKindMainOnly => 'Main only';
 
   @override
-  String get intentionPickerTypeActionsOnly => 'Actions only';
-
-  @override
-  String get intentionPickerActionTypeNote =>
-      'Only an action can be the final intention of a daily choice';
+  String get intentionPickerKindSupportingOnly => 'Supporting only';
 
   @override
   String get intentionPickerSortCaption => 'Sort by';
@@ -2333,9 +2513,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get intentionPickerAllHeader => 'All';
-
-  @override
   String get intentionPickerOrderCreatedNewest => 'Created, newest first';
 
   @override
@@ -2354,37 +2531,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerOrderTitleDescending => 'Name, Z to A';
 
   @override
-  String intentionPickerHeaderLabel(String type, String summary) {
-    return 'Show and sort. Type: $type. Sorted by: $summary.';
-  }
-
-  @override
-  String intentionPickerHeaderCountLabel(
-    String type,
-    int count,
-    String summary,
-  ) {
-    return 'Show and sort. Type: $type, $count. Sorted by: $summary.';
-  }
-
-  @override
-  String intentionPickerScopeHeader(String scope, String type) {
-    String _temp0 = intl.Intl.selectLogic(type, {
-      'all': 'Active',
-      'intentions': 'Active intentions',
-      'actions': 'Active actions',
+  String intentionPickerScopeHeader(String scope, String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'mainOnly': 'Active main',
+      'supportingOnly': 'Active supporting',
+      'mainAndSupporting': 'Active',
       'other': '',
     });
-    String _temp1 = intl.Intl.selectLogic(type, {
-      'all': 'Archived',
-      'intentions': 'Archived intentions',
-      'actions': 'Archived actions',
+    String _temp1 = intl.Intl.selectLogic(kind, {
+      'mainOnly': 'Archived main',
+      'supportingOnly': 'Archived supporting',
+      'mainAndSupporting': 'Archived',
       'other': '',
     });
-    String _temp2 = intl.Intl.selectLogic(type, {
-      'all': 'All',
-      'intentions': 'All intentions',
-      'actions': 'All actions',
+    String _temp2 = intl.Intl.selectLogic(kind, {
+      'mainOnly': 'All main',
+      'supportingOnly': 'All supporting',
+      'mainAndSupporting': 'All',
       'other': '',
     });
     String _temp3 = intl.Intl.selectLogic(scope, {
@@ -2411,13 +2574,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get intentionPickerActionsHeader => 'Actions';
-
-  @override
   String get intentionPickerIntentionsHeader => 'Intentions';
-
-  @override
-  String get intentionPickerLoadingMoreActions => 'Loading more actions';
 
   @override
   String get intentionPickerLoadingMoreIntentions => 'Loading more intentions';
@@ -2426,30 +2583,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get intentionPickerEmptyScopeTitle => 'Nothing to choose from';
 
   @override
-  String get intentionPickerEmptyTypeTitle => 'No intentions of this type';
-
-  @override
-  String get intentionPickerEmptyTypeText =>
-      'Show both types to choose from the available intentions.';
-
-  @override
   String get intentionPickerShowBothTypes => 'Show both types';
 
   @override
-  String intentionPickerEmptyScopedTypeTitle(String scope, String type) {
-    String _temp0 = intl.Intl.selectLogic(type, {
-      'actions': 'No active actions',
-      'intentions': 'No active intentions',
+  String intentionCatalogEmptyKindTitle(String scope, String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'main': 'No active main intentions',
+      'supporting': 'No active supporting intentions',
       'other': '',
     });
-    String _temp1 = intl.Intl.selectLogic(type, {
-      'actions': 'No actions in the archive',
-      'intentions': 'No intentions in the archive',
+    String _temp1 = intl.Intl.selectLogic(kind, {
+      'main': 'No main intentions in the archive',
+      'supporting': 'No supporting intentions in the archive',
       'other': '',
     });
-    String _temp2 = intl.Intl.selectLogic(type, {
-      'actions': 'No actions yet',
-      'intentions': 'No intentions yet',
+    String _temp2 = intl.Intl.selectLogic(kind, {
+      'main': 'No main intentions yet',
+      'supporting': 'No supporting intentions yet',
       'other': '',
     });
     String _temp3 = intl.Intl.selectLogic(scope, {
@@ -2462,12 +2612,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get intentionPickerEmptyActionsText =>
-      'An intention marked as an action is shown here.';
+  String get intentionCatalogEmptyMainText =>
+      'An intention becomes main when you mark it so on its page. Create a new one with the plus button below.';
 
   @override
-  String get intentionPickerEmptyIntentionsText =>
-      'Everything here is marked as an action.';
+  String get intentionCatalogEmptySupportingText =>
+      'An intention becomes supporting when it is created in the Needs or Can use group of another intention, or when you mark it so on its page.';
 
   @override
   String get intentionCatalogNoActiveTitle => 'No active intentions';
@@ -2491,10 +2641,206 @@ class AppLocalizationsEn extends AppLocalizations {
       'An intention you archive leaves the active list and stays here.';
 
   @override
-  String get intentionPickerActionTitle => 'Choose an action';
+  String get pathStartPickerTitle => 'Choose an intention';
 
   @override
-  String get intentionPickerIntentionTitle => 'Choose an intention';
+  String get pathStartPickerEmpty =>
+      'There are no intentions available to start a path.';
+
+  @override
+  String get pathStartPickerCurrentRoot => 'Current start of path';
+
+  @override
+  String get pathStartNewAction => 'New action';
+
+  @override
+  String get pathStartEditPath => 'Edit path';
+
+  @override
+  String pathStartSubtitle(String flow) {
+    return '$flow: where the path starts';
+  }
+
+  @override
+  String get pathStartFirstStep => 'The intention where the path starts';
+
+  @override
+  String get pathStartFirstNote =>
+      'Usually this is the goal behind the action. You can choose the immediate reason if it is clear enough.';
+
+  @override
+  String get pathStartSecondStep => 'Further down';
+
+  @override
+  String get pathStartSecondNote =>
+      'This is optional: each next intention is something needed or possible for the previous one.';
+
+  @override
+  String get pathStartCurrentStep => 'You are here';
+
+  @override
+  String get pathTitle => 'Path';
+
+  @override
+  String get pathEditTitle => 'Edit path';
+
+  @override
+  String get pathSave => 'Save';
+
+  @override
+  String get pathChooseReason => 'Choose a reason';
+
+  @override
+  String get pathChooseReasonLabel =>
+      'Choose a reason: the intention where the path starts';
+
+  @override
+  String get pathEmptyHint =>
+      'Start from the goal this action serves and go down step by step, or start right from the nearest reason. One intention is enough.';
+
+  @override
+  String get pathShortenHint => 'Tap an intention to end the path at it.';
+
+  @override
+  String get pathNewAction => 'New action';
+
+  @override
+  String pathActionLabel(String title) {
+    return 'The path leads to the action “$title”';
+  }
+
+  @override
+  String get pathNewActionLabel => 'The path leads to a new action';
+
+  @override
+  String pathRootLabel(String title) {
+    return 'Root intention “$title”. Choose another start of the path';
+  }
+
+  @override
+  String pathEndAtLabel(String title) {
+    return 'Intermediate intention “$title”. End the path at it';
+  }
+
+  @override
+  String pathFinalLabel(String title) {
+    return 'Final intention “$title”';
+  }
+
+  @override
+  String get pathNeedEmptyTitle => 'Nothing is needed yet';
+
+  @override
+  String get pathNeedEmptyText =>
+      'Add what is essential, or end the path here.';
+
+  @override
+  String get pathCanEmptyTitle => 'Nothing to use yet';
+
+  @override
+  String get pathCanEmptyText => 'Add what helps but is not essential.';
+
+  @override
+  String get pathNextIntention => 'Next intention';
+
+  @override
+  String pathCandidateNeedLabel(String source, String title, String priority) {
+    return 'To $source, need $title. Priority $priority';
+  }
+
+  @override
+  String pathCandidateCanLabel(String source, String title, String priority) {
+    return 'To $source, can use $title. Priority $priority';
+  }
+
+  @override
+  String get pathCandidatesLoading => 'Loading next intentions…';
+
+  @override
+  String get pathCandidatesUnavailable =>
+      'Could not load next intentions. Try again.';
+
+  @override
+  String get pathAdd => 'Add';
+
+  @override
+  String pathAddNeedLabel(String source) {
+    return 'Add to Needs of $source';
+  }
+
+  @override
+  String pathAddCanLabel(String source) {
+    return 'Add to Can use of $source';
+  }
+
+  @override
+  String get pathLoading => 'Loading the path…';
+
+  @override
+  String get pathReadUnavailable => 'Couldn\'t load the path. Try again.';
+
+  @override
+  String get pathReadCorruption =>
+      'Saved data is damaged, so the path can\'t be shown.';
+
+  @override
+  String get pathReadUnexpected =>
+      'Couldn\'t load the path because of an unexpected error.';
+
+  @override
+  String get pathDiscardTitle => 'Discard changes?';
+
+  @override
+  String get pathDiscardMessage =>
+      'Your changes to the path will not be saved.';
+
+  @override
+  String get pathDiscardAction => 'Discard';
+
+  @override
+  String get pathContinueAction => 'Keep editing';
+
+  @override
+  String pathDiscardKeptRelations(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'The $count added relations will remain.',
+      one: 'The added relation will remain.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pathDiscardKeptIntentions(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'The $count created intentions will remain.',
+      one: 'The created intention will remain.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pathDiscardKeptBoth(int relations, int intentions) {
+    String _temp0 = intl.Intl.pluralLogic(
+      relations,
+      locale: localeName,
+      other: 'The $relations added relations',
+      one: 'The added relation',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      intentions,
+      locale: localeName,
+      other: 'the $intentions created intentions',
+      one: 'the created intention',
+    );
+    return '$_temp0 and $_temp1 will remain.';
+  }
+
+  @override
+  String get pathCandidateNew => 'New';
 
   @override
   String get participantPickerTitle => 'Choose intentions';
@@ -2526,17 +2872,21 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get intentionPickerNoActionsByTitle => 'No actions with this name';
-
-  @override
   String get intentionPickerNoIntentionsByTitle =>
       'No intentions with this name';
 
   @override
-  String get intentionPickerTryShorterTitle => 'Try a shorter name.';
+  String intentionCatalogOtherKindMatches(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'main': 'There are no matches among main intentions, but there are matches among supporting intentions.',
+      'supporting': 'There are no matches among supporting intentions, but there are matches among main intentions.',
+      'other': '',
+    });
+    return '$_temp0';
+  }
 
   @override
-  String get intentionPickerNoActionsByTags => 'No actions match these tags';
+  String get intentionPickerTryShorterTitle => 'Try a shorter name.';
 
   @override
   String get intentionPickerNoIntentionsByTags =>
@@ -2545,9 +2895,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get intentionPickerChangeTags =>
       'Change the tags in the filter or reset it.';
-
-  @override
-  String get intentionPickerNoActionsFound => 'No actions found';
 
   @override
   String get intentionPickerNoIntentionsFound => 'No intentions found';
@@ -2581,473 +2928,114 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enter valid Unicode text without NUL.';
 
   @override
-  String get choicePathTitle => 'Choose a path to an action';
+  String get actionDayLoading => 'Loading actions…';
 
   @override
-  String get choicePathBottomTitle => 'Choose a source for the action';
-
-  @override
-  String get choicePathBottomTraversal =>
-      'Exploration: from the action to a source';
-
-  @override
-  String get choicePathBottomPathDirection =>
-      'Relation direction: from the source to the action';
-
-  @override
-  String choicePathFixedAction(String action) {
-    return 'Selected action: $action';
-  }
-
-  @override
-  String get choicePathActionPending => 'Loading the selected action…';
-
-  @override
-  String choicePathCurrentSource(String source) {
-    return 'Source: $source';
-  }
-
-  @override
-  String get choicePathSourceSelected => 'Source confirmed';
-
-  @override
-  String choicePathSelectSource(String source) {
-    return 'Confirm source “$source”';
-  }
-
-  @override
-  String get choicePathBottomNoPath =>
-      'There are no valid incoming relations for this action right now. Choose another action.';
-
-  @override
-  String get choicePathDirection =>
-      'Path from the source intention to an action';
-
-  @override
-  String choicePathSource(String source) {
-    return 'Source intention: $source';
-  }
-
-  @override
-  String get choicePathSourcePending => 'Loading the source intention…';
-
-  @override
-  String choicePathReturnTo(String source) {
-    return 'Return to “$source”';
-  }
-
-  @override
-  String choicePathStepSemantics(int index, String phrase, String priority) {
-    return 'Step $index: $phrase. Priority $priority';
-  }
-
-  @override
-  String get choicePathActionSelected => 'Action selected';
-
-  @override
-  String choicePathSelectAction(String action) {
-    return 'Choose action “$action”';
-  }
-
-  @override
-  String get choicePathSelectionNotSaved =>
-      'The daily choice has not been created yet.';
-
-  @override
-  String get choicePathContinuations => 'Available continuations';
-
-  @override
-  String get choicePathLoading => 'Checking available continuations…';
-
-  @override
-  String get choicePathNoPath =>
-      'There is no valid path from this intention to another action right now. Only relations leading to a ready action become continuations. Mark an intention as ready or link it to an action.';
-
-  @override
-  String get choicePathNoFurtherPath =>
-      'There are no further valid continuations.';
-
-  @override
-  String get choicePathTopNoFurtherPath =>
-      'There are no further valid continuations. Only relations leading to a ready action become continuations. Mark an intention as ready or link it to an action.';
-
-  @override
-  String get choicePathOpenRelations => 'Open relations';
-
-  @override
-  String get choicePathConflict =>
-      'The graph has changed. Refresh the path before continuing.';
-
-  @override
-  String get choicePathRefresh => 'Refresh path';
-
-  @override
-  String get choicePathNotFound =>
-      'An intention on this path no longer exists.';
-
-  @override
-  String get choicePathUnavailable =>
-      'Continuations are temporarily unavailable. Try again.';
-
-  @override
-  String get choicePathCorruption =>
-      'Saved path data is damaged. Continuation is unavailable.';
-
-  @override
-  String get choicePathUnexpected =>
-      'Continuations could not be checked because of an unexpected error.';
-
-  @override
-  String get choicePathLoadMore => 'Show more continuations';
-
-  @override
-  String get choicePathLoadingMore => 'Loading the next page…';
-
-  @override
-  String choicePathContinueSemantics(String phrase, String priority) {
-    return 'Continue along relation: $phrase. Priority $priority';
-  }
-
-  @override
-  String get dailyChoiceCreationTitle => 'Confirm daily choice';
-
-  @override
-  String get dailyChoiceAllDay => 'All day';
-
-  @override
-  String get dailyChoicePriorityLabel => 'Priority';
-
-  @override
-  String dailyChoicePriorityOption(String priority) {
-    return 'Priority $priority';
-  }
-
-  @override
-  String get dailyChoiceCatalogTitle => 'Daily choices';
-
-  @override
-  String get dailyChoiceCreateFromAction => 'Create a choice from an action';
-
-  @override
-  String get dailyChoiceCatalogLoading => 'Loading daily choices…';
-
-  @override
-  String get dailyChoiceCalendarToday => 'Today';
-
-  @override
-  String get dailyChoiceCalendarDayAllCompleted =>
-      'All daily choices are completed';
-
-  @override
-  String get dailyChoiceCalendarDayHasIncomplete =>
-      'There is an incomplete daily choice';
-
-  @override
-  String get dailyChoiceCalendarDayMarksUnavailable =>
+  String get actionCalendarDayMarksUnavailable =>
       'Day marks could not be loaded.';
 
   @override
-  String get dailyChoiceCalendarExpand => 'Expand calendar';
+  String get actionCalendarExpand => 'Expand calendar';
 
   @override
-  String get dailyChoiceCalendarCollapse => 'Collapse calendar';
+  String get actionCalendarCollapse => 'Collapse calendar';
 
   @override
-  String get dailyChoiceCalendarPreviousMonth => 'Previous month';
+  String get actionCalendarChooseYearAndMonth => 'Choose year and month';
 
   @override
-  String get dailyChoiceCalendarNextMonth => 'Next month';
+  String get actionCalendarBackToMonthDays => 'Back to the days of the month';
 
   @override
-  String get dailyChoiceCalendarChooseYearAndMonth => 'Choose year and month';
+  String get actionCalendarPreviousYears => 'Previous years';
 
   @override
-  String get dailyChoiceCalendarBackToMonthDays =>
-      'Back to the days of the month';
+  String get actionCalendarNextYears => 'Next years';
 
   @override
-  String get dailyChoiceCalendarPreviousYears => 'Previous years';
+  String get actionCalendarPreviousYear => 'Previous year';
 
   @override
-  String get dailyChoiceCalendarNextYears => 'Next years';
+  String get actionCalendarNextYear => 'Next year';
 
   @override
-  String get dailyChoiceCalendarPreviousYear => 'Previous year';
+  String get actionDaySectionIncomplete => 'Not completed';
 
   @override
-  String get dailyChoiceCalendarNextYear => 'Next year';
+  String get actionDaySectionCompleted => 'Completed';
 
   @override
-  String get dailyChoiceCatalogIncomplete => 'Not completed';
+  String get actionDayEmptyTitle => 'No actions for this date';
 
   @override
-  String get dailyChoiceCatalogCompleted => 'Completed';
+  String get actionDayEmptyText =>
+      'Every action here serves one of your intentions.';
 
   @override
-  String get dailyChoiceCatalogEmptyTitle => 'No choices for this date';
+  String get detailsActionsAdd => 'Add';
 
   @override
-  String get dailyChoiceCatalogEmptyText =>
-      'Create a choice from an action and set this date. It will appear here.';
+  String get detailsActionsAddLabel => 'Add action';
 
   @override
-  String get dailyChoiceCatalogRefreshing => 'Refreshing…';
+  String get actionDayRefreshing => 'Refreshing…';
 
   @override
-  String get dailyChoiceCatalogScrollToTop => 'Back to top';
+  String get actionDayScrollToTop => 'Back to top';
 
   @override
-  String get dailyChoiceCatalogLoadingMore => 'Loading more daily choices…';
+  String get actionDayLoadingMore => 'Loading more actions…';
 
   @override
-  String get dailyChoiceCatalogUnavailable => 'Could not load daily choices.';
+  String get actionDayUnavailable => 'Could not load actions.';
 
   @override
-  String get dailyChoiceCatalogCorruption =>
-      'Stored daily choice data is damaged and cannot be shown.';
+  String get actionDayCorruption =>
+      'Stored action data is damaged and cannot be shown.';
 
   @override
-  String get dailyChoiceCatalogExpired =>
-      'The catalog changed. Refresh it to continue.';
+  String get actionDayExpired => 'The list changed. Refresh it to continue.';
 
   @override
-  String get dailyChoiceCatalogUnexpected =>
-      'Could not load daily choices because of an unexpected error.';
+  String get actionDayUnexpected =>
+      'Could not load actions because of an unexpected error.';
 
   @override
-  String dailyChoiceCatalogPathStepCount(int count) {
+  String actionDayPathIntentionCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count steps in path',
-      one: '$count step in path',
+      other: '$count intentions in path',
+      one: '$count intention in path',
     );
     return '$_temp0';
   }
 
   @override
-  String dailyChoiceCatalogCompletionLabel(
-    int number,
-    String action,
-    String priority,
-  ) {
-    return 'Completion of choice #$number. $action. $priority';
+  String actionDayCompletionLabel(int number, String action, String priority) {
+    return 'Completion of action #$number. $action. $priority';
   }
 
   @override
-  String get dailyChoiceCompletionRefresh => 'Refresh choice';
-
-  @override
-  String dailyChoiceCatalogRowLabel(int number, String action) {
-    return 'Choice #$number. $action';
+  String actionDayRowLabel(int number, String action) {
+    return 'Action #$number. $action';
   }
 
   @override
-  String dailyChoiceCatalogRowSource(String source) {
-    return 'Source intention: $source';
+  String actionDayRowRoot(String root) {
+    return 'Root intention: $root';
   }
 
   @override
-  String dailyChoiceCatalogRowTime(String time) {
+  String actionDayRowTime(String time) {
     return 'At $time';
   }
 
   @override
-  String get dailyChoiceDetailsTitle => 'Daily choice';
+  String get actionCompleted => 'Completed';
 
   @override
-  String get dailyChoiceDetailsLoading => 'Loading daily choice…';
-
-  @override
-  String get dailyChoiceDetailsNotFound =>
-      'This daily choice no longer exists.';
-
-  @override
-  String get dailyChoiceDetailsUnavailable =>
-      'Could not load this daily choice. Try again.';
-
-  @override
-  String get dailyChoiceDetailsCorruption =>
-      'The stored path is damaged and cannot be shown.';
-
-  @override
-  String get dailyChoiceDetailsUnexpected =>
-      'Could not load this daily choice because of an unexpected error.';
-
-  @override
-  String dailyChoiceDetailsPhrase(String source, String selected) {
-    return 'To $source, today I $selected';
-  }
-
-  @override
-  String dailyChoiceDetailsDate(String date) {
-    return 'Daily choice date: $date';
-  }
-
-  @override
-  String get dailyChoiceDetailsCompleted => 'Completed';
-
-  @override
-  String get dailyChoiceDetailsNotCompleted => 'Not completed';
-
-  @override
-  String get dailyChoiceDetailsSource => 'Source intention';
-
-  @override
-  String get dailyChoiceDetailsIntermediate => 'Intermediate intention';
-
-  @override
-  String get dailyChoiceDetailsSelectedAction => 'Selected action';
-
-  @override
-  String get dailyChoiceDetailsArchived => 'Archived';
-
-  @override
-  String get dailyChoiceDetailsActive => 'Active';
-
-  @override
-  String dailyChoiceDetailsStep(int number) {
-    return 'Transition $number';
-  }
-
-  @override
-  String get dailyChoiceSheetExpand => 'Expand daily choice sheet';
-
-  @override
-  String get dailyChoiceSheetCollapse => 'Collapse daily choice sheet';
-
-  @override
-  String dailyChoiceSheetCompletionLabel(String action, String priority) {
-    return 'Completion of the choice. $action. $priority';
-  }
-
-  @override
-  String get dailyChoiceSheetOptionsLabel => 'Daily choice options';
-
-  @override
-  String get dailyChoiceSheetTabsLabel => 'Daily choice sections';
-
-  @override
-  String get dailyChoiceSheetPathTab => 'Path';
-
-  @override
-  String dailyChoiceSheetPathTabLabel(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Path, $count steps',
-      one: 'Path, $count step',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String dailyChoiceSheetPathTabArchivedLabel(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Path, $count steps, something in it is archived',
-      one: 'Path, $count step, something in it is archived',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get dailyChoiceSheetPathArchivedNote =>
-      'The path contains archived intentions or relations.';
-
-  @override
-  String get dailyChoiceSheetDescriptionTitle => 'Description';
-
-  @override
-  String get dailyChoiceSheetDescriptionBack => 'Back to the daily choice';
-
-  @override
-  String get dailyChoiceSheetDescriptionSave => 'Save';
-
-  @override
-  String get dailyChoiceSheetDescriptionDiscardTitle => 'Discard changes?';
-
-  @override
-  String get dailyChoiceSheetDescriptionDiscardMessage =>
-      'Your changes to the description won’t be saved.';
-
-  @override
-  String get dailyChoiceSheetDescriptionDiscardAction => 'Discard';
-
-  @override
-  String get dailyChoiceSheetDescriptionContinueAction => 'Keep editing';
-
-  @override
-  String get dailyChoiceFieldDate => 'Date';
-
-  @override
-  String get dailyChoiceFieldTime => 'Time';
-
-  @override
-  String dailyChoiceFieldDateLabel(String date) {
-    return 'Date: $date. Change date';
-  }
-
-  @override
-  String dailyChoiceFieldTimeLabel(String time) {
-    return 'Time: $time. Change time';
-  }
-
-  @override
-  String get dailyChoiceDateSheetLabel => 'Daily choice date';
-
-  @override
-  String get dailyChoiceTimeSheetLabel => 'Daily choice time';
-
-  @override
-  String get dailyChoiceTimeHalfSwitchLabel => 'Half of the day';
-
-  @override
-  String get dailyChoiceTimeAmLabel => 'Before noon';
-
-  @override
-  String get dailyChoiceTimePmLabel => 'After noon';
-
-  @override
-  String get dailyChoiceDateTomorrow => 'Tomorrow';
-
-  @override
-  String get dailyChoiceDateYesterday => 'Yesterday';
-
-  @override
-  String get dailyChoiceCreationPath => 'Path to confirm';
-
-  @override
-  String dailyChoiceCreationAction(String action) {
-    return 'Selected action: $action';
-  }
-
-  @override
-  String get dailyChoiceCreationDescription => 'Description (optional)';
-
-  @override
-  String get dailyChoiceCreationCompleted => 'Already completed';
-
-  @override
-  String get dailyChoiceCreationCompletedHint =>
-      'Mark if the action was already done for this date';
-
-  @override
-  String get dailyChoiceCreationSave => 'Save daily choice';
-
-  @override
-  String get dailyChoiceCreationSaving => 'Saving…';
-
-  @override
-  String get dailyChoiceCreationCancel => 'Cancel';
-
-  @override
-  String get dailyChoiceCreationRefreshPath =>
-      'Return to the path and refresh it';
-
-  @override
-  String get choicePathOpenConfirmation => 'Continue to choice confirmation';
+  String get actionNotCompleted => 'Not completed';
 
   @override
   String get creationCancelAction => 'Cancel creation';
@@ -3096,6 +3084,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get batchAnchorNote => 'The intention whose page you came from';
+
+  @override
+  String get batchPathEndAnchorNote => 'The last intention of the path';
 
   @override
   String get batchEmpty => 'Nothing selected yet';
@@ -3158,4 +3149,383 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get batchContinueAction => 'Continue selecting';
+
+  @override
+  String get actionEditorTitle => 'New action';
+
+  @override
+  String get actionEditorCreate => 'Create action';
+
+  @override
+  String get actionEditorDiscardTitle => 'Discard the new action?';
+
+  @override
+  String get actionEditorDiscardMessage =>
+      'The entered name and description won’t be saved.';
+
+  @override
+  String get actionEditorPathEmptyHint =>
+      'An action needs at least one intention it serves.';
+
+  @override
+  String actionEditorPathBetween(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions between',
+      one: '$count intention between',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String actionEditorPathThen(String previous, String next) {
+    return '$previous, then $next';
+  }
+
+  @override
+  String actionEditorPathLabel(String path) {
+    return 'Path: $path. Change the path';
+  }
+
+  @override
+  String get actionEditorPathLinkArchived => 'A link is archived';
+
+  @override
+  String get actionEditorPathLinkDeleted => 'A link is deleted';
+
+  @override
+  String actionEditorPriorityLabel(String priority) {
+    return 'Priority $priority. Change the priority';
+  }
+
+  @override
+  String get actionPriorityHighest => 'The highest';
+
+  @override
+  String get actionPriorityLowest => 'The lowest';
+
+  @override
+  String cascadeArchiveIntentionSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count supporting intentions',
+      one: '$count supporting intention',
+    );
+    return 'Archived with $_temp0';
+  }
+
+  @override
+  String cascadeArchiveIntentionPromoted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions became main',
+      one: '$count intention became main',
+    );
+    return 'Archived, $_temp0';
+  }
+
+  @override
+  String cascadeArchiveRelationSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count supporting intentions',
+      one: '$count supporting intention',
+    );
+    return 'Relation archived with $_temp0';
+  }
+
+  @override
+  String get cascadeArchiveRelationPromoted =>
+      'Relation archived, intention became main';
+
+  @override
+  String cascadeDeleteIntentionSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count supporting intentions',
+      one: '$count supporting intention',
+    );
+    return 'Intention deleted with $_temp0';
+  }
+
+  @override
+  String cascadeDeleteIntentionPromoted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions became main',
+      one: '$count intention became main',
+    );
+    return 'Intention deleted, $_temp0';
+  }
+
+  @override
+  String cascadeDeleteRelationSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count supporting intentions',
+      one: '$count supporting intention',
+    );
+    return 'Relation deleted with $_temp0';
+  }
+
+  @override
+  String get cascadeDeleteRelationPromoted =>
+      'Relation deleted, intention became main';
+
+  @override
+  String cascadeDeleteIntentionArchived(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions were archived',
+      one: '$count intention was archived',
+    );
+    return 'Intention deleted; $_temp0';
+  }
+
+  @override
+  String cascadeDeleteRelationArchived(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions were archived',
+      one: '$count intention was archived',
+    );
+    return 'Relation deleted; $_temp0';
+  }
+
+  @override
+  String cascadeDeleteArchived(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions were archived',
+      one: '$count intention was archived',
+    );
+    return '; $_temp0';
+  }
+
+  @override
+  String cascadeRestoreIntentionSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count supporting intentions',
+      one: '$count supporting intention',
+    );
+    return 'Restored with $_temp0';
+  }
+
+  @override
+  String get cascadeRestoreIntentionMain => 'Restored as main';
+
+  @override
+  String cascadeRestoreIntentionMainSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count supporting intentions',
+      one: '$count supporting intention',
+    );
+    return 'Restored as main with $_temp0';
+  }
+
+  @override
+  String cascadeRestoreRelation(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions',
+      one: '$count intention',
+    );
+    return 'Relation restored with $_temp0';
+  }
+
+  @override
+  String get cascadeRestoreRelationMain =>
+      'Relation restored, intention returned as main';
+
+  @override
+  String cascadeRestoreRelationMainOthers(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions',
+      one: '$count intention',
+    );
+    return 'Relation restored with $_temp0, one as main';
+  }
+
+  @override
+  String get detailsCascadeArchiveTitle => 'Archive intention?';
+
+  @override
+  String get detailsCascadeRestoreTitle => 'Restore intention?';
+
+  @override
+  String detailsCascadeArchiveQuestion(int count) {
+    return 'Supporting intentions archived with it: $count.';
+  }
+
+  @override
+  String detailsCascadeRestoreQuestion(int count) {
+    return 'Supporting intentions restored with it: $count.';
+  }
+
+  @override
+  String get detailsCascadeWithSupporting => 'With supporting intentions';
+
+  @override
+  String get detailsCascadeOnlyThis => 'Only this';
+
+  @override
+  String detailsCascadeArchiveHint(int count) {
+    return 'Supporting intentions archived with it: $count';
+  }
+
+  @override
+  String detailsCascadeRestoreHint(int count) {
+    return 'Supporting intentions restored with it: $count';
+  }
+
+  @override
+  String detailsCascadeDeleteHint(int count) {
+    return 'Supporting intentions deleted with it: $count';
+  }
+
+  @override
+  String detailsCascadeDeleteArchiveHint(int count) {
+    return 'Intentions archived: $count';
+  }
+
+  @override
+  String get detailsOptionDeleteKeepsPaths =>
+      'It stays in saved paths marked “Deleted”';
+
+  @override
+  String detailsDeleteCascadeTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions',
+      one: '$count intention',
+    );
+    return 'Delete $_temp0?';
+  }
+
+  @override
+  String detailsDeleteCascadeText(String title) {
+    return 'Supporting intentions no longer held by any main intention will be deleted with “$title”.';
+  }
+
+  @override
+  String detailsDeleteSingleText(String title) {
+    return 'The intention “$title” and its description will be deleted. Its tags stay.';
+  }
+
+  @override
+  String detailsDeleteRelations(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count relations will be deleted',
+      one: '$count relation will be deleted',
+    );
+    return '$_temp0.';
+  }
+
+  @override
+  String get detailsDeleteIrreversible => 'Deletion cannot be undone.';
+
+  @override
+  String get detailsDeletePaths =>
+      'Action paths retain deleted items marked “Deleted”.';
+
+  @override
+  String get detailsDeleteArchiveText =>
+      'These intentions and their relations will be archived.';
+
+  @override
+  String detailsDeleteSupportingList(int count) {
+    return 'Supporting, deleted with it · $count';
+  }
+
+  @override
+  String detailsDeleteMainsList(int count) {
+    return 'Main, only lose their relation · $count';
+  }
+
+  @override
+  String detailsDeleteArchivedList(int count) {
+    return 'Will be archived · $count';
+  }
+
+  @override
+  String detailsDeleteShowAll(int count) {
+    return 'Show all $count';
+  }
+
+  @override
+  String detailsDeletePromoted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count become main',
+      one: '$count becomes main',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String detailsDeleteArchivedCount(int count) {
+    return '$count will be archived';
+  }
+
+  @override
+  String detailsDeleteOnlyEffects(String effects) {
+    return 'Only this: $effects';
+  }
+
+  @override
+  String detailsDeleteCount(int count) {
+    return 'Delete $count';
+  }
+
+  @override
+  String relationDeleteCascadeTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions',
+      one: '$count intention',
+    );
+    return 'Delete relation and $_temp0?';
+  }
+
+  @override
+  String relationDeleteCascadeText(String title) {
+    return '“$title” is a supporting intention and will no longer be held by any main intention after deleting the relation.';
+  }
+
+  @override
+  String relationDeleteAndMore(int count) {
+    return 'and $count more';
+  }
+
+  @override
+  String get relationDeleteKeepMainEffect =>
+      'Keep as main: the intention will become main';
+
+  @override
+  String get relationDeleteKeepMain => 'Keep as main';
+
+  @override
+  String get relationDeleteAll => 'Delete all';
 }

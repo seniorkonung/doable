@@ -20,8 +20,8 @@ String longTermRelationCommandFailureMessage(
     LongTermRelationCorruptionFailure() =>
       localizations.relationsAdditionCorruption,
     LongTermRelationNotFoundFailure() ||
-    LongTermRelationReferencedByDailyPathFailure() ||
     LongTermRelationArchivedTypeChangeFailure() ||
+    LongTermRelationCascadeConflictFailure() ||
     LongTermRelationUnexpectedFailure() =>
       localizations.relationsAdditionUnexpected,
   },
@@ -34,12 +34,12 @@ String longTermRelationCommandFailureMessage(
       localizations.relationEditorUpdateUnavailable,
     LongTermRelationCorruptionFailure() =>
       localizations.relationEditorUpdateCorruption,
-    // Изменение связи не называет пару и участников и не проверяет шаги пути,
-    // поэтому такие отказы для него неожиданны.
-    LongTermRelationReferencedByDailyPathFailure() ||
+    // Изменение связи не называет пару и участников, поэтому такие отказы для
+    // него неожиданны.
     LongTermRelationPairOccupiedFailure() ||
     LongTermRelationParticipantNotFoundFailure() ||
     LongTermRelationParticipantArchivedFailure() ||
+    LongTermRelationCascadeConflictFailure() ||
     LongTermRelationUnexpectedFailure() =>
       localizations.relationEditorUpdateUnexpected,
   },
@@ -49,8 +49,8 @@ String longTermRelationCommandFailureMessage(
       localizations.relationArchiveUnavailable,
     LongTermRelationCorruptionFailure() =>
       localizations.relationArchiveCorruption,
+    LongTermRelationCascadeConflictFailure() ||
     LongTermRelationPairOccupiedFailure() ||
-    LongTermRelationReferencedByDailyPathFailure() ||
     LongTermRelationArchivedTypeChangeFailure() ||
     LongTermRelationParticipantNotFoundFailure() ||
     LongTermRelationParticipantArchivedFailure() =>
@@ -66,32 +66,25 @@ String longTermRelationCommandFailureMessage(
       RelationParticipantRole.related =>
         localizations.relationRestoreRelatedNotFound,
     },
-    LongTermRelationParticipantArchivedFailure(:final role) => switch (role) {
-      RelationParticipantRole.source =>
-        localizations.relationRestoreSourceArchived,
-      RelationParticipantRole.related =>
-        localizations.relationRestoreRelatedArchived,
-    },
     LongTermRelationUnavailableFailure() =>
       localizations.relationRestoreUnavailable,
     LongTermRelationCorruptionFailure() =>
       localizations.relationRestoreCorruption,
-    LongTermRelationPairOccupiedFailure() =>
-      localizations.relationRestoreConflict,
-    LongTermRelationReferencedByDailyPathFailure() ||
-    LongTermRelationArchivedTypeChangeFailure() =>
+    LongTermRelationCascadeConflictFailure() ||
+    LongTermRelationPairOccupiedFailure() ||
+    LongTermRelationArchivedTypeChangeFailure() ||
+    LongTermRelationParticipantArchivedFailure() =>
       localizations.relationRestoreConflict,
     LongTermRelationUnexpectedFailure() =>
       localizations.relationRestoreUnexpected,
   },
   LongTermRelationCommandKind.delete => switch (failure) {
     LongTermRelationNotFoundFailure() => localizations.relationDeleteNotFound,
-    LongTermRelationReferencedByDailyPathFailure() =>
-      localizations.relationDeleteReferencedByDailyPath,
     LongTermRelationUnavailableFailure() =>
       localizations.relationDeleteUnavailable,
     LongTermRelationCorruptionFailure() =>
       localizations.relationDeleteCorruption,
+    LongTermRelationCascadeConflictFailure() ||
     LongTermRelationPairOccupiedFailure() ||
     LongTermRelationArchivedTypeChangeFailure() ||
     LongTermRelationParticipantNotFoundFailure() ||

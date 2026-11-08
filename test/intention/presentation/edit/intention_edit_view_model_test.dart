@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../details/details_test_support.dart';
+import '../../../support/intention_cascade_execution.dart';
 
 void main() {
   test('отсутствующее описание считается пустым текстом', () async {
@@ -56,7 +57,7 @@ void main() {
         graphCommandCoordinatorProvider.notifier,
       );
       coordinator.acceptExisting(
-        EnableIntentionReadiness(intention.id),
+        givenArchiveIntention(intention.id),
         presentationTitle: intention.title,
       );
       final session = _listenSession(container, intention);
@@ -82,7 +83,7 @@ void main() {
     container
         .read(graphCommandCoordinatorProvider.notifier)
         .acceptExisting(
-          ArchiveIntention(intention.id),
+          givenArchiveIntention(intention.id),
           presentationTitle: intention.title,
         );
 

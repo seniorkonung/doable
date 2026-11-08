@@ -1,8 +1,8 @@
-import 'package:doable/src/daily_choice/application/daily_choice_day_statuses.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/action/application/action_day_statuses.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/statistics/application/contribution_counts.dart';
 import 'package:doable/src/statistics/application/intention_statistics_breakdown.dart';
 import 'package:doable/src/statistics/application/intention_statistics_calendar.dart';
@@ -14,27 +14,30 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('каждый вид предоставляет только свои разбивки в порядке показа', () {
-    expect(StatisticsView.sourceIntentions.breakdowns, [
-      StatisticsBreakdown.selectedActions,
+    expect(StatisticsView.rootIntentions.breakdowns, [
+      StatisticsBreakdown.terminalIntentions,
     ]);
     expect(StatisticsView.intermediateIntentions.breakdowns, [
-      StatisticsBreakdown.sourceIntentions,
-      StatisticsBreakdown.selectedActions,
+      StatisticsBreakdown.rootIntentions,
+      StatisticsBreakdown.terminalIntentions,
     ]);
-    expect(StatisticsView.selectedActions.breakdowns, [
-      StatisticsBreakdown.sourceIntentions,
+    expect(StatisticsView.terminalIntentions.breakdowns, [
+      StatisticsBreakdown.rootIntentions,
     ]);
     expect(StatisticsView.throughRelations.breakdowns, [
       StatisticsBreakdown.relations,
-      StatisticsBreakdown.selectedActions,
+      StatisticsBreakdown.terminalIntentions,
     ]);
   });
 
   test('цель разбивки сохраняет период и открывает соответствующий вид', () {
     final period = StatisticsYear(2025);
     for (final (breakdown, view) in [
-      (StatisticsBreakdown.sourceIntentions, StatisticsView.sourceIntentions),
-      (StatisticsBreakdown.selectedActions, StatisticsView.selectedActions),
+      (StatisticsBreakdown.rootIntentions, StatisticsView.rootIntentions),
+      (
+        StatisticsBreakdown.terminalIntentions,
+        StatisticsView.terminalIntentions,
+      ),
       (StatisticsBreakdown.relations, StatisticsView.throughRelations),
     ]) {
       final target = IntentionStatisticsTarget.forBreakdown(
@@ -51,8 +54,8 @@ void main() {
     final incomplete = CalendarDate.fromParts(2026, 10, 7);
     final empty = CalendarDate.fromParts(2026, 10, 9);
     final statuses = {
-      completed: DailyChoiceDayStatus.allCompleted,
-      incomplete: DailyChoiceDayStatus.hasIncomplete,
+      completed: ActionDayStatus.allCompleted,
+      incomplete: ActionDayStatus.hasIncomplete,
     };
     final calendar = IntentionStatisticsMonthCalendar(
       period: StatisticsMonth(2026, 10),
@@ -60,8 +63,8 @@ void main() {
     );
     statuses.clear();
 
-    expect(calendar.statuses[completed], DailyChoiceDayStatus.allCompleted);
-    expect(calendar.statuses[incomplete], DailyChoiceDayStatus.hasIncomplete);
+    expect(calendar.statuses[completed], ActionDayStatus.allCompleted);
+    expect(calendar.statuses[incomplete], ActionDayStatus.hasIncomplete);
     expect(calendar.statuses[empty], isNull);
     expect(() => calendar.statuses.clear(), throwsUnsupportedError);
     expect(
@@ -73,7 +76,7 @@ void main() {
     );
   });
 
-  test('год сохраняет ровно 12 месяцев, включая месяцы без выборов', () {
+  test('год сохраняет ровно 12 месяцев, включая месяцы без действий', () {
     final months = List.generate(
       12,
       (index) => ContributionCounts(planned: index, contribution: 0),
@@ -154,9 +157,8 @@ void main() {
       expect(
         () => _section(
           query: query,
-          details: IntentionStatisticsSourceDetails(
-            uncompleted: UncompletedSplit(missed: 0, upcoming: 0),
-            selectedActions: _emptyIntentions(),
+          details: IntentionStatisticsRootDetails(
+            terminalIntentions: _emptyIntentions(),
           ),
         ),
         throwsA(isA<StatisticsDataValidationException>()),
@@ -169,24 +171,23 @@ void main() {
     () {
       final counts = ContributionCounts(planned: 8, contribution: 3);
       final cards = IntentionStatisticsCards(
-        sourceIntentions: ContributionCounts(planned: 7, contribution: 3),
+        rootIntentions: ContributionCounts(planned: 7, contribution: 3),
         intermediateIntentions: _zero,
-        selectedActions: _zero,
+        terminalIntentions: _zero,
         throughRelations: counts,
       );
-      for (final (missed, explicitPathChoices) in [(6, 7), (5, 9), (5, -1)]) {
+      for (final explicitPathActions in [9, -1]) {
         expect(
           () => _section(
             cards: cards,
             details: IntentionStatisticsThroughRelationsDetails(
-              uncompleted: UncompletedSplit(missed: missed, upcoming: 0),
-              explicitPathChoices: explicitPathChoices,
+              explicitPathActions: explicitPathActions,
               relations: StatisticsBreakdownFirstPage<StatisticsRelationItem>(
                 items: const [],
                 totalItems: 0,
                 nextCursor: null,
               ),
-              selectedActions: _emptyIntentions(),
+              terminalIntentions: _emptyIntentions(),
             ),
           ),
           throwsA(isA<StatisticsDataValidationException>()),
@@ -195,14 +196,13 @@ void main() {
       final section = _section(
         cards: cards,
         details: IntentionStatisticsThroughRelationsDetails(
-          uncompleted: UncompletedSplit(missed: 5, upcoming: 0),
-          explicitPathChoices: 7,
+          explicitPathActions: 7,
           relations: StatisticsBreakdownFirstPage<StatisticsRelationItem>(
             items: const [],
             totalItems: 0,
             nextCursor: null,
           ),
-          selectedActions: _emptyIntentions(),
+          terminalIntentions: _emptyIntentions(),
         ),
       );
       expect(section.selectedCounts.planned, 8);
@@ -210,6 +210,52 @@ void main() {
       expect(section.periodCounts.contribution, 4);
     },
   );
+
+  test('раздел принимает пустой вид запроса с любым видом разбивок', () {
+    final query = IntentionStatisticsQuery(
+      intentionId: _id,
+      period: StatisticsMonth(2026, 10),
+      view: null,
+      pageSize: 100,
+    );
+
+    final section = _section(
+      query: query,
+      details: IntentionStatisticsRootDetails(
+        terminalIntentions: _emptyIntentions(),
+      ),
+    );
+
+    expect(section.view, StatisticsView.rootIntentions);
+  });
+
+  test(
+    'раздел отклоняет вид разбивок, не совпадающий с заданным видом запроса',
+    () {
+      expect(
+        () => _section(
+          details: IntentionStatisticsTerminalDetails(
+            rootIntentions: _emptyIntentions(),
+          ),
+        ),
+        throwsA(isA<StatisticsDataValidationException>()),
+      );
+    },
+  );
+
+  test('раздел отклоняет вид, где действий больше, чем в периоде', () {
+    expect(
+      () => _section(
+        cards: IntentionStatisticsCards(
+          rootIntentions: _zero,
+          intermediateIntentions: _zero,
+          terminalIntentions: _zero,
+          throughRelations: ContributionCounts(planned: 22, contribution: 0),
+        ),
+      ),
+      throwsA(isA<StatisticsDataValidationException>()),
+    );
+  });
 
   test('размер порции ограничивает каждую из двух разбивок раздела', () {
     StatisticsItem item(String id, int planned) => StatisticsItem(
@@ -243,28 +289,26 @@ void main() {
             intentionId: _id,
             period: StatisticsMonth(2026, 10),
             view: StatisticsView.intermediateIntentions,
-            localDate: CalendarDate.fromParts(2026, 10, 12),
             pageSize: 1,
           ),
           cards: IntentionStatisticsCards(
-            sourceIntentions: _zero,
+            rootIntentions: _zero,
             intermediateIntentions: ContributionCounts(
               planned: 2,
               contribution: 0,
             ),
-            selectedActions: _zero,
+            terminalIntentions: _zero,
             throughRelations: ContributionCounts(planned: 2, contribution: 0),
           ),
           details: IntentionStatisticsIntermediateDetails(
-            uncompleted: UncompletedSplit(missed: 2, upcoming: 0),
-            sourceIntentions: sources,
-            selectedActions: actions,
+            rootIntentions: sources,
+            terminalIntentions: actions,
           ),
           calendar: IntentionStatisticsMonthCalendar(
             period: StatisticsMonth(2026, 10),
             statuses: {
               CalendarDate.fromParts(2026, 10, 5):
-                  DailyChoiceDayStatus.hasIncomplete,
+                  ActionDayStatus.hasIncomplete,
             },
           ),
         ),
@@ -288,7 +332,6 @@ IntentionStatisticsQuery _query(StatisticsPeriod period) =>
       intentionId: _id,
       period: period,
       view: StatisticsView.throughRelations,
-      localDate: CalendarDate.fromParts(2026, 10, 12),
       pageSize: 100,
     );
 
@@ -303,23 +346,22 @@ IntentionStatisticsSection _section({
   cards:
       cards ??
       IntentionStatisticsCards(
-        sourceIntentions: _zero,
+        rootIntentions: _zero,
         intermediateIntentions: _zero,
-        selectedActions: _zero,
+        terminalIntentions: _zero,
         throughRelations: _zero,
       ),
   periodCounts: ContributionCounts(planned: 21, contribution: 4),
   details:
       details ??
       IntentionStatisticsThroughRelationsDetails(
-        uncompleted: UncompletedSplit(missed: 0, upcoming: 0),
-        explicitPathChoices: 0,
+        explicitPathActions: 0,
         relations: StatisticsBreakdownFirstPage<StatisticsRelationItem>(
           items: const [],
           totalItems: 0,
           nextCursor: null,
         ),
-        selectedActions: _emptyIntentions(),
+        terminalIntentions: _emptyIntentions(),
       ),
   calendar:
       calendar ??

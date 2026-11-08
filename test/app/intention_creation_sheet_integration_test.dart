@@ -12,7 +12,7 @@ import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openFileBackedLocalDatabase;
-import 'package:doable/src/design_system/components/option_tiles.dart';
+import 'package:doable/src/design_system/components/segmented_control.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/components/tag_row.dart';
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
@@ -25,7 +25,7 @@ import 'package:doable/src/intention/application/intention_catalog.dart'
         IntentionCatalogFirstPage,
         IntentionCatalogOrder,
         IntentionCatalogQuery,
-        IntentionReadinessFilter,
+        IntentionKindFilter,
         IntentionSaved,
         IntentionScope,
         IntentionSummary,
@@ -66,11 +66,11 @@ import '../support/tag_positions.dart';
 // Названия намерений и тегов — данные человека: они одинаковы в обеих
 // локалях.
 
-/// «Гулять» — активное готовое намерение с тегом «Дом»; название
+/// «Гулять» — активное главное намерение с тегом «Дом»; название
 /// не совпадает с поиском каталога.
 const _walk = 1;
 
-/// «Плавать» — активное неготовое намерение без тегов.
+/// «Плавать» — активное главное намерение без тегов.
 const _swim = 2;
 
 /// «Читать» — архивированное намерение.
@@ -84,7 +84,7 @@ const _atWork = 4;
 /// входит.
 const _inGarden = 5;
 
-/// Уже существовавшее одноимённое намерение без тегов и готовности.
+/// Уже существовавшее одноимённое намерение без тегов.
 const _namesake = 6;
 
 /// Этюды с тегом «Дом» совпадают со всеми условиями выдачи каталога; каждый
@@ -122,13 +122,6 @@ const _creationTables = [
 
 final _sheet = find.byKey(const ValueKey('intention-creation-sheet'));
 final _chooseTags = find.byKey(const ValueKey('intention-editor-choose-tags'));
-final _readiness = find.byKey(const ValueKey('intention-editor-readiness'));
-final _readinessConfirmation = find.byKey(
-  const ValueKey('intention-editor-readiness-confirmation'),
-);
-final _readinessConfirm = find.byKey(
-  const ValueKey('intention-editor-readiness-confirm'),
-);
 final _submit = find.byKey(const ValueKey('intention-editor-submit'));
 final _message = find.byKey(const ValueKey('graph-operation-message'));
 
@@ -172,16 +165,15 @@ void main() {
           _intentionId(_namesake),
           title: _title,
           description: null,
-          readiness: IntentionReadiness.notReady,
         );
         expect(app.completions, isEmpty);
 
-        // Все четыре поля черновика готовятся только через интерфейс панели,
+        // Поля черновика готовятся только через интерфейс панели,
         // панели тегов и листа тега.
         final sport = await _prepareFullDraft(tester, app, tags: [_homeTag]);
         expect(_text(tester, 'intention-editor-title'), _rawTitle);
         expect(_text(tester, 'intention-editor-description'), _description);
-        expect(_iconOf(tester, _readiness), Icons.check_circle);
+        expect(find.text('Главное'), findsOneWidget);
         // Созданный позже «Спорт» стоит первым в ручном порядке.
         expect(_chipNames(tester), [_sport, 'Дом']);
 
@@ -208,7 +200,6 @@ void main() {
           title: _title,
           description: _description,
           tags: [_sport, 'Дом'],
-          readiness: IntentionReadiness.ready,
         );
         final created = _createdId(creation);
         expect(created, isNot(_intentionId(_namesake)));
@@ -229,22 +220,16 @@ void main() {
           _intentionId(_namesake),
           title: _title,
           description: null,
-          readiness: IntentionReadiness.notReady,
         );
         final revision = creation.revision!;
         expect(app.completions, hasLength(2));
-        _expectConfirmedPackage(
-          creation,
-          tags: [_sport, 'Дом'],
-          readiness: IntentionReadiness.ready,
-        );
+        _expectConfirmedPackage(creation, tags: [_sport, 'Дом']);
         expect(_storedIntentionIds(app.raw), [...intentionsBefore, created]);
         _expectStoredIntention(
           app.raw,
           created,
           title: _title,
           description: _description,
-          readiness: IntentionReadiness.ready,
         );
         expect(_storedAssignments(app.raw, created), [
           home.toCanonicalString(),
@@ -279,7 +264,7 @@ void main() {
         final summary = catalog.items.first;
         expect(summary.title, _title);
         expect(summary.descriptionPreview, isNotNull);
-        expect(summary.readiness, IntentionReadiness.ready);
+        expect(summary.kind, IntentionKind.main);
         expect(summary.archiveState, IntentionArchiveState.active);
         expect(summary.createdAt.value, summary.updatedAt.value);
         expect(
@@ -322,7 +307,7 @@ void main() {
         expectIntentionGraphRootPage(app.router);
 
         // Минимальное создание через ту же кнопку по-прежнему даёт пустой
-        // набор и выключенную готовность, не попадает в неподходящую выдачу.
+        // набор и главный вид, не попадает в неподходящую выдачу.
         final catalogAfterFull = _catalog(app);
         await _openSheet(tester, app);
         await tester.enterText(
@@ -339,21 +324,15 @@ void main() {
           title: _minimalTitle,
           description: null,
           tags: [],
-          readiness: IntentionReadiness.notReady,
         );
         final minimal = _createdId(minimalCreation);
         expect(app.completions, hasLength(3));
-        _expectConfirmedPackage(
-          minimalCreation,
-          tags: [],
-          readiness: IntentionReadiness.notReady,
-        );
+        _expectConfirmedPackage(minimalCreation, tags: []);
         _expectStoredIntention(
           app.raw,
           minimal,
           title: _minimalTitle,
           description: null,
-          readiness: IntentionReadiness.notReady,
         );
         expect(_storedAssignments(app.raw, minimal), isEmpty);
         await _waitFor(
@@ -389,7 +368,6 @@ void main() {
           created,
           title: _title,
           description: _description,
-          readiness: IntentionReadiness.ready,
           tags: [_sport, 'Дом'],
         );
         await _expectDurableIntention(
@@ -398,7 +376,6 @@ void main() {
           minimal,
           title: _minimalTitle,
           description: null,
-          readiness: IntentionReadiness.notReady,
           tags: [],
         );
         final found = await _catalogPage(tester, reopened, catalogBefore.query);
@@ -436,20 +413,12 @@ void _seedGraph(sqlite.Database database) {
     void intention(
       int number,
       String title, {
-      required bool ready,
       bool archived = false,
       List<int> tags = const [],
     }) {
       database.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [
-          tagFixtureId(number),
-          title,
-          ready ? 1 : 0,
-          archived ? 1 : 0,
-          number,
-          number,
-        ],
+        'INSERT INTO intentions (id, title, kind, is_archived, created_at, updated_at) VALUES (?, ?, \'main\', ?, ?, ?)',
+        [tagFixtureId(number), title, archived ? 1 : 0, number, number],
       );
       for (final tag in tags) {
         database.execute(
@@ -459,22 +428,16 @@ void _seedGraph(sqlite.Database database) {
       }
     }
 
-    intention(_walk, 'Гулять', ready: true, tags: [_homeTag]);
-    intention(_swim, 'Плавать', ready: false);
-    intention(_read, 'Читать', ready: true, archived: true);
-    intention(
-      _atWork,
-      'Рисовать на работе',
-      ready: true,
-      tags: [_homeTag, _workTag],
-    );
-    intention(_inGarden, 'Рисовать в саду', ready: false, tags: [_gardenTag]);
-    intention(_namesake, _title, ready: false);
+    intention(_walk, 'Гулять', tags: [_homeTag]);
+    intention(_swim, 'Плавать');
+    intention(_read, 'Читать', archived: true);
+    intention(_atWork, 'Рисовать на работе', tags: [_homeTag, _workTag]);
+    intention(_inGarden, 'Рисовать в саду', tags: [_gardenTag]);
+    intention(_namesake, _title);
     for (final number in _sketches) {
       intention(
         number,
         'Рисовать этюд ${number - _firstSketch + 1}',
-        ready: number.isEven,
         archived: _isArchivedSketch(number),
         tags: [_homeTag],
       );
@@ -621,7 +584,7 @@ Future<void> _searchCatalog(WidgetTester tester, _Launch app) async {
   final catalog = _catalog(app);
   expect(catalog.totalCount, _sketchCount);
   expect(catalog.nextCursor, isNull);
-  expect(catalog.selection.scope, const IntentionScopeOpen(IntentionScope.all));
+  expect(catalog.selection.show.scope, IntentionScope.all);
   expect(catalog.selection.titleFilterText, _catalogFilter);
   expect(
     catalog.selection.tagFilter,
@@ -630,7 +593,7 @@ Future<void> _searchCatalog(WidgetTester tester, _Launch app) async {
       excludedTagIds: [_tagId(_workTag)],
     ),
   );
-  expect(catalog.query.readinessFilter, IntentionReadinessFilter.all);
+  expect(catalog.query.kindFilter, IntentionKindFilter.mainOnly);
 }
 
 /// Прокручивает выдачу каталога жестом в видимой области списка.
@@ -668,8 +631,8 @@ Future<void> _openSheet(WidgetTester tester, _Launch app) async {
   ]);
 }
 
-/// Готовит в панели, открытой общей кнопкой, все четыре поля черновика: сырое
-/// название, описание, явно подтверждённую готовность и набор из
+/// Готовит в панели, открытой общей кнопкой, поля черновика: сырое
+/// название, описание и набор из
 /// существующих тегов [tags] и тега «Спорт», созданного настоящим листом из
 /// панели тегов. Возвращается в ту же панель и возвращает идентификатор
 /// созданного тега. Быстрый вызов сохранения после открытия панели тегов не
@@ -685,7 +648,7 @@ Future<TagId> _prepareFullDraft(
   expect(_text(tester, 'intention-editor-title'), isEmpty);
   expect(_text(tester, 'intention-editor-description'), isEmpty);
   expect(_chipNames(tester), isEmpty);
-  expect(_iconOf(tester, _readiness), Icons.check_circle_outline);
+  expect(find.text('Главное'), findsOneWidget);
   expect(tester.getRect(_sheet).top, greaterThanOrEqualTo(72));
   expect(
     appNavigationDestinations(skipOffstage: false).hitTestable(),
@@ -699,13 +662,6 @@ Future<TagId> _prepareFullDraft(
     find.byKey(const ValueKey('intention-editor-description')),
     _description,
   );
-  await _tap(tester, _readiness);
-  await _until(tester, _readinessConfirmation);
-  await tester.pumpAndSettle();
-  await _tap(tester, _readinessConfirm);
-  await tester.pumpAndSettle();
-  expect(_readinessConfirmation, findsNothing);
-
   await _tap(tester, _chooseTags);
   await _until(tester, _row(_tagId(_homeTag)));
   await tester.pumpAndSettle();
@@ -781,7 +737,7 @@ Future<TagId> _prepareFullDraft(
   expect(_chipNames(tester), hasLength(tags.length + 1));
   expect(_text(tester, 'intention-editor-title'), _rawTitle);
   expect(_text(tester, 'intention-editor-description'), _description);
-  expect(_iconOf(tester, _readiness), Icons.check_circle);
+  expect(find.text('Главное'), findsOneWidget);
   expect(app.completions.whereType<IntentionCommandCompletion>(), isEmpty);
   expect(_storedCreationTables(app.raw), graphBefore);
   expect(tester.widget<FilledButton>(_submit).onPressed, isNotNull);
@@ -834,7 +790,7 @@ Future<void> _select(WidgetTester tester, AppDestination destination) async {
     find.byType(switch (destination) {
       AppDestination.home => HomePage,
       AppDestination.intentionGraph => IntentionCatalogPage,
-      AppDestination.dailyChoices => fail('Пункт не используется проверкой'),
+      AppDestination.actions => fail('Пункт не используется проверкой'),
     }),
   );
   await tester.pumpAndSettle();
@@ -883,7 +839,6 @@ Future<void> _expectCreatedPage(
   required String title,
   required String? description,
   required List<String> tags,
-  required IntentionReadiness readiness,
   IntentionCreationHistory? history,
 }) async {
   final id = _createdId(completion);
@@ -919,7 +874,7 @@ Future<void> _expectCreatedPage(
   expect(state.intention.id, id);
   expect(state.intention.title, title);
   expect(state.intention.description, description);
-  expect(state.intention.readiness, readiness);
+  expect(state.intention.kind, IntentionKind.main);
   expect(state.intention.archiveState, IntentionArchiveState.active);
   final assignments = container.read(
     tagAssignmentsViewModelProvider(id),
@@ -942,14 +897,14 @@ Future<void> _expectCreatedPage(
   );
   expect(
     tester
-        .widget<OptionTiles<IntentionReadiness>>(
+        .widget<SegmentedControl<IntentionKind>>(
           find.descendant(
             of: page,
-            matching: find.byType(OptionTiles<IntentionReadiness>),
+            matching: find.byType(SegmentedControl<IntentionKind>),
           ),
         )
         .value,
-    readiness,
+    IntentionKind.main,
   );
   for (final tag in assignments.items) {
     final row = find.byKey(
@@ -1026,12 +981,11 @@ Future<void> _closeCreatedPage(
 }
 
 /// Один подтверждённый пакет создания: полный снимок нового намерения с
-/// тегами [tags] и готовностью и одно назначение на каждый тег,
+/// тегами [tags], видом «главное» и одно назначение на каждый тег,
 /// все на одной ревизии.
 void _expectConfirmedPackage(
   IntentionCommandCompletion completion, {
   required List<String> tags,
-  required IntentionReadiness readiness,
 }) {
   final package = completion.confirmedChange!;
   expect(package.changes, [
@@ -1041,32 +995,28 @@ void _expectConfirmedPackage(
   final IntentionSummary summary =
       (package.changes.first as IntentionCatalogCreated).entry.summary;
   expect([for (final tag in summary.tags) tag.name.value], tags);
-  expect(summary.readiness, readiness);
+  expect(summary.kind, IntentionKind.main);
   expect(summary.archiveState, IntentionArchiveState.active);
   expect(summary.createdAt.value, summary.updatedAt.value);
 }
 
 /// Строка созданного намерения [id]: нормализованное название, сохранённое
-/// описание либо его отсутствие, готовность, активное состояние и равные
+/// описание либо его отсутствие, вид «главное», активное состояние и равные
 /// время создания и последнего изменения.
 void _expectStoredIntention(
   sqlite.Database raw,
   IntentionId id, {
   required String title,
   required String? description,
-  required IntentionReadiness readiness,
 }) {
   final row = raw.select(
-    'SELECT title, description, is_action_ready, is_archived, created_at, '
+    'SELECT title, description, kind, is_archived, created_at, '
     'updated_at FROM intentions WHERE id = ?',
     [id.toCanonicalString()],
   ).single;
   expect(row['title'], title);
   expect(row['description'], description);
-  expect(row['is_action_ready'], switch (readiness) {
-    IntentionReadiness.ready => 1,
-    IntentionReadiness.notReady => 0,
-  });
+  expect(row['kind'], 'main');
   expect(row['is_archived'], 0);
   expect(row['created_at'], row['updated_at']);
 }
@@ -1080,7 +1030,6 @@ Future<void> _expectDurableIntention(
   IntentionId id, {
   required String title,
   required String? description,
-  required IntentionReadiness readiness,
   required List<String> tags,
 }) async {
   final repository = app.container.read(personalGraphRepositoryProvider);
@@ -1094,7 +1043,7 @@ Future<void> _expectDurableIntention(
   final intention = details.intention;
   expect(intention.title, title);
   expect(intention.description, description);
-  expect(intention.readiness, readiness);
+  expect(intention.kind, IntentionKind.main);
   expect(intention.archiveState, IntentionArchiveState.active);
   expect(intention.createdAt.value, intention.updatedAt.value);
   final assignments = switch (await _readStorage(
@@ -1142,7 +1091,7 @@ Future<IntentionCatalogFirstPage> _catalogPage(
     () => repository.getCatalogPage(
       IntentionCatalogQuery(
         scope: query.scope,
-        readinessFilter: query.readinessFilter,
+        kindFilter: query.kindFilter,
         titleFilter: _catalogFilter,
         tagFilter: query.tagFilter,
         order: query.order,
@@ -1175,7 +1124,7 @@ bool _catalogCurrentAt(_Launch app, GraphRevision revision) =>
     };
 
 /// Каталог продолжает ту же выдачу: те же параметры и условия, включая
-/// готовность, охват и порядок, без нового чтения первой порции.
+/// охват и порядок, без нового чтения первой порции.
 void _expectSameSearch(
   IntentionCatalogLoaded actual,
   IntentionCatalogLoaded expected,
@@ -1225,10 +1174,6 @@ bool _isMarked(WidgetTester tester, TagId id) =>
 
 String _text(WidgetTester tester, String key) =>
     tester.widget<TextField>(find.byKey(ValueKey(key))).controller!.text;
-
-IconData? _iconOf(WidgetTester tester, Finder button) => tester
-    .widget<Icon>(find.descendant(of: button, matching: find.byType(Icon)))
-    .icon;
 
 /// Названия выбранных тегов панели в показанном порядке.
 List<String> _chipNames(WidgetTester tester) => [

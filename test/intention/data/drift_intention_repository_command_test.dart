@@ -25,6 +25,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import '../../support/graph_seed.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/tag_storage_fixture.dart';
 import '../../support/tag_positions.dart';
@@ -59,6 +60,155 @@ void main() {
   });
 
   tearDown(() => database.close());
+
+  group('Изменение вида намерения', () {
+    test(
+      'проверяет входящую связь по архивному состоянию и сохраняет снимки',
+      () async {
+        final source = _id(_firstUuid);
+        final target = _id(_secondUuid);
+        for (final id in [source, target]) {
+          await _insertIntention(
+            database,
+            id: id.toCanonicalString(),
+            title: 'Намерение',
+            createdAt: DateTime.utc(2026, 1, 1),
+          );
+        }
+        final beforeRejection = _storedRows(raw, 'intentions');
+        final rejected = await repository.execute(
+          ChangeIntentionKind(target, IntentionKind.supporting),
+        );
+        expect(_storedRows(raw, 'intentions'), beforeRejection);
+        expect(
+          rejected,
+          isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
+              .having(
+                (r) => r.failure,
+                'отказ',
+                isA<IntentionMissingIncomingRelationFailure>(),
+              ),
+        );
+        expect(clock.calls, 0);
+        seedRawGraph(raw, () {
+          raw.execute(
+            "INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at) VALUES (?, ?, ?, 'need', 4, 1, 1)",
+            [
+              _idForSequence(0x801).toCanonicalString(),
+              source.toCanonicalString(),
+              target.toCanonicalString(),
+            ],
+          );
+        });
+        final beforeIntentions = _storedRows(raw, 'intentions');
+        final beforeRelations = _storedRows(raw, 'long_term_relations');
+        final saved = _commandSuccess(
+          await repository.execute(
+            ChangeIntentionKind(target, IntentionKind.supporting),
+          ),
+        ) as IntentionSaved;
+        final mutation = saved.catalogMutation as IntentionCatalogUpdated;
+        expect(mutation.before.summary.kind, IntentionKind.main);
+        expect(mutation.after.summary.kind, IntentionKind.supporting);
+        expect(_storedRows(raw, 'intentions').first, beforeIntentions.first);
+        expect(_storedRows(raw, 'long_term_relations'), beforeRelations);
+        expect(saved.intention.updatedAt.value, DateTime.utc(2026, 9, 3, 12));
+        final unchanged = _commandSuccess(
+          await repository.execute(
+            ChangeIntentionKind(target, IntentionKind.supporting),
+          ),
+        ) as IntentionSaved;
+        expect(unchanged.catalogMutation, isA<IntentionCatalogUnchanged>());
+        expect(
+          mutation.revision.compareTo(unchanged.catalogMutation.revision),
+          GraphRevisionOrder.same,
+        );
+        expect(unchanged.intention.updatedAt, saved.intention.updatedAt);
+        expect(clock.calls, 1);
+        expect(
+          diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>(),
+          [
+            _failedCommand(
+              IntentionCommandDiagnosticsType.changeKind,
+              DiagnosticsFailureCode.validation,
+            ),
+            _successfulCommand(IntentionCommandDiagnosticsType.changeKind),
+            _successfulCommand(IntentionCommandDiagnosticsType.changeKind),
+          ],
+        );
+      },
+    );
+
+    test(
+      'архивная входящая связь допускает только архивное намерение',
+      () async {
+        clock = _DeterministicClock([
+          DateTime.utc(2026, 9, 3, 12),
+          DateTime.utc(2026, 9, 3, 13),
+        ]);
+        repository = DriftPersonalGraphRepository(
+          database,
+          idGenerator,
+          clock.call,
+          diagnostics,
+        );
+        final source = _id(_firstUuid);
+        final target = _id(_secondUuid);
+        for (final id in [source, target]) {
+          await _insertIntention(
+            database,
+            id: id.toCanonicalString(),
+            title: 'Намерение',
+            createdAt: DateTime.utc(2026, 1, 1),
+          );
+        }
+        seedRawGraph(raw, () {
+          raw.execute(
+            "INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, is_archived, created_at, updated_at) VALUES (?, ?, ?, 'can', 4, 1, 1, 1)",
+            [
+              _idForSequence(0x802).toCanonicalString(),
+              source.toCanonicalString(),
+              target.toCanonicalString(),
+            ],
+          );
+        });
+        expect(
+          await repository.execute(
+            ChangeIntentionKind(target, IntentionKind.supporting),
+          ),
+          isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
+              .having(
+                (r) => r.failure,
+                'отказ',
+                isA<IntentionMissingIncomingRelationFailure>(),
+              ),
+        );
+        seedRawGraph(
+          raw,
+          () => raw.execute(
+            'UPDATE intentions SET is_archived = 1 WHERE id = ?',
+            [target.toCanonicalString()],
+          ),
+        );
+        final saved = _saved(
+          await repository.execute(
+            ChangeIntentionKind(target, IntentionKind.supporting),
+          ),
+        );
+        expect(saved.kind, IntentionKind.supporting);
+        expect(saved.archiveState, IntentionArchiveState.archived);
+        final main = _commandSuccess(
+          await repository.execute(
+            ChangeIntentionKind(target, IntentionKind.main),
+          ),
+        ) as IntentionSaved;
+        final mutation = main.catalogMutation as IntentionCatalogUpdated;
+        expect(mutation.before.summary.kind, IntentionKind.supporting);
+        expect(mutation.after.summary.kind, IntentionKind.main);
+        expect(main.intention.updatedAt.value, DateTime.utc(2026, 9, 3, 13));
+      },
+    );
+  });
 
   group('DriftPersonalGraphRepository.execute', () {
     group('Собственные теги каталожных снимков команд', () {
@@ -103,6 +253,13 @@ void main() {
       test(
         'снимки изменения полей сохраняют полные собственные теги',
         () async {
+          seedRawGraph(
+            raw,
+            () => raw.execute('UPDATE intentions SET kind = ? WHERE id = ?', [
+              'supporting',
+              id.toCanonicalString(),
+            ]),
+          );
           rawOverride.overrideSelect(const {
             'title_search_key': 'историческая проекция',
           });
@@ -132,6 +289,7 @@ void main() {
           expect(mutation.after.matches(query('Новое название')), isTrue);
           for (final entry in [mutation.before, mutation.after]) {
             expect(entry.summary.id, id);
+            expect(entry.summary.kind, IntentionKind.supporting);
             expect(
               entry.summary.tags.map((tag) => tag.name.value),
               expectedTagNames,
@@ -145,26 +303,31 @@ void main() {
         },
       );
 
-      // Включение и выключение готовности проходят одну ветку, поэтому
-      // выключение отдельно не проверяется.
-      for (final (name, command, isReady, isArchived)
-          in <(String, IntentionCommand Function(IntentionId), int, int)>[
-            ('включения готовности', EnableIntentionReadiness.new, 0, 0),
-            ('архивирования', ArchiveIntention.new, 1, 0),
-            ('восстановления из архива', RestoreIntention.new, 1, 1),
+      for (final (name, command, isArchived)
+          in <(String, Future<IntentionCommand> Function(IntentionId), int)>[
+            (
+              'архивирования',
+              (id) => previewedArchiveIntention(repository, id),
+              0,
+            ),
+            (
+              'восстановления из архива',
+              (id) => previewedRestoreIntention(repository, id),
+              1,
+            ),
           ]) {
         test('снимки $name сохраняют полные собственные теги', () async {
           seedRawGraph(raw, () {
             if (isArchived == 1) {
               raw.execute('UPDATE long_term_relations SET is_archived = 1');
             }
-            raw.execute(
-              'UPDATE intentions SET is_action_ready = ?, is_archived = ? WHERE id = ?',
-              [isReady, isArchived, id.toCanonicalString()],
-            );
+            raw.execute('UPDATE intentions SET is_archived = ? WHERE id = ?', [
+              isArchived,
+              id.toCanonicalString(),
+            ]);
           });
           final saved = _commandSuccess(
-            await repository.execute(command(id)),
+            await repository.execute(await command(id)),
           ) as IntentionSaved;
           final mutation = saved.catalogMutation as IntentionCatalogUpdated;
 
@@ -178,18 +341,12 @@ void main() {
             );
           }
           expect(
-            mutation.before.summary.readiness,
-            isReady == 1
-                ? IntentionReadiness.ready
-                : IntentionReadiness.notReady,
-          );
-          expect(
             mutation.before.summary.archiveState,
             isArchived == 1
                 ? IntentionArchiveState.archived
                 : IntentionArchiveState.active,
           );
-          expect(mutation.after.summary.readiness, saved.intention.readiness);
+          expect(mutation.after.summary.kind, saved.intention.kind);
           expect(
             mutation.after.summary.archiveState,
             saved.intention.archiveState,
@@ -210,37 +367,37 @@ void main() {
         });
       }
 
-      // Включение и выключение готовности проходят одну ветку, поэтому
-      // выключение отдельно не проверяется.
-      for (final (name, command, isReady, isArchived)
-          in <(String, IntentionCommand Function(IntentionId), int, int)>[
+      for (final (name, command, isArchived)
+          in <(String, Future<IntentionCommand> Function(IntentionId), int)>[
             (
               'изменения полей',
-              (id) => UpdateIntention(
+              (id) async => UpdateIntention(
                 id: id,
                 title: 'Намерение 1',
                 description: 'Описание 1',
               ),
-              1,
               0,
             ),
-            ('включения готовности', EnableIntentionReadiness.new, 1, 0),
-            ('архивирования', ArchiveIntention.new, 1, 1),
-            ('восстановления из архива', RestoreIntention.new, 1, 0),
+            ('архивирования', (id) async => givenArchiveIntention(id), 1),
+            (
+              'восстановления из архива',
+              (id) async => givenRestoreIntention(id),
+              0,
+            ),
           ]) {
         test('повтор $name сохраняет проверенные теги без записи', () async {
           seedRawGraph(raw, () {
             if (isArchived == 1) {
               raw.execute('UPDATE long_term_relations SET is_archived = 1');
             }
-            raw.execute(
-              'UPDATE intentions SET is_action_ready = ?, is_archived = ? WHERE id = ?',
-              [isReady, isArchived, id.toCanonicalString()],
-            );
+            raw.execute('UPDATE intentions SET is_archived = ? WHERE id = ?', [
+              isArchived,
+              id.toCanonicalString(),
+            ]);
           });
 
           final saved = _commandSuccess(
-            await repository.execute(command(id)),
+            await repository.execute(await command(id)),
           ) as IntentionSaved;
           final mutation = saved.catalogMutation as IntentionCatalogUnchanged;
 
@@ -261,12 +418,13 @@ void main() {
         'снимок удаления сохраняет теги до каскадного удаления назначений',
         () async {
           seedRawGraph(raw, () {
-            raw.execute('DELETE FROM daily_choices');
             raw.execute('DELETE FROM long_term_relations');
           });
 
           final deleted = _commandSuccess(
-            await repository.execute(DeleteIntention(id)),
+            await repository.execute(
+              await previewedDeleteIntention(repository, id),
+            ),
           ) as IntentionDeleted;
           final mutation = deleted.catalogMutation as IntentionCatalogDeleted;
 
@@ -532,7 +690,7 @@ void main() {
       });
     });
 
-    test('создаёт active not-ready намерение с нормализованными данными и единым UTC-временем', () async {
+    test('создаёт активное главное намерение с нормализованными данными и единым UTC-временем', () async {
       final result = await repository.execute(
         const CreateIntention(
           title: '  Купить  молоко  ',
@@ -544,7 +702,7 @@ void main() {
       expect(saved.id, _id(_firstUuid));
       expect(saved.title, 'Купить  молоко');
       expect(saved.description, '  В фермерском магазине\n');
-      expect(saved.readiness, IntentionReadiness.notReady);
+      expect(saved.kind, IntentionKind.main);
       expect(saved.archiveState, IntentionArchiveState.active);
       expect(saved.createdAt.value, DateTime.utc(2026, 9, 3, 12));
       expect(saved.createdAt.value.isUtc, isTrue);
@@ -676,7 +834,9 @@ void main() {
       expect(updatedMutation.after.summary.title, 'Позвонить врачу');
 
       final deleted = _commandSuccess(
-        await repository.execute(DeleteIntention(created.intention.id)),
+        await repository.execute(
+          await previewedDeleteIntention(repository, created.intention.id),
+        ),
       ) as IntentionDeleted;
       final deletedMutation =
           deleted.catalogMutation as IntentionCatalogDeleted;
@@ -690,7 +850,7 @@ void main() {
       expect(deletedMutation.entry.matches(doctorQuery), isTrue);
 
       final failed = await repository.execute(
-        DeleteIntention(created.intention.id),
+        givenDeleteIntention(created.intention.id),
       );
       expect(failed, _failure<IntentionNotFoundFailure>());
       final pageAfterFailure = _firstCatalogPage(
@@ -825,13 +985,11 @@ void main() {
       final fixtures = [
         (
           id: _id(_firstUuid),
-          isActionReady: false,
           isArchived: false,
           createdAt: DateTime.utc(2026, 9, 2, 10),
         ),
         (
           id: _id(_secondUuid),
-          isActionReady: true,
           isArchived: true,
           createdAt: DateTime.utc(2026, 9, 2, 11),
         ),
@@ -842,7 +1000,6 @@ void main() {
           id: fixture.id.toCanonicalString(),
           title: 'Исходное название',
           description: 'Исходное описание',
-          isActionReady: fixture.isActionReady,
           isArchived: fixture.isArchived,
           createdAt: fixture.createdAt,
         );
@@ -873,12 +1030,6 @@ void main() {
         expect(saved.id, fixture.id);
         expect(saved.title, 'Обновлённое  название');
         expect(saved.description, '  Новое описание\n');
-        expect(
-          saved.readiness,
-          fixture.isActionReady
-              ? IntentionReadiness.ready
-              : IntentionReadiness.notReady,
-        );
         expect(
           saved.archiveState,
           fixture.isArchived
@@ -946,7 +1097,6 @@ void main() {
           id: id.toCanonicalString(),
           title: 'Неизменное название',
           description: 'Неизменное описание',
-          isActionReady: true,
           isArchived: true,
           createdAt: createdAt,
         );
@@ -1006,17 +1156,21 @@ void main() {
             ),
           ),
         );
-        final readinessUpdated = _saved(
-          await repository.execute(EnableIntentionReadiness(id)),
-        );
         final archiveUpdated = _saved(
-          await repository.execute(ArchiveIntention(id)),
+          await repository.execute(
+            await previewedArchiveIntention(repository, id),
+          ),
+        );
+        final restoreUpdated = _saved(
+          await repository.execute(
+            await previewedRestoreIntention(repository, id),
+          ),
         );
 
         expect(titleUpdated.updatedAt.value, previouslyUpdatedAt);
-        expect(readinessUpdated.updatedAt.value, createdAt);
-        expect(archiveUpdated.updatedAt.value, DateTime.utc(2026, 9, 3, 11));
-        expect(archiveUpdated.createdAt.value, createdAt);
+        expect(archiveUpdated.updatedAt.value, createdAt);
+        expect(restoreUpdated.updatedAt.value, DateTime.utc(2026, 9, 3, 11));
+        expect(restoreUpdated.createdAt.value, createdAt);
         final stored = await (database.select(
           database.intentions,
         )..where((row) => row.id.equals(id.toCanonicalString()))).getSingle();
@@ -1099,7 +1253,9 @@ void main() {
             createdAt: DateTime.utc(2026, 9, 2, 10),
           );
 
-          final result = await repository.execute(DeleteIntention(fixture.id));
+          final result = await repository.execute(
+            await previewedDeleteIntention(repository, fixture.id),
+          );
 
           expect(result, _deleted(fixture.id));
           expect(
@@ -1136,7 +1292,7 @@ void main() {
       'возвращает not-found при удалении отсутствующего намерения',
       () async {
         final result = await repository.execute(
-          DeleteIntention(_id(_firstUuid)),
+          givenDeleteIntention(_id(_firstUuid)),
         );
 
         expect(result, _failure<IntentionNotFoundFailure>());
@@ -1149,233 +1305,203 @@ void main() {
       },
     );
 
-    // У каждой команды два случая: изменение при противоположном значении
-    // несвязанного признака и повтор без записи.
-    test('выполняет матрицу переходов readiness и архива без изменения несвязанных данных', () async {
-      final transitions =
-          <
-            ({
-              IntentionCommand Function(IntentionId) command,
-              IntentionCommandDiagnosticsType commandType,
-              IntentionReadiness? readiness,
-              IntentionArchiveState? archiveState,
-              List<
-                ({
-                  IntentionReadiness readiness,
-                  IntentionArchiveState archiveState,
-                })
-              >
-              fixtures,
-            })
-          >[
-            (
-              command: (IntentionId id) => EnableIntentionReadiness(id),
-              commandType: IntentionCommandDiagnosticsType.enableReadiness,
-              readiness: IntentionReadiness.ready,
-              archiveState: null,
-              fixtures: [
-                (
-                  readiness: IntentionReadiness.notReady,
-                  archiveState: IntentionArchiveState.archived,
-                ),
-                (
-                  readiness: IntentionReadiness.ready,
-                  archiveState: IntentionArchiveState.active,
-                ),
-              ],
-            ),
-            (
-              command: (IntentionId id) => DisableIntentionReadiness(id),
-              commandType: IntentionCommandDiagnosticsType.disableReadiness,
-              readiness: IntentionReadiness.notReady,
-              archiveState: null,
-              fixtures: [
-                (
-                  readiness: IntentionReadiness.ready,
-                  archiveState: IntentionArchiveState.archived,
-                ),
-                (
-                  readiness: IntentionReadiness.notReady,
-                  archiveState: IntentionArchiveState.active,
-                ),
-              ],
-            ),
-            (
-              command: (IntentionId id) => ArchiveIntention(id),
-              commandType: IntentionCommandDiagnosticsType.archive,
-              readiness: null,
-              archiveState: IntentionArchiveState.archived,
-              fixtures: [
-                (
-                  readiness: IntentionReadiness.ready,
-                  archiveState: IntentionArchiveState.active,
-                ),
-                (
-                  readiness: IntentionReadiness.notReady,
-                  archiveState: IntentionArchiveState.archived,
-                ),
-              ],
-            ),
-            (
-              command: (IntentionId id) => RestoreIntention(id),
-              commandType: IntentionCommandDiagnosticsType.restore,
-              readiness: null,
-              archiveState: IntentionArchiveState.active,
-              fixtures: [
-                (
-                  readiness: IntentionReadiness.ready,
-                  archiveState: IntentionArchiveState.archived,
-                ),
-                (
-                  readiness: IntentionReadiness.notReady,
-                  archiveState: IntentionArchiveState.active,
-                ),
-              ],
-            ),
-          ];
-      final transitionTimes = [
-        for (var hour = 10; hour < 14; hour++) DateTime.utc(2026, 9, 3, hour),
-      ];
-      clock = _DeterministicClock(transitionTimes);
-      repository = DriftPersonalGraphRepository(
-        database,
-        idGenerator,
-        clock.call,
-        diagnostics,
-      );
+    // У каждой команды два случая: изменение состояния и повтор без записи.
+    test(
+      'выполняет матрицу переходов архива без изменения несвязанных данных',
+      () async {
+        final transitions =
+            <
+              ({
+                Future<IntentionCommand> Function(IntentionId) previewed,
+                IntentionCommand Function(IntentionId) given,
+                IntentionCommandDiagnosticsType commandType,
+                IntentionArchiveState archiveState,
+                List<IntentionArchiveState> fixtures,
+              })
+            >[
+              (
+                previewed: (IntentionId id) =>
+                    previewedArchiveIntention(repository, id),
+                given: givenArchiveIntention,
+                commandType: IntentionCommandDiagnosticsType.archive,
+                archiveState: IntentionArchiveState.archived,
+                fixtures: [
+                  IntentionArchiveState.active,
+                  IntentionArchiveState.archived,
+                ],
+              ),
+              (
+                previewed: (IntentionId id) =>
+                    previewedRestoreIntention(repository, id),
+                given: givenRestoreIntention,
+                commandType: IntentionCommandDiagnosticsType.restore,
+                archiveState: IntentionArchiveState.active,
+                fixtures: [
+                  IntentionArchiveState.archived,
+                  IntentionArchiveState.active,
+                ],
+              ),
+            ];
+        final transitionTimes = [
+          for (var hour = 10; hour < 12; hour++) DateTime.utc(2026, 9, 3, hour),
+        ];
+        clock = _DeterministicClock(transitionTimes);
+        repository = DriftPersonalGraphRepository(
+          database,
+          idGenerator,
+          clock.call,
+          diagnostics,
+        );
 
-      var sequence = 1;
-      var transitionCount = 0;
-      for (final transition in transitions) {
-        for (final fixture in transition.fixtures) {
-          final id = _idForSequence(sequence++);
-          final title = 'Название $sequence';
-          final description = 'Описание $sequence';
-          final createdAt = DateTime.utc(2026, 9, 2, 10, sequence);
+        var sequence = 1;
+        var transitionCount = 0;
+        for (final transition in transitions) {
+          for (final initialArchiveState in transition.fixtures) {
+            final id = _idForSequence(sequence++);
+            final title = 'Название $sequence';
+            final description = 'Описание $sequence';
+            final createdAt = DateTime.utc(2026, 9, 2, 10, sequence);
+            await _insertIntention(
+              database,
+              id: id.toCanonicalString(),
+              title: title,
+              description: description,
+              isArchived: initialArchiveState == IntentionArchiveState.archived,
+              createdAt: createdAt,
+            );
+            final expectedArchiveState = transition.archiveState;
+            final changesState = expectedArchiveState != initialArchiveState;
+
+            // Неприменимая операция не имеет предпросмотра.
+            final command = changesState
+                ? await transition.previewed(id)
+                : transition.given(id);
+            final saved = _saved(await repository.execute(command));
+
+            expect(saved.id, id);
+            expect(saved.title, title);
+            expect(saved.description, description);
+            expect(saved.createdAt.value, createdAt);
+            expect(saved.archiveState, expectedArchiveState);
+            if (changesState) {
+              expect(saved.updatedAt.value, transitionTimes[transitionCount++]);
+            } else {
+              expect(saved.updatedAt.value, createdAt);
+            }
+
+            final row =
+                await (database.select(database.intentions)
+                      ..where((row) => row.id.equals(id.toCanonicalString())))
+                    .getSingle();
+            expect(row.title, title);
+            expect(row.description, description);
+            expect(
+              row.isArchived,
+              expectedArchiveState == IntentionArchiveState.archived,
+            );
+            expect(row.createdAt, createdAt.microsecondsSinceEpoch);
+            expect(row.updatedAt, saved.updatedAt.value.microsecondsSinceEpoch);
+          }
+        }
+
+        expect(transitionCount, transitionTimes.length);
+        expect(
+          diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>(),
+          everyElement(
+            isA<IntentionCommandDiagnosticsEvent>().having(
+              (event) => event.status,
+              'status',
+              isA<DiagnosticsSucceeded>(),
+            ),
+          ),
+        );
+        expect(
+          diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().map(
+            (event) => event.commandType,
+          ),
+          [
+            for (final transition in transitions)
+              for (final _ in transition.fixtures) transition.commandType,
+          ],
+        );
+      },
+    );
+
+    test(
+      'снимки смены вида принадлежат условию вида по своему состоянию',
+      () async {
+        final id = _idForSequence(0x701);
+        final sourceId = _idForSequence(0x702);
+        for (final (intentionId, title) in [
+          (id, 'Гулять'),
+          (sourceId, 'Бегать'),
+        ]) {
           await _insertIntention(
             database,
-            id: id.toCanonicalString(),
+            id: intentionId.toCanonicalString(),
             title: title,
-            description: description,
-            isActionReady: fixture.readiness == IntentionReadiness.ready,
-            isArchived: fixture.archiveState == IntentionArchiveState.archived,
-            createdAt: createdAt,
+            createdAt: DateTime.utc(2026, 9, 2, 10),
           );
-          final expectedReadiness = transition.readiness ?? fixture.readiness;
-          final expectedArchiveState =
-              transition.archiveState ?? fixture.archiveState;
-          final changesState =
-              expectedReadiness != fixture.readiness ||
-              expectedArchiveState != fixture.archiveState;
-
-          final saved = _saved(
-            await repository.execute(transition.command(id)),
-          );
-
-          expect(saved.id, id);
-          expect(saved.title, title);
-          expect(saved.description, description);
-          expect(saved.createdAt.value, createdAt);
-          expect(saved.readiness, expectedReadiness);
-          expect(saved.archiveState, expectedArchiveState);
-          if (changesState) {
-            expect(saved.updatedAt.value, transitionTimes[transitionCount++]);
-          } else {
-            expect(saved.updatedAt.value, createdAt);
-          }
-
-          final row = await (database.select(
-            database.intentions,
-          )..where((row) => row.id.equals(id.toCanonicalString()))).getSingle();
-          expect(row.title, title);
-          expect(row.description, description);
-          expect(
-            row.isActionReady,
-            expectedReadiness == IntentionReadiness.ready,
-          );
-          expect(
-            row.isArchived,
-            expectedArchiveState == IntentionArchiveState.archived,
-          );
-          expect(row.createdAt, createdAt.microsecondsSinceEpoch);
-          expect(row.updatedAt, saved.updatedAt.value.microsecondsSinceEpoch);
         }
-      }
-
-      expect(transitionCount, transitionTimes.length);
-      expect(
-        diagnostics.events,
-        everyElement(
-          isA<IntentionCommandDiagnosticsEvent>().having(
-            (event) => event.status,
-            'status',
-            isA<DiagnosticsSucceeded>(),
-          ),
-        ),
-      );
-      expect(
-        diagnostics.events.whereType<IntentionCommandDiagnosticsEvent>().map(
-          (event) => event.commandType,
-        ),
-        [
-          for (final transition in transitions)
-            for (final _ in transition.fixtures) transition.commandType,
-        ],
-      );
-    });
-
-    test('снимки смены готовности принадлежат условию готовности по своему состоянию', () async {
-      final id = _idForSequence(0x701);
-      await _insertIntention(
-        database,
-        id: id.toCanonicalString(),
-        title: 'Гулять',
-        createdAt: DateTime.utc(2026, 9, 2, 10),
-      );
-      clock = _DeterministicClock([
-        DateTime.utc(2026, 9, 3, 10),
-        DateTime.utc(2026, 9, 3, 11),
-      ]);
-      repository = DriftPersonalGraphRepository(
-        database,
-        idGenerator,
-        clock.call,
-        diagnostics,
-      );
-      IntentionCatalogQuery query(IntentionReadinessFilter filter) =>
-          IntentionCatalogQuery(
-            scope: IntentionScope.active,
-            readinessFilter: filter,
-            titleFilter: null,
-            order: IntentionCatalogOrder.createdAtDescending,
-            pageSize: 1,
+        // Вспомогательным намерение становится только при входящей связи.
+        seedRawGraph(raw, () {
+          raw.execute(
+            "INSERT INTO long_term_relations (id, source_intention_id, related_intention_id, type, priority, created_at, updated_at) VALUES (?, ?, ?, 'need', 4, 1, 1)",
+            [
+              _idForSequence(0x703).toCanonicalString(),
+              sourceId.toCanonicalString(),
+              id.toCanonicalString(),
+            ],
           );
+        });
+        clock = _DeterministicClock([
+          DateTime.utc(2026, 9, 3, 10),
+          DateTime.utc(2026, 9, 3, 11),
+        ]);
+        repository = DriftPersonalGraphRepository(
+          database,
+          idGenerator,
+          clock.call,
+          diagnostics,
+        );
+        IntentionCatalogQuery query(IntentionKindFilter filter) =>
+            IntentionCatalogQuery(
+              scope: IntentionScope.active,
+              kindFilter: filter,
+              titleFilter: null,
+              order: IntentionCatalogOrder.createdAtDescending,
+              pageSize: 1,
+            );
 
-      for (final (command, readyBefore) in [
-        (EnableIntentionReadiness.new, false),
-        (DisableIntentionReadiness.new, true),
-      ]) {
-        final saved = _commandSuccess(
-          await repository.execute(command(id)),
-        ) as IntentionSaved;
-        final mutation = saved.catalogMutation as IntentionCatalogUpdated;
-
-        for (final (snapshot, isReady) in [
-          (mutation.before, readyBefore),
-          (mutation.after, !readyBefore),
+        for (final (newKind, mainBefore) in [
+          (IntentionKind.supporting, true),
+          (IntentionKind.main, false),
         ]) {
-          expect(snapshot.matches(query(IntentionReadinessFilter.all)), isTrue);
-          expect(
-            snapshot.matches(query(IntentionReadinessFilter.readyOnly)),
-            isReady,
-          );
-          expect(
-            snapshot.matches(query(IntentionReadinessFilter.notReadyOnly)),
-            !isReady,
-          );
+          final saved = _commandSuccess(
+            await repository.execute(ChangeIntentionKind(id, newKind)),
+          ) as IntentionSaved;
+          final mutation = saved.catalogMutation as IntentionCatalogUpdated;
+
+          for (final (snapshot, isMain) in [
+            (mutation.before, mainBefore),
+            (mutation.after, !mainBefore),
+          ]) {
+            expect(
+              snapshot.matches(query(IntentionKindFilter.mainAndSupporting)),
+              isTrue,
+            );
+            expect(
+              snapshot.matches(query(IntentionKindFilter.mainOnly)),
+              isMain,
+            );
+            expect(
+              snapshot.matches(query(IntentionKindFilter.supportingOnly)),
+              !isMain,
+            );
+          }
         }
-      }
-    });
+      },
+    );
 
     test('ключ порядка названия в порции и снимках команды берётся из сохранённой проекции', () async {
       final walkId = _idForSequence(0x711);
@@ -1417,34 +1543,44 @@ void main() {
       ];
       expect(walkKey.compareTo(readKey), isNegative);
 
-      final enabled = _commandSuccess(
-        await repository.execute(EnableIntentionReadiness(walkId)),
+      final archived = _commandSuccess(
+        await repository.execute(
+          await previewedArchiveIntention(repository, walkId),
+        ),
       ) as IntentionSaved;
-      final enabledMutation =
-          enabled.catalogMutation as IntentionCatalogUpdated;
+      final archivedMutation =
+          archived.catalogMutation as IntentionCatalogUpdated;
       expect(
-        enabledMutation.before.summary.titleOrderKey.compareTo(walkKey),
+        archivedMutation.before.summary.titleOrderKey.compareTo(walkKey),
         0,
       );
-      expect(enabledMutation.after.summary.titleOrderKey.compareTo(walkKey), 0);
+      expect(
+        archivedMutation.after.summary.titleOrderKey.compareTo(walkKey),
+        0,
+      );
 
       // Сохранённая проекция расходится с названием, как после обновления
-      // данных Unicode без пересчёта: ключ следует проекции.
-      rawOverride.overrideSelect(const {
-        'title_search_key': 'читать',
-      }, column: 'title_search_key');
-      final disabled = _commandSuccess(
-        await repository.execute(DisableIntentionReadiness(walkId)),
+      // данных Unicode без пересчёта: ключ следует проекции. Первое чтение
+      // строки проверяет архивное состояние, второе даёт снимок до записи.
+      rawOverride.overrideSelect(
+        const {'title_search_key': 'читать'},
+        column: 'title_search_key',
+        skippedReads: 1,
+      );
+      final restored = _commandSuccess(
+        await repository.execute(
+          await previewedRestoreIntention(repository, walkId),
+        ),
       ) as IntentionSaved;
-      final disabledMutation =
-          disabled.catalogMutation as IntentionCatalogUpdated;
-      expect(disabledMutation.before.summary.title, 'Гулять');
+      final restoredMutation =
+          restored.catalogMutation as IntentionCatalogUpdated;
+      expect(restoredMutation.before.summary.title, 'Гулять');
       expect(
-        disabledMutation.before.summary.titleOrderKey.compareTo(readKey),
+        restoredMutation.before.summary.titleOrderKey.compareTo(readKey),
         0,
       );
       expect(
-        disabledMutation.after.summary.titleOrderKey.compareTo(walkKey),
+        restoredMutation.after.summary.titleOrderKey.compareTo(walkKey),
         0,
       );
     });
@@ -1461,19 +1597,11 @@ void main() {
               })
             >[
               (
-                command: (IntentionId id) => EnableIntentionReadiness(id),
-                commandType: IntentionCommandDiagnosticsType.enableReadiness,
-              ),
-              (
-                command: (IntentionId id) => DisableIntentionReadiness(id),
-                commandType: IntentionCommandDiagnosticsType.disableReadiness,
-              ),
-              (
-                command: (IntentionId id) => ArchiveIntention(id),
+                command: givenArchiveIntention,
                 commandType: IntentionCommandDiagnosticsType.archive,
               ),
               (
-                command: (IntentionId id) => RestoreIntention(id),
+                command: givenRestoreIntention,
                 commandType: IntentionCommandDiagnosticsType.restore,
               ),
             ];
@@ -1609,19 +1737,19 @@ void main() {
     test(
       'отклоняет malformed raw command snapshots до typed Drift mapping',
       () async {
-        // По одному случаю на проверку чтения снимка: тип текста, диапазон
-        // флага, пустой и недопустимый ключ поиска, тип числа.
+        // По одному случаю на проверку чтения снимка: тип текста, недопустимый
+        // вид, пустой и недопустимый ключ поиска, тип числа.
         final fixtures =
             <
               ({
-                IntentionCommand Function(IntentionId) command,
+                Future<IntentionCommand> Function(IntentionId) command,
                 IntentionCommandDiagnosticsType commandType,
                 bool isArchived,
                 Map<String, Object?> overrides,
               })
             >[
               (
-                command: (id) => UpdateIntention(
+                command: (id) async => UpdateIntention(
                   id: id,
                   title: 'Обновлённое название',
                   description: 'Обновлённое описание',
@@ -1633,25 +1761,25 @@ void main() {
                 },
               ),
               (
-                command: EnableIntentionReadiness.new,
-                commandType: IntentionCommandDiagnosticsType.enableReadiness,
+                command: (id) => previewedArchiveIntention(repository, id),
+                commandType: IntentionCommandDiagnosticsType.archive,
                 isArchived: false,
-                overrides: const {'is_action_ready': 2},
+                overrides: const {'kind': 'unknown'},
               ),
               (
-                command: DisableIntentionReadiness.new,
-                commandType: IntentionCommandDiagnosticsType.disableReadiness,
+                command: (id) => previewedArchiveIntention(repository, id),
+                commandType: IntentionCommandDiagnosticsType.archive,
                 isArchived: false,
                 overrides: const {'title_search_key': ''},
               ),
               (
-                command: RestoreIntention.new,
+                command: (id) => previewedRestoreIntention(repository, id),
                 commandType: IntentionCommandDiagnosticsType.restore,
                 isArchived: true,
                 overrides: const {'title_search_key': 'ключ\u0000поиска'},
               ),
               (
-                command: DeleteIntention.new,
+                command: (id) => previewedDeleteIntention(repository, id),
                 commandType: IntentionCommandDiagnosticsType.delete,
                 isArchived: false,
                 overrides: const {'created_at': 1.5},
@@ -1679,9 +1807,11 @@ void main() {
           final revisionBefore = _firstCatalogPage(
             await repository.getCatalogPage(query),
           ).revision;
+          // Предпросмотр читается до подмены строк, как при запуске операции.
+          final command = await fixture.command(id);
           rawOverride.overrideSelect(fixture.overrides);
 
-          final result = await repository.execute(fixture.command(id));
+          final result = await repository.execute(command);
 
           expect(result, _failure<IntentionCorruptionFailure>());
           expect(
@@ -1698,7 +1828,6 @@ void main() {
           )..where((row) => row.id.equals(id.toCanonicalString()))).getSingle();
           expect(stored.title, 'Исходное название');
           expect(stored.description, 'Исходное описание');
-          expect(stored.isActionReady, isFalse);
           expect(stored.isArchived, fixture.isArchived);
           expect(stored.createdAt, createdAt.microsecondsSinceEpoch);
           expect(stored.updatedAt, createdAt.microsecondsSinceEpoch);
@@ -1729,9 +1858,9 @@ void main() {
         order: IntentionCatalogOrder.createdAtDescending,
         pageSize: 100,
       );
-      final readyHomeQuery = IntentionCatalogQuery(
+      final mainHomeQuery = IntentionCatalogQuery(
         scope: IntentionScope.active,
-        readinessFilter: IntentionReadinessFilter.readyOnly,
+        kindFilter: IntentionKindFilter.mainOnly,
         titleFilter: null,
         tagFilter: IntentionTagFilter(requiredTagIds: [homeTagId]),
         order: IntentionCatalogOrder.createdAtDescending,
@@ -1775,31 +1904,18 @@ void main() {
             title: '  Убрать дом  ',
             description: '  Вымыть окна\n',
           ),
-          readiness: IntentionReadiness.notReady,
           withTags: false,
         ),
-        for (final (readiness, withTags) in const [
-          (IntentionReadiness.ready, false),
-          (IntentionReadiness.notReady, true),
-          (IntentionReadiness.ready, true),
-        ])
+        for (final withTags in const [false, true])
           (
-            name: [
-              switch (readiness) {
-                IntentionReadiness.ready => 'готовность',
-                IntentionReadiness.notReady => 'без готовности',
-              },
-              withTags ? 'два тега' : 'без тегов',
-            ].join(', '),
+            name: withTags ? 'два тега' : 'без тегов',
             command: CreateIntention.withInitialState(
               title: '  Убрать дом  ',
               description: '  Вымыть окна\n',
-              readiness: readiness,
               tagIds: withTags
                   ? [homeTagId, weekendTagId, homeTagId]
                   : const <TagId>[],
             ),
-            readiness: readiness,
             withTags: withTags,
           ),
       ];
@@ -1859,14 +1975,13 @@ void main() {
             expect(intention.id, newId);
             expect(intention.title, 'Убрать дом');
             expect(intention.description, '  Вымыть окна\n');
-            expect(intention.readiness, scenario.readiness);
+            expect(intention.kind, IntentionKind.main);
             expect(intention.archiveState, IntentionArchiveState.active);
             expect(intention.createdAt.value, createdAt);
             expect(intention.updatedAt, intention.createdAt);
 
             final summary = created.entry.summary;
             expect(summary.id, newId);
-            expect(summary.readiness, scenario.readiness);
             expect(summary.archiveState, IntentionArchiveState.active);
             expect(summary.createdAt, intention.createdAt);
             expect(summary.updatedAt, intention.createdAt);
@@ -1875,10 +1990,22 @@ void main() {
               summary.tags.map((tag) => tag.name.value),
               scenario.withTags ? ['Выходные', 'Дом'] : isEmpty,
             );
-            final matchesReadyHome =
-                scenario.readiness == IntentionReadiness.ready &&
-                scenario.withTags;
-            expect(created.entry.matches(readyHomeQuery), matchesReadyHome);
+            // Созданное намерение всегда главное: условие вида не отсекает
+            // его, а решают теги.
+            expect(summary.kind, IntentionKind.main);
+            expect(created.entry.matches(mainHomeQuery), scenario.withTags);
+            expect(
+              created.entry.matches(
+                IntentionCatalogQuery(
+                  scope: IntentionScope.active,
+                  kindFilter: IntentionKindFilter.supportingOnly,
+                  titleFilter: null,
+                  order: IntentionCatalogOrder.createdAtDescending,
+                  pageSize: 100,
+                ),
+              ),
+              isFalse,
+            );
 
             final page = _firstCatalogPage(
               await repository.getCatalogPage(allQuery),
@@ -1892,9 +2019,9 @@ void main() {
               _summaryFacts(summary),
             );
             expect(
-              _catalogItems(await repository.getCatalogPage(readyHomeQuery))
+              _catalogItems(await repository.getCatalogPage(mainHomeQuery))
                   .map((item) => item.id),
-              matchesReadyHome ? [newId] : isEmpty,
+              scenario.withTags ? [newId] : isEmpty,
             );
             expect(
               (await _tagAssignments(
@@ -1904,7 +2031,7 @@ void main() {
               expectedTagIds,
             );
             final details = await _details(repository, newId);
-            expect(details.intention.readiness, scenario.readiness);
+            expect(details.intention.kind, IntentionKind.main);
           },
         );
       }
@@ -1924,7 +2051,6 @@ void main() {
             CreateIntention.withInitialState(
               title: 'Убрать дом',
               description: null,
-              readiness: IntentionReadiness.ready,
               tagIds: [firstMissing, homeTagId, secondMissing],
             ),
           );
@@ -1986,7 +2112,6 @@ void main() {
             CreateIntention.withInitialState(
               title: 'Убрать дом',
               description: null,
-              readiness: IntentionReadiness.notReady,
               tagIds: [homeTagId],
             ),
           ),
@@ -2047,7 +2172,6 @@ void main() {
           CreateIntention.withInitialState(
             title: 'Убрать дом',
             description: null,
-            readiness: IntentionReadiness.ready,
             tagIds: [homeTagId, weekendTagId],
           ),
         );
@@ -2086,7 +2210,6 @@ void main() {
             CreateIntention.withInitialState(
               title: 'Убрать дом',
               description: null,
-              readiness: IntentionReadiness.ready,
               tagIds: [recreatedTagId, weekendTagId],
             ),
           ),
@@ -2112,7 +2235,6 @@ void main() {
           CreateIntention.withInitialState(
             title: '   ',
             description: null,
-            readiness: IntentionReadiness.ready,
             tagIds: [homeTagId],
           ),
         );
@@ -2148,7 +2270,7 @@ List<Object?> _summaryFacts(IntentionSummary summary) => [
   summary.id,
   summary.title,
   summary.descriptionPreview?.text,
-  summary.readiness,
+  summary.kind,
   summary.archiveState,
   summary.createdAt,
   summary.updatedAt,
@@ -2308,7 +2430,6 @@ Future<void> _insertIntention(
   required String id,
   required String title,
   String? description,
-  bool isActionReady = false,
   bool isArchived = false,
   required DateTime createdAt,
   DateTime? updatedAt,
@@ -2321,7 +2442,6 @@ Future<void> _insertIntention(
             id: id,
             title: title,
             description: Value(description),
-            isActionReady: Value(isActionReady),
             isArchived: Value(isArchived),
             createdAt: createdAt.microsecondsSinceEpoch,
             updatedAt: (updatedAt ?? createdAt).microsecondsSinceEpoch,

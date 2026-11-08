@@ -18,6 +18,7 @@ import '../../../intention/presentation/editor/intention_creation_launch.dart';
 import '../../../intention/presentation/picker/intention_picker_view.dart';
 import '../../application/intention_relation_group.dart';
 import '../../application/relation_pair_probe.dart';
+import '../../domain/long_term_relation.dart';
 import '../relation_command_failure_message.dart';
 import 'relation_batch_picker_purpose.dart';
 import 'relation_batch_state.dart';
@@ -30,12 +31,14 @@ final class RelationBatchPickerPage extends ConsumerStatefulWidget {
     required this.pageIntentionId,
     required this.pageTitle,
     required this.group,
+    this.anchor = const RelationBatchPageAnchor(),
     super.key,
   });
 
   final IntentionId pageIntentionId;
   final String pageTitle;
   final IntentionRelationGroup group;
+  final RelationBatchAnchor anchor;
 
   @override
   ConsumerState<RelationBatchPickerPage> createState() =>
@@ -54,6 +57,19 @@ final class _RelationBatchPickerPageState
       group: widget.group,
     ),
   );
+
+  /// Исход добавления якорь пути получает из самой команды: уход с поиска во
+  /// время записи его не теряет.
+  void _submit(RelationBatchViewModelProvider provider) {
+    final added = ref.read(provider.notifier).submit();
+    if (widget.anchor case RelationBatchPathEndAnchor(:final onAdded)) {
+      unawaited(
+        added.then((relations) {
+          if (relations != null) onAdded(relations);
+        }),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -106,6 +122,7 @@ final class _RelationBatchPickerPageState
         purposeDescription: relationBatchPickerPurpose(
           l10n,
           widget.group,
+          widget.anchor,
           provider,
           batch.selected.length,
         ),
@@ -133,11 +150,22 @@ final class _RelationBatchPickerPageState
                 IntentionEditorRoute(
                   launch: IntentionCreationForSearch(
                     initialTitle: title,
-                    onCreated: (id, createdTitle) {
+                    placement: switch (widget.group.direction) {
+                      RelationDirection.outgoing =>
+                        CreatedIntentionPlacement.belowPage,
+                      RelationDirection.incoming =>
+                        CreatedIntentionPlacement.abovePage,
+                    },
+                    onCreated: (id, createdTitle, kind) {
                       if (!mounted || !ref.read(provider).canEdit) return;
                       ref
                           .read(provider.notifier)
-                          .acceptCreated(id, createdTitle);
+                          .acceptCreated(id, createdTitle, kind);
+                      if (widget.anchor case RelationBatchPathEndAnchor(
+                        :final onIntentionCreated,
+                      )) {
+                        onIntentionCreated();
+                      }
                       clearTitle();
                     },
                   ),
@@ -179,9 +207,7 @@ final class _RelationBatchPickerPageState
                 final count => l10n.batchAddCount(count),
               },
             },
-            onPressed: batch.canSubmit
-                ? ref.read(provider.notifier).submit
-                : null,
+            onPressed: batch.canSubmit ? () => _submit(provider) : null,
           ),
         ),
       ),

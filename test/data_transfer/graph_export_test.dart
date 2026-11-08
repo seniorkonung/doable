@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:doable/src/action/application/action_command.dart';
+import 'package:doable/src/action/domain/action_id.dart';
 import 'package:doable/src/data/local/app_database.dart' show AppDatabase;
 import 'package:doable/src/data_transfer/application/document_access.dart';
 import 'package:doable/src/data_transfer/application/graph_export.dart';
@@ -34,9 +36,12 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/encoded_diagnostics_log.dart';
 import '../support/failing_snapshot_temporary_files.dart';
 import '../support/file_document_access.dart';
+import '../support/graph_import_files.dart';
 import '../support/graph_log_completeness_reference.dart';
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/intention_cascade_execution.dart';
 import '../support/local_database_harness.dart';
+import '../support/reference_graph_replacement.dart';
 
 void main() {
   late LocalDatabaseHarness harness;
@@ -145,7 +150,6 @@ void main() {
     CreateIntention.withInitialState(
       title: title,
       description: null,
-      readiness: IntentionReadiness.notReady,
       tagIds: tagIds,
     ),
   )).intention;
@@ -175,7 +179,7 @@ void main() {
         ),
       ),
     );
-    await confirm(ArchiveIntention(running.id));
+    await confirm(await previewedArchiveIntention(repository, running.id));
     final expected = _lines(await referenceGraphRecords(database));
     final container = app();
     final exported = nextExport(container);
@@ -192,6 +196,37 @@ void main() {
     expect(documents.finished, [documents.created.single.uri.toString()]);
     expect(diagnostics.events, [
       {'operation': 'graphExport', 'outcome': 'succeeded'},
+    ]);
+  });
+
+  test('экспорт после замены графа файлом с действиями и удаления действия '
+      'пишет оставшиеся действия с путями и надгробия, которые нужны их '
+      'путям, из подтверждённого состояния', () async {
+    await replaceWithReferenceGraph(repository, snapshots);
+    await confirm(
+      DeleteAction(
+        (ActionId.decode(
+          referenceTombstonedActionId,
+        ) as ActionIdDecodingSuccess).id,
+      ),
+    );
+    final container = app();
+    final exported = nextExport(container);
+
+    await startExport(container);
+
+    expect((await exported).outcome, GraphExportOutcome.succeeded);
+    final reading = await GraphFormatFile.read(
+      documents.created.single.openRead(),
+    );
+    final lines = _lines(await reading.records.toList());
+    expect(lines, _lines(await referenceGraphRecords(database)));
+    // Удалённое действие держало оба надгробия эталона: без него их нет.
+    expect(lines, [
+      for (final line in referenceGraphFileLines().skip(1))
+        if (!line.contains(referenceTombstonedActionId) &&
+            !line.startsWith('{"kind":"deleted'))
+          line,
     ]);
   });
 

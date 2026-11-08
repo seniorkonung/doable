@@ -18,7 +18,6 @@ import 'package:doable/src/graph_snapshots/graph_snapshot_store.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
@@ -185,7 +184,6 @@ Future<void> _seedGraph(DriftPersonalGraphRepository repository) async {
     CreateIntention.withInitialState(
       title: 'Здоровье',
       description: null,
-      readiness: IntentionReadiness.notReady,
       tagIds: {home.id},
     ),
   )).intention;
@@ -194,7 +192,6 @@ Future<void> _seedGraph(DriftPersonalGraphRepository repository) async {
     CreateIntention.withInitialState(
       title: 'Бегать',
       description: null,
-      readiness: IntentionReadiness.ready,
       tagIds: {home.id},
     ),
   )).intention;

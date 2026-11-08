@@ -10,6 +10,27 @@ class AppLocalizationsRu extends AppLocalizations {
   AppLocalizationsRu([String locale = 'ru']) : super(locale);
 
   @override
+  String get intentionKindLabel => 'Вид намерения';
+
+  @override
+  String get intentionKindMain => 'Главное';
+
+  @override
+  String get intentionKindSupporting => 'Вспомогательное';
+
+  @override
+  String get intentionKindMainSemantics =>
+      'Главное. Важно само по себе и остаётся, когда уходит то, что в нём нуждается';
+
+  @override
+  String get intentionKindSupportingSemantics =>
+      'Вспомогательное. Существует, пока в нём нуждается главное, и уходит вместе с ним';
+
+  @override
+  String get intentionKindSupportingUnavailable =>
+      'Вспомогательное. Возможно, когда другому намерению оно нужно или его можно использовать';
+
+  @override
   String get appTitle => 'Doable';
 
   @override
@@ -22,22 +43,44 @@ class AppLocalizationsRu extends AppLocalizations {
   String get appDestinationHome => 'Главная';
 
   @override
-  String get appDestinationDailyChoices => 'Дневные выборы';
+  String get appDestinationActions => 'Действия';
 
   @override
   String get appDestinationIntentionGraph => 'Граф намерений';
 
   @override
-  String get statisticsSourceIntentions => 'Исходные намерения';
+  String get statisticsRootIntentions => 'Корневые намерения';
 
   @override
   String get statisticsIntermediateIntentions => 'Промежуточные намерения';
 
   @override
-  String get statisticsSelectedActions => 'Выбранные действия';
+  String get statisticsTerminalIntentions => 'Конечные намерения';
 
   @override
-  String get statisticsThroughRelations => 'Весь вклад';
+  String get statisticsThroughRelations => 'Через связи';
+
+  @override
+  String get statisticsViewSheetTitle => 'Считать действия по';
+
+  @override
+  String get statisticsRootIntentionsHint => 'С чего начинается каждый путь';
+
+  @override
+  String get statisticsIntermediateIntentionsHint =>
+      'Звенья между корневым и конечным';
+
+  @override
+  String get statisticsTerminalIntentionsHint =>
+      'Последняя причина прямо над действием';
+
+  @override
+  String get statisticsThroughRelationsHint =>
+      'Все намерения, которым служит действие';
+
+  @override
+  String get statisticsThroughRelationsNote =>
+      'Вид считает по связям на сейчас и меняется вместе с ними.';
 
   @override
   String get statisticsMonthTab => 'Месяц';
@@ -114,39 +157,32 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String statisticsPlannedContribution(int count) {
+  String statisticsPeriodActions(int count) {
     final intl.NumberFormat countNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
     final String countString = countNumberFormat.format(count);
 
-    return 'Запланированный вклад: $countString';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString действия',
+      many: '$countString действий',
+      few: '$countString действия',
+      one: '$countString действие',
+    );
+    return '$_temp0';
   }
 
   @override
-  String statisticsContribution(int count) {
-    final intl.NumberFormat countNumberFormat =
+  String statisticsPeriodCompleted(int completed, int planned) {
+    final intl.NumberFormat completedNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
-
-    return 'Вклад: $countString';
-  }
-
-  @override
-  String statisticsMissed(int count) {
-    final intl.NumberFormat countNumberFormat =
+    final String completedString = completedNumberFormat.format(completed);
+    final intl.NumberFormat plannedNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
+    final String plannedString = plannedNumberFormat.format(planned);
 
-    return 'Пропущено: $countString';
-  }
-
-  @override
-  String statisticsUpcoming(int count) {
-    final intl.NumberFormat countNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
-
-    return 'Предстоит: $countString';
+    return '$completedString из $plannedString выполнено';
   }
 
   @override
@@ -178,24 +214,61 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String statisticsContributionShare(num share) {
+  String statisticsPeriodActionsShare(num share) {
     final intl.NumberFormat shareNumberFormat =
         intl.NumberFormat.percentPattern(localeName);
     final String shareString = shareNumberFormat.format(share);
 
-    return 'Доля вклада периода: $shareString';
+    return 'Доля действий периода: $shareString';
   }
-
-  @override
-  String get statisticsNoContributionShare =>
-      'Доля отсутствует: вклад периода равен нулю';
 
   @override
   String get statisticsLoading => 'Загружаем статистику…';
 
   @override
-  String get statisticsEmpty =>
-      'За выбранный период нет засчитанных дневных выборов для этого вида.';
+  String get statisticsPeriodEmpty =>
+      'В этом периоде действий нет. Действия, датированные им, будут посчитаны здесь.';
+
+  @override
+  String statisticsViewEmpty(String view) {
+    return 'В виде «$view» в этом периоде элементов нет.';
+  }
+
+  @override
+  String statisticsIntentionEmptyRootTitle(String period) {
+    return 'Нет действий с ним корневым за $period';
+  }
+
+  @override
+  String statisticsIntentionEmptyIntermediateTitle(String period) {
+    return 'Нет действий через него за $period';
+  }
+
+  @override
+  String statisticsIntentionEmptyTerminalTitle(String period) {
+    return 'Нет действий с ним конечным за $period';
+  }
+
+  @override
+  String statisticsIntentionEmptyThroughRelationsTitle(String period) {
+    return 'Нет действий через связи за $period';
+  }
+
+  @override
+  String get statisticsIntentionEmptyRootText =>
+      'Здесь будет посчитано действие выбранного периода, путь которого начинается с этого намерения.';
+
+  @override
+  String get statisticsIntentionEmptyIntermediateText =>
+      'Здесь будет посчитано действие выбранного периода, путь которого проходит через это намерение между корневым и конечным.';
+
+  @override
+  String get statisticsIntentionEmptyTerminalText =>
+      'Здесь будет посчитано действие выбранного периода, путь которого заканчивается этим намерением.';
+
+  @override
+  String get statisticsIntentionEmptyThroughRelationsText =>
+      'Здесь будет посчитано действие выбранного периода, которому это намерение служит через связи.';
 
   @override
   String get statisticsRefreshing => 'Обновляем статистику…';
@@ -243,16 +316,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get statisticsSectionTitle => 'Статистика';
 
   @override
-  String get statisticsBreakdownSourceIntentions => 'По исходным намерениям';
+  String get statisticsBreakdownRelations => 'Через какие связи';
 
   @override
-  String get statisticsBreakdownSelectedActions => 'По выбранным действиям';
-
-  @override
-  String get statisticsBreakdownRelations => 'По связям';
-
-  @override
-  String statisticsExplicitPathChoices(int count, int planned) {
+  String statisticsExplicitPathActions(int count, int planned) {
     final intl.NumberFormat countNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
     final String countString = countNumberFormat.format(count);
@@ -260,21 +327,17 @@ class AppLocalizationsRu extends AppLocalizations {
         intl.NumberFormat.decimalPattern(localeName);
     final String plannedString = plannedNumberFormat.format(planned);
 
-    return 'Дневные выборы с намерением на сохранённом пути выбора: $countString из $plannedString';
+    return 'С этим намерением на сохранённом пути: $countString из $plannedString';
   }
 
   @override
-  String statisticsBreakdownContributionShare(num share) {
+  String statisticsBreakdownActionsShare(num share) {
     final intl.NumberFormat shareNumberFormat =
         intl.NumberFormat.percentPattern(localeName);
     final String shareString = shareNumberFormat.format(share);
 
-    return 'Доля вклада намерения в этом виде: $shareString';
+    return 'Доля действий вида: $shareString';
   }
-
-  @override
-  String get statisticsBreakdownNoContributionShare =>
-      'Доля отсутствует: вклад намерения в этом виде равен нулю';
 
   @override
   String get statisticsRefreshUnavailableShort => 'Нет обновления.';
@@ -286,16 +349,14 @@ class AppLocalizationsRu extends AppLocalizations {
   String get statisticsRefreshUnexpectedShort => 'Ошибка обновления.';
 
   @override
-  String get statisticsCalendarDayAllCompleted =>
-      'Все засчитанные дневные выборы выполнены';
+  String get statisticsCalendarDayAllCompleted => 'Все действия вида выполнены';
 
   @override
   String get statisticsCalendarDayHasIncomplete =>
-      'Есть невыполненный засчитанный дневной выбор';
+      'Есть невыполненное действие вида';
 
   @override
-  String get statisticsCalendarDayNoChoices =>
-      'Нет засчитанных дневных выборов';
+  String get statisticsCalendarDayNoActions => 'Нет действий вида';
 
   @override
   String statisticsCalendarDaySemantics(DateTime date, String dayStatus) {
@@ -316,13 +377,40 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String statisticsViewCardSemantics(
-    String view,
-    String period,
-    String counts,
-  ) {
-    return '$view. $period. $counts';
+  String get statisticsTilesLabel => 'Как считаются действия этого намерения';
+
+  @override
+  String get statisticsTileRoot => 'Корневое';
+
+  @override
+  String get statisticsTileIntermediate => 'Промежуточное';
+
+  @override
+  String get statisticsTileTerminal => 'Конечное';
+
+  @override
+  String get statisticsTileThroughRelations => 'Через связи, как сейчас';
+
+  @override
+  String statisticsTileSemantics(String view, String actions, String period) {
+    return '$view: $actions за $period';
   }
+
+  @override
+  String get statisticsIntentionRootHint =>
+      'Действия, путь которых начинается с этого намерения.';
+
+  @override
+  String get statisticsIntentionIntermediateHint =>
+      'Действия, путь которых проходит через это намерение между корневым и конечным.';
+
+  @override
+  String get statisticsIntentionTerminalHint =>
+      'Действия, путь которых заканчивается этим намерением: оно их конечное.';
+
+  @override
+  String get statisticsIntentionThroughRelationsHint =>
+      'Действия, которым это намерение служит через связи. Число меняется вместе со связями.';
 
   @override
   String get quickCreationLabel => 'Быстрое создание';
@@ -341,35 +429,17 @@ class AppLocalizationsRu extends AppLocalizations {
       'Нажмите и удерживайте, чтобы сменить режим';
 
   @override
+  String get quickCreationModeAction => 'Новое действие';
+
+  @override
+  String get quickCreationModeActionHint => 'Разовое дело на день';
+
+  @override
   String get quickCreationModeIntention => 'Новое намерение';
 
   @override
   String get quickCreationModeIntentionHint =>
       'То, что вы хотите сделать или изменить';
-
-  @override
-  String get quickCreationModeDailyChoice => 'Новый дневной выбор';
-
-  @override
-  String get quickCreationModeDailyChoiceHint =>
-      'Действие для намерения в выбранный день';
-
-  @override
-  String get quickCreationDailyChoiceStartPrompt => 'С чего начать';
-
-  @override
-  String get quickCreationDailyChoiceFromIntention => 'От намерения';
-
-  @override
-  String get quickCreationDailyChoiceFromIntentionHint =>
-      'Сначала намерение, затем действие для него';
-
-  @override
-  String get quickCreationDailyChoiceFromAction => 'От действия';
-
-  @override
-  String get quickCreationDailyChoiceFromActionHint =>
-      'Сначала действие, затем намерение, которому оно служит';
 
   @override
   String get commonLoading => 'Загрузка…';
@@ -448,17 +518,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationNeighborhoodSummaryLoading => 'Загружаем связи и сводку…';
 
   @override
-  String relationNeighborhoodDailyTotal(int count) {
-    return 'Дневных выборов: $count';
-  }
-
-  @override
-  String get relationNeighborhoodDailySourceRole => 'Исходное намерение';
-
-  @override
-  String get relationNeighborhoodDailySelectedRole => 'Выбранное действие';
-
-  @override
   String get relationNeighborhoodTypeNeed => 'Нужно';
 
   @override
@@ -483,9 +542,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get relationNeighborhoodIntentionNotFound =>
       'Намерение для просмотра связей больше не существует.';
-
-  @override
-  String get relationNeighborhoodEmpty => 'В этой группе связей нет.';
 
   @override
   String get relationNeighborhoodLoadingMore => 'Загружаем ещё связи…';
@@ -611,11 +667,6 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String detailsRelationsWalkAction(String title) {
-    return 'Открыть страницу действия: $title';
-  }
-
-  @override
   String get detailsRelationsNeedsHint =>
       'Чтобы достичь этого, нужно всё перечисленное.';
 
@@ -656,10 +707,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Добавьте то, без чего этому намерению не обойтись.';
 
   @override
-  String get detailsRelationsEmptyNeedsActionText =>
-      'Действие может обходиться без других. Добавьте то, что ему нужно, если у него есть свои шаги.';
-
-  @override
   String get detailsRelationsEmptyCanUseTitle => 'Пока нечего использовать';
 
   @override
@@ -694,46 +741,82 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get detailsChoicesTab => 'Выборы';
+  String get detailsActionsTab => 'Действия';
 
   @override
-  String get detailsChoicesSourceHint =>
-      'Дневные выборы, которые начинаются с этого намерения.';
+  String detailsActionsTabSemantic(int count) {
+    return 'Действия: $count';
+  }
 
   @override
-  String get detailsChoicesSelectedHint =>
-      'Дневные выборы, которые заканчиваются этим намерением.';
+  String get detailsActionsRolesLabel => 'Роль намерения в путях действий';
 
   @override
-  String get detailsChoicesAdd => 'Добавить';
+  String get detailsActionsRoleRoot => 'Корневое';
 
   @override
-  String get detailsChoicesAddSourceLabel =>
-      'Создать дневной выбор, который начинается с этого намерения';
+  String get detailsActionsRoleIntermediate => 'Промежуточное';
 
   @override
-  String get detailsChoicesAddSelectedLabel =>
-      'Создать дневной выбор, который заканчивается этим действием';
+  String get detailsActionsRoleFinal => 'Конечное';
+
+  @override
+  String detailsActionsRoleTileSemantic(String role, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count действия',
+      many: '$count действий',
+      few: '$count действия',
+      one: '$count действие',
+    );
+    return '$role: $_temp0';
+  }
+
+  @override
+  String get detailsActionsEmptyTitle => 'Действий пока нет';
+
+  @override
+  String get detailsActionsEmptyRoot =>
+      'Здесь появится действие, путь которого начинается с этого намерения.';
+
+  @override
+  String get detailsActionsEmptyIntermediate =>
+      'Здесь появится действие, путь которого проходит через это намерение.';
+
+  @override
+  String get detailsActionsEmptyFinal =>
+      'Здесь появится действие, путь которого заканчивается этим намерением.';
+
+  @override
+  String get detailsActionsTodayAndLater => 'Сегодня и позже';
+
+  @override
+  String get detailsActionsLoading => 'Загружаем действия…';
+
+  @override
+  String get detailsActionsLoadingMore => 'Загружаем ещё действия…';
+
+  @override
+  String get detailsActionsRefreshing => 'Обновляем…';
+
+  @override
+  String get detailsActionsUnavailable => 'Не удалось загрузить действия.';
+
+  @override
+  String get detailsActionsCorruption =>
+      'Сохранённые данные действий повреждены и не могут быть показаны.';
+
+  @override
+  String get detailsActionsExpired =>
+      'Список изменился. Обновите его, чтобы продолжить.';
+
+  @override
+  String get detailsActionsUnexpected =>
+      'Не удалось загрузить действия из-за непредвиденной ошибки.';
 
   @override
   String get detailsTitle => 'Подробности намерения';
-
-  @override
-  String get detailsTypeIntention => 'Намерение';
-
-  @override
-  String get detailsTypeAction => 'Действие';
-
-  @override
-  String get detailsTypeChoiceLabel => 'Намерение или действие';
-
-  @override
-  String get detailsTypeIntentionHint =>
-      'Любого размера. Может занять больше дня.';
-
-  @override
-  String get detailsTypeActionHint =>
-      'Выполнимо за один день, и понятно, что делать.';
 
   @override
   String get detailsArchivedBadge => 'Архив';
@@ -770,7 +853,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get detailsOptionRestoreWithRelations =>
-      'Его связи останутся в архиве, пока вы их не восстановите';
+      'Его связи с активными намерениями восстановятся вместе с ним';
 
   @override
   String get detailsOptionRestoreAlone =>
@@ -780,28 +863,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get detailsOptionDeleteKeepsTags => 'Его теги сохранятся';
 
   @override
-  String get detailsOptionDeleteRelationsFirst => 'Сначала удалите его связи';
-
-  @override
-  String get detailsOptionDeleteDailyChoicesFirst =>
-      'Сначала удалите его дневные выборы';
-
-  @override
-  String get detailsOptionDeleteRelationsAndDailyChoicesFirst =>
-      'Сначала удалите его связи и дневные выборы';
-
-  @override
   String get detailsOptionWait => 'Дождитесь окончания текущего изменения';
 
   @override
   String get detailsDeleteDialogTitle => 'Удалить намерение?';
-
-  @override
-  String get detailsDeleteDialogTextBefore => 'Намерение ';
-
-  @override
-  String get detailsDeleteDialogTextAfter =>
-      ' будет безвозвратно удалено вместе с описанием. Его теги сохранятся.';
 
   @override
   String get detailsDeleteDialogCancel => 'Отмена';
@@ -871,6 +936,10 @@ class AppLocalizationsRu extends AppLocalizations {
       'Намерение было изменено в другом месте. Его состояние не изменено.';
 
   @override
+  String get detailsStateChangeCascadeConflict =>
+      'Состояние намерения не изменено: связанные намерения изменились, и операция затронула бы их иначе. Попробуйте снова.';
+
+  @override
   String get detailsStateChangeUnavailable =>
       'Не удалось изменить состояние намерения. Повторите попытку.';
 
@@ -894,8 +963,8 @@ class AppLocalizationsRu extends AppLocalizations {
       'Намерение изменено в другом месте и не удалено.';
 
   @override
-  String get detailsDeleteBlockedByRelations =>
-      'Намерение не удалено: его связи блокируют удаление. Архивные и ещё не загруженные связи тоже блокируют.';
+  String get detailsDeleteCascadeConflict =>
+      'Намерение не удалено: связанные намерения изменились, и удаление затронуло бы их иначе. Попробуйте снова.';
 
   @override
   String get detailsDeleteUnavailable =>
@@ -1024,6 +1093,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get editorCreatedAndChosen => 'Намерение создано и отмечено.';
 
   @override
+  String get editorCreatedAndChosenPathStart =>
+      'Намерение создано и выбрано началом пути.';
+
+  @override
   String get editorCloseDiscardTitle => 'Сбросить черновик?';
 
   @override
@@ -1051,33 +1124,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get editorCloseFormAction => 'Закрыть форму';
-
-  @override
-  String get editorReadinessOption => 'Создать готовым к действию';
-
-  @override
-  String get editorReadinessOptionOn => 'Создать готовым к действию: включено';
-
-  @override
-  String get editorReadinessOptionOff =>
-      'Создать готовым к действию: выключено';
-
-  @override
-  String get editorReadinessConfirmationTitle => 'Создать готовым к действию?';
-
-  @override
-  String get editorReadinessOneDayCriterion =>
-      'Его можно полностью выполнить в течение одного дня.';
-
-  @override
-  String get editorReadinessClarityCriterion =>
-      'Человеку достаточно понятно, что именно нужно сделать.';
-
-  @override
-  String get editorReadinessCancelAction => 'Отмена';
-
-  @override
-  String get editorReadinessConfirmAction => 'Отметить готовым';
 
   @override
   String get editorChooseTags => 'Выбрать теги';
@@ -1121,13 +1167,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationCreate => 'Создание';
 
   @override
+  String get graphOperationChangeKind => 'Изменение вида';
+
+  @override
   String get graphOperationUpdate => 'Изменение';
-
-  @override
-  String get graphOperationEnableReadiness => 'Включение готовности';
-
-  @override
-  String get graphOperationDisableReadiness => 'Отключение готовности';
 
   @override
   String get graphOperationArchive => 'Архивирование';
@@ -1162,7 +1205,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get graphOperationRelation => 'связь';
 
   @override
-  String get graphOperationDailyChoice => 'дневной выбор';
+  String get graphOperationAction => 'действие';
 
   @override
   String get graphOperationTag => 'тег';
@@ -1257,7 +1300,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String dataExportComposition(
     int intentions,
     int relations,
-    int dailyChoices,
+    int actions,
     int tags,
   ) {
     final intl.NumberFormat intentionsNumberFormat =
@@ -1266,11 +1309,9 @@ class AppLocalizationsRu extends AppLocalizations {
     final intl.NumberFormat relationsNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
     final String relationsString = relationsNumberFormat.format(relations);
-    final intl.NumberFormat dailyChoicesNumberFormat =
+    final intl.NumberFormat actionsNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
-    final String dailyChoicesString = dailyChoicesNumberFormat.format(
-      dailyChoices,
-    );
+    final String actionsString = actionsNumberFormat.format(actions);
     final intl.NumberFormat tagsNumberFormat = intl.NumberFormat.decimalPattern(
       localeName,
     );
@@ -1293,12 +1334,12 @@ class AppLocalizationsRu extends AppLocalizations {
       one: '$relationsString связь',
     );
     String _temp2 = intl.Intl.pluralLogic(
-      dailyChoices,
+      actions,
       locale: localeName,
-      other: '$dailyChoicesString дневного выбора',
-      many: '$dailyChoicesString дневных выборов',
-      few: '$dailyChoicesString дневных выбора',
-      one: '$dailyChoicesString дневной выбор',
+      other: '$actionsString действия',
+      many: '$actionsString действий',
+      few: '$actionsString действия',
+      one: '$actionsString действие',
     );
     String _temp3 = intl.Intl.pluralLogic(
       tags,
@@ -1505,7 +1546,7 @@ class AppLocalizationsRu extends AppLocalizations {
     String date,
     int intentions,
     int relations,
-    int dailyChoices,
+    int actions,
     int tags,
   ) {
     final intl.NumberFormat intentionsNumberFormat =
@@ -1514,11 +1555,9 @@ class AppLocalizationsRu extends AppLocalizations {
     final intl.NumberFormat relationsNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
     final String relationsString = relationsNumberFormat.format(relations);
-    final intl.NumberFormat dailyChoicesNumberFormat =
+    final intl.NumberFormat actionsNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
-    final String dailyChoicesString = dailyChoicesNumberFormat.format(
-      dailyChoices,
-    );
+    final String actionsString = actionsNumberFormat.format(actions);
     final intl.NumberFormat tagsNumberFormat = intl.NumberFormat.decimalPattern(
       localeName,
     );
@@ -1541,12 +1580,12 @@ class AppLocalizationsRu extends AppLocalizations {
       one: '$relationsString связь',
     );
     String _temp2 = intl.Intl.pluralLogic(
-      dailyChoices,
+      actions,
       locale: localeName,
-      other: '$dailyChoicesString дневного выбора',
-      many: '$dailyChoicesString дневных выборов',
-      few: '$dailyChoicesString дневных выбора',
-      one: '$dailyChoicesString дневной выбор',
+      other: '$actionsString действия',
+      many: '$actionsString действий',
+      few: '$actionsString действия',
+      one: '$actionsString действие',
     );
     String _temp3 = intl.Intl.pluralLogic(
       tags,
@@ -1679,7 +1718,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get tagsPanelDeleteTextAfter =>
-      ' и все его назначения активным и архивированным намерениям. Сами намерения, связи, дневные выборы и их пути сохранятся.';
+      ' и все его назначения активным и архивированным намерениям. Сами намерения, связи, действия и их пути сохранятся.';
 
   @override
   String get tagsPanelDeleteCancel => 'Отмена';
@@ -1855,65 +1894,264 @@ class AppLocalizationsRu extends AppLocalizations {
       'Действие с тегом не выполнено из-за непредвиденной ошибки.';
 
   @override
-  String get dailyChoiceCreated => 'Дневной выбор создан.';
+  String get actionDeleted => 'Действие удалено.';
 
   @override
-  String get dailyChoiceDeleted => 'Дневной выбор удалён.';
+  String get actionCreated => 'Действие создано.';
 
   @override
-  String get dailyChoiceSheetOptionEditDescription => 'Изменить описание';
+  String get actionPathConflict =>
+      'Путь больше не совпадает с графом. Проверьте путь и попробуйте снова.';
 
   @override
-  String get dailyChoiceSheetOptionDelete => 'Удалить дневной выбор';
+  String get actionDescriptionInvalid => 'Проверьте описание действия.';
 
   @override
-  String get dailyChoiceDeleteDialogTitle => 'Удалить дневной выбор?';
+  String get actionOperationNotFound => 'Действие больше не существует.';
 
   @override
-  String get dailyChoiceDeleteDialogBefore => 'Выбор ';
-
-  @override
-  String dailyChoiceDeleteDialogAfter(String date) {
-    return ' на $date будет удалён. Это действие нельзя отменить.';
-  }
-
-  @override
-  String get dailyChoiceDeleteDialogAction => 'Удалить';
-
-  @override
-  String get dailyChoiceSourceInvalid =>
-      'Проверьте исходное намерение дневного выбора.';
-
-  @override
-  String get dailyChoiceSelectedInvalid =>
-      'Проверьте выбранное намерение дневного выбора.';
-
-  @override
-  String get dailyChoiceDateInvalid => 'Проверьте дату дневного выбора.';
-
-  @override
-  String get dailyChoiceDescriptionInvalid =>
-      'Проверьте описание дневного выбора.';
-
-  @override
-  String get dailyChoiceOperationNotFound =>
-      'Дневной выбор больше не существует.';
-
-  @override
-  String get dailyChoiceOperationConflict =>
+  String get actionOperationConflict =>
       'Данные изменились. Обновите их и подтвердите снова.';
 
   @override
-  String get dailyChoiceOperationUnavailable =>
-      'Не удалось выполнить действие с дневным выбором. Повторите попытку.';
+  String get actionOperationUnavailable =>
+      'Не удалось выполнить операцию с действием. Повторите попытку.';
 
   @override
-  String get dailyChoiceOperationCorruption =>
-      'Сохранённые данные повреждены. Дневной выбор не изменён.';
+  String get actionOperationCorruption =>
+      'Сохранённые данные повреждены. Действие не изменено.';
 
   @override
-  String get dailyChoiceOperationUnexpected =>
-      'Действие с дневным выбором не выполнено из-за непредвиденной ошибки.';
+  String get actionOperationUnexpected =>
+      'Операция с действием не выполнена из-за непредвиденной ошибки.';
+
+  @override
+  String get actionPanelTitle => 'Действие';
+
+  @override
+  String get actionPanelExpand => 'Раскрыть панель действия';
+
+  @override
+  String get actionPanelCollapse => 'Свернуть панель действия';
+
+  @override
+  String get actionPanelLoading => 'Загружаем действие…';
+
+  @override
+  String get actionPanelUnavailable =>
+      'Не удалось загрузить действие. Повторите попытку.';
+
+  @override
+  String get actionPanelCorruption =>
+      'Сохранённое действие повреждено и не может быть показано.';
+
+  @override
+  String get actionPanelUnexpected =>
+      'Не удалось загрузить действие из-за непредвиденной ошибки.';
+
+  @override
+  String actionPanelCompletionLabel(String action, String priority) {
+    return 'Выполнение действия. $action. $priority';
+  }
+
+  @override
+  String get actionRefresh => 'Обновить действие';
+
+  @override
+  String get actionFieldDate => 'Дата';
+
+  @override
+  String get actionFieldTime => 'Время';
+
+  @override
+  String get actionFieldPriority => 'Приоритет';
+
+  @override
+  String actionFieldDateLabel(String date) {
+    return 'Дата: $date. Изменить дату';
+  }
+
+  @override
+  String actionFieldTimeLabel(String time) {
+    return 'Время: $time. Изменить время';
+  }
+
+  @override
+  String get actionAllDay => 'Весь день';
+
+  @override
+  String actionPriorityOption(String priority) {
+    return 'Приоритет $priority';
+  }
+
+  @override
+  String get actionDateToday => 'Сегодня';
+
+  @override
+  String get actionDateTomorrow => 'Завтра';
+
+  @override
+  String get actionDateYesterday => 'Вчера';
+
+  @override
+  String get actionDateSheetLabel => 'Дата действия';
+
+  @override
+  String get actionTimeSheetLabel => 'Время действия';
+
+  @override
+  String get actionTimeHalfSwitchLabel => 'Половина суток';
+
+  @override
+  String get actionTimeAmLabel => 'До полудня';
+
+  @override
+  String get actionTimePmLabel => 'После полудня';
+
+  @override
+  String get actionCalendarPreviousMonth => 'Предыдущий месяц';
+
+  @override
+  String get actionCalendarNextMonth => 'Следующий месяц';
+
+  @override
+  String get actionCalendarDayAllCompleted => 'Все действия выполнены';
+
+  @override
+  String get actionCalendarDayHasIncomplete => 'Есть невыполненное действие';
+
+  @override
+  String get actionPanelOptionsLabel => 'Параметры действия';
+
+  @override
+  String get actionOptionEditText => 'Изменить название и описание';
+
+  @override
+  String get actionOptionEditPath => 'Изменить путь';
+
+  @override
+  String get actionOptionEditPathHint =>
+      'Намерения, ради которых делается действие';
+
+  @override
+  String get actionOptionDelete => 'Удалить действие';
+
+  @override
+  String get actionOptionDeleteHint => 'Намерения и связи останутся';
+
+  @override
+  String get actionDeleteDialogTitle => 'Удалить действие?';
+
+  @override
+  String get actionDeleteDialogBefore => 'Действие ';
+
+  @override
+  String actionDeleteDialogAfter(String date) {
+    return ' на $date будет удалено. Удаление нельзя отменить. Намерения и связи его пути останутся.';
+  }
+
+  @override
+  String get actionDeleteDialogToday => 'сегодня';
+
+  @override
+  String get actionDeleteDialogAction => 'Удалить';
+
+  @override
+  String get actionTextEditTitle => 'Изменить действие';
+
+  @override
+  String get actionTextEditBack => 'Назад к действию';
+
+  @override
+  String get actionTextEditSave => 'Сохранить';
+
+  @override
+  String get actionTextEditNameLabel => 'Название';
+
+  @override
+  String get actionTextEditDescriptionLabel => 'Описание';
+
+  @override
+  String get actionTextEditDiscardTitle => 'Отменить изменения?';
+
+  @override
+  String get actionTextEditDiscardMessage =>
+      'Изменения названия и описания не сохранятся.';
+
+  @override
+  String get actionTextEditDiscardAction => 'Отменить';
+
+  @override
+  String get actionTextEditContinueAction => 'Продолжить правку';
+
+  @override
+  String get actionPanelTabsLabel => 'Разделы действия';
+
+  @override
+  String get actionPanelPathTab => 'Путь';
+
+  @override
+  String actionPanelPathTabLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Путь, $count намерения',
+      many: 'Путь, $count намерений',
+      few: 'Путь, $count намерения',
+      one: 'Путь, $count намерение',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String actionPanelPathTabArchivedLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Путь, $count намерения, в пути есть архив',
+      many: 'Путь, $count намерений, в пути есть архив',
+      few: 'Путь, $count намерения, в пути есть архив',
+      one: 'Путь, $count намерение, в пути есть архив',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get actionPanelPathButtonLabel => 'Открыть путь действия';
+
+  @override
+  String get actionPathDeletedBadge => 'Удалено';
+
+  @override
+  String get actionPathNoteArchived =>
+      'Архивные намерения и связи остаются в сохранённом пути.';
+
+  @override
+  String get actionPathNoteDeleted =>
+      'Удалённые намерения и связи остаются в сохранённом пути такими, какими были.';
+
+  @override
+  String get actionPathNoteArchivedAndDeleted =>
+      'Архивные и удалённые намерения и связи остаются в сохранённом пути.';
+
+  @override
+  String get actionPathRoleRoot => 'Корневое намерение';
+
+  @override
+  String get actionPathRoleIntermediate => 'Промежуточное намерение';
+
+  @override
+  String get actionPathRoleFinal => 'Конечное намерение';
+
+  @override
+  String actionPathRelationLabel(
+    String kind,
+    String source,
+    String related,
+    String priority,
+  ) {
+    return 'Связь $kind. $source, $related. $priority';
+  }
 
   @override
   String get graphOperationAddRelations => 'Добавление';
@@ -2012,14 +2250,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Связанное намерение больше не существует. Связь не восстановлена.';
 
   @override
-  String get relationRestoreSourceArchived =>
-      'Сначала восстановите исходное намерение, затем восстановите эту связь.';
-
-  @override
-  String get relationRestoreRelatedArchived =>
-      'Сначала восстановите связанное намерение, затем восстановите эту связь.';
-
-  @override
   String get relationRestoreUnavailable =>
       'Не удалось восстановить связь. Повторите попытку.';
 
@@ -2042,10 +2272,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Связь не удалось удалить из-за конфликта актуального состояния.';
 
   @override
-  String get relationDeleteReferencedByDailyPath =>
-      'Связь используется в сохранённом дневном пути. Сначала удалите использующие её дневные выборы.';
-
-  @override
   String get relationDeleteUnavailable =>
       'Не удалось удалить связь. Повторите попытку.';
 
@@ -2056,10 +2282,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get relationDeleteUnexpected =>
       'Не удалось удалить связь из-за непредвиденной ошибки.';
-
-  @override
-  String get relationNeighborhoodOpenDailyChoice =>
-      'Открыть полный путь дневного выбора';
 
   @override
   String get relationDetailsTitle => 'Связь';
@@ -2099,10 +2321,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get relationDetailsPriorityLabel => 'Приоритет';
-
-  @override
-  String get relationDetailsPathProtection =>
-      'Связь используется в сохранённом дневном пути, поэтому удалить её нельзя.';
 
   @override
   String relationSheetArchivedLabel(String phrase) {
@@ -2162,6 +2380,45 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationSheetOptionsLabel => 'Параметры связи';
 
   @override
+  String relationArchiveIntentionsHint(int count) {
+    return 'Вместе со связью в архив уйдут вспомогательные намерения: $count';
+  }
+
+  @override
+  String relationDeleteIntentionsHint(int count) {
+    return 'Вместе со связью будут удалены вспомогательные намерения: $count';
+  }
+
+  @override
+  String get relationArchivePathsHint =>
+      'Останется в сохранённых путях с отметкой архива';
+
+  @override
+  String get relationRestorePathsHint =>
+      'В сохранённых путях больше не отмечена архивной и снова доступна для новых путей';
+
+  @override
+  String relationRestoreIntentionsHint(int count) {
+    return 'Вместе со связью вернутся намерения: $count';
+  }
+
+  @override
+  String get relationCascadeArchiveTitle => 'Архивировать связь?';
+
+  @override
+  String get relationCascadeRestoreTitle => 'Восстановить связь?';
+
+  @override
+  String relationCascadeArchiveQuestion(int count) {
+    return 'Вместе с ней в архив уйдут вспомогательные намерения: $count.';
+  }
+
+  @override
+  String relationCascadeRestoreQuestion(int count) {
+    return 'Вместе с ней вернутся вспомогательные намерения: $count.';
+  }
+
+  @override
   String get relationSheetOptionArchive => 'Архивировать';
 
   @override
@@ -2169,10 +2426,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get relationSheetOptionDelete => 'Удалить';
-
-  @override
-  String get relationSheetOptionRestoreBothArchived =>
-      'Сначала восстановите исходное и связанное намерения, затем восстановите эту связь.';
 
   @override
   String get relationSheetDeleteDialogTitle => 'Удалить связь?';
@@ -2191,81 +2444,17 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationSheetDeleteDialogConfirm => 'Удалить';
 
   @override
-  String get actionPickerLoading => 'Загружаем действия…';
-
-  @override
-  String get actionPickerEmpty => 'Доступных активных действий нет.';
-
-  @override
-  String get actionPickerUnavailable =>
-      'Не удалось загрузить действия. Повторите попытку.';
-
-  @override
-  String get actionPickerCorruption =>
-      'Сохранённые данные действий повреждены и не могут быть показаны.';
-
-  @override
-  String get actionPickerUnexpected =>
-      'Не удалось загрузить действия из-за непредвиденной ошибки.';
-
-  @override
-  String get sourcePickerEmpty => 'Доступных активных намерений нет.';
-
-  @override
-  String get dailyChoicePickerPurposeCreationSource =>
-      'Новый дневной выбор: исходное намерение';
-
-  @override
-  String get dailyChoicePickerPurposeCreationAction =>
-      'Новый дневной выбор: конечное действие';
-
-  @override
-  String get dailyChoicePickerFlowCreationFromSource =>
-      'Новый дневной выбор, от намерения';
-
-  @override
-  String get dailyChoicePickerFlowCreationFromAction =>
-      'Новый дневной выбор, от действия';
-
-  @override
-  String get dailyChoicePickerStepCurrent => 'Вы здесь';
-
-  @override
-  String get dailyChoicePickerStepSource => 'Исходное намерение';
-
-  @override
-  String get dailyChoicePickerStepAction => 'Конечное действие';
-
-  @override
-  String get dailyChoicePickerStepPathDown => 'Путь вниз к действию';
-
-  @override
-  String get dailyChoicePickerStepPathDownNote =>
-      'Каждый следующий шаг — то, что нужно или можно для предыдущего';
-
-  @override
-  String get dailyChoicePickerStepPathUp => 'Путь вверх к исходному намерению';
-
-  @override
-  String get dailyChoicePickerStepPathUpNote => 'Нужен хотя бы один шаг';
-
-  @override
-  String get dailyChoicePickerStepDetails =>
-      'Дата, время, приоритет и описание';
-
-  @override
   String get intentionPickerArchived => 'в архиве';
 
   @override
-  String get intentionPickerKindAction => 'действие';
+  String get intentionPickerKindMain => 'главное';
 
   @override
-  String get intentionPickerKindIntention => 'намерение';
+  String get intentionPickerKindSupporting => 'вспомогательное';
 
   @override
-  String intentionPickerOpenActionPage(String title) {
-    return 'Открыть страницу действия «$title»';
-  }
+  String get intentionPickerKindSupportingUnheld =>
+      'вспомогательное, его не удерживает ни одно главное намерение';
 
   @override
   String intentionPickerOpenIntentionPage(String title) {
@@ -2313,17 +2502,14 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerTypeCaption => 'Тип';
 
   @override
-  String get intentionPickerTypeAll => 'Намерения и действия';
+  String get intentionPickerKindMainAndSupporting =>
+      'Главные и вспомогательные';
 
   @override
-  String get intentionPickerTypeIntentionsOnly => 'Только намерения';
+  String get intentionPickerKindMainOnly => 'Только главные';
 
   @override
-  String get intentionPickerTypeActionsOnly => 'Только действия';
-
-  @override
-  String get intentionPickerActionTypeNote =>
-      'Конечным в дневном выборе может быть только действие';
+  String get intentionPickerKindSupportingOnly => 'Только вспомогательные';
 
   @override
   String get intentionPickerSortCaption => 'Сортировка';
@@ -2358,9 +2544,6 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get intentionPickerAllHeader => 'Все';
-
-  @override
   String get intentionPickerOrderCreatedNewest => 'Создание, сначала новые';
 
   @override
@@ -2379,37 +2562,23 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerOrderTitleDescending => 'Название, от Я до А';
 
   @override
-  String intentionPickerHeaderLabel(String type, String summary) {
-    return 'Показать и упорядочить. Тип: $type. Сортировка: $summary.';
-  }
-
-  @override
-  String intentionPickerHeaderCountLabel(
-    String type,
-    int count,
-    String summary,
-  ) {
-    return 'Показать и упорядочить. Тип: $type, $count. Сортировка: $summary.';
-  }
-
-  @override
-  String intentionPickerScopeHeader(String scope, String type) {
-    String _temp0 = intl.Intl.selectLogic(type, {
-      'all': 'Активные',
-      'intentions': 'Активные намерения',
-      'actions': 'Активные действия',
+  String intentionPickerScopeHeader(String scope, String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'mainOnly': 'Активные главные',
+      'supportingOnly': 'Активные вспомогательные',
+      'mainAndSupporting': 'Активные',
       'other': '',
     });
-    String _temp1 = intl.Intl.selectLogic(type, {
-      'all': 'Архивные',
-      'intentions': 'Архивные намерения',
-      'actions': 'Архивные действия',
+    String _temp1 = intl.Intl.selectLogic(kind, {
+      'mainOnly': 'Архивные главные',
+      'supportingOnly': 'Архивные вспомогательные',
+      'mainAndSupporting': 'Архивные',
       'other': '',
     });
-    String _temp2 = intl.Intl.selectLogic(type, {
-      'all': 'Все',
-      'intentions': 'Все намерения',
-      'actions': 'Все действия',
+    String _temp2 = intl.Intl.selectLogic(kind, {
+      'mainOnly': 'Все главные',
+      'supportingOnly': 'Все вспомогательные',
+      'mainAndSupporting': 'Все',
       'other': '',
     });
     String _temp3 = intl.Intl.selectLogic(scope, {
@@ -2436,13 +2605,7 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get intentionPickerActionsHeader => 'Действия';
-
-  @override
   String get intentionPickerIntentionsHeader => 'Намерения';
-
-  @override
-  String get intentionPickerLoadingMoreActions => 'Загружаем ещё действия';
 
   @override
   String get intentionPickerLoadingMoreIntentions => 'Загружаем ещё намерения';
@@ -2451,30 +2614,23 @@ class AppLocalizationsRu extends AppLocalizations {
   String get intentionPickerEmptyScopeTitle => 'Выбрать не из чего';
 
   @override
-  String get intentionPickerEmptyTypeTitle => 'Намерений этого типа нет';
-
-  @override
-  String get intentionPickerEmptyTypeText =>
-      'Покажите оба типа, чтобы выбрать из доступных намерений.';
-
-  @override
   String get intentionPickerShowBothTypes => 'Показать оба типа';
 
   @override
-  String intentionPickerEmptyScopedTypeTitle(String scope, String type) {
-    String _temp0 = intl.Intl.selectLogic(type, {
-      'actions': 'Нет активных действий',
-      'intentions': 'Нет активных намерений',
+  String intentionCatalogEmptyKindTitle(String scope, String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'main': 'Нет активных главных намерений',
+      'supporting': 'Нет активных вспомогательных намерений',
       'other': '',
     });
-    String _temp1 = intl.Intl.selectLogic(type, {
-      'actions': 'Нет действий в архиве',
-      'intentions': 'Нет намерений в архиве',
+    String _temp1 = intl.Intl.selectLogic(kind, {
+      'main': 'В архиве нет главных намерений',
+      'supporting': 'В архиве нет вспомогательных намерений',
       'other': '',
     });
-    String _temp2 = intl.Intl.selectLogic(type, {
-      'actions': 'Действий пока нет',
-      'intentions': 'Намерений пока нет',
+    String _temp2 = intl.Intl.selectLogic(kind, {
+      'main': 'Главных намерений пока нет',
+      'supporting': 'Вспомогательных намерений пока нет',
       'other': '',
     });
     String _temp3 = intl.Intl.selectLogic(scope, {
@@ -2487,12 +2643,12 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get intentionPickerEmptyActionsText =>
-      'Здесь появится намерение, отмеченное как действие.';
+  String get intentionCatalogEmptyMainText =>
+      'Намерение становится главным, когда его так отмечают на его странице. Новое создаётся кнопкой с плюсом внизу.';
 
   @override
-  String get intentionPickerEmptyIntentionsText =>
-      'Здесь всё отмечено как действия.';
+  String get intentionCatalogEmptySupportingText =>
+      'Вспомогательным становится намерение, созданное в группах «Нужно» или «Можно использовать» другого намерения, и то, которое так отметили на его странице.';
 
   @override
   String get intentionCatalogNoActiveTitle => 'Нет активных намерений';
@@ -2516,10 +2672,215 @@ class AppLocalizationsRu extends AppLocalizations {
       'Архивированное намерение уходит из активного списка и остаётся здесь.';
 
   @override
-  String get intentionPickerActionTitle => 'Выбор действия';
+  String get pathStartPickerTitle => 'Выбор намерения';
 
   @override
-  String get intentionPickerIntentionTitle => 'Выбор намерения';
+  String get pathStartPickerEmpty => 'Нет доступных намерений для начала пути.';
+
+  @override
+  String get pathStartPickerCurrentRoot => 'Сейчас в начале пути';
+
+  @override
+  String get pathStartNewAction => 'Новое действие';
+
+  @override
+  String get pathStartEditPath => 'Изменение пути';
+
+  @override
+  String pathStartSubtitle(String flow) {
+    return '$flow: с чего начинается путь';
+  }
+
+  @override
+  String get pathStartFirstStep => 'Намерение, с которого начинается путь';
+
+  @override
+  String get pathStartFirstNote =>
+      'Обычно это цель, ради которой делается действие. Если ближайшая причина достаточно понятна, можно выбрать её.';
+
+  @override
+  String get pathStartSecondStep => 'Дальше вниз';
+
+  @override
+  String get pathStartSecondNote =>
+      'Это необязательно: каждое следующее намерение — то, что нужно или можно для предыдущего.';
+
+  @override
+  String get pathStartCurrentStep => 'Вы здесь';
+
+  @override
+  String get pathTitle => 'Путь';
+
+  @override
+  String get pathEditTitle => 'Изменить путь';
+
+  @override
+  String get pathSave => 'Сохранить';
+
+  @override
+  String get pathChooseReason => 'Выберите причину';
+
+  @override
+  String get pathChooseReasonLabel =>
+      'Выберите причину: намерение, с которого начинается путь';
+
+  @override
+  String get pathEmptyHint =>
+      'Начните с цели, ради которой делается действие, и спускайтесь вниз шаг за шагом или сразу с ближайшей причины. Достаточно одного намерения.';
+
+  @override
+  String get pathShortenHint =>
+      'Нажмите на намерение, чтобы закончить путь на нём.';
+
+  @override
+  String get pathNewAction => 'Новое действие';
+
+  @override
+  String pathActionLabel(String title) {
+    return 'Путь ведёт к действию «$title»';
+  }
+
+  @override
+  String get pathNewActionLabel => 'Путь ведёт к новому действию';
+
+  @override
+  String pathRootLabel(String title) {
+    return 'Корневое намерение «$title». Выбрать другое начало пути';
+  }
+
+  @override
+  String pathEndAtLabel(String title) {
+    return 'Промежуточное намерение «$title». Закончить путь на нём';
+  }
+
+  @override
+  String pathFinalLabel(String title) {
+    return 'Конечное намерение «$title»';
+  }
+
+  @override
+  String get pathNeedEmptyTitle => 'Пока ничего не нужно';
+
+  @override
+  String get pathNeedEmptyText =>
+      'Добавьте то, без чего не обойтись, или закончите путь здесь.';
+
+  @override
+  String get pathCanEmptyTitle => 'Пока нечего использовать';
+
+  @override
+  String get pathCanEmptyText =>
+      'Добавьте то, что помогает, но не обязательно.';
+
+  @override
+  String get pathNextIntention => 'Следующее намерение';
+
+  @override
+  String pathCandidateNeedLabel(String source, String title, String priority) {
+    return 'Чтобы «$source», нужно «$title». Приоритет $priority';
+  }
+
+  @override
+  String pathCandidateCanLabel(String source, String title, String priority) {
+    return 'Чтобы «$source», можно использовать «$title». Приоритет $priority';
+  }
+
+  @override
+  String get pathCandidatesLoading => 'Загружаем следующие намерения…';
+
+  @override
+  String get pathCandidatesUnavailable =>
+      'Не удалось загрузить следующие намерения. Повторите попытку.';
+
+  @override
+  String get pathAdd => 'Добавить';
+
+  @override
+  String pathAddNeedLabel(String source) {
+    return 'Добавить в «Нужно» намерения «$source»';
+  }
+
+  @override
+  String pathAddCanLabel(String source) {
+    return 'Добавить в «Можно» намерения «$source»';
+  }
+
+  @override
+  String get pathLoading => 'Загружаем путь…';
+
+  @override
+  String get pathReadUnavailable =>
+      'Не удалось загрузить путь. Повторите попытку.';
+
+  @override
+  String get pathReadCorruption =>
+      'Сохранённые данные повреждены, путь не может быть показан.';
+
+  @override
+  String get pathReadUnexpected =>
+      'Не удалось загрузить путь из-за непредвиденной ошибки.';
+
+  @override
+  String get pathDiscardTitle => 'Отменить изменения?';
+
+  @override
+  String get pathDiscardMessage => 'Изменения пути не сохранятся.';
+
+  @override
+  String get pathDiscardAction => 'Отменить';
+
+  @override
+  String get pathContinueAction => 'Продолжить правку';
+
+  @override
+  String pathDiscardKeptRelations(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Добавленные $count связи останутся.',
+      many: 'Добавленные $count связей останутся.',
+      few: 'Добавленные $count связи останутся.',
+      one: 'Добавленная $count связь останется.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pathDiscardKeptIntentions(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Созданные $count намерения останутся.',
+      many: 'Созданные $count намерений останутся.',
+      few: 'Созданные $count намерения останутся.',
+      one: 'Созданное $count намерение останется.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pathDiscardKeptBoth(int relations, int intentions) {
+    String _temp0 = intl.Intl.pluralLogic(
+      relations,
+      locale: localeName,
+      other: 'Добавленные $relations связи',
+      many: 'Добавленные $relations связей',
+      few: 'Добавленные $relations связи',
+      one: 'Добавленная $relations связь',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      intentions,
+      locale: localeName,
+      other: 'созданные $intentions намерения',
+      many: 'созданные $intentions намерений',
+      few: 'созданные $intentions намерения',
+      one: 'созданное $intentions намерение',
+    );
+    return '$_temp0 и $_temp1 останутся.';
+  }
+
+  @override
+  String get pathCandidateNew => 'Новое';
 
   @override
   String get participantPickerTitle => 'Выбор намерений';
@@ -2553,18 +2914,23 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get intentionPickerNoActionsByTitle =>
-      'Нет действий с таким названием';
-
-  @override
   String get intentionPickerNoIntentionsByTitle =>
       'Нет намерений с таким названием';
 
   @override
-  String get intentionPickerTryShorterTitle => 'Попробуйте название короче.';
+  String intentionCatalogOtherKindMatches(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'main':
+          'Среди главных совпадений нет, но они есть среди вспомогательных.',
+      'supporting':
+          'Среди вспомогательных совпадений нет, но они есть среди главных.',
+      'other': '',
+    });
+    return '$_temp0';
+  }
 
   @override
-  String get intentionPickerNoActionsByTags => 'Нет действий под эти теги';
+  String get intentionPickerTryShorterTitle => 'Попробуйте название короче.';
 
   @override
   String get intentionPickerNoIntentionsByTags => 'Нет намерений под эти теги';
@@ -2572,9 +2938,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get intentionPickerChangeTags =>
       'Измените теги в фильтре или сбросьте его.';
-
-  @override
-  String get intentionPickerNoActionsFound => 'Действия не найдены';
 
   @override
   String get intentionPickerNoIntentionsFound => 'Намерения не найдены';
@@ -2607,475 +2970,116 @@ class AppLocalizationsRu extends AppLocalizations {
       'Введите корректный Unicode-текст без NUL.';
 
   @override
-  String get choicePathTitle => 'Выбор пути к действию';
+  String get actionDayLoading => 'Загружаем действия…';
 
   @override
-  String get choicePathBottomTitle => 'Выбор основания для действия';
+  String get actionCalendarDayMarksUnavailable => 'Отметки дней не загружены.';
 
   @override
-  String get choicePathBottomTraversal => 'Обход: от действия к основанию';
+  String get actionCalendarExpand => 'Развернуть календарь';
 
   @override
-  String get choicePathBottomPathDirection =>
-      'Направление связей: от основания к действию';
+  String get actionCalendarCollapse => 'Свернуть календарь';
 
   @override
-  String choicePathFixedAction(String action) {
-    return 'Выбранное действие: $action';
-  }
+  String get actionCalendarChooseYearAndMonth => 'Выбрать год и месяц';
 
   @override
-  String get choicePathActionPending => 'Загружаем выбранное действие…';
+  String get actionCalendarBackToMonthDays => 'Вернуться к дням месяца';
 
   @override
-  String choicePathCurrentSource(String source) {
-    return 'Основание: $source';
-  }
+  String get actionCalendarPreviousYears => 'Предыдущие годы';
 
   @override
-  String get choicePathSourceSelected => 'Основание подтверждено';
+  String get actionCalendarNextYears => 'Следующие годы';
 
   @override
-  String choicePathSelectSource(String source) {
-    return 'Подтвердить основание «$source»';
-  }
+  String get actionCalendarPreviousYear => 'Предыдущий год';
 
   @override
-  String get choicePathBottomNoPath =>
-      'Для этого действия сейчас нет допустимых входящих связей. Выберите другое действие.';
+  String get actionCalendarNextYear => 'Следующий год';
 
   @override
-  String get choicePathDirection => 'Путь от исходного намерения к действию';
+  String get actionDaySectionIncomplete => 'Невыполненные';
 
   @override
-  String choicePathSource(String source) {
-    return 'Исходное намерение: $source';
-  }
+  String get actionDaySectionCompleted => 'Выполненные';
 
   @override
-  String get choicePathSourcePending => 'Загружаем исходное намерение…';
+  String get actionDayEmptyTitle => 'Нет действий на эту дату';
 
   @override
-  String choicePathReturnTo(String source) {
-    return 'Вернуться к «$source»';
-  }
+  String get actionDayEmptyText =>
+      'Каждое действие здесь служит одному из ваших намерений.';
 
   @override
-  String choicePathStepSemantics(int index, String phrase, String priority) {
-    return 'Шаг $index: $phrase. Приоритет $priority';
-  }
+  String get detailsActionsAdd => 'Добавить';
 
   @override
-  String get choicePathActionSelected => 'Действие выбрано';
+  String get detailsActionsAddLabel => 'Добавить действие';
 
   @override
-  String choicePathSelectAction(String action) {
-    return 'Выбрать действие «$action»';
-  }
+  String get actionDayRefreshing => 'Обновляем…';
 
   @override
-  String get choicePathSelectionNotSaved => 'Связь «я сегодня» ещё не создана.';
+  String get actionDayScrollToTop => 'Вернуться к началу';
 
   @override
-  String get choicePathContinuations => 'Доступные продолжения';
+  String get actionDayLoadingMore => 'Загружаем ещё действия…';
 
   @override
-  String get choicePathLoading => 'Проверяем доступные продолжения…';
+  String get actionDayUnavailable => 'Не удалось загрузить действия.';
 
   @override
-  String get choicePathNoPath =>
-      'Из этого намерения сейчас нет допустимого пути к другому действию. Продолжениями становятся только связи, ведущие к готовому действию. Отметьте намерение готовым или свяжите его с действием.';
+  String get actionDayCorruption =>
+      'Сохранённые данные действий повреждены и не могут быть показаны.';
 
   @override
-  String get choicePathNoFurtherPath =>
-      'Дальнейших допустимых продолжений нет.';
+  String get actionDayExpired =>
+      'Список изменился. Обновите его, чтобы продолжить.';
 
   @override
-  String get choicePathTopNoFurtherPath =>
-      'Дальнейших допустимых продолжений нет. Продолжениями становятся только связи, ведущие к готовому действию. Отметьте намерение готовым или свяжите его с действием.';
+  String get actionDayUnexpected =>
+      'Не удалось загрузить действия из-за непредвиденной ошибки.';
 
   @override
-  String get choicePathOpenRelations => 'Открыть связи';
-
-  @override
-  String get choicePathConflict =>
-      'Граф изменился. Актуализируйте путь перед дальнейшим выбором.';
-
-  @override
-  String get choicePathRefresh => 'Актуализировать путь';
-
-  @override
-  String get choicePathNotFound => 'Намерение пути больше не существует.';
-
-  @override
-  String get choicePathUnavailable =>
-      'Продолжения временно недоступны. Повторите попытку.';
-
-  @override
-  String get choicePathCorruption =>
-      'Сохранённые данные пути повреждены. Продолжение недоступно.';
-
-  @override
-  String get choicePathUnexpected =>
-      'Не удалось проверить продолжения из-за непредвиденной ошибки.';
-
-  @override
-  String get choicePathLoadMore => 'Показать ещё продолжения';
-
-  @override
-  String get choicePathLoadingMore => 'Загружаем следующую порцию…';
-
-  @override
-  String choicePathContinueSemantics(String phrase, String priority) {
-    return 'Продолжить по связи: $phrase. Приоритет $priority';
-  }
-
-  @override
-  String get dailyChoiceCreationTitle => 'Подтвердить дневной выбор';
-
-  @override
-  String get dailyChoiceAllDay => 'Весь день';
-
-  @override
-  String get dailyChoicePriorityLabel => 'Приоритет';
-
-  @override
-  String dailyChoicePriorityOption(String priority) {
-    return 'Приоритет $priority';
-  }
-
-  @override
-  String get dailyChoiceCatalogTitle => 'Дневные выборы';
-
-  @override
-  String get dailyChoiceCreateFromAction => 'Создать выбор от действия';
-
-  @override
-  String get dailyChoiceCatalogLoading => 'Загружаем дневные выборы…';
-
-  @override
-  String get dailyChoiceCalendarToday => 'Сегодня';
-
-  @override
-  String get dailyChoiceCalendarDayAllCompleted =>
-      'Все дневные выборы выполнены';
-
-  @override
-  String get dailyChoiceCalendarDayHasIncomplete =>
-      'Есть невыполненный дневной выбор';
-
-  @override
-  String get dailyChoiceCalendarDayMarksUnavailable =>
-      'Отметки дней не загружены.';
-
-  @override
-  String get dailyChoiceCalendarExpand => 'Развернуть календарь';
-
-  @override
-  String get dailyChoiceCalendarCollapse => 'Свернуть календарь';
-
-  @override
-  String get dailyChoiceCalendarPreviousMonth => 'Предыдущий месяц';
-
-  @override
-  String get dailyChoiceCalendarNextMonth => 'Следующий месяц';
-
-  @override
-  String get dailyChoiceCalendarChooseYearAndMonth => 'Выбрать год и месяц';
-
-  @override
-  String get dailyChoiceCalendarBackToMonthDays => 'Вернуться к дням месяца';
-
-  @override
-  String get dailyChoiceCalendarPreviousYears => 'Предыдущие годы';
-
-  @override
-  String get dailyChoiceCalendarNextYears => 'Следующие годы';
-
-  @override
-  String get dailyChoiceCalendarPreviousYear => 'Предыдущий год';
-
-  @override
-  String get dailyChoiceCalendarNextYear => 'Следующий год';
-
-  @override
-  String get dailyChoiceCatalogIncomplete => 'Невыполненные';
-
-  @override
-  String get dailyChoiceCatalogCompleted => 'Выполненные';
-
-  @override
-  String get dailyChoiceCatalogEmptyTitle => 'Выборов на эту дату нет';
-
-  @override
-  String get dailyChoiceCatalogEmptyText =>
-      'Создайте выбор из действия и назначьте эту дату. Он появится здесь.';
-
-  @override
-  String get dailyChoiceCatalogRefreshing => 'Обновляем…';
-
-  @override
-  String get dailyChoiceCatalogScrollToTop => 'Вернуться к началу';
-
-  @override
-  String get dailyChoiceCatalogLoadingMore => 'Загружаем ещё дневные выборы…';
-
-  @override
-  String get dailyChoiceCatalogUnavailable =>
-      'Не удалось загрузить дневные выборы.';
-
-  @override
-  String get dailyChoiceCatalogCorruption =>
-      'Сохранённые данные дневных выборов повреждены и не могут быть показаны.';
-
-  @override
-  String get dailyChoiceCatalogExpired =>
-      'Каталог изменился. Обновите его, чтобы продолжить.';
-
-  @override
-  String get dailyChoiceCatalogUnexpected =>
-      'Не удалось загрузить дневные выборы из-за непредвиденной ошибки.';
-
-  @override
-  String dailyChoiceCatalogPathStepCount(int count) {
+  String actionDayPathIntentionCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count шага в пути',
-      many: '$count шагов в пути',
-      few: '$count шага в пути',
-      one: '$count шаг в пути',
+      other: '$count намерения в пути',
+      many: '$count намерений в пути',
+      few: '$count намерения в пути',
+      one: '$count намерение в пути',
     );
     return '$_temp0';
   }
 
   @override
-  String dailyChoiceCatalogCompletionLabel(
-    int number,
-    String action,
-    String priority,
-  ) {
-    return 'Выполнение выбора № $number. $action. $priority';
+  String actionDayCompletionLabel(int number, String action, String priority) {
+    return 'Выполнение действия № $number. $action. $priority';
   }
 
   @override
-  String get dailyChoiceCompletionRefresh => 'Обновить выбор';
-
-  @override
-  String dailyChoiceCatalogRowLabel(int number, String action) {
-    return 'Выбор № $number. $action';
+  String actionDayRowLabel(int number, String action) {
+    return 'Действие № $number. $action';
   }
 
   @override
-  String dailyChoiceCatalogRowSource(String source) {
-    return 'Исходное намерение: $source';
+  String actionDayRowRoot(String root) {
+    return 'Корневое намерение: $root';
   }
 
   @override
-  String dailyChoiceCatalogRowTime(String time) {
+  String actionDayRowTime(String time) {
     return 'В $time';
   }
 
   @override
-  String get dailyChoiceDetailsTitle => 'Дневной выбор';
+  String get actionCompleted => 'Выполнено';
 
   @override
-  String get dailyChoiceDetailsLoading => 'Загружаем дневной выбор…';
-
-  @override
-  String get dailyChoiceDetailsNotFound =>
-      'Дневной выбор больше не существует.';
-
-  @override
-  String get dailyChoiceDetailsUnavailable =>
-      'Не удалось загрузить дневной выбор. Повторите попытку.';
-
-  @override
-  String get dailyChoiceDetailsCorruption =>
-      'Сохранённый путь повреждён и не может быть показан.';
-
-  @override
-  String get dailyChoiceDetailsUnexpected =>
-      'Не удалось загрузить дневной выбор из-за непредвиденной ошибки.';
-
-  @override
-  String dailyChoiceDetailsPhrase(String source, String selected) {
-    return 'Чтобы $source, я сегодня $selected';
-  }
-
-  @override
-  String dailyChoiceDetailsDate(String date) {
-    return 'Дата дневного выбора: $date';
-  }
-
-  @override
-  String get dailyChoiceDetailsCompleted => 'Выполнено';
-
-  @override
-  String get dailyChoiceDetailsNotCompleted => 'Не выполнено';
-
-  @override
-  String get dailyChoiceDetailsSource => 'Основание';
-
-  @override
-  String get dailyChoiceDetailsIntermediate => 'Промежуточное намерение';
-
-  @override
-  String get dailyChoiceDetailsSelectedAction => 'Выбранное действие';
-
-  @override
-  String get dailyChoiceDetailsArchived => 'Архивировано';
-
-  @override
-  String get dailyChoiceDetailsActive => 'Активно';
-
-  @override
-  String dailyChoiceDetailsStep(int number) {
-    return 'Переход $number';
-  }
-
-  @override
-  String get dailyChoiceSheetExpand => 'Раскрыть панель дневного выбора';
-
-  @override
-  String get dailyChoiceSheetCollapse => 'Свернуть панель дневного выбора';
-
-  @override
-  String dailyChoiceSheetCompletionLabel(String action, String priority) {
-    return 'Выполнение выбора. $action. $priority';
-  }
-
-  @override
-  String get dailyChoiceSheetOptionsLabel => 'Параметры дневного выбора';
-
-  @override
-  String get dailyChoiceSheetTabsLabel => 'Разделы дневного выбора';
-
-  @override
-  String get dailyChoiceSheetPathTab => 'Путь';
-
-  @override
-  String dailyChoiceSheetPathTabLabel(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Путь, $count шага',
-      many: 'Путь, $count шагов',
-      few: 'Путь, $count шага',
-      one: 'Путь, $count шаг',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String dailyChoiceSheetPathTabArchivedLabel(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Путь, $count шага, в пути есть архив',
-      many: 'Путь, $count шагов, в пути есть архив',
-      few: 'Путь, $count шага, в пути есть архив',
-      one: 'Путь, $count шаг, в пути есть архив',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get dailyChoiceSheetPathArchivedNote =>
-      'В пути есть архивированные намерения или связи.';
-
-  @override
-  String get dailyChoiceSheetDescriptionTitle => 'Описание';
-
-  @override
-  String get dailyChoiceSheetDescriptionBack => 'Назад к дневному выбору';
-
-  @override
-  String get dailyChoiceSheetDescriptionSave => 'Сохранить';
-
-  @override
-  String get dailyChoiceSheetDescriptionDiscardTitle => 'Отменить изменения?';
-
-  @override
-  String get dailyChoiceSheetDescriptionDiscardMessage =>
-      'Изменения описания не сохранятся.';
-
-  @override
-  String get dailyChoiceSheetDescriptionDiscardAction => 'Отменить';
-
-  @override
-  String get dailyChoiceSheetDescriptionContinueAction => 'Продолжить правку';
-
-  @override
-  String get dailyChoiceFieldDate => 'Дата';
-
-  @override
-  String get dailyChoiceFieldTime => 'Время';
-
-  @override
-  String dailyChoiceFieldDateLabel(String date) {
-    return 'Дата: $date. Изменить дату';
-  }
-
-  @override
-  String dailyChoiceFieldTimeLabel(String time) {
-    return 'Время: $time. Изменить время';
-  }
-
-  @override
-  String get dailyChoiceDateSheetLabel => 'Дата дневного выбора';
-
-  @override
-  String get dailyChoiceTimeSheetLabel => 'Время дневного выбора';
-
-  @override
-  String get dailyChoiceTimeHalfSwitchLabel => 'Половина суток';
-
-  @override
-  String get dailyChoiceTimeAmLabel => 'До полудня';
-
-  @override
-  String get dailyChoiceTimePmLabel => 'После полудня';
-
-  @override
-  String get dailyChoiceDateTomorrow => 'Завтра';
-
-  @override
-  String get dailyChoiceDateYesterday => 'Вчера';
-
-  @override
-  String get dailyChoiceCreationPath => 'Подтверждаемый путь';
-
-  @override
-  String dailyChoiceCreationAction(String action) {
-    return 'Выбранное действие: $action';
-  }
-
-  @override
-  String get dailyChoiceCreationDescription => 'Описание (необязательно)';
-
-  @override
-  String get dailyChoiceCreationCompleted => 'Уже выполнено';
-
-  @override
-  String get dailyChoiceCreationCompletedHint =>
-      'Отметьте, если действие уже выполнено для этой даты';
-
-  @override
-  String get dailyChoiceCreationSave => 'Сохранить дневной выбор';
-
-  @override
-  String get dailyChoiceCreationSaving => 'Сохраняем…';
-
-  @override
-  String get dailyChoiceCreationCancel => 'Отмена';
-
-  @override
-  String get dailyChoiceCreationRefreshPath =>
-      'Вернуться к пути и актуализировать его';
-
-  @override
-  String get choicePathOpenConfirmation => 'Перейти к подтверждению выбора';
+  String get actionNotCompleted => 'Не выполнено';
 
   @override
   String get creationCancelAction => 'Отменить создание';
@@ -3124,6 +3128,9 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get batchAnchorNote => 'Намерение, со страницы которого вы пришли';
+
+  @override
+  String get batchPathEndAnchorNote => 'Последнее намерение пути';
 
   @override
   String get batchEmpty => 'Пока ничего не выбрано';
@@ -3189,4 +3196,427 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get batchContinueAction => 'Продолжить выбор';
+
+  @override
+  String get actionEditorTitle => 'Новое действие';
+
+  @override
+  String get actionEditorCreate => 'Создать действие';
+
+  @override
+  String get actionEditorDiscardTitle => 'Отменить новое действие?';
+
+  @override
+  String get actionEditorDiscardMessage =>
+      'Введённые название и описание не будут сохранены.';
+
+  @override
+  String get actionEditorPathEmptyHint =>
+      'Действию нужно хотя бы одно намерение, которому оно служит.';
+
+  @override
+  String actionEditorPathBetween(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count промежуточного намерения',
+      many: '$count промежуточных намерений',
+      few: '$count промежуточных намерения',
+      one: '$count промежуточное намерение',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String actionEditorPathThen(String previous, String next) {
+    return '$previous, затем $next';
+  }
+
+  @override
+  String actionEditorPathLabel(String path) {
+    return 'Путь: $path. Изменить путь';
+  }
+
+  @override
+  String get actionEditorPathLinkArchived => 'Связь в архиве';
+
+  @override
+  String get actionEditorPathLinkDeleted => 'Связь удалена';
+
+  @override
+  String actionEditorPriorityLabel(String priority) {
+    return 'Приоритет $priority. Изменить приоритет';
+  }
+
+  @override
+  String get actionPriorityHighest => 'Самый высокий';
+
+  @override
+  String get actionPriorityLowest => 'Самый низкий';
+
+  @override
+  String cascadeArchiveIntentionSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count вспомогательными',
+      many: '$count вспомогательными',
+      few: '$count вспомогательными',
+      one: '$count вспомогательным',
+    );
+    return 'В архиве вместе с $_temp0';
+  }
+
+  @override
+  String cascadeArchiveIntentionPromoted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count намерения стали главными',
+      many: '$count намерений стали главными',
+      few: '$count намерения стали главными',
+      one: '$count намерение стало главным',
+    );
+    return 'В архиве, $_temp0';
+  }
+
+  @override
+  String cascadeArchiveRelationSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count вспомогательными',
+      many: '$count вспомогательными',
+      few: '$count вспомогательными',
+      one: '$count вспомогательным',
+    );
+    return 'Связь в архиве вместе с $_temp0';
+  }
+
+  @override
+  String get cascadeArchiveRelationPromoted =>
+      'Связь в архиве, намерение стало главным';
+
+  @override
+  String cascadeDeleteIntentionSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count вспомогательными',
+      many: '$count вспомогательными',
+      few: '$count вспомогательными',
+      one: '$count вспомогательным',
+    );
+    return 'Намерение удалено вместе с $_temp0';
+  }
+
+  @override
+  String cascadeDeleteIntentionPromoted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count намерения стали главными',
+      many: '$count намерений стали главными',
+      few: '$count намерения стали главными',
+      one: '$count намерение стало главным',
+    );
+    return 'Намерение удалено, $_temp0';
+  }
+
+  @override
+  String cascadeDeleteRelationSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count вспомогательными',
+      many: '$count вспомогательными',
+      few: '$count вспомогательными',
+      one: '$count вспомогательным',
+    );
+    return 'Связь удалена вместе с $_temp0';
+  }
+
+  @override
+  String get cascadeDeleteRelationPromoted =>
+      'Связь удалена, намерение стало главным';
+
+  @override
+  String cascadeDeleteIntentionArchived(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'ушли $count намерения',
+      many: 'ушли $count намерений',
+      few: 'ушли $count намерения',
+      one: 'ушло $count намерение',
+    );
+    return 'Намерение удалено; в архив $_temp0';
+  }
+
+  @override
+  String cascadeDeleteRelationArchived(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'ушли $count намерения',
+      many: 'ушли $count намерений',
+      few: 'ушли $count намерения',
+      one: 'ушло $count намерение',
+    );
+    return 'Связь удалена; в архив $_temp0';
+  }
+
+  @override
+  String cascadeDeleteArchived(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'ушли $count намерения',
+      many: 'ушли $count намерений',
+      few: 'ушли $count намерения',
+      one: 'ушло $count намерение',
+    );
+    return '; в архив $_temp0';
+  }
+
+  @override
+  String cascadeRestoreIntentionSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count вспомогательными',
+      many: '$count вспомогательными',
+      few: '$count вспомогательными',
+      one: '$count вспомогательным',
+    );
+    return 'Восстановлено вместе с $_temp0';
+  }
+
+  @override
+  String get cascadeRestoreIntentionMain => 'Восстановлено как главное';
+
+  @override
+  String cascadeRestoreIntentionMainSupporting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count вспомогательными',
+      many: '$count вспомогательными',
+      few: '$count вспомогательными',
+      one: '$count вспомогательным',
+    );
+    return 'Восстановлено как главное вместе с $_temp0';
+  }
+
+  @override
+  String cascadeRestoreRelation(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count намерениями',
+      many: '$count намерениями',
+      few: '$count намерениями',
+      one: '$count намерением',
+    );
+    return 'Связь восстановлена вместе с $_temp0';
+  }
+
+  @override
+  String get cascadeRestoreRelationMain =>
+      'Связь восстановлена, намерение вернулось главным';
+
+  @override
+  String cascadeRestoreRelationMainOthers(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count намерениями',
+      many: '$count намерениями',
+      few: '$count намерениями',
+      one: '$count намерением',
+    );
+    return 'Связь восстановлена вместе с $_temp0, одно из них главным';
+  }
+
+  @override
+  String get detailsCascadeArchiveTitle => 'Архивировать намерение?';
+
+  @override
+  String get detailsCascadeRestoreTitle => 'Восстановить намерение?';
+
+  @override
+  String detailsCascadeArchiveQuestion(int count) {
+    return 'Вместе с ним в архив уйдут вспомогательные намерения: $count.';
+  }
+
+  @override
+  String detailsCascadeRestoreQuestion(int count) {
+    return 'Вместе с ним вернутся вспомогательные намерения: $count.';
+  }
+
+  @override
+  String get detailsCascadeWithSupporting => 'Со вспомогательными';
+
+  @override
+  String get detailsCascadeOnlyThis => 'Только это';
+
+  @override
+  String detailsCascadeArchiveHint(int count) {
+    return 'Вместе с ним в архив уйдут вспомогательные намерения: $count';
+  }
+
+  @override
+  String detailsCascadeRestoreHint(int count) {
+    return 'Вместе с ним вернутся вспомогательные намерения: $count';
+  }
+
+  @override
+  String detailsCascadeDeleteHint(int count) {
+    return 'Вместе с ним будут удалены вспомогательные намерения: $count';
+  }
+
+  @override
+  String detailsCascadeDeleteArchiveHint(int count) {
+    return 'В архив уйдут намерения: $count';
+  }
+
+  @override
+  String get detailsOptionDeleteKeepsPaths =>
+      'В сохранённых путях останется с пометкой «Удалено»';
+
+  @override
+  String detailsDeleteCascadeTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count намерения',
+      many: '$count намерений',
+      few: '$count намерения',
+      one: '$count намерение',
+    );
+    return 'Удалить $_temp0?';
+  }
+
+  @override
+  String detailsDeleteCascadeText(String title) {
+    return 'Вместе с намерением «$title» будут удалены вспомогательные намерения, которые больше не удерживаются ни одним главным.';
+  }
+
+  @override
+  String detailsDeleteSingleText(String title) {
+    return 'Намерение «$title» и его описание будут удалены. Теги сохранятся.';
+  }
+
+  @override
+  String detailsDeleteRelations(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count связи',
+      many: '$count связей',
+      few: '$count связи',
+      one: '$count связь',
+    );
+    return 'Связи, которые будут удалены: $_temp0.';
+  }
+
+  @override
+  String get detailsDeleteIrreversible => 'Удаление нельзя отменить.';
+
+  @override
+  String get detailsDeletePaths =>
+      'Пути действий сохранят удалённое с пометкой «Удалено».';
+
+  @override
+  String get detailsDeleteArchiveText =>
+      'Эти намерения уйдут в архив вместе со своими связями.';
+
+  @override
+  String detailsDeleteSupportingList(int count) {
+    return 'Вспомогательные, уходят вместе с ним · $count';
+  }
+
+  @override
+  String detailsDeleteMainsList(int count) {
+    return 'Главные, теряют только связь · $count';
+  }
+
+  @override
+  String detailsDeleteArchivedList(int count) {
+    return 'Уйдут в архив · $count';
+  }
+
+  @override
+  String detailsDeleteShowAll(int count) {
+    return 'Показать все $count';
+  }
+
+  @override
+  String detailsDeletePromoted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count станут главными',
+      many: '$count станут главными',
+      few: '$count станут главными',
+      one: '$count станет главным',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String detailsDeleteArchivedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'уйдут $count',
+      many: 'уйдут $count',
+      few: 'уйдут $count',
+      one: 'уйдёт $count',
+    );
+    return 'в архив $_temp0';
+  }
+
+  @override
+  String detailsDeleteOnlyEffects(String effects) {
+    return 'Только это: $effects';
+  }
+
+  @override
+  String detailsDeleteCount(int count) {
+    return 'Удалить $count';
+  }
+
+  @override
+  String relationDeleteCascadeTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count намерения',
+      many: '$count намерений',
+      few: '$count намерения',
+      one: '$count намерение',
+    );
+    return 'Удалить связь и $_temp0?';
+  }
+
+  @override
+  String relationDeleteCascadeText(String title) {
+    return 'Намерение «$title» вспомогательное и после удаления связи больше не удерживается ни одним главным.';
+  }
+
+  @override
+  String relationDeleteAndMore(int count) {
+    return 'и ещё $count';
+  }
+
+  @override
+  String get relationDeleteKeepMainEffect =>
+      'Оставить главным: намерение станет главным';
+
+  @override
+  String get relationDeleteKeepMain => 'Оставить главным';
+
+  @override
+  String get relationDeleteAll => 'Удалить всё';
 }

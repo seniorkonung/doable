@@ -8,7 +8,6 @@ import 'package:doable/src/design_system/doable_theme.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart'
     hide IntentionCatalogPage;
 import 'package:doable/src/intention/application/intention_result.dart';
-import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_catalog_purpose.dart';
 import 'package:doable/src/intention/presentation/catalog/intention_tag_conditions_view_model.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
@@ -181,7 +180,6 @@ void main() {
         testSummary(
           index: index,
           title: 'Долгая прогулка до дальнего парка $index',
-          readiness: IntentionReadiness.ready,
           description: 'Описание',
           tags: index == 2 ? const [] : rowTags,
         ),
@@ -262,7 +260,6 @@ void main() {
     final lastSummary = testSummary(
       index: 1,
       title: 'Долгая прогулка до дальнего парка 1',
-      readiness: IntentionReadiness.ready,
       tags: rowTags,
     );
     repository.complete(

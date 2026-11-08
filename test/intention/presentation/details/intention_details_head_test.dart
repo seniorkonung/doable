@@ -23,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/intention_options.dart';
 import '../../../support/ordinary_page_test_app.dart';
+import '../../../support/intention_cascade_execution.dart';
 import 'details_test_support.dart';
 
 void main() {
@@ -71,46 +72,38 @@ void main() {
     testWidgets('после загрузки панель называет тип и показывает его значок: '
         '${locale.languageCode}', (tester) async {
       final semantics = tester.ensureSemantics();
-      for (final readiness in IntentionReadiness.values) {
-        final repository = ControlledDetailsRepository();
-        final intention = testDetailsIntention(readiness: readiness);
-        await _pumpPage(tester, repository, intention, locale: locale);
-        await waitForDetailRequests(repository, 1);
-        repository.detailRequests.single.add(ResultSuccess(intention));
-        await tester.pumpAndSettle();
+      final repository = ControlledDetailsRepository();
+      final intention = testDetailsIntention();
+      await _pumpPage(tester, repository, intention, locale: locale);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests.single.add(ResultSuccess(intention));
+      await tester.pumpAndSettle();
 
-        final ready = readiness == IntentionReadiness.ready;
-        final type = ready
-            ? (russian ? 'Действие' : 'Action')
-            : (russian ? 'Намерение' : 'Intention');
-        final bar = tester.widget<TopBar>(find.byType(TopBar));
-        expect(bar.title, type);
-        expect(
-          bar.titleIcon,
-          ready ? DoableIconData.bolt : DoableIconData.intention,
-        );
-        expect(
-          tester.getSemantics(_barText),
-          isSemantics(
-            label: type,
-            namesRoute: true,
-            isHeader: true,
-            children: const [],
-          ),
-        );
-        expect(
-          find.bySemanticsLabel(
-            russian ? 'Подробности намерения' : 'Intention details',
-          ),
-          findsNothing,
-        );
-        expect(
-          tester.widget<PageHead>(find.byType(PageHead)).name,
-          intention.title,
-        );
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pump();
-      }
+      final type = russian ? 'Намерение' : 'Intention';
+      final bar = tester.widget<TopBar>(find.byType(TopBar));
+      expect(bar.title, type);
+      expect(bar.titleIcon, DoableIconData.intention);
+      expect(
+        tester.getSemantics(_barText),
+        isSemantics(
+          label: type,
+          namesRoute: true,
+          isHeader: true,
+          children: const [],
+        ),
+      );
+      expect(
+        find.bySemanticsLabel(
+          russian ? 'Подробности намерения' : 'Intention details',
+        ),
+        findsNothing,
+      );
+      expect(
+        tester.widget<PageHead>(find.byType(PageHead)).name,
+        intention.title,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
       semantics.dispose();
     });
   }
@@ -298,7 +291,7 @@ void main() {
       tester.element(find.byType(IntentionDetailsPage)),
     ).read(graphCommandCoordinatorProvider.notifier);
     final busy = coordinator.acceptExisting(
-      DeleteIntention(intention.id),
+      givenDeleteIntention(intention.id),
       presentationTitle: intention.title,
     ) as IntentionCommandAccepted;
     coordinator.releaseInitiatorPresentation(busy.token);

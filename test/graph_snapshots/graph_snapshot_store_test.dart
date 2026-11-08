@@ -3,10 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/action/application/action_command.dart';
 import 'package:doable/src/data/local/app_database.dart' show AppDatabase;
 import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
@@ -31,10 +28,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:uuid/uuid.dart';
 
+import '../support/action_seed.dart';
 import '../support/encoded_diagnostics_log.dart';
 import '../support/forwarding_graph_fact_log.dart';
 import '../support/graph_log_completeness_reference.dart';
+import '../support/graph_seed.dart';
 import '../support/in_memory_diagnostics_sink.dart';
+import '../support/intention_cascade_execution.dart';
 import '../support/local_database_harness.dart';
 
 void main() {
@@ -90,13 +90,11 @@ void main() {
 
   Future<Intention> createIntention(
     String title, {
-    IntentionReadiness readiness = IntentionReadiness.notReady,
     Set<TagId> tagIds = const {},
   }) async => (await confirm<IntentionSaved>(
     CreateIntention.withInitialState(
       title: title,
       description: null,
-      readiness: readiness,
       tagIds: tagIds,
     ),
   )).intention;
@@ -140,31 +138,30 @@ void main() {
       'Здоровье',
       tagIds: {home.id, sport.id},
     );
-    final running = await createIntention(
-      'Бегать',
-      readiness: IntentionReadiness.ready,
-    );
+    final running = await createIntention('Бегать');
     final swimming = await createIntention('Плавать');
-    final needRunning = await relate(health, running);
+    await relate(health, running);
     await relate(health, swimming, type: LongTermRelationType.can);
-    final choice = (await confirm<DailyChoiceCreated>(
-      CreateDailyChoice(
-        sourceIntentionId: health.id,
-        selectedIntentionId: running.id,
-        path: ConfirmedChoicePath([
-          ConfirmedChoicePathStep(
-            relationId: needRunning.id,
-            sourceIntentionId: health.id,
-            type: needRunning.type,
-            relatedIntentionId: running.id,
-          ),
-        ]),
-        date: CalendarDate.fromParts(2026, 10, 17),
-        description: null,
-        isCompleted: false,
+    final action = seedActionId(1);
+    await recordGraphChange(
+      database,
+      () => insertAction(
+        database,
+        id: action.toCanonicalString(),
+        path: [health.id.toCanonicalString(), running.id.toCanonicalString()],
       ),
-    )).choice;
+      recordedAt: now,
+    );
     await store.writeSnapshot(await repository.readCurrentPosition());
+
+    await recordGraphChange(
+      database,
+      () => database.customStatement(
+        "UPDATE intentions SET kind = 'supporting' WHERE id = ?",
+        [running.id.toCanonicalString()],
+      ),
+      recordedAt: now,
+    );
 
     await confirm(
       UpdateTag(
@@ -175,8 +172,8 @@ void main() {
     );
     await confirm(RemoveTagAssignment(tagId: home.id, intentionId: health.id));
     await confirm(AssignTag(tagId: home.id, intentionId: health.id));
-    await confirm(DeleteDailyChoice(choice.id));
-    await confirm(ArchiveIntention(swimming.id));
+    await confirm(DeleteAction(action));
+    await confirm(await previewedArchiveIntention(repository, swimming.id));
     await createIntention('Читать');
     final position = await repository.readCurrentPosition();
     await store.writeSnapshot(position);
@@ -413,7 +410,7 @@ typedef _Counts = ({
   int intentions,
   int tagAssignments,
   int longTermRelations,
-  int dailyChoices,
+  int actions,
 });
 
 _Counts _counts(GraphRecordCounts counts) => (
@@ -421,7 +418,7 @@ _Counts _counts(GraphRecordCounts counts) => (
   intentions: counts.intentions,
   tagAssignments: counts.tagAssignments,
   longTermRelations: counts.longTermRelations,
-  dailyChoices: counts.dailyChoices,
+  actions: counts.actions,
 );
 
 _Counts _countsOf(List<GraphEntityRecord> records) => (
@@ -429,5 +426,5 @@ _Counts _countsOf(List<GraphEntityRecord> records) => (
   intentions: records.whereType<IntentionRecord>().length,
   tagAssignments: records.whereType<TagAssignmentRecord>().length,
   longTermRelations: records.whereType<LongTermRelationRecord>().length,
-  dailyChoices: records.whereType<DailyChoiceRecord>().length,
+  actions: records.whereType<ActionRecord>().length,
 );

@@ -11,7 +11,7 @@ import 'package:doable/src/app/quick_creation/quick_creation_mode.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/app/routing/app_router_provider.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_catalog_page.dart';
+import 'package:doable/src/action/presentation/day/action_day_root_page.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show openInMemoryLocalDatabase;
 import 'package:doable/src/design_system/components/empty_state.dart';
@@ -35,14 +35,14 @@ import '../../support/quick_creation.dart';
 import '../../support/tag_storage_fixture.dart';
 
 /// Намерение страницы, над которой открыта панель связи, и страницы, которую
-/// открывает лист над корневым каталогом дневных выборов.
+/// открывает лист над корневым экраном дня.
 const _origin = 1;
 
 /// Намерение страницы, которую панель открывает поверх себя.
 const _other = 2;
 
 /// Связь «чтобы другое, нужно исходное», которую открывает панель на странице
-/// исходного намерения: готовое к действию намерение открывается на группе
+/// исходного намерения: главное намерение открывается на группе
 /// «Нужно для».
 const _relation = 10;
 
@@ -144,7 +144,7 @@ void main() {
     ('системное «назад»', _systemBack),
   ]) {
     testWidgets('$name со страницы над листом, открытым над корневым каталогом '
-        'дневных выборов, возвращает тот же лист с его состоянием, а '
+        'действий, возвращает тот же лист с его состоянием, а '
         'следующее «назад» показывает каталог', (tester) async {
       final router = await _start(tester);
       await _openPageAboveCatalogSheet(tester, router);
@@ -158,14 +158,14 @@ void main() {
 
       expect(_allSheets, findsNothing);
       expect(_allIntentionPages, findsNothing);
-      expectDailyChoicesRootPage(router);
-      expect(find.byType(DailyChoiceCatalogPage), findsOneWidget);
+      expectActionsRootPage(router);
+      expect(find.byType(ActionDayRootPage), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }
 
   testWidgets('выбор пункта панели навигации на странице над листом, '
-      'открытым над корневым каталогом дневных выборов, убирает из истории '
+      'открытым над корневым экраном дня, убирает из истории '
       'и страницу, и лист', (tester) async {
     final router = await _start(tester);
     await _openPageAboveCatalogSheet(tester, router);
@@ -248,22 +248,22 @@ Future<void> _openPageAboveSheet(WidgetTester tester, AppRouter router) async {
   expect(appNavigationDestinations().hitTestable(), findsExactly(3));
 }
 
-/// Открывает дневные выборы корневой страницей, показывает над каталогом лист
+/// Открывает экран дня корневой страницей, показывает над ним лист
 /// с состоянием «Счёт: 1» и открывает из листа страницу намерения [_origin],
 /// которая встаёт над листом.
 Future<void> _openPageAboveCatalogSheet(
   WidgetTester tester,
   AppRouter router,
 ) async {
-  await openDailyChoices(tester);
+  await openActions(tester);
   // Пустой день показан, когда первая загрузка закончилась и ничто не движется.
   await _until(tester, find.byType(EmptyState));
   await tester.pumpAndSettle();
-  expectDailyChoicesRootPage(router);
+  expectActionsRootPage(router);
 
   unawaited(
     showDoableSheet<void>(
-      context: tester.element(find.byType(DailyChoiceCatalogPage)),
+      context: tester.element(find.byType(ActionDayRootPage)),
       builder: (_, presentation) => Sheet(
         presentation,
         title: _catalogSheetTitle,
@@ -356,9 +356,9 @@ Future<AppRouter> _start(WidgetTester tester) async {
       (_other, _otherTitle),
     ]) {
       raw.execute(
-        'INSERT INTO intentions (id, title, is_action_ready, is_archived, '
+        'INSERT INTO intentions (id, title, kind, is_archived, '
         'created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [tagFixtureId(number), title, 1, 0, number, number],
+        [tagFixtureId(number), title, 'main', 0, number, number],
       );
     }
     raw.execute(

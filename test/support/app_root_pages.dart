@@ -1,9 +1,9 @@
 /// Общие шаги входа в корневые страницы приложения и возврата на них.
 ///
 /// Это единственное место в `test/`, которое знает способ входа в Главную,
-/// каталог намерений и каталог дневных выборов и вид нижнего маршрута под
+/// каталог намерений и экран дня и вид нижнего маршрута под
 /// открытыми страницами. Сценарий называет только намерение — «открыть
-/// Главную», «открыть граф намерений», «открыть дневные выборы», «вернулись
+/// Главную», «открыть граф намерений», «открыть действия», «вернулись
 /// на корневую страницу» — и не зависит от того, как приложение размещает
 /// корневые страницы.
 ///
@@ -130,23 +130,23 @@ Future<void> openIntentionGraph(
   if (content != null) await waitFor(tester, content);
 }
 
-/// Открывает дневные выборы — каталог дневных выборов как корневую страницу.
+/// Открывает действия — экран дня как корневую страницу.
 ///
 /// Шаг нажимает вход и не ждёт содержимого каталога: его дожидается сам
 /// сценарий. [tap] — нажатие сценария; по умолчанию [tapWhenFound].
-Future<void> openDailyChoices(
+Future<void> openActions(
   WidgetTester tester, {
   RootPageTap tap = tapWhenFound,
-}) => tap(tester, appNavigationDestination(AppDestination.dailyChoices));
+}) => tap(tester, appNavigationDestination(AppDestination.actions));
 
-/// Открывает дневные выборы переходом маршрутизатора, без нажатия.
+/// Открывает действия переходом маршрутизатора, без нажатия.
 ///
-/// Для страничных проверок, которые показывают каталог дневных выборов до
+/// Для страничных проверок, которые показывают экран дня до
 /// первого кадра и поэтому не могут нажать вход: переход начинается сразу, а
 /// кадры продвигает сам сценарий.
-void openDailyChoicesOn(StackRouter router) {
+void openActionsOn(StackRouter router) {
   unawaited(
-    router.navigate(const AppShellRoute(children: [DailyChoiceCatalogRoute()])),
+    router.navigate(const AppShellRoute(children: [ActionDayRootRoute()])),
   );
 }
 
@@ -195,9 +195,9 @@ Future<void> returnToIntentionGraphAfterCreation(
   expect(find.byType(IntentionCatalogPage), findsOneWidget);
 }
 
-/// Проверяет, что все страницы поверх закрыты и открыты дневные выборы.
-void expectDailyChoicesRootPage(StackRouter router) {
-  _expectRootPage(router, DailyChoiceCatalogRoute.name);
+/// Проверяет, что все страницы поверх закрыты и открыты действия.
+void expectActionsRootPage(StackRouter router) {
+  _expectRootPage(router, ActionDayRootRoute.name);
 }
 
 /// Нижний маршрут — оболочка, а её выбранный пункт показывает [rootPage].

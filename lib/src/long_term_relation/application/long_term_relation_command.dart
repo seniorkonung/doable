@@ -1,11 +1,11 @@
 import '../../graph/application/graph_command_result.dart';
 import '../../graph/application/graph_revision.dart';
+import '../../intention/application/cascade/intention_cascade.dart';
 import '../../intention/domain/intention_id.dart';
 import '../domain/long_term_relation.dart';
 import '../domain/long_term_relation_description.dart';
 import '../domain/long_term_relation_id.dart';
 import 'intention_relation_group.dart';
-import 'long_term_relation_permissions.dart';
 
 sealed class LongTermRelationCommand
     implements
@@ -39,19 +39,53 @@ final class AddLongTermRelations extends LongTermRelationCommand {
     required IntentionId pageIntentionId,
     required IntentionRelationGroup group,
     required Iterable<IntentionId> candidateIds,
+  }) => AddLongTermRelations._validated(
+    pageIntentionId: pageIntentionId,
+    group: group,
+    candidateIds: List.unmodifiable(candidateIds),
+    supportingCandidateIds: const {},
+  );
+
+  /// Добавляет связи в исходящую группу: кандидаты оказываются ниже намерения
+  /// страницы, поэтому созданное в поиске намерение может стать
+  /// вспомогательным вместе со своей связью.
+  factory AddLongTermRelations.outgoing({
+    required IntentionId pageIntentionId,
+    required LongTermRelationType type,
+    required Iterable<OutgoingRelationCandidate> candidates,
   }) {
-    final candidates = List<IntentionId>.unmodifiable(candidateIds);
-    if (candidates.isEmpty) {
+    final ordered = List<OutgoingRelationCandidate>.of(candidates);
+    return AddLongTermRelations._validated(
+      pageIntentionId: pageIntentionId,
+      group: switch (type) {
+        LongTermRelationType.need => IntentionRelationGroup.needs,
+        LongTermRelationType.can => IntentionRelationGroup.canUse,
+      },
+      candidateIds: List.unmodifiable(ordered.map((candidate) => candidate.id)),
+      supportingCandidateIds: Set.unmodifiable({
+        for (final candidate in ordered)
+          if (candidate.becomesSupporting) candidate.id,
+      }),
+    );
+  }
+
+  factory AddLongTermRelations._validated({
+    required IntentionId pageIntentionId,
+    required IntentionRelationGroup group,
+    required List<IntentionId> candidateIds,
+    required Set<IntentionId> supportingCandidateIds,
+  }) {
+    if (candidateIds.isEmpty) {
       throw const AddLongTermRelationsValidationException(
         AddLongTermRelationsValidationFailure.noCandidates,
       );
     }
-    if (candidates.toSet().length != candidates.length) {
+    if (candidateIds.toSet().length != candidateIds.length) {
       throw const AddLongTermRelationsValidationException(
         AddLongTermRelationsValidationFailure.duplicateCandidates,
       );
     }
-    if (candidates.contains(pageIntentionId)) {
+    if (candidateIds.contains(pageIntentionId)) {
       throw const AddLongTermRelationsValidationException(
         AddLongTermRelationsValidationFailure.pageIntentionAmongCandidates,
       );
@@ -59,7 +93,8 @@ final class AddLongTermRelations extends LongTermRelationCommand {
     return AddLongTermRelations._(
       pageIntentionId: pageIntentionId,
       group: group,
-      candidateIds: candidates,
+      candidateIds: candidateIds,
+      supportingCandidateIds: supportingCandidateIds,
     );
   }
 
@@ -67,11 +102,25 @@ final class AddLongTermRelations extends LongTermRelationCommand {
     required this.pageIntentionId,
     required this.group,
     required this.candidateIds,
+    required this.supportingCandidateIds,
   });
 
   final IntentionId pageIntentionId;
   final IntentionRelationGroup group;
   final List<IntentionId> candidateIds;
+
+  /// Кандидаты, которые становятся вспомогательными в той же операции, что и
+  /// их связи. Непуст только у исходящей группы.
+  final Set<IntentionId> supportingCandidateIds;
+}
+
+/// Кандидат исходящей группы; [becomesSupporting] делает его вспомогательным
+/// вместе со связью.
+final class OutgoingRelationCandidate {
+  const OutgoingRelationCandidate(this.id, {this.becomesSupporting = false});
+
+  final IntentionId id;
+  final bool becomesSupporting;
 }
 
 sealed class LongTermRelationFieldPatch<T extends Object> {
@@ -137,22 +186,28 @@ final class UpdateLongTermRelation extends LongTermRelationCommand {
   final LongTermRelationPatch patch;
 }
 
+/// Архивирует связь по варианту [execution] (D7, ADR-0057).
 final class ArchiveLongTermRelation extends LongTermRelationCommand {
-  const ArchiveLongTermRelation(this.relationId);
+  const ArchiveLongTermRelation(this.relationId, {required this.execution});
 
   final LongTermRelationId relationId;
+  final CascadeExecution<ArchiveCascadeComposition> execution;
 }
 
+/// Восстанавливает связь по варианту [execution] (D7, ADR-0057).
 final class RestoreLongTermRelation extends LongTermRelationCommand {
-  const RestoreLongTermRelation(this.relationId);
+  const RestoreLongTermRelation(this.relationId, {required this.execution});
 
   final LongTermRelationId relationId;
+  final CascadeExecution<RestoreCascadeComposition> execution;
 }
 
+/// Удаляет связь по варианту [execution] (D7, ADR-0057).
 final class DeleteLongTermRelation extends LongTermRelationCommand {
-  const DeleteLongTermRelation(this.relationId);
+  const DeleteLongTermRelation(this.relationId, {required this.execution});
 
   final LongTermRelationId relationId;
+  final CascadeExecution<DeleteCascadeComposition> execution;
 }
 
 enum RelationParticipantRole { source, related }
@@ -166,16 +221,6 @@ final class LongTermRelationPairOccupiedFailure
   const LongTermRelationPairOccupiedFailure(this.existingRelationId);
 
   final LongTermRelationId existingRelationId;
-
-  @override
-  GraphFailureCategory get category => GraphFailureCategory.conflict;
-}
-
-final class LongTermRelationReferencedByDailyPathFailure
-    extends LongTermRelationCommandFailure {
-  const LongTermRelationReferencedByDailyPathFailure(this.relationId);
-
-  final LongTermRelationId relationId;
 
   @override
   GraphFailureCategory get category => GraphFailureCategory.conflict;
@@ -233,6 +278,17 @@ final class LongTermRelationParticipantArchivedFailure
   GraphFailureCategory get category => GraphFailureCategory.conflict;
 }
 
+/// Каскад по текущему состоянию затронул бы намерения иначе, чем состав
+/// выбранного варианта, переданный командой (D7, ADR-0057). Ничего не
+/// записано; следующая попытка снова читает предпросмотр.
+final class LongTermRelationCascadeConflictFailure
+    extends LongTermRelationCommandFailure {
+  const LongTermRelationCascadeConflictFailure();
+
+  @override
+  GraphFailureCategory get category => GraphFailureCategory.conflict;
+}
+
 final class LongTermRelationUnavailableFailure
     extends LongTermRelationCommandFailure {
   const LongTermRelationUnavailableFailure();
@@ -280,14 +336,12 @@ final class LongTermRelationUpdated extends LongTermRelationCommandSuccess {
     required this.before,
     required this.relation,
     required this.description,
-    this.permissions = const LongTermRelationPermissions.unknown(),
     required super.changes,
   });
 
   final LongTermRelation before;
   final LongTermRelation relation;
   final LongTermRelationDescription? description;
-  final LongTermRelationPermissions permissions;
 }
 
 final class LongTermRelationDeleted extends LongTermRelationCommandSuccess {

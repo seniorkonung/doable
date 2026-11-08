@@ -8,12 +8,11 @@ import '../../../graph/application/graph_command_coordinator.dart';
 import '../../../graph/application/graph_command_result.dart';
 import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
+import '../../../intention/application/cascade/intention_cascade.dart';
 import '../../../intention/application/intention_catalog.dart';
-import '../../../intention/domain/intention.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
-import '../../application/long_term_relation_permissions.dart';
 import '../../domain/long_term_relation.dart';
 import '../../domain/long_term_relation_description.dart';
 import '../../domain/long_term_relation_id.dart';
@@ -71,6 +70,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
   /// Право отказа правки, которое публикует текущее состояние.
   GraphInitiatorPresentationClaim? _publishedEditFailureClaim;
   var _isTerminated = false;
+  var _isReadingCascadePreview = false;
 
   @override
   RelationDetailsState build(LongTermRelationId relationId) {
@@ -178,12 +178,22 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
   }
 
   /// Архивирует активную связь независимо от состояния её участников.
-  void archive() =>
-      _startLifecycleChange(RelationDetailsLifecycleKind.archive, _Change.new);
+  void archive([Future<CascadeChoice?> Function(int count)? choose]) =>
+      unawaited(
+        _startLifecycleChange(
+          _VariantQuestion(RelationDetailsLifecycleKind.archive, choose),
+          _Change.new,
+        ),
+      );
 
-  /// Восстанавливает архивную связь, только если оба участника активны.
-  void restore() =>
-      _startLifecycleChange(RelationDetailsLifecycleKind.restore, _Change.new);
+  /// Восстанавливает архивную связь вместе с архивными участниками.
+  void restore([Future<CascadeChoice?> Function(int count)? choose]) =>
+      unawaited(
+        _startLifecycleChange(
+          _VariantQuestion(RelationDetailsLifecycleKind.restore, choose),
+          _Change.new,
+        ),
+      );
 
   /// Возвращает успех только собственной принятой команды удаления.
   /// Общее состояние данных по ID не передаёт право закрытия другим страницам.
@@ -191,10 +201,16 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
   /// Снимок без связи до исхода команды не показан, а после подтверждения
   /// состояние становится [RelationDetailsOwnDeletionConfirmed], прежнее
   /// содержимое которого показывает только [initiator].
-  Future<bool> delete(RelationDeletionInitiator initiator) async {
+  Future<bool> delete(
+    RelationDeletionInitiator initiator, {
+    required Future<CascadeChoice?> Function(
+      RelationDeleteCascadePreview preview,
+    )
+    confirmDeletion,
+  }) async {
     final relationId = _relationId;
     final completion = await _startLifecycleChange(
-      RelationDetailsLifecycleKind.delete,
+      _DeletionConfirmation(confirmDeletion),
       (token) => _Deletion(token, initiator),
     );
     return switch (completion?.result) {
@@ -215,7 +231,10 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
 
   /// Повторяет доказанно устранимый отказ архивирования или восстановления.
   /// Удаление повторяет начинающая его панель через [delete].
-  void retryLifecycleChange() {
+  void retryLifecycleChange([
+    Future<CascadeChoice?> Function(int count, {required bool restoring})?
+    choose,
+  ]) {
     final current = state;
     final change = current is RelationDetailsLoaded
         ? current.lifecycleChange
@@ -226,7 +245,21 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     switch (change.kind) {
       case RelationDetailsLifecycleKind.archive ||
           RelationDetailsLifecycleKind.restore:
-        _startLifecycleChange(change.kind, _Change.new);
+        unawaited(
+          _startLifecycleChange(
+            _VariantQuestion(
+              change.kind,
+              choose == null
+                  ? null
+                  : (count) => choose(
+                      count,
+                      restoring:
+                          change.kind == RelationDetailsLifecycleKind.restore,
+                    ),
+            ),
+            _Change.new,
+          ),
+        );
       case RelationDetailsLifecycleKind.delete:
         break;
     }
@@ -309,30 +342,59 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     }
   }
 
-  Future<LongTermRelationCommandCompletion>? _startLifecycleChange(
-    RelationDetailsLifecycleKind kind,
+  /// Читает предпросмотр каскада при запуске операции и передаёт
+  /// выбранный вариант с его составом (D7). Отказ чтения панель
+  /// показывает внутри себя, и команда не запускается.
+  Future<LongTermRelationCommandCompletion?> _startLifecycleChange(
+    _LifecycleDecision decision,
     _Command Function(LongTermRelationOperationToken token) command,
-  ) {
-    final current = state;
-    if (current is! RelationDetailsLoaded ||
+  ) async {
+    final kind = decision.kind;
+    final initial = state;
+    if (initial is! RelationDetailsLoaded ||
         _isOperationRunning ||
+        _isReadingCascadePreview ||
+        !_isLifecycleChangeApplicable(initial, kind)) {
+      return null;
+    }
+
+    final relationId = _relationId;
+    final _LifecycleStart? decided;
+    _isReadingCascadePreview = true;
+    try {
+      final preview = await ref
+          .read(personalGraphRepositoryProvider)
+          .previewCurrentCascade(
+            RelationCascadeSubject(relationId),
+            switch (kind) {
+              RelationDetailsLifecycleKind.archive => CascadeOperation.archive,
+              RelationDetailsLifecycleKind.restore => CascadeOperation.restore,
+              RelationDetailsLifecycleKind.delete => CascadeOperation.delete,
+            },
+          );
+      decided = await _decide(relationId, decision, preview);
+    } finally {
+      _isReadingCascadePreview = false;
+    }
+    if (decided == null) return null;
+    // Отказ операции панели принадлежит самой панели, поэтому без неё
+    // операция не начинается.
+    final current = ref.mounted && !_isTerminated ? state : null;
+    if (current is! RelationDetailsLoaded ||
         !_isLifecycleChangeApplicable(current, kind)) {
       return null;
     }
 
-    final start = switch (kind) {
-      RelationDetailsLifecycleKind.archive =>
-        _coordinator.acceptRelationArchive(
-          ArchiveLongTermRelation(_relationId),
-        ),
-      RelationDetailsLifecycleKind.restore =>
-        _coordinator.acceptRelationRestore(
-          RestoreLongTermRelation(_relationId),
-        ),
-      RelationDetailsLifecycleKind.delete => _coordinator.acceptRelationDelete(
-        DeleteLongTermRelation(_relationId),
-      ),
-    };
+    final LongTermRelationCommandStart start;
+    switch (decided) {
+      case _CommandAcceptance(:final accept):
+        start = accept();
+      case _PreviewFailed(:final failure):
+        state = current.copyWith(
+          lifecycleChange: RelationDetailsLifecyclePreviewFailed(kind, failure),
+        );
+        return null;
+    }
     switch (start) {
       case LongTermRelationCommandAccepted(:final token, :final future):
         _command = command(token);
@@ -347,7 +409,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
         state = current.copyWith(isOperationRunning: true);
       case GraphCommandCoordinatorDraining():
         state = current.copyWith(
-          lifecycleChange: RelationDetailsLifecycleFailed(
+          lifecycleChange: RelationDetailsLifecycleCommandFailed(
             kind,
             const LongTermRelationUnexpectedFailure(),
           ),
@@ -356,19 +418,84 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     return null;
   }
 
+  /// Готовит команду из варианта, выбранного человеком; `null` — отказ.
+  /// Команда исполняет состав именно этого варианта плана (D7).
+  Future<_LifecycleStart?> _decide(
+    LongTermRelationId relationId,
+    _LifecycleDecision decision,
+    CascadePreviewResult preview,
+  ) async {
+    switch ((decision, preview)) {
+      case (_, final CascadePreviewFailure failure):
+        return _PreviewFailed(failure);
+      case (
+        final _VariantQuestion question,
+        ArchiveCascadePreview(:final plan),
+      ):
+        final choice = await question.ask(
+          plan.asksQuestion ? plan.withSupporting.departing.length : 0,
+        );
+        if (choice == null) return null;
+        return _CommandAcceptance(
+          () => _coordinator.acceptRelationArchive(
+            ArchiveLongTermRelation(
+              relationId,
+              execution: CascadeExecution.of(plan, choice),
+            ),
+          ),
+        );
+      case (
+        final _VariantQuestion question,
+        RestoreCascadePreview(:final plan),
+      ):
+        final choice = await question.ask(
+          plan.asksQuestion
+              ? plan.withSupporting.restored
+                    .toSet()
+                    .difference(plan.onlyThis.restored.toSet())
+                    .length
+              : 0,
+        );
+        if (choice == null) return null;
+        return _CommandAcceptance(
+          () => _coordinator.acceptRelationRestore(
+            RestoreLongTermRelation(
+              relationId,
+              execution: CascadeExecution.of(plan, choice),
+            ),
+          ),
+        );
+      case (
+        _DeletionConfirmation(:final confirm),
+        final RelationDeleteCascadePreview preview,
+      ):
+        final choice = await confirm(preview);
+        if (choice == null) return null;
+        final plan = preview.plan;
+        return _CommandAcceptance(
+          () => _coordinator.acceptRelationDelete(
+            DeleteLongTermRelation(
+              relationId,
+              execution: CascadeExecution.of(plan, choice),
+            ),
+          ),
+        );
+      // Вид предпросмотра соответствует операции; иной вид, включая
+      // удаление намерения, — отказ чтения, а не команда.
+      case _:
+        return const _PreviewFailed(CascadePreviewUnexpected());
+    }
+  }
+
   bool _isLifecycleChangeApplicable(
     RelationDetailsLoaded loaded,
     RelationDetailsLifecycleKind kind,
   ) => switch (kind) {
     RelationDetailsLifecycleKind.archive =>
-      loaded.permissions.canChangeArchiveState &&
-          loaded.details.relation.scope == RelationScope.active,
+      loaded.details.relation.scope == RelationScope.active,
     RelationDetailsLifecycleKind.restore =>
-      loaded.permissions.canChangeArchiveState &&
-          loaded.details.relation.scope == RelationScope.archived &&
-          loaded.details.source.archiveState == IntentionArchiveState.active &&
-          loaded.details.related.archiveState == IntentionArchiveState.active,
-    RelationDetailsLifecycleKind.delete => loaded.permissions.canDelete,
+      loaded.details.relation.scope == RelationScope.archived,
+    RelationDetailsLifecycleKind.delete => true,
   };
 
   Future<void> _finishLifecycleChange(
@@ -420,13 +547,13 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
                 _scopeMatchesLifecycleKind(relation.scope, kind) =>
           current.copyWith(clearLifecycleChange: true),
         GraphResultSuccess() => current.copyWith(
-          lifecycleChange: RelationDetailsLifecycleFailed(
+          lifecycleChange: RelationDetailsLifecycleCommandFailed(
             kind,
             const LongTermRelationUnexpectedFailure(),
           ),
         ),
         GraphResultFailure(:final failure) => current.copyWith(
-          lifecycleChange: RelationDetailsLifecycleFailed(
+          lifecycleChange: RelationDetailsLifecycleCommandFailed(
             kind,
             failure,
             failurePresentation: _coordinator.claimInitiatorFailure(
@@ -448,7 +575,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
       final current = state;
       if (current is RelationDetailsLoaded) {
         state = current.copyWith(
-          lifecycleChange: RelationDetailsLifecycleFailed(
+          lifecycleChange: RelationDetailsLifecycleCommandFailed(
             kind,
             const LongTermRelationUnexpectedFailure(),
           ),
@@ -531,19 +658,6 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     final relationChanged = changes.whereType<LongTermRelationChange>().any(
       (change) => change.id == _relationId,
     );
-    LongTermRelationPermissions? confirmedPermissions;
-    for (final change in changes) {
-      switch (change) {
-        case DailyChoiceChange(:final relationPermissions):
-          confirmedPermissions =
-              relationPermissions[_relationId] ?? confirmedPermissions;
-        case LongTermRelationChange(:final id, :final permissions)
-            when id == _relationId && permissions?.isConfirmed == true:
-          confirmedPermissions = permissions;
-        case GraphChange():
-          break;
-      }
-    }
     final current = state;
     final participantIds = current is RelationDetailsLoaded
         ? <IntentionId>{current.details.source.id, current.details.related.id}
@@ -557,9 +671,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
         GraphChange() => false,
       },
     );
-    if ((!relationChanged &&
-            !participantChanged &&
-            confirmedPermissions == null) ||
+    if ((!relationChanged && !participantChanged) ||
         !_advanceRevisionBarrier(confirmedChange.revision)) {
       return;
     }
@@ -575,7 +687,6 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     _generation = _generation.next();
     state = switch (current) {
       RelationDetailsLoaded() => current.copyWith(
-        permissions: confirmedPermissions,
         isOperationRunning: _isOperationRunning,
         refreshStatus: const RelationDetailsRefreshing(),
       ),
@@ -813,4 +924,53 @@ final class _DeletionRelationMissing extends _Command {
   const _DeletionRelationMissing(super.token, this.initiator);
 
   final RelationDeletionInitiator initiator;
+}
+
+/// Решение человека по операции жизненного цикла. Удаление исполняется только
+/// с вариантом из ответа подтверждения, поэтому без него непредставимо.
+sealed class _LifecycleDecision {
+  const _LifecycleDecision();
+
+  RelationDetailsLifecycleKind get kind;
+}
+
+/// Вопрос варианта архивирования или восстановления. Без вопроса исполняется
+/// вариант «со вспомогательными».
+final class _VariantQuestion extends _LifecycleDecision {
+  const _VariantQuestion(this.kind, this.choose);
+
+  @override
+  final RelationDetailsLifecycleKind kind;
+  final Future<CascadeChoice?> Function(int count)? choose;
+
+  Future<CascadeChoice?> ask(int count) async =>
+      count == 0 ? CascadeChoice.withSupporting : await choose?.call(count);
+}
+
+final class _DeletionConfirmation extends _LifecycleDecision {
+  const _DeletionConfirmation(this.confirm);
+
+  @override
+  RelationDetailsLifecycleKind get kind => RelationDetailsLifecycleKind.delete;
+
+  final Future<CascadeChoice?> Function(RelationDeleteCascadePreview preview)
+  confirm;
+}
+
+/// Решённая операция: команда, которую панель примет, если её связь ещё
+/// показана, или отказ чтения предпросмотра.
+sealed class _LifecycleStart {
+  const _LifecycleStart();
+}
+
+final class _CommandAcceptance extends _LifecycleStart {
+  const _CommandAcceptance(this.accept);
+
+  final LongTermRelationCommandStart Function() accept;
+}
+
+final class _PreviewFailed extends _LifecycleStart {
+  const _PreviewFailed(this.failure);
+
+  final CascadePreviewFailure failure;
 }

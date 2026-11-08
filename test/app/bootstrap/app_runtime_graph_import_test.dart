@@ -165,7 +165,7 @@ void main() {
         const GraphComposition(
           intentionCount: 4,
           relationCount: 3,
-          dailyChoiceCount: 2,
+          actionCount: 3,
           tagCount: 2,
         ),
       ),

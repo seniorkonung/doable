@@ -14,9 +14,35 @@ import '../../domain/long_term_relation.dart';
 import '../relation_group_name.dart';
 import 'relation_batch_view_model.dart';
 
+/// Откуда пришло намерение, с которым связываются отмеченные: от этого
+/// зависят подпись его карточки и кто узнаёт о результате поиска.
+sealed class RelationBatchAnchor {
+  const RelationBatchAnchor();
+}
+
+/// Намерение страницы, с которой открыт поиск.
+final class RelationBatchPageAnchor extends RelationBatchAnchor {
+  const RelationBatchPageAnchor();
+}
+
+/// Последнее намерение пути: экран пути узнаёт о намерениях, созданных в
+/// поиске, пока поиск открыт, а о добавленных связях — и после ухода с поиска
+/// во время записи.
+final class RelationBatchPathEndAnchor extends RelationBatchAnchor {
+  const RelationBatchPathEndAnchor({
+    required this.onAdded,
+    required this.onIntentionCreated,
+  });
+
+  /// Связи подтверждённого добавления в порядке отметок.
+  final void Function(List<LongTermRelation> relations) onAdded;
+  final VoidCallback onIntentionCreated;
+}
+
 IntentionPickerPurposeDescription relationBatchPickerPurpose(
   AppLocalizations l10n,
   IntentionRelationGroup group,
+  RelationBatchAnchor anchor,
   RelationBatchViewModelProvider provider,
   int count,
 ) {
@@ -60,7 +86,10 @@ IntentionPickerPurposeDescription relationBatchPickerPurpose(
                   RelationBatchItem(value: item.id, name: item.title),
               ],
               onRemove: ref.read(provider.notifier).remove,
-              anchorNote: l10n.batchAnchorNote,
+              anchorNote: switch (anchor) {
+                RelationBatchPageAnchor() => l10n.batchAnchorNote,
+                RelationBatchPathEndAnchor() => l10n.batchPathEndAnchorNote,
+              },
               emptyText: l10n.batchEmpty,
               needLabel: l10n.relationEditorTypeNeed,
               canLabel: l10n.relationEditorTypeCan,

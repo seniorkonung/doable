@@ -1,8 +1,7 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
 import 'package:doable/src/design_system/components/button.dart';
-import 'package:doable/src/design_system/components/option_tiles.dart';
+import 'package:doable/src/design_system/components/segmented_control.dart';
 import 'package:doable/src/design_system/components/tag_chip.dart';
 import 'package:doable/src/design_system/components/tags_section.dart';
 import 'package:doable/src/design_system/components/top_bar.dart';
@@ -14,6 +13,7 @@ import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_options.dart';
 import 'package:doable/src/intention/presentation/edit/intention_edit_page.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
 import 'package:doable/src/tag/application/tag_assignments.dart';
 import 'package:doable/src/tag/application/tag_read_result.dart';
 import 'package:doable/src/tag/presentation/assignments/tag_assignments_view_model.dart';
@@ -22,12 +22,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../../support/daily_choice_local_date.dart';
+import '../../../support/controlled_local_date.dart';
 import '../../../support/intention_options.dart';
 import '../../../support/ordinary_page_test_app.dart';
 import 'details_test_support.dart';
 
 void main() {
+  testWidgets('без входящей связи вспомогательный вид недоступен', (
+    tester,
+  ) async {
+    final repository = ControlledDetailsRepository();
+    final intention = testDetailsIntention();
+    await _pumpPage(tester, repository, intention);
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests.single.add(ResultSuccess(intention));
+    await tester.pumpAndSettle();
+    final control = tester.widget<SegmentedControl<IntentionKind>>(
+      find.byType(SegmentedControl<IntentionKind>),
+    );
+    expect(control.value, IntentionKind.main);
+    expect(control.second.disabled, isTrue);
+  });
   for (final (locale, editLabel) in [
     (const Locale('ru'), 'Изменить описание: Утром\nв парке'),
     (const Locale('en'), 'Edit the description: Утром\nв парке'),
@@ -149,124 +164,120 @@ void main() {
     expect(find.byType(IntentionEditPage), findsNothing);
     semantics.dispose();
   });
-  testWidgets('включение готовности плиткой сохраняется без отдельного '
-      'подтверждения и без сообщения об успехе', (tester) async {
-    final semantics = tester.ensureSemantics();
+  for (final (archived, incoming, allowed) in [
+    (false, testRelationCounts(archivedNeedIncoming: 1), false),
+    (false, testRelationCounts(activeCanIncoming: 1), true),
+    (true, testRelationCounts(archivedNeedIncoming: 1), true),
+    (true, testRelationCounts(), false),
+  ]) {
+    testWidgets('доступность вспомогательного вида по входящим связям: '
+        'архив=$archived, доступен=$allowed', (tester) async {
+      final repository = ControlledDetailsRepository();
+      final intention = testDetailsIntention(
+        archiveState: archived
+            ? IntentionArchiveState.archived
+            : IntentionArchiveState.active,
+      );
+      await _pumpPage(tester, repository, intention);
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests.single.add(
+        ResultSuccess(intention),
+        relationCounts: incoming,
+      );
+      await tester.pumpAndSettle();
+      final control = tester.widget<SegmentedControl<IntentionKind>>(
+        find.byType(SegmentedControl<IntentionKind>),
+      );
+      expect(control.second.disabled, !allowed);
+      if (!allowed) {
+        expect(
+          control.second.semanticLabel,
+          contains(
+            'Возможно, когда другому намерению оно нужно или его можно использовать',
+          ),
+        );
+      }
+    });
+  }
+
+  testWidgets('вид меняется сразу и остаётся подтверждённым при отказе', (
+    tester,
+  ) async {
     final repository = ControlledDetailsRepository();
     final before = testDetailsIntention(index: 30);
     final saved = testDetailsIntention(
       index: 30,
-      readiness: IntentionReadiness.ready,
+      kind: IntentionKind.supporting,
     );
+    final counts = testRelationCounts(activeNeedIncoming: 1);
     await _pumpPage(tester, repository, before);
     await waitForDetailRequests(repository, 1);
-    repository.detailRequests.single.add(ResultSuccess(before));
+    repository.detailRequests.single.add(
+      ResultSuccess(before),
+      relationCounts: counts,
+    );
     await tester.pumpAndSettle();
 
-    expect(
-      tester.getSemantics(_typeTile('Намерение')),
-      _typeTileSemantics(_intentionTileLabel, selected: true),
-    );
-    expect(
-      tester.getSemantics(_typeTile('Действие')),
-      _typeTileSemantics(_actionTileLabel, selected: false),
-    );
-    await tester.tap(_typeTile('Действие'));
+    await tester.tap(find.text('Вспомогательное'));
     await tester.pump();
-
-    expect(repository.commands.single, isA<EnableIntentionReadiness>());
+    final command = repository.commands.single as ChangeIntentionKind;
+    expect(command.kind, IntentionKind.supporting);
     expect(find.byType(Dialog), findsNothing);
+    expect(
+      tester
+          .widget<SegmentedControl<IntentionKind>>(
+            find.byType(SegmentedControl<IntentionKind>),
+          )
+          .onChange,
+      isNull,
+    );
     repository.completeCommand(
       0,
       testDetailsSavedResult(saved, before: before),
     );
     await tester.pump();
     await waitForDetailRequests(repository, 2);
-    repository.detailRequests[1].add(ResultSuccess(saved));
+    repository.detailRequests[1].add(
+      ResultSuccess(saved),
+      relationCounts: counts,
+    );
     await tester.pumpAndSettle();
-
     expect(
-      tester.getSemantics(_typeTile('Действие')),
-      _typeTileSemantics(_actionTileLabel, selected: true),
+      tester
+          .widget<SegmentedControl<IntentionKind>>(
+            find.byType(SegmentedControl<IntentionKind>),
+          )
+          .value,
+      IntentionKind.supporting,
     );
     expect(
-      find.descendant(of: find.byType(TopBar), matching: find.text('Действие')),
+      find.descendant(
+        of: find.byType(TopBar),
+        matching: find.text('Намерение'),
+      ),
       findsOneWidget,
     );
     expect(find.byType(SnackBar), findsNothing);
-    semantics.dispose();
-  });
 
-  testWidgets('плитка «Намерение» обратимо выключает готовность', (
-    tester,
-  ) async {
-    final semantics = tester.ensureSemantics();
-    final repository = ControlledDetailsRepository();
-    final ready = testDetailsIntention(
-      index: 31,
-      readiness: IntentionReadiness.ready,
-    );
-    final notReady = testDetailsIntention(index: 31);
-    await _pumpPage(tester, repository, ready);
-    await waitForDetailRequests(repository, 1);
-    repository.detailRequests.single.add(ResultSuccess(ready));
-    await tester.pumpAndSettle();
-
-    await tester.tap(_typeTile('Намерение'));
+    await tester.tap(find.text('Главное'));
     await tester.pump();
-
-    expect(repository.commands.single, isA<DisableIntentionReadiness>());
+    expect(
+      (repository.commands.last as ChangeIntentionKind).kind,
+      IntentionKind.main,
+    );
     repository.completeCommand(
-      0,
-      testDetailsSavedResult(notReady, before: ready),
+      1,
+      const ResultFailure(IntentionUnavailableFailure()),
     );
-    await tester.pump();
-    await waitForDetailRequests(repository, 2);
-    repository.detailRequests[1].add(ResultSuccess(notReady));
     await tester.pumpAndSettle();
-
     expect(
-      tester.getSemantics(_typeTile('Намерение')),
-      _typeTileSemantics(_intentionTileLabel, selected: true),
+      tester
+          .widget<SegmentedControl<IntentionKind>>(
+            find.byType(SegmentedControl<IntentionKind>),
+          )
+          .value,
+      IntentionKind.supporting,
     );
-    semantics.dispose();
-  });
-
-  testWidgets('плитки доступны у архивированного намерения и недоступны, '
-      'пока выполняется команда', (tester) async {
-    final semantics = tester.ensureSemantics();
-    final repository = ControlledDetailsRepository();
-    final intention = testDetailsIntention(
-      index: 32,
-      archiveState: IntentionArchiveState.archived,
-    );
-    await _pumpPage(tester, repository, intention);
-    await waitForDetailRequests(repository, 1);
-    repository.detailRequests.single.add(ResultSuccess(intention));
-    await tester.pumpAndSettle();
-
-    await tester.tap(_typeTile('Действие'));
-    await tester.pump();
-    expect(repository.commands.single, isA<EnableIntentionReadiness>());
-
-    expect(
-      tester.getSemantics(_typeTile('Намерение')),
-      isSemantics(
-        label: _intentionTileLabel,
-        isButton: true,
-        hasEnabledState: true,
-        isEnabled: false,
-        hasSelectedState: true,
-        isSelected: true,
-        isInMutuallyExclusiveGroup: true,
-        hasTapAction: false,
-      ),
-    );
-    await tester.tap(_typeTile('Действие'));
-    // Индикатор выполняющейся команды не даёт кадрам успокоиться.
-    await tester.pump(const Duration(seconds: 1));
-    expect(repository.commands, hasLength(1));
-    semantics.dispose();
   });
 
   testWidgets('обзор только что созданного намерения кончается одной '
@@ -278,7 +289,7 @@ void main() {
       id: testDetailsIntentionId(41),
       title: 'Бегать',
       description: null,
-      readiness: IntentionReadiness.notReady,
+      kind: IntentionKind.main,
       archiveState: IntentionArchiveState.active,
       createdAt: createdNow,
       updatedAt: createdNow,
@@ -288,8 +299,7 @@ void main() {
       repository,
       intention,
       overrides: [
-        ControlledDailyChoiceLocalDate(CalendarDate.fromParts(2026, 10, 29))
-            .override,
+        ControlledLocalDate(CalendarDate.fromParts(2026, 10, 29)).override,
         tagAssignmentsReaderProvider.overrideWithValue(_NoTagReads()),
       ],
     );
@@ -299,8 +309,12 @@ void main() {
 
     expect(find.text('Добавить описание'), findsOneWidget);
     expect(
-      tester.getSemantics(_typeTile('Намерение')),
-      _typeTileSemantics(_intentionTileLabel, selected: true),
+      tester
+          .widget<SegmentedControl<IntentionKind>>(
+            find.byType(SegmentedControl<IntentionKind>),
+          )
+          .value,
+      IntentionKind.main,
     );
     final tags = find.byType(TagsSection);
     expect(
@@ -341,28 +355,6 @@ final class _NoTagReads extends Fake implements TagReadContract {
     ),
   );
 }
-
-const _intentionTileLabel =
-    'Намерение\nЛюбого размера. Может занять больше дня.';
-const _actionTileLabel =
-    'Действие\nВыполнимо за один день, и понятно, что делать.';
-
-Finder _typeTile(String title) => find.descendant(
-  of: find.byType(OptionTiles<IntentionReadiness>),
-  matching: find.text(title),
-);
-
-Matcher _typeTileSemantics(String label, {required bool selected}) =>
-    isSemantics(
-      label: label,
-      isButton: true,
-      hasEnabledState: true,
-      isEnabled: true,
-      hasSelectedState: true,
-      isSelected: selected,
-      isInMutuallyExclusiveGroup: true,
-      hasTapAction: true,
-    );
 
 final _editTitle = find.byKey(const ValueKey('intention-edit-title'));
 final _editDescription = find.byKey(

@@ -44,58 +44,27 @@ final _purposeDescription = IntentionPickerPurposeDescription(
   buildSheetBody: (_) => const SizedBox.shrink(),
 );
 
-final _actionField = find.byKey(const ValueKey('daily-choice-action-filter'));
+const _filterFieldKey = ValueKey('participant-picker-filter');
+final _filterField = find.byKey(_filterFieldKey);
 final _filterButton = find.byType(FilterButton);
 final _list = find.byKey(
-  const PageStorageKey<String>('daily-choice-action-list'),
+  const PageStorageKey<String>('participant-picker-list'),
 );
 
 void main() {
-  for (final (locale, action, intention, participants) in [
-    (
-      const Locale('ru'),
-      'Выбор действия',
-      'Выбор намерения',
-      'Выбор намерений',
-    ),
-    (
-      const Locale('en'),
-      'Choose an action',
-      'Choose an intention',
-      'Choose intentions',
-    ),
+  for (final (locale, title) in [
+    (const Locale('ru'), 'Выбор намерений'),
+    (const Locale('en'), 'Choose intentions'),
   ]) {
-    for (final (purpose, title, keyPrefix) in [
-      (
-        SelectDailyChoiceAction(session: IntentionSearchSession()),
-        action,
-        'daily-choice-action',
-      ),
-      (
-        SelectDailyChoiceSource(session: IntentionSearchSession()),
-        intention,
-        'daily-choice-source',
-      ),
-      (
-        SelectRelationParticipant(
-          session: IntentionSearchSession(),
-          pairProbe: RelationPairProbe(
-            counterpartId: testSummary(index: 999).id,
-            candidateRole: RelationParticipantRole.related,
-          ),
-        ),
-        participants,
-        'participant-picker',
-      ),
-    ]) {
+    {
+      final purpose = _participants();
+      const keyPrefix = 'participant-picker';
       testWidgets(
         '${locale.languageCode}: $keyPrefix открывает показ и упорядочивание до выдачи, с числом, после отказа и при недопустимом фильтре',
         (tester) async {
           final semantics = tester.ensureSemantics();
           final ru = locale.languageCode == 'ru';
-          final type = purpose is SelectDailyChoiceAction
-              ? (ru ? 'Действия' : 'Actions')
-              : (ru ? 'Все' : 'All');
+          final shown = ru ? 'Намерения' : 'Intentions';
           final h = await _open(tester, locale: locale, purpose: purpose);
           final header = find.byType(CatalogHeader);
           final sheetTitle = ru ? 'Показать и упорядочить' : 'Show and sort';
@@ -120,18 +89,19 @@ void main() {
             await tester.pump(const Duration(milliseconds: 300));
             expect(find.text(sheetTitle), findsOneWidget);
             expect(tester.widget<CatalogHeader>(header).expanded, isTrue);
-            final typeRow = tester.getSemantics(
-              find.descendant(
-                of: find.byType(Sheet),
-                matching: find.bySemanticsLabel(ru ? 'Тип' : 'Type'),
-              ),
-            );
-            expect(
-              typeRow.value,
-              purpose is SelectDailyChoiceAction
-                  ? (ru ? 'Только действия' : 'Actions only')
-                  : (ru ? 'Намерения и действия' : 'Intentions and actions'),
-            );
+            // Поиск для выбора не предлагает ни охвата, ни вида.
+            for (final caption in [
+              ru ? 'Показать' : 'Show',
+              ru ? 'Тип' : 'Type',
+            ]) {
+              expect(
+                find.descendant(
+                  of: find.byType(Sheet),
+                  matching: find.text(caption),
+                ),
+                findsNothing,
+              );
+            }
             if (sortByName) {
               await tester.tap(
                 find.descendant(
@@ -156,15 +126,15 @@ void main() {
           // Первая порция ещё не подтверждена: число не объявляется.
           await openAndClose(
             ru
-                ? 'Показать и упорядочить. Тип: $type. Сортировка: Создание, сначала новые.'
-                : 'Show and sort. Type: $type. Sorted by: Created, newest first.',
+                ? 'Показать и упорядочить. Показаны: $shown. Сортировка: Создание, сначала новые.'
+                : 'Show and sort. Showing: $shown. Sorted by: Created, newest first.',
           );
           h.repository.complete(0, _firstPage(_actions(1)));
           await tester.pumpAndSettle();
           await openAndClose(
             ru
-                ? 'Показать и упорядочить. Тип: $type, 1. Сортировка: Создание, сначала новые.'
-                : 'Show and sort. Type: $type, 1. Sorted by: Created, newest first.',
+                ? 'Показать и упорядочить. Показаны: $shown, 1. Сортировка: Создание, сначала новые.'
+                : 'Show and sort. Showing: $shown, 1. Sorted by: Created, newest first.',
             sortByName: true,
           );
 
@@ -174,8 +144,8 @@ void main() {
           );
           await tester.pumpAndSettle();
           final withoutCount = ru
-              ? 'Показать и упорядочить. Тип: $type. Сортировка: Название, от А до Я.'
-              : 'Show and sort. Type: $type. Sorted by: Name, A to Z.';
+              ? 'Показать и упорядочить. Показаны: $shown. Сортировка: Название, от А до Я.'
+              : 'Show and sort. Showing: $shown. Sorted by: Name, A to Z.';
           await openAndClose(withoutCount);
 
           await tester.enterText(
@@ -189,13 +159,10 @@ void main() {
       );
 
       testWidgets(
-        '${locale.languageCode}: $keyPrefix показывает текущие тип и сортировку без прежнего числа до подтверждения новой выдачи',
+        '${locale.languageCode}: $keyPrefix показывает текущую сортировку без прежнего числа до подтверждения новой выдачи',
         (tester) async {
           final ru = locale.languageCode == 'ru';
-          final pinned = purpose is SelectDailyChoiceAction;
-          final initialTitle = pinned
-              ? (ru ? 'Действия' : 'Actions')
-              : (ru ? 'Все' : 'All');
+          final initialTitle = ru ? 'Намерения' : 'Intentions';
           final initialSummary = ru
               ? 'Создание, сначала новые'
               : 'Created, newest first';
@@ -210,30 +177,6 @@ void main() {
           await tester.pump();
           await tester.pump();
           expect(_header(initialTitle, 13), findsOneWidget);
-
-          if (!pinned) {
-            notifier.changeType(IntentionTypeChoice.intentions);
-            await tester.pump();
-            expect(
-              _header(ru ? 'Намерения' : 'Intentions', null),
-              findsOneWidget,
-            );
-            expect(find.text(initialSummary), findsOneWidget);
-            h.repository.complete(
-              h.repository.queries.length - 1,
-              _firstPage(const []),
-            );
-            await tester.pumpAndSettle();
-            expect(_header(ru ? 'Намерения' : 'Intentions', 0), findsOneWidget);
-            notifier.changeType(IntentionTypeChoice.actions);
-            await tester.pump();
-            expect(_header(ru ? 'Действия' : 'Actions', null), findsOneWidget);
-            h.repository.complete(
-              h.repository.queries.length - 1,
-              _firstPage(_actions(2)),
-            );
-            await tester.pumpAndSettle();
-          }
 
           for (final (order, ruSummary, enSummary) in [
             (
@@ -264,7 +207,7 @@ void main() {
           ]) {
             notifier.changeOrder(order);
             await tester.pump();
-            expect(_header(ru ? 'Действия' : 'Actions', null), findsOneWidget);
+            expect(_header(initialTitle, null), findsOneWidget);
             expect(find.text(ru ? ruSummary : enSummary), findsOneWidget);
           }
           h.repository.complete(
@@ -272,11 +215,48 @@ void main() {
             const ResultFailure(IntentionUnavailableFailure()),
           );
           await tester.pumpAndSettle();
-          expect(_header(ru ? 'Действия' : 'Actions', null), findsOneWidget);
+          expect(_header(initialTitle, null), findsOneWidget);
           expect(
             find.text(ru ? 'Название, от Я до А' : 'Name, Z to A'),
             findsOneWidget,
           );
+        },
+      );
+
+      testWidgets(
+        '${locale.languageCode}: $keyPrefix показывает намерения обоих видов без выбора вида',
+        (tester) async {
+          final h = await _open(tester, locale: locale, purpose: purpose);
+          final notifier = h.container.read(
+            intentionCatalogViewModelProvider(purpose).notifier,
+          );
+          final initialQuery = h.repository.queries.single;
+          h.repository.complete(
+            0,
+            _firstPage([
+              testSummary(
+                index: 2,
+                title: 'Вспомогательное',
+                kind: IntentionKind.supporting,
+              ),
+              testSummary(index: 1, title: 'Главное'),
+            ]),
+          );
+          await tester.pumpAndSettle();
+
+          expect(
+            initialQuery.kindFilter,
+            IntentionKindFilter.mainAndSupporting,
+          );
+          expect(initialQuery.counting, IntentionCatalogCounting.totalOnly);
+          expect(find.text('Вспомогательное'), findsOneWidget);
+          expect(find.text('Главное'), findsOneWidget);
+
+          notifier.changeKind(IntentionKindFilter.supportingOnly);
+          await tester.pumpAndSettle();
+          expect(h.repository.queries, hasLength(1));
+          expect(notifier.selection.show, isA<IntentionShowFixed>());
+          expect(find.text('Главное'), findsOneWidget);
         },
       );
 
@@ -371,23 +351,17 @@ void main() {
     (
       const Locale('ru'),
       (
-        actions: 'Действия',
-        intentions: 'Все',
-        intentionsOnly: 'Намерения',
+        intentions: 'Намерения',
         byTitle: (
-          'Нет действий с таким названием',
+          'Нет намерений с таким названием',
           'Попробуйте название короче.',
         ),
         byTags: (
-          'Нет действий под эти теги',
+          'Нет намерений под эти теги',
           'Измените теги в фильтре или сбросьте его.',
         ),
         byBoth: (
           'Намерения не найдены',
-          'Измените название или условия по тегам.',
-        ),
-        actionsByBoth: (
-          'Действия не найдены',
           'Измените название или условия по тегам.',
         ),
         scope: 'Выбрать не из чего',
@@ -398,20 +372,14 @@ void main() {
     (
       const Locale('en'),
       (
-        actions: 'Actions',
-        intentions: 'All',
-        intentionsOnly: 'Intentions',
-        byTitle: ('No actions with this name', 'Try a shorter name.'),
+        intentions: 'Intentions',
+        byTitle: ('No intentions with this name', 'Try a shorter name.'),
         byTags: (
-          'No actions match these tags',
+          'No intentions match these tags',
           'Change the tags in the filter or reset it.',
         ),
         byBoth: (
           'No intentions found',
-          'Change the name or the tag conditions.',
-        ),
-        actionsByBoth: (
-          'No actions found',
           'Change the name or the tag conditions.',
         ),
         scope: 'Nothing to choose from',
@@ -421,100 +389,35 @@ void main() {
     ),
   ]) {
     final lang = locale.languageCode;
-    for (final (
-          scenario,
-          purpose,
-          type,
-          filter,
-          required,
-          header,
-          message,
-          reset,
-        )
-        in [
-          (
-            'пустая выдача по названию советует название короче',
-            SelectDailyChoiceAction(session: IntentionSearchSession()),
-            IntentionTypeChoice.actions,
-            'бег',
-            false,
-            texts.actions,
-            texts.byTitle,
-            true,
-          ),
-          (
-            'пустая выдача по условиям отличается от пустого охвата',
-            SelectDailyChoiceSource(session: IntentionSearchSession()),
-            IntentionTypeChoice.actions,
-            '',
-            true,
-            texts.actions,
-            texts.byTags,
-            true,
-          ),
-          (
-            'пустая выдача называет обе причины',
-            SelectDailyChoiceSource(session: IntentionSearchSession()),
-            IntentionTypeChoice.all,
-            'бег',
-            true,
-            texts.intentions,
-            texts.byBoth,
-            true,
-          ),
-          (
-            'пустая выдача по названию называет выбранные действия в поиске исходного намерения',
-            SelectDailyChoiceSource(session: IntentionSearchSession()),
-            IntentionTypeChoice.actions,
-            'бег',
-            false,
-            texts.actions,
-            texts.byTitle,
-            true,
-          ),
-          (
-            'пустая выдача по названию и тегам называет выбранные действия',
-            SelectDailyChoiceSource(session: IntentionSearchSession()),
-            IntentionTypeChoice.actions,
-            'бег',
-            true,
-            texts.actions,
-            texts.actionsByBoth,
-            true,
-          ),
-          (
-            'пустой охват без фильтров не предлагает сброс',
-            SelectDailyChoiceAction(session: IntentionSearchSession()),
-            IntentionTypeChoice.actions,
-            '',
-            false,
-            texts.actions,
-            (texts.scope, _emptyScopeMessage),
-            false,
-          ),
-          (
-            'пустой охват при открытом типе «Намерения» не предлагает действия',
-            SelectDailyChoiceSource(session: IntentionSearchSession()),
-            IntentionTypeChoice.intentions,
-            '',
-            false,
-            texts.intentionsOnly,
-            (texts.scope, _emptyScopeMessage),
-            false,
-          ),
-        ]) {
+    for (final (scenario, filter, required, message, reset) in [
+      (
+        'пустая выдача по условиям отличается от пустого охвата',
+        '',
+        true,
+        texts.byTags,
+        true,
+      ),
+      (
+        'пустая выдача по названию называет намерения',
+        'бег',
+        false,
+        texts.byTitle,
+        true,
+      ),
+      ('пустая выдача называет обе причины', 'бег', true, texts.byBoth, true),
+      (
+        'пустой охват без фильтров не предлагает ни сброс, ни показ обоих типов',
+        '',
+        false,
+        (texts.scope, _emptyScopeMessage),
+        false,
+      ),
+    ]) {
       testWidgets('$lang: $scenario', (tester) async {
         final sport = _tag(1, 'Спорт');
+        final purpose = _participants();
         final h = await _open(tester, locale: locale, purpose: purpose);
-        h.container
-            .read(intentionCatalogViewModelProvider(purpose).notifier)
-            .changeType(type);
-        final prefix = switch (purpose) {
-          SelectDailyChoiceAction() => 'daily-choice-action',
-          SelectDailyChoiceSource() => 'daily-choice-source',
-          SelectRelationParticipant() => 'participant-picker',
-        };
-        await tester.enterText(find.byKey(ValueKey('$prefix-filter')), filter);
+        await tester.enterText(find.byKey(_filterFieldKey), filter);
         if (required) {
           h.conditions(purpose).cycle(sport.id);
         }
@@ -526,7 +429,7 @@ void main() {
         await tester.pumpAndSettle();
 
         final (title, text) = message;
-        expect(_header(header, 0), findsOneWidget);
+        expect(_header(texts.intentions, 0), findsOneWidget);
         expect(_inEmptyState(title), findsOneWidget);
         expect(_inEmptyState(text), findsOneWidget);
         expect(
@@ -537,38 +440,26 @@ void main() {
       });
     }
 
-    for (final (purpose, type, prefix, header, items) in [
-      (
-        SelectDailyChoiceAction(session: IntentionSearchSession()),
-        IntentionTypeChoice.actions,
-        'daily-choice-action',
-        texts.actions,
-        _actions(3),
-      ),
-      (
-        SelectRelationParticipant(
-          pairProbe: RelationPairProbe(
-            counterpartId: _action(9).id,
-            candidateRole: RelationParticipantRole.related,
-          ),
-          session: IntentionSearchSession(),
+    {
+      final purpose = SelectRelationParticipant(
+        pairProbe: RelationPairProbe(
+          counterpartId: _action(9).id,
+          candidateRole: RelationParticipantRole.related,
         ),
-        IntentionTypeChoice.intentions,
-        'participant-picker',
-        texts.intentionsOnly,
-        [testSummary(title: 'Быть здоровым')],
-      ),
-    ]) {
+        session: IntentionSearchSession(),
+      );
+      final header = texts.intentions;
+      final items = [testSummary(title: 'Быть здоровым')];
       testWidgets(
-        '$lang, $prefix: «${texts.reset}» снимает название и условия, сохраняя тип, порядок и ограничения',
+        '$lang: «${texts.reset}» снимает название и условия, сохраняя порядок и ограничения',
         (tester) async {
           final sport = _tag(1, 'Спорт');
           final work = _tag(2, 'Работа');
           final h = await _open(tester, locale: locale, purpose: purpose);
-          h.container.read(intentionCatalogViewModelProvider(purpose).notifier)
-            ..changeType(type)
-            ..changeOrder(IntentionCatalogOrder.titleDescending);
-          final field = find.byKey(ValueKey('$prefix-filter'));
+          h.container
+              .read(intentionCatalogViewModelProvider(purpose).notifier)
+              .changeOrder(IntentionCatalogOrder.titleDescending);
+          final field = _filterField;
           await tester.enterText(field, 'бег');
           final conditions = h.conditions(purpose)
             ..cycle(sport.id)
@@ -590,7 +481,7 @@ void main() {
           expect(query.titleFilter, isNull);
           expect(query.tagFilter, IntentionTagFilter.empty);
           expect(query.cursor, isNull);
-          expect(query.readinessFilter, filteredQuery.readinessFilter);
+          expect(query.kindFilter, IntentionKindFilter.mainAndSupporting);
           expect(query.order, IntentionCatalogOrder.titleDescending);
           expect(query.scope, filteredQuery.scope);
           expect(query.pairProbe, filteredQuery.pairProbe);
@@ -627,115 +518,24 @@ void main() {
         },
       );
     }
-
-    for (final type in [
-      IntentionTypeChoice.intentions,
-      IntentionTypeChoice.actions,
-    ]) {
-      testWidgets(
-        '$lang, ${type == IntentionTypeChoice.intentions ? 'Намерения' : 'Действия'}: пустой тип предлагает показать оба типа',
-        (tester) async {
-          final ru = locale.languageCode == 'ru';
-          final purpose = SelectRelationParticipant(
-            pairProbe: RelationPairProbe(
-              counterpartId: _action(9).id,
-              candidateRole: RelationParticipantRole.related,
-            ),
-            session: IntentionSearchSession(),
-          );
-          final items = type == IntentionTypeChoice.intentions
-              ? _actions(2)
-              : [testSummary(title: 'Быть здоровым')];
-          final h = await _open(tester, locale: locale, purpose: purpose);
-          h.container.read(intentionCatalogViewModelProvider(purpose).notifier)
-            ..changeType(type)
-            ..changeOrder(IntentionCatalogOrder.titleDescending);
-          await tester.pump();
-          h.repository.complete(
-            h.repository.queries.length - 1,
-            _firstPage(
-              const [],
-              typeCounts: IntentionTypeCounts(
-                all: items.length,
-                actions: type == IntentionTypeChoice.intentions
-                    ? items.length
-                    : 0,
-              ),
-            ),
-          );
-          await tester.pumpAndSettle();
-
-          expect(
-            _header(
-              type == IntentionTypeChoice.intentions
-                  ? texts.intentionsOnly
-                  : texts.actions,
-              0,
-            ),
-            findsOneWidget,
-          );
-          expect(
-            _inEmptyState(
-              ru ? 'Намерений этого типа нет' : 'No intentions of this type',
-            ),
-            findsOneWidget,
-          );
-          expect(
-            _inEmptyState(
-              ru
-                  ? 'Покажите оба типа, чтобы выбрать из доступных намерений.'
-                  : 'Show both types to choose from the available intentions.',
-            ),
-            findsOneWidget,
-          );
-          expect(_inEmptyState(texts.reset), findsNothing);
-
-          await tester.tap(_inEmptyState(texts.showBoth));
-          await tester.pump();
-          final query = h.repository.queries.last;
-          expect(query.readinessFilter, IntentionReadinessFilter.all);
-          expect(query.scope, IntentionScope.active);
-          expect(query.pairProbe, purpose.pairProbe);
-          expect(query.order, IntentionCatalogOrder.titleDescending);
-          expect(query.cursor, isNull);
-          h.repository.complete(
-            h.repository.queries.length - 1,
-            _firstPage(items),
-          );
-          await tester.pumpAndSettle();
-          expect(_header(texts.intentions, items.length), findsOneWidget);
-          expect(find.text(items.first.title), findsOneWidget);
-          expect(find.byType(EmptyState), findsNothing);
-        },
-      );
-    }
   }
 
   testWidgets(
-    'поле поиска, фильтр и заголовок исходного намерения остаются на месте при прокрутке',
+    'поле поиска, фильтр и заголовок остаются на месте при прокрутке',
     (tester) async {
-      final h = await _open(
-        tester,
-        purpose: SelectDailyChoiceSource(session: IntentionSearchSession()),
-      );
+      final h = await _open(tester, purpose: _participants());
       h.repository.complete(0, _firstPage(_actions(20)));
       await tester.pumpAndSettle();
-      final sourceField = find.byKey(
-        const ValueKey('daily-choice-source-filter'),
-      );
-      final sourceList = find.byKey(
-        const PageStorageKey<String>('daily-choice-source-list'),
-      );
-      final field = tester.getRect(sourceField);
+      final field = tester.getRect(_filterField);
       final button = tester.getRect(_filterButton);
       final header = tester.getRect(find.byType(CatalogHeader));
       expect(header.top, field.bottom + 4);
-      expect(_header('Все', 20), findsOneWidget);
+      expect(_header('Намерения', 20), findsOneWidget);
 
-      await tester.drag(sourceList, const Offset(0, -300));
+      await tester.drag(_list, const Offset(0, -300));
       await tester.pumpAndSettle();
 
-      expect(tester.getRect(sourceField), field);
+      expect(tester.getRect(_filterField), field);
       expect(tester.getRect(_filterButton), button);
       expect(tester.getRect(find.byType(CatalogHeader)), header);
     },
@@ -751,21 +551,21 @@ void main() {
       h.repository.complete(0, _firstPage(_actions(3)));
       await tester.pumpAndSettle();
 
-      await tester.enterText(_actionField, 'а' * 256);
+      await tester.enterText(_filterField, 'а' * 256);
       await tester.pump();
       expect(
-        _header(locale.languageCode == 'ru' ? 'Действия' : 'Actions', null),
+        _header(locale.languageCode == 'ru' ? 'Намерения' : 'Intentions', null),
         findsOneWidget,
       );
       await tester.pump(const Duration(milliseconds: 300));
       await tester.pumpAndSettle();
 
       expect(
-        find.descendant(of: _actionField, matching: find.text(error)),
+        find.descendant(of: _filterField, matching: find.text(error)),
         findsOneWidget,
       );
       expect(
-        _header(locale.languageCode == 'ru' ? 'Действия' : 'Actions', null),
+        _header(locale.languageCode == 'ru' ? 'Намерения' : 'Intentions', null),
         findsOneWidget,
       );
       expect(find.byWidgetPredicate((w) => w is ListState), findsNothing);
@@ -780,7 +580,7 @@ void main() {
     final h = await _open(tester);
     h.repository.complete(0, _firstPage(_actions(10)));
     await tester.pumpAndSettle();
-    await tester.showKeyboard(_actionField);
+    await tester.showKeyboard(_filterField);
     const keyboard = 336.0;
     tester.view.viewInsets = const FakeViewPadding(bottom: keyboard);
     addTearDown(tester.view.resetViewInsets);
@@ -788,7 +588,7 @@ void main() {
 
     const aboveKeyboard = 844.0 - keyboard;
     final bar = tester.getRect(find.byType(TopBar));
-    final field = tester.getRect(_actionField);
+    final field = tester.getRect(_filterField);
     final firstRow = tester.getRect(_row(10));
     expect(bar.top, greaterThanOrEqualTo(0));
     expect(field.top, greaterThanOrEqualTo(bar.bottom));
@@ -807,7 +607,7 @@ void main() {
           .pixels,
       greaterThan(0),
     );
-    expect(tester.getRect(_actionField), field);
+    expect(tester.getRect(_filterField), field);
     expect(tester.takeException(), isNull);
   });
 
@@ -825,7 +625,6 @@ void main() {
     final summary = testSummary(
       index: 1,
       title: 'Бегать по утрам',
-      readiness: IntentionReadiness.ready,
       tags: [sport],
     );
     h.repository.complete(0, _firstPage([summary]));
@@ -920,7 +719,7 @@ void main() {
           );
         }
         expect(
-          _header(locale.languageCode == 'ru' ? 'Все' : 'All', 6),
+          _header(locale.languageCode == 'ru' ? 'Намерения' : 'Intentions', 6),
           findsOneWidget,
         );
         await tester.tap(find.text(items.first.title));
@@ -952,8 +751,8 @@ void main() {
         await tester.tap(
           find.bySemanticsLabel(
             locale.languageCode == 'ru'
-                ? 'Открыть страницу действия «${items.first.title}»'
-                : 'Open the page of action ${items.first.title}',
+                ? 'Открыть страницу намерения «${items.first.title}»'
+                : 'Open the page of intention ${items.first.title}',
           ),
         );
         expect(h.openedDetails, [items.first.id]);
@@ -1067,6 +866,14 @@ void main() {
   }
 }
 
+SelectRelationParticipant _participants() => SelectRelationParticipant(
+  session: IntentionSearchSession(),
+  pairProbe: RelationPairProbe(
+    counterpartId: testSummary(index: 999).id,
+    candidateRole: RelationParticipantRole.related,
+  ),
+);
+
 Finder _title(String text) =>
     find.descendant(of: find.byType(TopBar), matching: find.text(text));
 
@@ -1079,17 +886,14 @@ Finder _inEmptyState(String text) =>
     find.descendant(of: find.byType(EmptyState), matching: find.text(text));
 
 Finder _row(int index) => find.byKey(
-  ValueKey('daily-choice-action-${_action(index).id.toCanonicalString()}'),
+  ValueKey('participant-picker-${_action(index).id.toCanonicalString()}'),
 );
 
 Finder _panelRow(Tag tag) =>
     find.byKey(ValueKey('tags-panel-row-${tag.id.toCanonicalString()}'));
 
-IntentionSummary _action(int index) => testSummary(
-  index: index,
-  title: 'Действие $index',
-  readiness: IntentionReadiness.ready,
-);
+IntentionSummary _action(int index) =>
+    testSummary(index: index, title: 'Действие $index');
 
 /// Сводки действий в порядке выдачи: от новых к старым.
 List<IntentionSummary> _actions(int count) => [
@@ -1099,16 +903,13 @@ List<IntentionSummary> _actions(int count) => [
 Result<IntentionCatalogPage> _firstPage(
   List<IntentionSummary> items, {
   int? totalCount,
-  IntentionTypeCounts? typeCounts,
   Map<IntentionId, PairOccupant>? pairOccupants,
   int? exactTitleCount,
 }) => ResultSuccess(
   IntentionCatalogFirstPage(
     items: items,
     totalCount: totalCount ?? items.length,
-    counts: typeCounts == null
-        ? const IntentionCountsTotalOnly()
-        : IntentionCountsByType(typeCounts),
+    counts: const IntentionCountsTotalOnly(),
     nextCursor: (totalCount ?? items.length) > items.length
         ? const TestCatalogCursor()
         : null,
@@ -1183,9 +984,7 @@ Future<_Harness> _open(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: IntentionPickerView(
-          purpose:
-              purpose ??
-              SelectDailyChoiceAction(session: IntentionSearchSession()),
+          purpose: purpose ?? _participants(),
           closeLabel: _closeLabel,
           emptyScopeMessage: _emptyScopeMessage,
           onClose: () => h.closes++,

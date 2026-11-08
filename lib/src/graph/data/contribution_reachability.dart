@@ -40,11 +40,11 @@ final class ContributionRelationGraph {
   final Uint32List parents;
 }
 
-/// Непустой опорный набор и суммарный вес самостоятельных дневных выборов.
+/// Непустой опорный набор и суммарный вес самостоятельных действий Главной.
 ///
-/// Подготовка групп сохраняет выбранное действие и исходные намерения
-/// архивированных шагов. Равные наборы объединяются до подсчёта, а каждый
-/// дубликат выбора увеличивает вес. [seeds] копируется; [counts] неизменяем.
+/// Подготовка групп Главной сохраняет существующие намерения пути действия,
+/// из которых следующее опорное не достижимо активной связью их пары. Равные
+/// наборы объединяются до подсчёта, а каждый дубликат увеличивает вес. [seeds] копируется; [counts] неизменяем.
 /// Подготовка передаёт только группы с положительным запланированным вкладом.
 final class ContributionSeedGroup {
   ContributionSeedGroup({
@@ -63,7 +63,7 @@ typedef ContributionReachabilityEntry = ({
   ContributionCounts counts,
 });
 
-/// Точные количества Главной в порядке убывания вклада, запланированного
+/// Точные количества Главной в порядке убывания запланированного вклада,
 /// вклада и идентификатора. Возвращает только элементы с запланированным вкладом.
 ///
 /// Чистый синхронный подсчёт для вызова адаптером в фоновом изоляте. Не читает
@@ -75,7 +75,8 @@ List<ContributionReachabilityEntry> computeContributionReachability(
 ) {
   if (groups.isEmpty) return const [];
 
-  final components = _condense(graph, groups);
+  final components = _condense(graph, groups.expand((group) => group.seeds));
+  final weights = [for (final group in groups) group.counts];
   final componentCount = components.childOffsets.length - 1;
   final planned = Int64List(componentCount);
   final contribution = Int64List(componentCount);
@@ -91,8 +92,8 @@ List<ContributionReachabilityEntry> computeContributionReachability(
       }
     }
 
-    final plannedSums = _byteSums(groups, first, contribution: false);
-    final contributionSums = _byteSums(groups, first, contribution: true);
+    final plannedSums = _byteSums(weights, first, contribution: false);
+    final contributionSums = _byteSums(weights, first, contribution: true);
     // Тарьян выдаёт потомков раньше предков; повторные рёбра безопасны для OR.
     for (var component = 0; component < componentCount; component++) {
       var mask = masks[component];
@@ -125,18 +126,20 @@ List<ContributionReachabilityEntry> computeContributionReachability(
       ),
   ];
   entries.sort((a, b) {
+    final byPlanned = b.counts.planned.compareTo(a.counts.planned);
+    if (byPlanned != 0) return byPlanned;
     final byContribution = b.counts.contribution.compareTo(
       a.counts.contribution,
     );
-    if (byContribution != 0) return byContribution;
-    final byPlanned = b.counts.planned.compareTo(a.counts.planned);
-    return byPlanned != 0 ? byPlanned : b.intentionId.compareTo(a.intentionId);
+    return byContribution != 0
+        ? byContribution
+        : b.intentionId.compareTo(a.intentionId);
   });
   return List.unmodifiable(entries);
 }
 
 Int64List _byteSums(
-  List<ContributionSeedGroup> groups,
+  List<ContributionCounts> weights,
   int first, {
   required bool contribution,
 }) {
@@ -145,10 +148,10 @@ Int64List _byteSums(
     for (var subset = 1; subset < 256; subset++) {
       final lowestBit = subset & -subset;
       final group = first + byte * 8 + lowestBit.bitLength - 1;
-      final weight = group < groups.length
+      final weight = group < weights.length
           ? (contribution
-                ? groups[group].counts.contribution
-                : groups[group].counts.planned)
+                ? weights[group].contribution
+                : weights[group].planned)
           : 0;
       final offset = byte * 256;
       sums[offset + subset] = sums[offset + (subset ^ lowestBit)] + weight;
@@ -177,20 +180,18 @@ final class _Components {
 
 _Components _condense(
   ContributionRelationGraph graph,
-  List<ContributionSeedGroup> groups, {
+  Iterable<IntentionId> seeds, {
   IntentionId? excludedIntentionId,
 }) {
   final ids = [...graph.intentionIds];
   final indexes = {for (var i = 0; i < ids.length; i++) ids[i]: i};
   final seedNodes = <int>[];
-  for (final group in groups) {
-    for (final seed in group.seeds) {
-      final node = indexes.putIfAbsent(seed, () {
-        ids.add(seed);
-        return ids.length - 1;
-      });
-      seedNodes.add(node);
-    }
+  for (final seed in seeds) {
+    final node = indexes.putIfAbsent(seed, () {
+      ids.add(seed);
+      return ids.length - 1;
+    });
+    seedNodes.add(node);
   }
 
   final affected = Uint8List(ids.length);

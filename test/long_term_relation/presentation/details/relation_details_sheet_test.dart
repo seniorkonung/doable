@@ -2,26 +2,28 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
-import 'package:doable/src/daily_choice/presentation/catalog/daily_choice_local_date_provider.dart';
+import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:doable/src/design_system/components/priority_picker.dart';
 import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
 import 'package:doable/src/design_system/doable_priority.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
+import 'package:doable/src/intention/application/cascade/intention_cascade.dart';
 import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
-import 'package:doable/src/long_term_relation/application/long_term_relation_permissions.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_projection.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
 import 'package:doable/src/long_term_relation/domain/long_term_relation_description.dart';
 import 'package:doable/src/long_term_relation/presentation/details/relation_details_sheet.dart';
+import 'package:doable/src/shared/domain/calendar_date.dart';
+import 'package:doable/src/shared/presentation/local_day/local_date_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/ordinary_page_test_app.dart';
+import '../../../support/intention_cascade_execution.dart';
 import '../relation_graph_test_support.dart';
 import 'relation_details_test_support.dart';
 
@@ -910,8 +912,6 @@ void main() {
       RelationScope scope = RelationScope.active,
       IntentionArchiveState sourceArchiveState = IntentionArchiveState.active,
       IntentionArchiveState relatedArchiveState = IntentionArchiveState.active,
-      LongTermRelationPermissions permissions =
-          const LongTermRelationPermissions.unrestricted(),
     }) => testRelationDetails(
       relationId: relationId,
       sourceId: testIntentionId(1),
@@ -921,7 +921,6 @@ void main() {
       scope: scope,
       sourceArchiveState: sourceArchiveState,
       relatedArchiveState: relatedArchiveState,
-      permissions: permissions,
     );
 
     Future<ControlledRelationDetailsRepository> openPanel(
@@ -979,6 +978,129 @@ void main() {
       expect(find.textContaining('Изменить'), findsNothing);
       semantics.dispose();
     });
+
+    testWidgets(
+      'отказ предпросмотра оставляет действия меню доступными без пояснений',
+      (tester) async {
+        final repository = await openPanel(
+          tester,
+          relation(
+            scope: RelationScope.archived,
+            relatedArchiveState: IntentionArchiveState.archived,
+          ),
+        );
+        repository.onPreviewCascade = (_, _) =>
+            const CascadePreviewUnavailable();
+        await openMenu(tester);
+        for (final name in ['Восстановить из архива', 'Удалить']) {
+          final row = tester.widget<OptionRow>(
+            find.byWidgetPredicate(
+              (widget) => widget is OptionRow && widget.name == name,
+            ),
+          );
+          expect(row.onPressed, isNotNull);
+          expect(row.hint, isNull);
+        }
+      },
+    );
+
+    testWidgets(
+      'меню показывает последствия, а отмена каскада не меняет связь',
+      (tester) async {
+        final repository = await openPanel(tester, relation());
+        final child = testIntentionId(2);
+        final cascade = ArchiveCascadeComposition(
+          departing: [child],
+          promoted: const [],
+          archivedRelationCount: 1,
+        );
+        final single = ArchiveCascadeComposition(
+          departing: const [],
+          promoted: [child],
+          archivedRelationCount: 1,
+        );
+        repository.onPreviewCascade = (subject, operation) =>
+            operation == CascadeOperation.archive
+            ? ArchiveCascadePreview(
+                revision: revision,
+                plan: CascadePlan(
+                  withSupporting: cascade,
+                  onlyThis: single,
+                  asksQuestion: true,
+                ),
+                titles: {child: 'много ходить'},
+              )
+            : givenCascadePreview(subject, operation, revision);
+        await openMenu(tester);
+        expect(
+          find.textContaining('в архив уйдут вспомогательные намерения: 1'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('с пометкой «Удалено»'), findsOneWidget);
+        await tester.tap(find.text('Архивировать'));
+        await tester.pumpAndSettle();
+        expect(find.text('Архивировать связь?'), findsOneWidget);
+        await tester.tap(find.text('Отмена'));
+        await tester.pumpAndSettle();
+        expect(repository.relationCommands, isEmpty);
+        await choose(tester, 'Архивировать');
+        await tester.tap(find.text('Только это'));
+        await tester.pumpAndSettle();
+        final command =
+            repository.relationCommands.single as ArchiveLongTermRelation;
+        expect(command.execution.choice, CascadeChoice.onlyThis);
+        expect(command.execution.expected.promoted, [child]);
+      },
+    );
+
+    testWidgets(
+      'восстановление спрашивает только о намерениях сверх архивного участника',
+      (tester) async {
+        final repository = await openPanel(
+          tester,
+          relation(
+            scope: RelationScope.archived,
+            relatedArchiveState: IntentionArchiveState.archived,
+          ),
+        );
+        final participant = testIntentionId(2);
+        final child = testIntentionId(3);
+        final cascade = RestoreCascadeComposition(
+          restored: [participant, child],
+          returnedAsMain: null,
+          restoredRelationCount: 2,
+        );
+        final single = RestoreCascadeComposition(
+          restored: [participant],
+          returnedAsMain: null,
+          restoredRelationCount: 1,
+        );
+        repository.onPreviewCascade = (subject, operation) =>
+            operation == CascadeOperation.restore
+            ? RestoreCascadePreview(
+                revision: revision,
+                plan: CascadePlan(
+                  withSupporting: cascade,
+                  onlyThis: single,
+                  asksQuestion: true,
+                ),
+                titles: {participant: 'много ходить', child: 'обувь'},
+              )
+            : givenCascadePreview(subject, operation, revision);
+        await choose(tester, 'Восстановить из архива');
+        expect(find.text('Восстановить связь?'), findsOneWidget);
+        expect(
+          find.textContaining('вспомогательные намерения: 1'),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('Со вспомогательными'));
+        await tester.pumpAndSettle();
+        final command =
+            repository.relationCommands.single as RestoreLongTermRelation;
+        expect(command.execution.choice, CascadeChoice.withSupporting);
+        expect(command.execution.expected.restored, [participant, child]);
+      },
+    );
 
     testWidgets('архивирование начинается после закрытия меню и отражается в '
         'панели без сообщения', (tester) async {
@@ -1042,31 +1164,25 @@ void main() {
       semantics.dispose();
     });
 
-    for (final (title, source, related, reason) in const [
+    for (final (title, source, related) in const [
       (
-        'исходный',
+        'исходным',
         IntentionArchiveState.archived,
         IntentionArchiveState.active,
-        'Сначала восстановите исходное намерение, затем восстановите эту '
-            'связь.',
       ),
       (
-        'связанный',
+        'связанным',
         IntentionArchiveState.active,
         IntentionArchiveState.archived,
-        'Сначала восстановите связанное намерение, затем восстановите эту '
-            'связь.',
       ),
       (
-        'оба',
+        'обоими',
         IntentionArchiveState.archived,
         IntentionArchiveState.archived,
-        'Сначала восстановите исходное и связанное намерения, затем '
-            'восстановите эту связь.',
       ),
     ]) {
-      testWidgets('восстановление остаётся в меню с причиной, пока архивирован '
-          '$title участник', (tester) async {
+      testWidgets('восстановление связи с архивным $title участником '
+          'доступно и отправляет команду', (tester) async {
         final semantics = tester.ensureSemantics();
         final repository = await openPanel(
           tester,
@@ -1077,45 +1193,16 @@ void main() {
           ),
         );
 
-        await openMenu(tester);
-        expect(find.text('Восстановить из архива'), findsOneWidget);
-        expect(find.text(reason), findsOneWidget);
-
-        await tester.tap(find.text('Восстановить из архива'));
+        await choose(tester, 'Восстановить из архива');
         await tester.pumpAndSettle();
 
-        expect(repository.relationCommands, isEmpty);
-        expect(find.text(reason), findsOneWidget);
+        expect(
+          repository.relationCommands.single,
+          isA<RestoreLongTermRelation>(),
+        );
         semantics.dispose();
       });
     }
-
-    testWidgets('удаление остаётся в меню с причиной, пока связь входит в путь '
-        'дневного выбора', (tester) async {
-      final semantics = tester.ensureSemantics();
-      final repository = await openPanel(
-        tester,
-        relation(
-          permissions:
-              const LongTermRelationPermissions.referencedByDailyPath(),
-        ),
-      );
-
-      await openMenu(tester);
-      expect(
-        find.text(
-          'Связь используется в сохранённом дневном пути, поэтому удалить её '
-          'нельзя.',
-        ),
-        findsOneWidget,
-      );
-      await tester.tap(find.text('Удалить'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Удалить связь?'), findsNothing);
-      expect(repository.relationCommands, isEmpty);
-      semantics.dispose();
-    });
 
     testWidgets('пока операция выполняется, пункты просят дождаться её '
         'окончания', (tester) async {
@@ -1156,28 +1243,147 @@ void main() {
       semantics.dispose();
     });
 
-    testWidgets('зависимость, появившаяся при открытом подтверждении, не даёт '
-        'отправить удаление', (tester) async {
-      final semantics = tester.ensureSemantics();
+    testWidgets(
+      'подтверждение показывает последствия удаления и передаёт выбор',
+      (tester) async {
+        final repository = await openPanel(tester, relation());
+        final child = testIntentionId(2);
+        final archived = testIntentionId(3);
+        final cascade = DeleteCascadeComposition(
+          departing: [child],
+          promoted: const [],
+          archivedByInvariant: [archived],
+          mainsLosingRelation: const [],
+          deletedRelationCount: 3,
+        );
+        final single = DeleteCascadeComposition(
+          departing: const [],
+          promoted: [child],
+          archivedByInvariant: const [],
+          mainsLosingRelation: const [],
+          deletedRelationCount: 1,
+        );
+        repository.onPreviewCascade = (subject, operation) =>
+            operation == CascadeOperation.delete
+            ? RelationDeleteCascadePreview(
+                revision: revision,
+                plan: CascadePlan(
+                  withSupporting: cascade,
+                  onlyThis: single,
+                  asksQuestion: true,
+                ),
+                titles: {child: 'много ходить', archived: 'обувь'},
+              )
+            : givenCascadePreview(subject, operation, revision);
+        await choose(tester, 'Удалить');
+        expect(find.text('Удалить связь и 1 намерение?'), findsOneWidget);
+        expect(find.textContaining('3 связи'), findsOneWidget);
+        expect(find.text('Уйдут в архив · 1'), findsOneWidget);
+        expect(find.text('обувь'), findsOneWidget);
+        expect(
+          find.text('Оставить главным: намерение станет главным'),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('Оставить главным'));
+        await tester.pump();
+        final command =
+            repository.relationCommands.single as DeleteLongTermRelation;
+        expect(command.execution.choice, CascadeChoice.onlyThis);
+        expect(command.execution.expected.promoted, [child]);
+      },
+    );
+
+    testWidgets('подтверждение называет намерение, которое уйдёт в архив', (
+      tester,
+    ) async {
       final repository = await openPanel(tester, relation());
-
+      final child = testIntentionId(3);
+      final composition = DeleteCascadeComposition(
+        departing: const [],
+        promoted: const [],
+        archivedByInvariant: [child],
+        mainsLosingRelation: const [],
+        deletedRelationCount: 1,
+      );
+      repository.onPreviewCascade = (subject, operation) =>
+          operation == CascadeOperation.delete
+          ? RelationDeleteCascadePreview(
+              revision: revision,
+              plan: CascadePlan(
+                withSupporting: composition,
+                onlyThis: composition,
+                asksQuestion: false,
+              ),
+              titles: {child: 'обувь'},
+            )
+          : givenCascadePreview(subject, operation, revision);
       await choose(tester, 'Удалить');
-      repository
-          .watchAt(0)
-          .emitDetails(
-            relation(
-              permissions:
-                  const LongTermRelationPermissions.referencedByDailyPath(),
-            ),
-            revision: const TestGraphRevision(2),
-          );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Удалить'));
-      await tester.pumpAndSettle();
+      expect(find.text('Удалить связь?'), findsOneWidget);
+      expect(find.text('Уйдут в архив · 1'), findsOneWidget);
+      expect(find.text('обувь'), findsOneWidget);
+      expect(find.textContaining('Пути действий'), findsOneWidget);
+    });
 
-      expect(repository.relationCommands, isEmpty);
-      expect(find.text('много ходить').hitTestable(), findsOneWidget);
-      semantics.dispose();
+    testWidgets(
+      'длинные списки удаления и архива показывают четыре названия и остаток',
+      (tester) async {
+        final repository = await openPanel(tester, relation());
+        final departing = [for (var i = 2; i < 7; i++) testIntentionId(i)];
+        final archived = [for (var i = 7; i < 12; i++) testIntentionId(i)];
+        final cascade = DeleteCascadeComposition(
+          departing: departing,
+          promoted: const [],
+          archivedByInvariant: archived,
+          mainsLosingRelation: const [],
+          deletedRelationCount: 6,
+        );
+        repository.onPreviewCascade = (subject, operation) =>
+            operation == CascadeOperation.delete
+            ? RelationDeleteCascadePreview(
+                revision: revision,
+                plan: CascadePlan(
+                  withSupporting: cascade,
+                  onlyThis: cascade,
+                  asksQuestion: true,
+                ),
+                titles: {
+                  for (var i = 0; i < 5; i++) departing[i]: 'Уходит $i',
+                  for (var i = 0; i < 5; i++) archived[i]: 'В архив $i',
+                },
+              )
+            : givenCascadePreview(subject, operation, revision);
+        await choose(tester, 'Удалить');
+        expect(find.text('Удалить связь и 5 намерений?'), findsOneWidget);
+        expect(find.text('Уходит 3'), findsOneWidget);
+        expect(find.text('Уходит 4'), findsNothing);
+        expect(find.text('В архив 3'), findsOneWidget);
+        expect(find.text('В архив 4'), findsNothing);
+        expect(find.text('и ещё 1'), findsNWidgets(2));
+        await tester.tap(find.text('Удалить всё'));
+        await tester.pump();
+        final command =
+            repository.relationCommands.single as DeleteLongTermRelation;
+        expect(command.execution.choice, CascadeChoice.withSupporting);
+        expect(command.execution.expected.departing, departing);
+      },
+    );
+
+    testWidgets('архивированную связь с архивным участником можно удалить', (
+      tester,
+    ) async {
+      final repository = await openPanel(
+        tester,
+        relation(
+          scope: RelationScope.archived,
+          relatedArchiveState: IntentionArchiveState.archived,
+        ),
+      );
+      await choose(tester, 'Удалить');
+      expect(find.text('Удалить связь?'), findsOneWidget);
+      expect(find.textContaining('Оба намерения сохранятся'), findsOneWidget);
+      await tester.tap(find.text('Удалить'));
+      await tester.pump();
+      expect(repository.relationCommands.single, isA<DeleteLongTermRelation>());
     });
 
     /// Подтверждает удаление из меню; запись остаётся незавершённой.
@@ -1389,6 +1595,55 @@ void main() {
       semantics.dispose();
     });
 
+    testWidgets('после конфликта удаления повтор показывает обновлённый '
+        'состав каскада', (tester) async {
+      final repository = await openPanel(tester, relation());
+      final first = testIntentionId(3);
+      final second = testIntentionId(4);
+      var departing = [first];
+      repository.onPreviewCascade = (subject, operation) {
+        if (operation != CascadeOperation.delete) {
+          return givenCascadePreview(subject, operation, revision);
+        }
+        final composition = DeleteCascadeComposition(
+          departing: departing,
+          promoted: const [],
+          archivedByInvariant: const [],
+          mainsLosingRelation: const [],
+          deletedRelationCount: 1,
+        );
+        return RelationDeleteCascadePreview(
+          revision: revision,
+          plan: CascadePlan(
+            withSupporting: composition,
+            onlyThis: composition,
+            asksQuestion: true,
+          ),
+          titles: {first: 'первое намерение', second: 'второе намерение'},
+        );
+      };
+
+      await choose(tester, 'Удалить');
+      expect(find.text('первое намерение'), findsOneWidget);
+      expect(find.text('второе намерение'), findsNothing);
+      await tester.tap(find.text('Удалить всё'));
+      await tester.pump();
+      repository.failRelationCommand(
+        0,
+        const LongTermRelationCascadeConflictFailure(),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Повторить'), findsOneWidget);
+      departing = [first, second];
+      await tester.tap(find.text('Повторить'));
+      await tester.pumpAndSettle();
+      expect(find.text('Удалить связь и 2 намерения?'), findsOneWidget);
+      expect(find.text('первое намерение'), findsOneWidget);
+      expect(find.text('второе намерение'), findsOneWidget);
+      expect(repository.relationCommands, hasLength(1));
+    });
+
     testWidgets('отказ удаления остаётся в панели с данными, а повтор '
         'закрывает панель до позднего снимка', (tester) async {
       final semantics = tester.ensureSemantics();
@@ -1411,6 +1666,8 @@ void main() {
       expect(find.text('много ходить').hitTestable(), findsOneWidget);
 
       await tester.tap(find.text('Повторить'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Удалить'));
       await tester.pump();
       repository.completeRelationDelete(
         1,
@@ -1467,30 +1724,63 @@ void main() {
       semantics.dispose();
     });
 
-    testWidgets('отказ восстановления из-за участника объясняется в панели '
-        'без повтора', (tester) async {
+    testWidgets('отказ чтения предпросмотра при архивировании остаётся в '
+        'панели без команды, а повтор читает предпросмотр заново и '
+        'архивирует', (tester) async {
       final semantics = tester.ensureSemantics();
-      final details = relation(scope: RelationScope.archived);
-      final repository = await openPanel(tester, details);
+      final repository = await openPanel(tester, relation());
+      repository.onPreviewCascade = (_, _) => const CascadePreviewUnavailable();
+
+      await choose(tester, 'Архивировать');
+      await tester.pumpAndSettle();
+
+      expect(repository.relationCommands, isEmpty);
+      expect(
+        find.text('Не удалось архивировать связь. Повторите попытку.'),
+        findsOneWidget,
+      );
+
+      repository.onPreviewCascade = null;
+      await tester.tap(find.text('Повторить'));
+      await tester.pump();
+
+      expect(
+        repository.relationCommands.single,
+        isA<ArchiveLongTermRelation>(),
+      );
+      expect(
+        find.text('Не удалось архивировать связь. Повторите попытку.'),
+        findsNothing,
+      );
+      semantics.dispose();
+    });
+
+    testWidgets('конфликт состава при восстановлении объясняется в панели '
+        'с повторным чтением предпросмотра', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final repository = await openPanel(
+        tester,
+        relation(scope: RelationScope.archived),
+      );
 
       await choose(tester, 'Восстановить из архива');
       repository.failRelationCommand(
         0,
-        LongTermRelationParticipantArchivedFailure(
-          role: RelationParticipantRole.related,
-          intentionId: details.related.id,
-        ),
+        const LongTermRelationCascadeConflictFailure(),
       );
       await tester.pumpAndSettle();
 
       expect(
         find.text(
-          'Сначала восстановите связанное намерение, затем восстановите эту '
-          'связь.',
+          'Связь не удалось восстановить из-за конфликта актуального '
+          'состояния.',
         ),
         findsOneWidget,
       );
-      expect(find.text('Повторить'), findsNothing);
+      expect(find.text('Повторить'), findsOneWidget);
+      await tester.tap(find.text('Повторить'));
+      await tester.pump();
+      expect(repository.relationCommands, hasLength(2));
       expect(find.textContaining('Архивные связи остаются'), findsOneWidget);
       semantics.dispose();
     });
@@ -1679,8 +1969,8 @@ Future<ControlledRelationDetailsRepository> _openSheet(
   final container = ProviderContainer(
     overrides: [
       personalGraphRepositoryProvider.overrideWithValue(repository),
-      dailyChoiceLocalDateSourceProvider.overrideWithValue(
-        () => DailyChoiceLocalDay(
+      localDateSourceProvider.overrideWithValue(
+        () => LocalDay(
           date: CalendarDate.fromParts(2026, 11, 2),
           untilNextDate: const Duration(hours: 1),
         ),

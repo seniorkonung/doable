@@ -15,6 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../support/graph_seed.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
 import '../../support/local_database_harness.dart';
 
@@ -50,10 +51,10 @@ void main() {
       expect(active!.id, activeId);
       expect(active.title, 'Переписать "статью"');
       expect(active.description, '  Сохранить точный\nтекст  ');
-      expect(active.readiness, IntentionReadiness.ready);
+      expect(active.kind, IntentionKind.main);
       expect(active.archiveState, IntentionArchiveState.active);
       expect(active.createdAt.value, DateTime.utc(2026, 9, 3, 10));
-      expect(active.updatedAt.value, DateTime.utc(2026, 9, 3, 12));
+      expect(active.updatedAt.value, DateTime.utc(2026, 9, 3, 11));
 
       final archived = _watched(
         await repository.watchIntention(archivedId).first,
@@ -62,7 +63,7 @@ void main() {
       expect(archived!.id, archivedId);
       expect(archived.title, 'Архивировать журнал');
       expect(archived.description, isNull);
-      expect(archived.readiness, IntentionReadiness.notReady);
+      expect(archived.kind, IntentionKind.supporting);
       expect(archived.archiveState, IntentionArchiveState.archived);
       expect(archived.createdAt.value, DateTime.utc(2026, 9, 3, 13));
       expect(archived.updatedAt.value, DateTime.utc(2026, 9, 3, 16));
@@ -83,6 +84,7 @@ void main() {
       );
       expect(archivedPage.totalCount, 1);
       expect(archivedPage.items.map((item) => item.id), [archivedId]);
+      expect(archivedPage.items.single.kind, IntentionKind.supporting);
 
       final allPage = _firstPage(
         await repository.getCatalogPage(_catalogQuery(IntentionScope.all)),
@@ -277,17 +279,16 @@ void main() {
                 id,
                 title,
                 description,
-                is_action_ready,
+                kind,
                 is_archived,
                 created_at,
                 updated_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?)
+              ) VALUES (?, ?, ?, 'main', ?, ?, ?)
             ''',
             [
               fixture.id,
               'Повреждённое намерение',
               null,
-              0,
               0,
               DateTime.utc(2026, 9, 3, 10).microsecondsSinceEpoch,
               DateTime.utc(2026, 9, 3, 10).microsecondsSinceEpoch,
@@ -335,7 +336,6 @@ Future<void> _createFirstObjectGraph(
     _SequenceClock([
       DateTime.utc(2026, 9, 3, 10),
       DateTime.utc(2026, 9, 3, 11),
-      DateTime.utc(2026, 9, 3, 12),
       DateTime.utc(2026, 9, 3, 13),
       DateTime.utc(2026, 9, 3, 14),
       DateTime.utc(2026, 9, 3, 15),
@@ -361,16 +361,28 @@ Future<void> _createFirstObjectGraph(
       ),
     ),
   );
-  _saved(await repository.execute(EnableIntentionReadiness(activeId)));
 
   _saved(
     await repository.execute(
       const CreateIntention(title: 'Архивировать журнал', description: null),
     ),
   );
-  _saved(await repository.execute(ArchiveIntention(archivedId)));
-  _saved(await repository.execute(RestoreIntention(archivedId)));
-  _saved(await repository.execute(ArchiveIntention(archivedId)));
+  for (final command in [
+    () => previewedArchiveIntention(repository, archivedId),
+    () => previewedRestoreIntention(repository, archivedId),
+    () => previewedArchiveIntention(repository, archivedId),
+  ]) {
+    final saved = _saved(await repository.execute(await command()));
+    expect(saved.kind, IntentionKind.main);
+  }
+  // Архивное вспомогательное намерение может не иметь входящей связи.
+  await seedGraph(
+    database,
+    () => database.customStatement(
+      'UPDATE intentions SET kind = ? WHERE id = ?',
+      ['supporting', archivedId.toCanonicalString()],
+    ),
+  );
 
   _saved(
     await repository.execute(
@@ -378,7 +390,9 @@ Future<void> _createFirstObjectGraph(
     ),
   );
   expect(
-    await repository.execute(DeleteIntention(deletedId)),
+    await repository.execute(
+      await previewedDeleteIntention(repository, deletedId),
+    ),
     _deleted(deletedId),
   );
 

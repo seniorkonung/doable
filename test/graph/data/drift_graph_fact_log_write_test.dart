@@ -1,7 +1,5 @@
-import 'package:doable/src/daily_choice/application/confirmed_choice_path.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_command.dart';
-import 'package:doable/src/daily_choice/application/daily_choice_result.dart';
-import 'package:doable/src/daily_choice/domain/calendar_date.dart';
+import 'package:doable/src/action/application/action_command.dart';
+import 'package:doable/src/action/application/action_result.dart';
 import 'package:doable/src/data/local/app_database.dart'
     show AppDatabase, GraphLogPackage;
 import 'package:doable/src/graph/application/graph_command_result.dart';
@@ -14,11 +12,8 @@ import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_id_generator.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
-import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/long_term_relation/application/intention_relation_group.dart';
 import 'package:doable/src/long_term_relation/application/long_term_relation_command.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation.dart';
-import 'package:doable/src/long_term_relation/domain/long_term_relation_id.dart';
 import 'package:doable/src/tag/application/tag_command.dart';
 import 'package:doable/src/tag/application/tag_result.dart';
 import 'package:doable/src/tag/domain/tag_name.dart';
@@ -26,8 +21,10 @@ import 'package:drift/drift.dart' show OrderingTerm;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../../support/action_seed.dart';
 import '../../support/graph_seed.dart';
 import '../../support/in_memory_diagnostics_sink.dart';
+import '../../support/intention_cascade_execution.dart';
 import '../../support/local_database_harness.dart';
 import '../../support/tag_positions.dart';
 
@@ -55,19 +52,16 @@ void main() {
     database.graphLogPackages,
   )..orderBy([(package) => OrderingTerm.asc(package.position)])).get();
 
-  Future<Intention> createIntention(
-    String title, {
-    IntentionReadiness readiness = IntentionReadiness.notReady,
-  }) async => _confirmed<IntentionSaved>(
-    await repository.execute(
-      CreateIntention.withInitialState(
-        title: title,
-        description: null,
-        readiness: readiness,
-        tagIds: const {},
-      ),
-    ),
-  ).intention;
+  Future<Intention> createIntention(String title) async =>
+      _confirmed<IntentionSaved>(
+        await repository.execute(
+          CreateIntention.withInitialState(
+            title: title,
+            description: null,
+            tagIds: const {},
+          ),
+        ),
+      ).intention;
 
   test('каждый блок записи подтверждает команду одним пакетом фактов со следующей позицией', () async {
     var lastPosition = 0;
@@ -134,7 +128,6 @@ void main() {
         CreateIntention.withInitialState(
           title: 'Изучать язык',
           description: null,
-          readiness: IntentionReadiness.notReady,
           tagIds: {tag.id},
         ),
       ),
@@ -145,7 +138,6 @@ void main() {
         CreateIntention.withInitialState(
           title: 'Читать',
           description: null,
-          readiness: IntentionReadiness.ready,
           tagIds: const {},
         ),
       ),
@@ -161,36 +153,33 @@ void main() {
       ),
       ['создание связи'],
     )).relations.single;
-    final choice = (await expectOnePackage<DailyChoiceCreated>(
-      repository.execute(
-        CreateDailyChoice(
-          sourceIntentionId: source.id,
-          selectedIntentionId: selected.id,
-          path: _path(relation.id, source.id, selected.id),
-          date: CalendarDate.fromParts(2026, 10, 17),
-          description: null,
-          isCompleted: false,
-        ),
+    final action = seedActionId(1);
+    // Команды создания действия нет: действие заполняется в обход лога.
+    await seedGraph(
+      database,
+      () => insertAction(
+        database,
+        id: action.toCanonicalString(),
+        path: [source.id.toCanonicalString(), selected.id.toCanonicalString()],
       ),
-      ['создание дневного выбора'],
-    )).choice;
-    await expectOnePackage<DailyChoiceFieldsUpdated>(
-      repository.execute(
-        UpdateDailyChoiceFields(
-          choiceId: choice.id,
-          patch: const DailyChoiceFieldsPatch(
-            isCompleted: DailyChoiceFieldSet(true),
-          ),
-        ),
-      ),
-      ['изменение дневного выбора'],
     );
-    await expectOnePackage<DailyChoiceDeleted>(
-      repository.execute(DeleteDailyChoice(choice.id)),
-      ['удаление дневного выбора'],
+    await expectOnePackage<ActionFieldsUpdated>(
+      repository.execute(
+        UpdateActionFields(
+          actionId: action,
+          patch: const ActionFieldsPatch(isCompleted: ActionFieldSet(true)),
+        ),
+      ),
+      ['изменение действия'],
+    );
+    await expectOnePackage<ActionDeleted>(
+      repository.execute(DeleteAction(action)),
+      ['удаление действия'],
     );
     await expectOnePackage<LongTermRelationDeleted>(
-      repository.execute(DeleteLongTermRelation(relation.id)),
+      repository.execute(
+        await previewedDeleteRelation(repository, relation.id),
+      ),
       ['удаление связи'],
     );
   });
@@ -361,19 +350,6 @@ T _confirmed<T>(Object result) {
   return (confirmed! as ConfirmedGraphResult).value as T;
 }
 
-ConfirmedChoicePath _path(
-  LongTermRelationId relationId,
-  IntentionId sourceId,
-  IntentionId relatedId,
-) => ConfirmedChoicePath([
-  ConfirmedChoicePathStep(
-    relationId: relationId,
-    sourceIntentionId: sourceId,
-    type: LongTermRelationType.need,
-    relatedIntentionId: relatedId,
-  ),
-]);
-
 List<GraphFact> _decodeFacts(GraphLogPackage package) =>
     GraphFormatCodec.decodePackage(
       package.facts!,
@@ -388,9 +364,11 @@ List<String> _factKinds(GraphLogPackage package) => [
       GraphEntityDeleted(:final entity) => switch (entity) {
         TagKey() => 'удаление тега',
         IntentionKey() => 'удаление намерения',
+        DeletedIntentionKey() => 'удаление надгробия намерения',
         TagAssignmentKey() => 'удаление назначения',
         LongTermRelationKey() => 'удаление связи',
-        DailyChoiceKey() => 'удаление дневного выбора',
+        DeletedRelationPairKey() => 'удаление надгробия связи',
+        ActionKey() => 'удаление действия',
       },
     },
 ];
@@ -398,9 +376,11 @@ List<String> _factKinds(GraphLogPackage package) => [
 String _entityOf(GraphEntityRecord record) => switch (record) {
   TagRecord() => 'тега',
   IntentionRecord() => 'намерения',
+  DeletedIntentionRecord() => 'надгробия намерения',
   TagAssignmentRecord() => 'назначения',
   LongTermRelationRecord() => 'связи',
-  DailyChoiceRecord() => 'дневного выбора',
+  DeletedRelationPairRecord() => 'надгробия связи',
+  ActionRecord() => 'действия',
 };
 
 /// Описание одного-двух графемных кластеров, с которым запись [intention],
@@ -413,7 +393,7 @@ String _descriptionForRecordLength(Intention intention, int byteLength) {
         id: intention.id,
         title: intention.title,
         description: 'a',
-        readiness: intention.readiness,
+        kind: intention.kind,
         archiveState: intention.archiveState,
         createdAt: intention.createdAt,
         updatedAt: IntentionTimestamp(_now),

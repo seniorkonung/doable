@@ -233,7 +233,7 @@ IntentionCatalogEntrySnapshot _entry(IntentionId id, List<Tag> tags) => _Entry(
     id: id,
     title: 'Намерение',
     descriptionPreview: null,
-    readiness: IntentionReadiness.notReady,
+    kind: IntentionKind.main,
     archiveState: IntentionArchiveState.active,
     createdAt: IntentionTimestamp(DateTime.utc(2026, 9, 1)),
     updatedAt: IntentionTimestamp(DateTime.utc(2026, 9, 2)),

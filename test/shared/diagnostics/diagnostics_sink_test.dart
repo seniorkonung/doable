@@ -54,6 +54,54 @@ void main() {
       });
     });
 
+    test('отказ построения индекса удержания кодируется без данных графа', () {
+      final messages = <String>[];
+      final sink = DeveloperDiagnosticsSink(messages.add);
+
+      recordDiagnosticsSafely(
+        sink,
+        const IntentionHoldingIndexDiagnosticsEvent(
+          stage: IntentionHoldingIndexDiagnosticsStage.relations,
+          status: DiagnosticsFailed(
+            duration: Duration(microseconds: 4321),
+            code: DiagnosticsFailureCode.corruption,
+          ),
+        ),
+      );
+
+      expect(jsonDecode(messages.single), {
+        'operation': 'intentionHoldingIndex',
+        'stage': 'relations',
+        'outcome': 'failed',
+        'durationMicros': 4321,
+        'failureCode': 'corruption',
+      });
+    });
+
+    test('отказ предпросмотра каскада кодируется без данных графа', () {
+      final messages = <String>[];
+      final sink = DeveloperDiagnosticsSink(messages.add);
+
+      recordDiagnosticsSafely(
+        sink,
+        const IntentionCascadePreviewDiagnosticsEvent(
+          stage: IntentionCascadePreviewDiagnosticsStage.titles,
+          status: DiagnosticsFailed(
+            duration: Duration(microseconds: 4321),
+            code: DiagnosticsFailureCode.conflict,
+          ),
+        ),
+      );
+
+      expect(jsonDecode(messages.single), {
+        'operation': 'intentionCascadePreview',
+        'stage': 'titles',
+        'outcome': 'failed',
+        'durationMicros': 4321,
+        'failureCode': 'conflict',
+      });
+    });
+
     test('успех чтения порции каталога кодируется с полем сортировки', () {
       final messages = <String>[];
       final sink = DeveloperDiagnosticsSink(messages.add);
@@ -81,13 +129,13 @@ void main() {
       final sink = DeveloperDiagnosticsSink(messages.add);
 
       sink.record(
-        const DailyChoiceDayStatusesReadDiagnosticsEvent(
+        const ActionDayStatusesReadDiagnosticsEvent(
           status: DiagnosticsStarted(),
         ),
       );
 
       expect(jsonDecode(messages.single), {
-        'operation': 'dailyChoiceDayStatusesRead',
+        'operation': 'actionDayStatusesRead',
         'stage': 'read',
         'outcome': 'started',
       });
@@ -98,13 +146,13 @@ void main() {
       final sink = DeveloperDiagnosticsSink(messages.add);
 
       sink.record(
-        const DailyChoiceDayStatusesReadDiagnosticsEvent(
+        const ActionDayStatusesReadDiagnosticsEvent(
           status: DiagnosticsSucceeded(Duration(microseconds: 1234)),
         ),
       );
 
       expect(jsonDecode(messages.single), {
-        'operation': 'dailyChoiceDayStatusesRead',
+        'operation': 'actionDayStatusesRead',
         'stage': 'read',
         'outcome': 'succeeded',
         'durationMicros': 1234,
@@ -119,7 +167,7 @@ void main() {
         final sink = DeveloperDiagnosticsSink(messages.add);
 
         sink.record(
-          const DailyChoiceDayStatusesReadDiagnosticsEvent(
+          const ActionDayStatusesReadDiagnosticsEvent(
             status: DiagnosticsFailed(
               duration: Duration(microseconds: 5678),
               code: DiagnosticsFailureCode.corruption,
@@ -128,7 +176,7 @@ void main() {
         );
 
         expect(jsonDecode(messages.single), {
-          'operation': 'dailyChoiceDayStatusesRead',
+          'operation': 'actionDayStatusesRead',
           'stage': 'read',
           'outcome': 'failed',
           'durationMicros': 5678,
