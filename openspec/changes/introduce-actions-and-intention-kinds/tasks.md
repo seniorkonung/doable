@@ -1621,3 +1621,17 @@
   - **Зависимости:** 4.7.
   - **Предполагаемые файлы:** `lib/src/graph/data/drift_personal_graph_repository_relation_commands.dart`.
   - **Размер:** XS.
+
+- [ ] 4.27 Выполнение каскада строится только из плана предпросмотра и выбранного варианта
+  - **Критерии приёмки:**
+    - В `lib/src/intention/application/cascade/intention_cascade.dart` выполнение каскада создаётся фабрикой из плана предпросмотра и выбранного варианта, например `CascadeExecution.of(CascadePlan<C> plan, CascadeChoice choice)`: состав `expected` фабрика сама берёт из `plan.withSupporting` или `plan.onlyThis` по исчерпывающему разбору `CascadeChoice`. Публичного конструктора с произвольной парой `(choice, expected)` нет — он удалён или закрыт, поэтому несогласованную пару выбора и состава нельзя выразить вне этого файла (D7, правило `type-safe-design`).
+    - В `lib/src/intention/presentation/details/intention_details_view_model.dart` и `lib/src/long_term_relation/presentation/details/relation_details_view_model.dart` нет выражения `choice == CascadeChoice.onlyThis ? plan.onlyThis : plan.withSupporting`: все команды архивирования, восстановления и удаления намерения и связи, включая построенные задачей 4.22, получают выполнение из этой фабрики.
+    - Именованный конструктор `CascadeExecution.withSupporting` остаётся, только если у него остаются вызывающие; иначе удалён.
+    - Вспомогательные функции тестов в `test/graph/data/` и `test/support/intention_cascade_execution.dart`, которые собирали пару `(choice, expected)` вручную, строят выполнение через фабрику; где нужен составленный в тесте состав, они передают `CascadePlan` с этим составом. Ожидания этих тестов не меняются.
+    - Поведение не меняется: выбор варианта, сверка состава в транзакции, конфликт и сообщения об исходе остаются прежними.
+    - Тест (модульный для типа выполнения или существующие тесты моделей представления) подтверждает, что каждый выбранный вариант исполняется с составом именно этого варианта плана.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention test/long_term_relation/presentation/details test/graph/data`.
+  - **Зависимости:** 4.11, 4.13, 4.22.
+  - **Предполагаемые файлы:** `lib/src/intention/application/cascade/intention_cascade.dart`, `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/src/long_term_relation/presentation/details/relation_details_view_model.dart`, `test/support/intention_cascade_execution.dart`, затронутые тесты в `test/graph/data/`, `test/intention/` и `test/long_term_relation/presentation/details/`.
+  - **Размер:** S.
