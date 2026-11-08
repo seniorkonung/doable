@@ -1,6 +1,7 @@
 import 'package:doable/src/graph/application/graph_command_coordinator.dart';
 import 'package:doable/src/graph/application/graph_change.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
+import 'package:doable/src/intention/application/cascade/intention_cascade.dart';
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
@@ -634,7 +635,7 @@ void main() {
 
       container
           .read(intentionDetailsViewModelProvider(intention.id).notifier)
-          .delete();
+          .delete(_confirmWithSupporting);
       await pumpEventQueue();
       repository.completeCommand(0, testDetailsDeletedResult(intention));
       await pumpEventQueue();
@@ -703,7 +704,7 @@ void main() {
             ),
             (
               testDetailsIntention(index: 114),
-              (model) => model.delete(),
+              (model) => model.delete(_confirmWithSupporting),
               IntentionCommandKind.delete,
             ),
           ];
@@ -835,7 +836,9 @@ void main() {
           .read(graphCommandCoordinatorProvider.notifier)
           .shutdown();
       container.read(provider.notifier).archive();
-      final deleted = container.read(provider.notifier).delete();
+      final deleted = container
+          .read(provider.notifier)
+          .delete(_confirmWithSupporting);
 
       expect(repository.commands, isEmpty);
       expect(container.read(provider), same(before));
@@ -844,6 +847,10 @@ void main() {
     },
   );
 }
+
+Future<CascadeChoice?> _confirmWithSupporting(
+  IntentionDeleteCascadePreview preview,
+) async => CascadeChoice.withSupporting;
 
 ProviderContainer _detailsContainer(ControlledDetailsRepository repository) {
   repository.shareSecondWatch = false;
