@@ -863,9 +863,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get detailsOptionDeleteKeepsTags => 'Его теги сохранятся';
 
   @override
-  String get detailsOptionDeleteRelationsFirst => 'Сначала удалите его связи';
-
-  @override
   String get detailsOptionWait => 'Дождитесь окончания текущего изменения';
 
   @override
@@ -975,10 +972,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get detailsDeleteCascadeConflict =>
       'Намерение не удалено: связанные намерения изменились, и удаление затронуло бы их иначе. Попробуйте снова.';
-
-  @override
-  String get detailsDeleteBlockedByRelations =>
-      'Намерение не удалено: его связи блокируют удаление. Архивные и ещё не загруженные связи тоже блокируют.';
 
   @override
   String get detailsDeleteUnavailable =>

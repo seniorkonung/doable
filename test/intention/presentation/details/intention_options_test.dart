@@ -84,8 +84,7 @@ void main() {
     expect(delete.hint, 'Его теги сохранятся');
   });
 
-  test('удаление выключено, пока его блокируют связи любого архивного '
-      'состояния, и называет причину только о связях', () {
+  test('связи любого архивного состояния не выключают удаление', () {
     for (final counts in [
       testRelationCounts(activeNeedIncoming: 1),
       testRelationCounts(archivedCanIncoming: 1),
@@ -95,14 +94,14 @@ void main() {
           ru,
           _loaded(archived: archived, counts: counts),
         )[2];
-        expect(delete.value, isNull);
-        expect(delete.hint, 'Сначала удалите его связи');
+        expect(delete.value, IntentionOption.delete);
+        expect(delete.hint, 'Его теги сохранятся');
       }
     }
   });
 
   test('во время операции все пункты недоступны и просят дождаться её '
-      'окончания, а заблокированное удаление сохраняет свою причину', () {
+      'окончания', () {
     for (final archived in [false, true]) {
       final items = intentionOptions(
         ru,
@@ -114,17 +113,6 @@ void main() {
         everyElement('Дождитесь окончания текущего изменения'),
       );
     }
-
-    final blocked = intentionOptions(
-      ru,
-      _loaded(running: true, counts: testRelationCounts(activeNeedIncoming: 1)),
-    );
-    expect(blocked.map((item) => item.value), everyElement(isNull));
-    expect(blocked.map((item) => item.hint), [
-      'Дождитесь окончания текущего изменения',
-      'Дождитесь окончания текущего изменения',
-      'Сначала удалите его связи',
-    ]);
   });
 
   test('«Изменить» ждёт снимок после подтверждённого изменения, а остальные '
@@ -145,7 +133,7 @@ void main() {
     expect(active.map((item) => (item.name, item.hint)), [
       ('Edit', null),
       ('Archive', 'Its relations are archived with it'),
-      ('Delete', 'Delete its relations first'),
+      ('Delete', 'Its tags stay'),
     ]);
     expect(intentionOptions(en, _loaded()).map((item) => item.hint), [
       null,
@@ -160,10 +148,7 @@ void main() {
           counts: testRelationCounts(archivedNeedIncoming: 1),
         ),
       ).map((item) => item.hint).skip(1),
-      [
-        'Its relations stay archived until you restore them',
-        'Delete its relations first',
-      ],
+      ['Its relations stay archived until you restore them', 'Its tags stay'],
     );
     expect(
       intentionOptions(en, _loaded(running: true)).map((item) => item.hint),

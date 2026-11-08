@@ -316,11 +316,12 @@ void main() {
       await _closeRelationSheet(tester);
 
       await _openIntentionOptions(tester);
-      final blockedDeletion = tester.widget<OptionRow>(
+      // Связи не блокируют удаление намерения.
+      final deletion = tester.widget<OptionRow>(
         intentionOption(IntentionOption.delete),
       );
-      expect(blockedDeletion.onPressed, isNull);
-      expect(blockedDeletion.hint, 'Delete its relations first');
+      expect(deletion.onPressed, isNotNull);
+      expect(deletion.hint, 'Its tags stay');
       await tester.binding.handlePopRoute();
       await _pumpUntilAbsent(tester, find.byType(Sheet));
       await _chooseDetailsTab(tester, 'Relations');

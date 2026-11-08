@@ -84,19 +84,6 @@ void main() {
       .map((row) => row.values.toList())
       .toList();
 
-  Map<String, List<List<Object?>>> graph() => {
-    for (final table in [
-      'intentions',
-      'intention_titles_fts',
-      'long_term_relations',
-      'actions',
-      'action_path_items',
-      'tags',
-      'tag_assignments',
-    ])
-      table: rows(table),
-  };
-
   List<Object?> assigned(int number) => raw
       .select(
         'SELECT tag_id FROM tag_assignments WHERE intention_id = ? ORDER BY creation_sequence',
@@ -235,52 +222,31 @@ void main() {
     },
   );
 
-  test(
-    'связи намерения блокируют его удаление вместе с назначениями',
-    () async {
-      final before = graph();
+  test('связи не блокируют удаление намерения: уходят его связи и назначения, '
+      'а теги, действия и пути остаются', () async {
+    final tagsBefore = rows('tags');
+    final actionsBefore = rows('actions');
+    final pathBefore = rows('action_path_items');
 
-      final active = await repository.execute(
+    expect(
+      await repository.execute(
         await previewedDeleteIntention(repository, _intention(1)),
-      );
-      expect(
-        (active as ResultFailure).failure,
-        isA<IntentionHasBlockingRelationsFailure>(),
-      );
-      expect(graph(), before);
-
-      final archived = await repository.execute(
-        await previewedDeleteIntention(repository, _intention(2)),
-      );
-      expect(
-        (archived as ResultFailure).failure,
-        isA<IntentionHasBlockingRelationsFailure>(),
-      );
-      expect(graph(), before);
-    },
-  );
-
-  test('новая зависимость после пустой проверки блокирует удаление в момент команды', () async {
-    addIntention(4);
-    await assign(firstTagNumber, _intention(4));
-    expect(
-      raw.select(
-        'SELECT id FROM long_term_relations WHERE source_intention_id = ? OR related_intention_id = ?',
-        [tagFixtureId(4), tagFixtureId(4)],
       ),
-      isEmpty,
-    );
-    addRelation(103, 4, 3);
-    final before = graph();
-
-    final result = await repository.execute(
-      await previewedDeleteIntention(repository, _intention(4)),
+      isA<ResultSuccess>(),
     );
 
     expect(
-      (result as ResultFailure).failure,
-      isA<IntentionHasBlockingRelationsFailure>(),
+      raw
+          .select('SELECT id FROM intentions ORDER BY rowid')
+          .map((row) => row['id']),
+      [tagFixtureId(2), tagFixtureId(3)],
     );
-    expect(graph(), before);
+    expect(rows('long_term_relations'), isEmpty);
+    expect(assigned(1), isEmpty);
+    expect(assigned(2), [tagFixtureId(firstTagNumber)]);
+    expect(rows('tags'), tagsBefore);
+    expect(rows('actions'), actionsBefore);
+    expect(rows('action_path_items'), pathBefore);
+    expect(raw.select('PRAGMA foreign_key_check'), isEmpty);
   });
 }

@@ -643,20 +643,6 @@ void main() {
     },
   );
 
-  testWidgets(
-    'показывает безопасный конфликт блокирующих связей в общей поверхности',
-    (tester) async {
-      final harness = await _pumpPresenterApp(tester);
-      final operation = harness.startDelete(index: 3, title: 'Связанное');
-      harness.completeBlockingRelations(operation);
-      await tester.pumpAndSettle();
-
-      expect(find.text(_linkedNotDeleted('Связанное')), findsOneWidget);
-      await _closeMessage(tester);
-      expect(find.byType(SnackBar), findsNothing);
-    },
-  );
-
   for (final kind in TagCommandKind.values) {
     testWidgets(
       'отказ операции тега ${kind.name} показывается общей поверхностью без '
@@ -1851,11 +1837,6 @@ String _deleted(String title) => 'Delete — “$title”: Intention deleted.';
 String _notDeleted(String title) =>
     'Delete — “$title”: The intention couldn’t be deleted. Try again.';
 
-String _linkedNotDeleted(String title) =>
-    'Delete — “$title”: The intention wasn’t deleted: its relations still '
-    'block deletion. Archived relations and relations that aren’t loaded yet '
-    'block it too.';
-
 String _relationUpdateOutcome(String outcome) => 'Edit — “relation”: $outcome';
 
 String _relationRestoreOutcome(String outcome) =>
@@ -2643,15 +2624,6 @@ final class _PresenterHarness {
     _relationIndexes[accepted]!,
     GraphCommandFailed(failure),
   );
-
-  void completeBlockingRelations(IntentionCommandAccepted accepted) {
-    final (index, _) = _titles[accepted]!;
-    final intentionId = testDetailsIntention(index: index).id;
-    repository.completeCommand(
-      _commandIndexes[accepted]!,
-      ResultFailure(IntentionHasBlockingRelationsFailure(intentionId)),
-    );
-  }
 
   GraphExportAccepted startExport() {
     final outcome = Completer<GraphExportOutcome>();

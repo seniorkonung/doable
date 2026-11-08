@@ -532,7 +532,6 @@ _FailurePlace _failurePlace(IntentionFailure failure) => switch (failure) {
   IntentionMissingIncomingRelationFailure() ||
   IntentionNotFoundFailure() ||
   IntentionConflictFailure() ||
-  IntentionHasBlockingRelationsFailure() ||
   IntentionCascadeConflictFailure() ||
   IntentionCascadePreviewFailure() ||
   IntentionUnavailableFailure() ||
@@ -573,7 +572,6 @@ String _failureMessage(
     localizations.editorCreateTagsMissing(missingTagIds.length),
   IntentionGenericValidationFailure() => localizations.editorInvalidInput,
   IntentionConflictFailure() => localizations.editorCreateConflict,
-  IntentionHasBlockingRelationsFailure() ||
   IntentionCascadeConflictFailure() ||
   IntentionCascadePreviewFailure() => localizations.editorCreateUnexpected,
   IntentionUnavailableFailure() => localizations.editorCreateUnavailable,

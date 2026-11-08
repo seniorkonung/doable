@@ -576,7 +576,7 @@ final class DriftPersonalGraphRepository
           ChangeIntentionKind() => _changeIntentionKind(command, clock),
           ArchiveIntention() => _archiveIntentionCascade(command, clock),
           RestoreIntention() => _restoreIntention(command.id, clock),
-          DeleteIntention() => _deleteIntention(command.id),
+          DeleteIntention() => _deleteIntentionCascade(command, clock),
         },
       );
       _recordDiagnostics(
@@ -932,42 +932,6 @@ final class DriftPersonalGraphRepository
       before: before,
       after: await _catalogEntrySnapshot(stored),
     );
-  }
-
-  Future<_CommittedIntentionCommand> _deleteIntention(IntentionId id) async {
-    final storedBefore = await _readCommandSnapshot(id);
-    if (storedBefore == null) throw const _IntentionNotFound();
-    if (await _hasBlockingRelations(id)) {
-      throw _IntentionHasBlockingRelations(id);
-    }
-    final before = await _catalogEntrySnapshot(storedBefore);
-    final deletedRows = await (_database.delete(
-      _database.intentions,
-    )..where((row) => row.id.equals(id.toCanonicalString()))).go();
-    if (deletedRows == 0) throw const _IntentionNotFound();
-    return _CommittedIntentionDeleted(id: id, before: before);
-  }
-
-  Future<bool> _hasBlockingRelations(IntentionId id) async {
-    final serializedId = id.toCanonicalString();
-    final row = await _database
-        .customSelect(
-          '''
-            SELECT EXISTS (
-              SELECT 1
-              FROM long_term_relations
-              WHERE source_intention_id = ? OR related_intention_id = ?
-              LIMIT 1
-            ) AS has_blocking_relations
-          ''',
-          variables: [
-            Variable<String>(serializedId),
-            Variable<String>(serializedId),
-          ],
-          readsFrom: {_database.longTermRelations},
-        )
-        .getSingle();
-    return row.read<int>('has_blocking_relations') == 1;
   }
 
   Future<_StoredIntentionCommandSnapshot?> _readCommandSnapshot(
@@ -1624,26 +1588,6 @@ final class _CommittedIntentionUnchanged extends _CommittedIntentionCommand {
   );
 }
 
-final class _CommittedIntentionDeleted extends _CommittedIntentionCommand {
-  const _CommittedIntentionDeleted({required this.id, required this.before});
-
-  final IntentionId id;
-  final IntentionCatalogEntrySnapshot before;
-
-  @override
-  IntentionId get intentionId => id;
-
-  @override
-  bool get didMutate => true;
-
-  @override
-  IntentionCommandSuccess toSuccess(GraphRevision revision) => IntentionDeleted(
-    id,
-    catalogMutation: IntentionCatalogDeleted(revision: revision, entry: before),
-    additionalChanges: [IntentionHoldingChanged(revision: revision)],
-  );
-}
-
 /// Набор идентификаторов передаётся одним параметром: JSON-массивом
 /// различных канонических строк для `json_each(?)`. Чтение ничего не пишет на
 /// соединение, а размер набора не ограничен числом параметров SQL-выражения.
@@ -1784,9 +1728,6 @@ IntentionFailure _classifyCommandFailure(
   if (error is _CascadeCompositionConflict) {
     return const IntentionCascadeConflictFailure();
   }
-  if (error case _IntentionHasBlockingRelations(:final intentionId)) {
-    return IntentionHasBlockingRelationsFailure(intentionId);
-  }
   if (error case _IntentionCreationTagsMissing(:final tagIds)) {
     return IntentionCreationTagsMissingFailure(tagIds);
   }
@@ -1858,7 +1799,6 @@ DiagnosticsFailureCode _diagnosticsFailureCode(IntentionFailure failure) =>
       IntentionConflictFailure() => DiagnosticsFailureCode.conflict,
       IntentionCascadeConflictFailure() =>
         DiagnosticsFailureCode.cascadeConflict,
-      IntentionHasBlockingRelationsFailure() => DiagnosticsFailureCode.conflict,
       IntentionUnavailableFailure() => DiagnosticsFailureCode.unavailable,
       IntentionCorruptionFailure() => DiagnosticsFailureCode.corruption,
       IntentionCascadePreviewFailure() ||
@@ -1871,12 +1811,6 @@ final class _IntentionMissingIncomingRelation implements Exception {
 
 final class _IntentionNotFound implements Exception {
   const _IntentionNotFound();
-}
-
-final class _IntentionHasBlockingRelations implements Exception {
-  const _IntentionHasBlockingRelations(this.intentionId);
-
-  final IntentionId intentionId;
 }
 
 /// Выбранные теги создания [tagIds] отсутствуют на момент проверки в

@@ -388,40 +388,21 @@ void main() {
       expect(stored.isArchived, isTrue);
     });
 
-    test(
-      'создание перед удалением сохраняет обе сущности и возвращает конфликт',
-      () async {
-        final intentionsBefore = await database
-            .select(database.intentions)
-            .get();
+    test('создание перед удалением не блокирует удаление намерения', () async {
+      final deleteCommand = await previewedDeleteIntention(repository, pageId);
+      final creation = repository.execute(_addCommand(pageId, firstId));
+      final deletion = repository.execute(deleteCommand);
 
-        final deleteCommand = await previewedDeleteIntention(
-          repository,
-          pageId,
-        );
-        final creation = repository.execute(_addCommand(pageId, firstId));
-        final deletion = repository.execute(deleteCommand);
-
-        expect(await creation, isA<GraphCommandSucceeded>());
-        expect(
-          await deletion,
-          isA<ResultFailure<ConfirmedGraphResult<IntentionCommandSuccess>>>()
-              .having(
-                (result) => result.failure,
-                'failure',
-                isA<IntentionHasBlockingRelationsFailure>(),
-              ),
-        );
-        expect(
-          await database.select(database.intentions).get(),
-          hasLength(intentionsBefore.length),
-        );
-        expect(
-          await database.select(database.longTermRelations).get(),
-          hasLength(1),
-        );
-      },
-    );
+      expect(await creation, isA<GraphCommandSucceeded>());
+      expect(await deletion, isA<ResultSuccess>());
+      final remaining = [
+        for (final row in await database.select(database.intentions).get())
+          row.id,
+      ];
+      expect(remaining, isNot(contains(pageId.toCanonicalString())));
+      expect(remaining, contains(firstId.toCanonicalString()));
+      expect(await database.select(database.longTermRelations).get(), isEmpty);
+    });
   });
 
   group('отказ не оставляет следов', () {

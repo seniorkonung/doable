@@ -1,6 +1,5 @@
 import '../../graph/application/graph_command_result.dart';
 import '../../tag/domain/tag_id.dart';
-import '../domain/intention_id.dart';
 import '../domain/intention_text.dart';
 import 'cascade/intention_cascade.dart';
 
@@ -97,15 +96,6 @@ final class IntentionConflictFailure extends IntentionFailure {
 /// не записано; следующая попытка снова читает предпросмотр.
 final class IntentionCascadeConflictFailure extends IntentionFailure {
   const IntentionCascadeConflictFailure();
-
-  @override
-  IntentionFailureCode get code => IntentionFailureCode.conflict;
-}
-
-final class IntentionHasBlockingRelationsFailure extends IntentionFailure {
-  const IntentionHasBlockingRelationsFailure(this.intentionId);
-
-  final IntentionId intentionId;
 
   @override
   IntentionFailureCode get code => IntentionFailureCode.conflict;

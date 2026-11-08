@@ -857,9 +857,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailsOptionDeleteKeepsTags => 'Its tags stay';
 
   @override
-  String get detailsOptionDeleteRelationsFirst => 'Delete its relations first';
-
-  @override
   String get detailsOptionWait => 'Wait for the current change to finish';
 
   @override
@@ -969,10 +966,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get detailsDeleteCascadeConflict =>
       'The intention wasn’t deleted: related intentions changed, so deletion would affect them differently. Try again.';
-
-  @override
-  String get detailsDeleteBlockedByRelations =>
-      'The intention wasn’t deleted: its relations still block deletion. Archived relations and relations that aren’t loaded yet block it too.';
 
   @override
   String get detailsDeleteUnavailable =>

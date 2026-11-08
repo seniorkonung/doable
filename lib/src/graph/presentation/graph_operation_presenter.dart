@@ -572,7 +572,6 @@ String _failureFor(
   IntentionCommandKind.create => switch (failure) {
     IntentionValidationFailure() => localizations.editorInvalidInput,
     IntentionConflictFailure() => localizations.editorCreateConflict,
-    IntentionHasBlockingRelationsFailure() ||
     IntentionCascadeConflictFailure() ||
     IntentionCascadePreviewFailure() => localizations.editorCreateUnexpected,
     IntentionUnavailableFailure() => localizations.editorCreateUnavailable,
@@ -584,7 +583,6 @@ String _failureFor(
     IntentionValidationFailure() => localizations.detailsUpdateInvalidInput,
     IntentionNotFoundFailure() => localizations.detailsUpdateNotFound,
     IntentionConflictFailure() => localizations.detailsUpdateConflict,
-    IntentionHasBlockingRelationsFailure() ||
     IntentionCascadeConflictFailure() ||
     IntentionCascadePreviewFailure() => localizations.detailsUpdateUnexpected,
     IntentionUnavailableFailure() => localizations.detailsUpdateUnavailable,
@@ -599,8 +597,6 @@ String _failureFor(
     IntentionConflictFailure() => localizations.detailsStateChangeConflict,
     IntentionCascadeConflictFailure() =>
       localizations.detailsStateChangeCascadeConflict,
-    IntentionHasBlockingRelationsFailure() =>
-      localizations.detailsStateChangeUnexpected,
     IntentionUnavailableFailure() =>
       localizations.detailsStateChangeUnavailable,
     IntentionCorruptionFailure() => localizations.detailsStateChangeCorruption,
@@ -622,8 +618,6 @@ String _failureFor(
     IntentionConflictFailure() => localizations.detailsDeleteConflict,
     IntentionCascadeConflictFailure() =>
       localizations.detailsDeleteCascadeConflict,
-    IntentionHasBlockingRelationsFailure() =>
-      localizations.detailsDeleteBlockedByRelations,
     IntentionUnavailableFailure() => localizations.detailsDeleteUnavailable,
     IntentionCorruptionFailure() => localizations.detailsDeleteCorruption,
     IntentionUnexpectedFailure() => localizations.detailsDeleteUnexpected,

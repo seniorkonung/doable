@@ -1340,12 +1340,6 @@ abstract class AppLocalizations {
   /// **'Its tags stay'**
   String get detailsOptionDeleteKeepsTags;
 
-  /// Причина выключенного удаления намерения с долговременными связями
-  ///
-  /// In en, this message translates to:
-  /// **'Delete its relations first'**
-  String get detailsOptionDeleteRelationsFirst;
-
   /// Причина недоступности пунктов параметров во время изменяющей операции
   ///
   /// In en, this message translates to:
@@ -1531,12 +1525,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The intention wasn’t deleted: related intentions changed, so deletion would affect them differently. Try again.'**
   String get detailsDeleteCascadeConflict;
-
-  /// Объяснение блокировки удаления намерения его связями
-  ///
-  /// In en, this message translates to:
-  /// **'The intention wasn’t deleted: its relations still block deletion. Archived relations and relations that aren’t loaded yet block it too.'**
-  String get detailsDeleteBlockedByRelations;
 
   /// Устранимая недоступность физического удаления намерения
   ///

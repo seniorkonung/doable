@@ -559,10 +559,6 @@
   "@detailsOptionDeleteKeepsTags": {
     "description": "Пояснение доступного удаления намерения"
   },
-  "detailsOptionDeleteRelationsFirst": "Delete its relations first",
-  "@detailsOptionDeleteRelationsFirst": {
-    "description": "Причина выключенного удаления намерения с долговременными связями"
-  },
   "detailsOptionWait": "Wait for the current change to finish",
   "@detailsOptionWait": {
     "description": "Причина недоступности пунктов параметров во время изменяющей операции"
@@ -688,10 +684,6 @@
   "detailsDeleteCascadeConflict": "The intention wasn’t deleted: related intentions changed, so deletion would affect them differently. Try again.",
   "@detailsDeleteCascadeConflict": {
     "description": "Конфликт актуального состояния: каскад удаления затронул бы другие намерения иначе, чем показанный состав"
-  },
-  "detailsDeleteBlockedByRelations": "The intention wasn’t deleted: its relations still block deletion. Archived relations and relations that aren’t loaded yet block it too.",
-  "@detailsDeleteBlockedByRelations": {
-    "description": "Объяснение блокировки удаления намерения его связями"
   },
   "detailsDeleteUnavailable": "The intention couldn’t be deleted. Try again.",
   "@detailsDeleteUnavailable": {

@@ -277,39 +277,23 @@ void main() {
   );
 
   test(
-    'пересечение с удалением намерения даёт последовательный результат',
+    'связь не блокирует удаление намерения и удаляется вместе с ним',
     () async {
       await _create(repository, sourceId, relatedId);
       await _create(repository, thirdId, fourthId);
 
-      final blocked = await repository.execute(
+      final deleted = await repository.execute(
         await previewedDeleteIntention(repository, sourceId),
       );
+
+      expect(deleted, isA<GraphCommandSucceeded>());
+      expect(await _storedIntentionOrNull(database, sourceId), isNull);
+      expect(await _storedRelationOrNull(database, relationId), isNull);
+      expect(await _storedIntentionOrNull(database, relatedId), isNotNull);
       expect(
-        blocked,
-        isA<GraphCommandFailed>().having(
-          (failure) => failure.failure,
-          'конфликт зависимостей',
-          isA<IntentionHasBlockingRelationsFailure>(),
-        ),
+        await _storedRelationOrNull(database, secondRelationId),
+        isNotNull,
       );
-      expect(await _storedRelationOrNull(database, relationId), isNotNull);
-      expect(await _storedIntentionOrNull(database, sourceId), isNotNull);
-
-      await repository.execute(
-        await previewedDeleteRelation(repository, relationId),
-      );
-      expect(await _storedIntentionOrNull(database, sourceId), isNotNull);
-
-      await repository.execute(
-        await previewedDeleteRelation(repository, secondRelationId),
-      );
-      final intentionDeleted = await repository.execute(
-        await previewedDeleteIntention(repository, thirdId),
-      );
-      expect(intentionDeleted, isA<GraphCommandSucceeded>());
-      expect(await _storedIntentionOrNull(database, thirdId), isNull);
-      expect(await _storedIntentionOrNull(database, fourthId), isNotNull);
     },
   );
 }

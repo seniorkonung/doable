@@ -317,8 +317,10 @@ void main() {
         ),
         (
           'удаление связи',
+          // Каскад удаляет «3» вместе со связью, а «2» по-прежнему
+          // удерживается.
           () => previewedDeleteRelation(previews, durabilityRelation(102)),
-          {2: IntentionHolding.held, 3: IntentionHolding.notHeld},
+          {2: IntentionHolding.held},
         ),
         (
           'смена вида',

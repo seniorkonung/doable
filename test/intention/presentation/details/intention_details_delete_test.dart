@@ -1,7 +1,6 @@
 import 'package:doable/l10n/app_localizations.dart';
 import 'package:doable/src/app/routing/app_router.dart';
 import 'package:doable/src/design_system/doable_theme.dart';
-import 'package:doable/src/graph/application/graph_command_result.dart';
 import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
@@ -12,9 +11,7 @@ import 'package:doable/src/intention/domain/intention.dart';
 import 'package:doable/src/intention/domain/intention_id.dart';
 import 'package:doable/src/intention/presentation/details/intention_details_page.dart';
 import 'package:doable/src/intention/presentation/details/intention_options.dart';
-import 'package:doable/src/long_term_relation/application/relation_group_page.dart';
 import 'package:doable/src/long_term_relation/presentation/relation_group_paging_policy.dart';
-import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:doable/src/design_system/components/page_head.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -69,13 +66,6 @@ void main() {
         (
           (_) => const IntentionNotFoundFailure(),
           'The intention no longer exists. It wasn’t deleted.',
-          false,
-        ),
-        (
-          IntentionHasBlockingRelationsFailure.new,
-          'The intention wasn’t deleted: its relations still block deletion. '
-              'Archived relations and relations that aren’t loaded yet block '
-              'it too.',
           false,
         ),
         (
@@ -204,85 +194,6 @@ void main() {
       expect(find.text(intention.title), findsNothing);
     },
   );
-
-  testWidgets(
-    'незагруженные связи и отказ их чтения не снимают блокировку удаления',
-    (tester) async {
-      final repository = ControlledDetailsRepository();
-      final intention = testDetailsIntention(index: 161);
-      final counts = testRelationCounts(activeNeedOutgoing: 250);
-      var continuationReads = 0;
-      repository.onRelationGroupPage = (query) {
-        if (query.cursor != null) {
-          continuationReads += 1;
-          return const GraphResultFailure(RelationGroupUnavailableFailure());
-        }
-        return GraphResultSuccess(
-          RelationGroupFirstPage(
-            items: [
-              testDetailsRelationRow(ownerId: intention.id, index: 1),
-              testDetailsRelationRow(ownerId: intention.id, index: 2),
-            ],
-            counts: counts,
-            nextCursor: const _DeleteTestCursor(),
-            revision: const TestDetailsRevision(0),
-          ),
-        );
-      };
-      await _pumpDetailsPage(
-        tester,
-        repository,
-        intention.id,
-        pagingPolicy: RelationGroupPagingPolicy(
-          pageSize: 2,
-          prefetchRemaining: 0,
-        ),
-      );
-      await waitForDetailRequests(repository, 1);
-      repository.detailRequests[0].add(
-        ResultSuccess(intention),
-        relationCounts: counts,
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Relations'));
-      await tester.pumpAndSettle();
-
-      // Полное количество группы не подменяется числом загруженных строк.
-      expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('intention-relations-group-needs')),
-          matching: find.text('250'),
-        ),
-        findsOneWidget,
-      );
-
-      // Продолжение группы запрашивается только при показе её конца.
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, -2000));
-      await tester.pumpAndSettle();
-      expect(continuationReads, greaterThan(0));
-      expect(
-        find.text(
-          'The next relations couldn’t be loaded.',
-          skipOffstage: false,
-        ),
-        findsOneWidget,
-      );
-
-      // Параметры считают все связи сводки, а не загруженные строки.
-      await tester.tap(intentionOptionsButton);
-      await tester.pumpAndSettle();
-      final delete = tester.widget<OptionRow>(
-        intentionOption(IntentionOption.delete),
-      );
-      expect(delete.onPressed, isNull);
-      expect(delete.hint, 'Delete its relations first');
-    },
-  );
-}
-
-final class _DeleteTestCursor implements RelationGroupCursor {
-  const _DeleteTestCursor();
 }
 
 Future<void> _pumpDetailsPage(

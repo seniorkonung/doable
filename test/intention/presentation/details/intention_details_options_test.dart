@@ -88,7 +88,7 @@ void main() {
     expect(_rows(tester).map((row) => (row.name, row.hint)), [
       ('Изменить', null),
       ('Архивировать', 'Его связи архивируются вместе с ним'),
-      ('Удалить', 'Сначала удалите его связи'),
+      ('Удалить', 'Его теги сохранятся'),
     ]);
 
     await _choose(tester, 'Архивировать');
@@ -252,7 +252,7 @@ void main() {
     expect(_rows(tester).map((row) => row.hint), [
       'Дождитесь окончания текущего изменения',
       'Дождитесь окончания текущего изменения',
-      'Сначала удалите его связи',
+      'Дождитесь окончания текущего изменения',
     ]);
     await tester.tap(_inSheet('Изменить'), warnIfMissed: false);
     // Индикатор выполняющейся команды не даёт кадрам успокоиться.
@@ -272,11 +272,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byType(Sheet), findsOneWidget);
-    expect(
-      _rows(tester).take(2).map((row) => row.onPressed),
-      everyElement(isNotNull),
-    );
-    expect(_rows(tester).last.onPressed, isNull);
+    expect(_rows(tester).map((row) => row.onPressed), everyElement(isNotNull));
   });
 
   testWidgets('подтверждённое удаление активного намерения удаляет его и '
@@ -324,34 +320,28 @@ void main() {
     expect(find.widgetWithText(PageHead, 'Бегать'), findsOneWidget);
   });
 
-  for (final (scenario, counts, reason) in [
-    (
-      'архивированная входящая связь',
-      testRelationCounts(archivedCanIncoming: 1),
-      'Сначала удалите его связи',
-    ),
-  ]) {
-    testWidgets('$scenario блокирует удаление: «Удалить» выключено и называет '
-        'причину', (tester) async {
-      final repository = ControlledDetailsRepository();
-      await _openLoaded(
-        tester,
-        repository,
-        testDetailsIntention(),
-        counts: counts,
-      );
+  testWidgets('связи не блокируют удаление: «Удалить» доступно и '
+      'спрашивает подтверждение', (tester) async {
+    final repository = ControlledDetailsRepository();
+    await _openLoaded(
+      tester,
+      repository,
+      testDetailsIntention(title: 'Бегать'),
+      counts: testRelationCounts(activeNeedOutgoing: 1, archivedCanIncoming: 1),
+    );
 
-      await _openOptions(tester);
-      final delete = _rows(tester).last;
-      expect(delete.onPressed, isNull);
-      expect(delete.hint, reason);
-      await tester.tap(_inSheet('Удалить'), warnIfMissed: false);
-      await tester.pumpAndSettle();
-      expect(find.byType(Sheet), findsOneWidget);
-      expect(find.text('Удалить намерение?'), findsNothing);
-      expect(repository.commands, isEmpty);
-    });
-  }
+    await _openOptions(tester);
+    final delete = _rows(tester).last;
+    expect(delete.onPressed, isNotNull);
+    expect(delete.hint, 'Его теги сохранятся');
+    await _choose(tester, 'Удалить');
+    await tester.tap(
+      find.descendant(of: find.byType(Dialog), matching: find.text('Удалить')),
+    );
+    await tester.pump();
+
+    expect(repository.commands.single, isA<DeleteIntention>());
+  });
 
   testWidgets('утрата подробных данных закрывает открытый лист', (
     tester,

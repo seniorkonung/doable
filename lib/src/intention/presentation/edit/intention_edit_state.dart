@@ -144,7 +144,6 @@ final class IntentionEditState {
       IntentionMissingIncomingRelationFailure() ||
       IntentionNotFoundFailure() ||
       IntentionConflictFailure() ||
-      IntentionHasBlockingRelationsFailure() ||
       IntentionCascadeConflictFailure() ||
       IntentionCascadePreviewFailure() ||
       IntentionUnavailableFailure() ||

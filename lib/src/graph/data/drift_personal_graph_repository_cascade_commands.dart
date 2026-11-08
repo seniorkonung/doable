@@ -16,24 +16,34 @@ final class _IntentionKindInvariantViolation implements Exception {
 /// часть дважды и остаётся под пределом переменных SQLite.
 const _cascadeChunkSize = 400;
 
-/// Записанное архивирование каскада: строки каталога каждого намерения, у
-/// которого изменились архивное состояние или вид, — в порядке записи, — и
-/// архивированные связи с абсолютными количествами связей затронутых
-/// намерений и соседей (ADR-0011).
-final class _ArchiveCascadeWrite {
-  _ArchiveCascadeWrite({
+/// Записанный каскад: удалённые намерения со строками каталога до удаления,
+/// строки каталога каждого оставшегося намерения, у которого изменились
+/// архивное состояние или вид, — в порядке записи, — удалённые и
+/// архивированные связи и абсолютные количества связей затронутых
+/// оставшихся намерений и соседей (ADR-0011).
+final class _CascadeWrite {
+  _CascadeWrite({
+    required Map<IntentionId, IntentionCatalogEntrySnapshot> deleted,
     required Map<IntentionId, _IntentionCatalogChange> intentions,
+    required List<relation_domain.LongTermRelation> deletedRelations,
     required List<_CascadedRelationArchive> relations,
     required Map<IntentionId, RelationCounts> counts,
-  }) : intentions = Map.unmodifiable(intentions),
+  }) : deleted = Map.unmodifiable(deleted),
+       intentions = Map.unmodifiable(intentions),
+       deletedRelations = List.unmodifiable(deletedRelations),
        relations = List.unmodifiable(relations),
        counts = Map.unmodifiable(counts);
 
+  final Map<IntentionId, IntentionCatalogEntrySnapshot> deleted;
   final Map<IntentionId, _IntentionCatalogChange> intentions;
+  final List<relation_domain.LongTermRelation> deletedRelations;
   final List<_CascadedRelationArchive> relations;
   final Map<IntentionId, RelationCounts> counts;
 
-  List<IntentionCatalogUpdated> catalogMutations(GraphRevision revision) => [
+  /// Удалённые намерения раньше изменённых, каждые — в порядке записи.
+  List<IntentionCatalogMutation> catalogMutations(GraphRevision revision) => [
+    for (final entry in deleted.values)
+      IntentionCatalogDeleted(revision: revision, entry: entry),
     for (final change in intentions.values)
       IntentionCatalogUpdated(
         revision: revision,
@@ -43,6 +53,8 @@ final class _ArchiveCascadeWrite {
   ];
 
   List<GraphChange> relationChanges(GraphRevision revision) => [
+    for (final relation in deletedRelations)
+      LongTermRelationDeletedChange(revision: revision, relation: relation),
     for (final relation in relations) relation.toChange(revision),
     for (final entry in counts.entries)
       IntentionRelationCountsChanged(
@@ -74,9 +86,8 @@ extension _CascadeCommandExecution on DriftPersonalGraphRepository {
       planner.planArchive(PlannedIntention(command.id)),
       command.execution,
     );
-    final write = await _writeArchiveCascade(
-      intentions: [command.id, ...executed.departing],
-      relation: null,
+    final write = await _writeCascade(
+      archived: [command.id, ...executed.departing],
       promoted: executed.promoted,
       clock: clock,
     );
@@ -118,9 +129,9 @@ extension _CascadeCommandExecution on DriftPersonalGraphRepository {
       ),
       command.execution,
     );
-    final write = await _writeArchiveCascade(
-      intentions: executed.departing,
-      relation: relationId,
+    final write = await _writeCascade(
+      archived: executed.departing,
+      archivedRelation: relationId,
       promoted: executed.promoted,
       clock: clock,
     );
@@ -146,6 +157,69 @@ extension _CascadeCommandExecution on DriftPersonalGraphRepository {
     );
   }
 
+  /// Удаляет намерение по выбранному варианту каскада и архивирует активные
+  /// вспомогательные намерения, оставшиеся без активной входящей связи.
+  Future<_CommittedIntentionCommand> _deleteIntentionCascade(
+    DeleteIntention command,
+    _GraphWriteClock clock,
+  ) async {
+    if (await _readCommandSnapshot(command.id) == null) {
+      throw const _IntentionNotFound();
+    }
+    final planner = await _cascadePlannerInTransaction();
+    final executed = _requireExpectedVariant(
+      planner.planDelete(PlannedIntention(command.id)),
+      command.execution,
+    );
+    final write = await _writeCascade(
+      deleted: [command.id, ...executed.departing],
+      archived: executed.archivedByInvariant,
+      promoted: executed.promoted,
+      clock: clock,
+    );
+    return _CommittedIntentionDeleteCascade(
+      id: command.id,
+      write: write,
+      executed: executed,
+    );
+  }
+
+  /// Удаляет связь по выбранному варианту каскада и архивирует активные
+  /// вспомогательные намерения, оставшиеся без активной входящей связи.
+  Future<_CommittedLongTermRelationCommand> _deleteRelationCascade(
+    DeleteLongTermRelation command,
+    _GraphWriteClock clock,
+  ) async {
+    final relationId = command.relationId;
+    final stored = await _readStoredRelation(relationId);
+    if (stored == null) throw _LongTermRelationNotFound(relationId);
+    final relation = stored.toDomain();
+    final planner = await _cascadePlannerInTransaction();
+    final executed = _requireExpectedVariant(
+      planner.planDelete(
+        PlannedRelation(
+          source: relation.sourceIntentionId,
+          related: relation.relatedIntentionId,
+        ),
+      ),
+      command.execution,
+    );
+    final write = await _writeCascade(
+      deleted: executed.departing,
+      deletedRelation: relationId,
+      archived: executed.archivedByInvariant,
+      promoted: executed.promoted,
+      clock: clock,
+    );
+    return _CommittedRelationDeleteCascade(
+      relation: write.deletedRelations.singleWhere(
+        (deleted) => deleted.id == relationId,
+      ),
+      write: write,
+      executed: executed,
+    );
+  }
+
   /// Планировщик над индексом удержания текущей ревизии. Вызывается в
   /// транзакции команды, поэтому состав относится к состоянию, которое
   /// команда меняет.
@@ -159,27 +233,125 @@ extension _CascadeCommandExecution on DriftPersonalGraphRepository {
     );
   }
 
-  /// Записывает архивирование [intentions] со всеми их активными связями и
-  /// связи [relation], а [promoted] делает главными. Связи пишутся раньше
-  /// намерений (D8), и каждая изменённая строка получает одно показание
-  /// [clock]. После записи проверяется инвариант вида по намерениям, которые
-  /// остались активными на другом конце архивированных связей.
-  Future<_ArchiveCascadeWrite> _writeArchiveCascade({
-    required List<IntentionId> intentions,
-    required LongTermRelationId? relation,
+  /// Записывает каскад в порядке, которого требуют триггеры (D8): удаляет
+  /// намерения [deleted] со всеми их связями и назначениями тегов и связь
+  /// [deletedRelation], делает [promoted] главными и архивирует [archived]
+  /// со всеми их активными связями и связь [archivedRelation]. Связи
+  /// пишутся раньше намерений, и каждая изменённая строка получает одно
+  /// показание [clock]. После записи проверяется инвариант вида по
+  /// намерениям, которые остались на другом конце затронутых связей.
+  Future<_CascadeWrite> _writeCascade({
+    List<IntentionId> deleted = const [],
+    LongTermRelationId? deletedRelation,
+    required List<IntentionId> archived,
+    LongTermRelationId? archivedRelation,
     required List<IntentionId> promoted,
     required _GraphWriteClock clock,
   }) async {
-    final changed = [...intentions, ...promoted];
-    final before = await _catalogEntrySnapshots(changed);
-    final archivedAt = relation_domain.RelationTimestamp(clock.read());
-    final storedAt = archivedAt.value.microsecondsSinceEpoch;
+    final deletedBefore = await _catalogEntrySnapshots(deleted);
+    final changed = [...archived, ...promoted];
+    final changedBefore = await _catalogEntrySnapshots(changed);
+    final changedAt = relation_domain.RelationTimestamp(clock.read());
+    final storedAt = changedAt.value.microsecondsSinceEpoch;
 
+    final deletedRelations = await _collectRelationsOf(
+      deleted,
+      activeOnly: false,
+      also: deletedRelation,
+    );
+    await _deleteCascadeRows(
+      _database.longTermRelations,
+      (relation) => relation.id,
+      [for (final id in deletedRelations.keys) id.toCanonicalString()],
+    );
+    await _deleteCascadeRows(
+      _database.intentions,
+      (intention) => intention.id,
+      [for (final id in deleted) id.toCanonicalString()],
+    );
+    await _updateCascadeRows(
+      '''UPDATE intentions SET kind = 'main', updated_at = ?
+         WHERE kind = 'supporting' AND id IN''',
+      [for (final id in promoted) id.toCanonicalString()],
+      storedAt,
+      _database.intentions,
+    );
+    final archivedRelations = await _collectRelationsOf(
+      archived,
+      activeOnly: true,
+      also: archivedRelation,
+    );
+    await _updateCascadeRows(
+      '''UPDATE long_term_relations SET is_archived = 1, updated_at = ?
+         WHERE is_archived = 0 AND id IN''',
+      [for (final id in archivedRelations.keys) id.toCanonicalString()],
+      storedAt,
+      _database.longTermRelations,
+    );
+    await _updateCascadeRows(
+      '''UPDATE intentions SET is_archived = 1, updated_at = ?
+         WHERE is_archived = 0 AND id IN''',
+      [for (final id in archived) id.toCanonicalString()],
+      storedAt,
+      _database.intentions,
+    );
+
+    final ends = <IntentionId>{
+      for (final relation in [
+        ...deletedRelations.values,
+        ...archivedRelations.values,
+      ]) ...[relation.sourceIntentionId, relation.relatedIntentionId],
+    }.difference(deleted.toSet());
+    await _requireKindInvariant(ends.difference(archived.toSet()));
+    final changedAfter = await _catalogEntrySnapshots(changed);
+    return _CascadeWrite(
+      deleted: deletedBefore,
+      intentions: {
+        for (final id in changed)
+          id: (before: changedBefore[id]!, after: changedAfter[id]!),
+      },
+      deletedRelations: deletedRelations.values.toList(),
+      relations: [
+        for (final relation in archivedRelations.values)
+          _CascadedRelationArchive(relation, changedAt),
+      ],
+      counts: await _readVerifiedRelationCountsFor({...changed, ...ends}),
+    );
+  }
+
+  /// Связи намерений [intentions] и связь [also], только активные при
+  /// [activeOnly], в порядке их чтения.
+  Future<Map<LongTermRelationId, relation_domain.LongTermRelation>>
+  _collectRelationsOf(
+    List<IntentionId> intentions, {
+    required bool activeOnly,
+    required LongTermRelationId? also,
+  }) async {
     final relations = <LongTermRelationId, relation_domain.LongTermRelation>{};
+    final scope = activeOnly ? 'relation.is_archived = 0 AND' : '';
+    Future<void> collect(String where, List<String> ids) async {
+      final rows = await _database
+          .customSelect(
+            '''SELECT relation.creation_sequence, relation.id,
+                      relation.source_intention_id,
+                      relation.related_intention_id, relation.type,
+                      relation.priority, relation.is_archived,
+                      relation.created_at, relation.updated_at
+               FROM long_term_relations AS relation
+               WHERE $scope $where''',
+            variables: [for (final id in ids) Variable<String>(id)],
+            readsFrom: {_database.longTermRelations},
+          )
+          .get();
+      for (final row in rows) {
+        final relation = StoredLongTermRelation.decode(row.data).toDomain();
+        relations[relation.id] = relation;
+      }
+    }
+
     for (final chunk in _cascadeChunks(intentions)) {
       final placeholders = _placeholders(chunk.length);
-      await _collectActiveRelations(
-        relations,
+      await collect(
         '''(relation.source_intention_id IN ($placeholders) OR
             relation.related_intention_id IN ($placeholders))''',
         [
@@ -187,82 +359,15 @@ extension _CascadeCommandExecution on DriftPersonalGraphRepository {
         ],
       );
     }
-    if (relation != null) {
-      await _collectActiveRelations(relations, 'relation.id = ?', [
-        relation.toCanonicalString(),
-      ]);
+    if (also != null) {
+      await collect('relation.id = ?', [also.toCanonicalString()]);
     }
-    await _updateCascadeRows(
-      '''UPDATE long_term_relations SET is_archived = 1, updated_at = ?
-         WHERE is_archived = 0 AND id IN''',
-      [for (final id in relations.keys) id.toCanonicalString()],
-      storedAt,
-      _database.longTermRelations,
-    );
-    await _updateCascadeRows(
-      '''UPDATE intentions SET is_archived = 1, updated_at = ?
-         WHERE is_archived = 0 AND id IN''',
-      [for (final id in intentions) id.toCanonicalString()],
-      storedAt,
-      _database.intentions,
-    );
-    await _updateCascadeRows(
-      '''UPDATE intentions SET kind = 'main', updated_at = ?
-         WHERE is_archived = 0 AND kind = 'supporting' AND id IN''',
-      [for (final id in promoted) id.toCanonicalString()],
-      storedAt,
-      _database.intentions,
-    );
-
-    final archived = intentions.toSet();
-    final ends = <IntentionId>{
-      for (final relation in relations.values) ...[
-        relation.sourceIntentionId,
-        relation.relatedIntentionId,
-      ],
-    };
-    await _requireKindInvariant(ends.difference(archived));
-    final after = await _catalogEntrySnapshots(changed);
-    return _ArchiveCascadeWrite(
-      intentions: {
-        for (final id in changed) id: (before: before[id]!, after: after[id]!),
-      },
-      relations: [
-        for (final relation in relations.values)
-          _CascadedRelationArchive(relation, archivedAt),
-      ],
-      counts: await _readVerifiedRelationCountsFor({...changed, ...ends}),
-    );
+    return relations;
   }
 
-  /// Добавляет в [relations] активные связи, отобранные условием [where].
-  Future<void> _collectActiveRelations(
-    Map<LongTermRelationId, relation_domain.LongTermRelation> relations,
-    String where,
-    List<String> ids,
-  ) async {
-    final rows = await _database
-        .customSelect(
-          '''SELECT relation.creation_sequence, relation.id,
-                    relation.source_intention_id,
-                    relation.related_intention_id, relation.type,
-                    relation.priority, relation.is_archived,
-                    relation.created_at, relation.updated_at
-             FROM long_term_relations AS relation
-             WHERE relation.is_archived = 0 AND $where''',
-          variables: [for (final id in ids) Variable<String>(id)],
-          readsFrom: {_database.longTermRelations},
-        )
-        .get();
-    for (final row in rows) {
-      final relation = StoredLongTermRelation.decode(row.data).toDomain();
-      relations[relation.id] = relation;
-    }
-  }
-
-  /// Выполняет [statement], оканчивающийся `IN`, частями канонических [ids] с показанием
-  /// времени [storedAt]. Каждая строка должна измениться: иначе состав
-  /// разошёлся с сохранённым графом.
+  /// Выполняет [statement], оканчивающийся `IN`, частями канонических [ids]
+  /// с показанием времени [storedAt]. Каждая строка должна измениться:
+  /// иначе состав разошёлся с сохранённым графом.
   Future<void> _updateCascadeRows(
     String statement,
     List<String> ids,
@@ -280,6 +385,21 @@ extension _CascadeCommandExecution on DriftPersonalGraphRepository {
         updateKind: UpdateKind.update,
       );
       if (updated != chunk.length) throw const StoredGraphCorruption();
+    }
+  }
+
+  /// Удаляет строки [table] с каноническими [ids] частями. Каждая строка
+  /// должна удалиться: иначе состав разошёлся с сохранённым графом.
+  Future<void> _deleteCascadeRows<T extends Table, D>(
+    TableInfo<T, D> table,
+    Expression<String> Function(T row) id,
+    List<String> ids,
+  ) async {
+    for (final chunk in _cascadeChunks(ids)) {
+      final deleted = await (_database.delete(
+        table,
+      )..where((row) => id(row).isIn(chunk))).go();
+      if (deleted != chunk.length) throw const StoredGraphCorruption();
     }
   }
 
@@ -415,7 +535,7 @@ final class _CommittedIntentionArchiveCascade
   });
 
   final domain.Intention intention;
-  final _ArchiveCascadeWrite write;
+  final _CascadeWrite write;
   final ArchiveCascadeComposition executed;
 
   @override
@@ -454,7 +574,7 @@ final class _CommittedRelationArchiveCascade
   final relation_domain.LongTermRelation before;
   final relation_domain.LongTermRelation relation;
   final LongTermRelationDescription? description;
-  final _ArchiveCascadeWrite write;
+  final _CascadeWrite write;
   final ArchiveCascadeComposition executed;
 
   @override
@@ -466,6 +586,69 @@ final class _CommittedRelationArchiveCascade
         before: before,
         relation: relation,
         description: description,
+        changes: [
+          ...write.relationChanges(revision),
+          ...write.catalogMutations(revision),
+          IntentionHoldingChanged(revision: revision),
+          CascadeOutcome(revision: revision, executed: executed),
+        ],
+      );
+}
+
+final class _CommittedIntentionDeleteCascade
+    extends _CommittedIntentionCommand {
+  const _CommittedIntentionDeleteCascade({
+    required this.id,
+    required this.write,
+    required this.executed,
+  });
+
+  final IntentionId id;
+  final _CascadeWrite write;
+  final DeleteCascadeComposition executed;
+
+  @override
+  IntentionId get intentionId => id;
+
+  @override
+  bool get didMutate => true;
+
+  @override
+  IntentionCommandSuccess toSuccess(GraphRevision revision) {
+    // Предмет удалён первым, поэтому первая мутация каталога — его.
+    final [subject, ...others] = write.catalogMutations(revision);
+    return IntentionDeleted(
+      id,
+      catalogMutation: subject,
+      additionalCatalogMutations: others,
+      additionalChanges: [
+        ...write.relationChanges(revision),
+        IntentionHoldingChanged(revision: revision),
+        CascadeOutcome(revision: revision, executed: executed),
+      ],
+    );
+  }
+}
+
+final class _CommittedRelationDeleteCascade
+    extends _CommittedLongTermRelationCommand {
+  const _CommittedRelationDeleteCascade({
+    required this.relation,
+    required this.write,
+    required this.executed,
+  });
+
+  final relation_domain.LongTermRelation relation;
+  final _CascadeWrite write;
+  final DeleteCascadeComposition executed;
+
+  @override
+  bool get didMutate => true;
+
+  @override
+  LongTermRelationDeleted toSuccess(GraphRevision revision) =>
+      LongTermRelationDeleted(
+        relation: relation,
         changes: [
           ...write.relationChanges(revision),
           ...write.catalogMutations(revision),

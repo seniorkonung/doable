@@ -11,9 +11,7 @@ enum IntentionOption { edit, archive, restore, delete }
 /// Пункты листа «Намерение» по последнему принятому снимку страницы.
 ///
 /// Пока для намерения выполняется изменяющая операция, все пункты
-/// недоступны и просят дождаться её окончания. Исключение — удаление,
-/// которое блокируют связи: окончание операции его не откроет, поэтому оно
-/// сохраняет свою причину.
+/// недоступны и просят дождаться её окончания.
 List<OptionsMenuItem<IntentionOption>> intentionOptions(
   AppLocalizations localizations,
   IntentionDetailsLoaded loaded,
@@ -67,23 +65,18 @@ List<OptionsMenuItem<IntentionOption>> intentionOptions(
           hint: stateHint,
         );
 
-  final blockedReason = counts.total > 0
-      ? localizations.detailsOptionDeleteRelationsFirst
-      : busy
-      ? wait
-      : null;
-  final delete = blockedReason == null
-      ? OptionsMenuItem(
+  final delete = busy
+      ? OptionsMenuItem<IntentionOption>.unavailable(
+          icon: DoableIconData.delete,
+          name: localizations.detailsOptionDelete,
+          reason: wait,
+        )
+      : OptionsMenuItem(
           value: IntentionOption.delete,
           icon: DoableIconData.delete,
           name: localizations.detailsOptionDelete,
           hint: localizations.detailsOptionDeleteKeepsTags,
           tone: OptionRowTone.danger,
-        )
-      : OptionsMenuItem<IntentionOption>.unavailable(
-          icon: DoableIconData.delete,
-          name: localizations.detailsOptionDelete,
-          reason: blockedReason,
         );
 
   return [edit, stateChange, delete];

@@ -791,7 +791,6 @@ void main() {
             IntentionMissingIncomingRelationFailure() ||
             IntentionNotFoundFailure() ||
             IntentionConflictFailure() ||
-            IntentionHasBlockingRelationsFailure() ||
             IntentionCascadeConflictFailure() ||
             IntentionCascadePreviewFailure() ||
             IntentionCorruptionFailure() ||
