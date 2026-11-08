@@ -1572,3 +1572,14 @@
   - **Зависимости:** 4.11, 4.13.
   - **Предполагаемые файлы:** `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/src/long_term_relation/presentation/details/relation_details_view_model.dart`, `test/intention/presentation/details/intention_details_view_model_test.dart`, тесты модели представления связи в `test/long_term_relation/presentation/details/`.
   - **Размер:** S.
+- [ ] 4.23 Основная мутация каталога результата удаления намерения всегда описывает удалённый предмет
+  - **Критерии приёмки:**
+    - В `toSuccess` результата удаления намерения (`_CommittedIntentionDeleteCascade` в `lib/src/graph/data/drift_personal_graph_repository_cascade_commands.dart`) мутация каталога предмета выбирается явно по идентификатору удаляемого намерения, а не по позиции в `write.catalogMutations(revision)`; все остальные мутации каталога идут в `additionalCatalogMutations`, ни одна не теряется и не повторяется.
+    - `IntentionDeleted.catalogMutation` — `IntentionCatalogDeleted` записи самого предмета независимо от порядка строк хранилища и порядка создания намерений каскада.
+    - Вводящий в заблуждение комментарий «Предмет удалён первым, поэтому первая мутация каталога — его.» убран или заменён верным.
+    - Новый тест хранилища в `test/graph/data/drift_intention_cascade_delete_test.dart`: вспомогательное намерение каскада создано раньше предмета (меньший UUIDv7), удаление со вспомогательными; `catalogMutation` относится к идентификатору предмета, а мутация вспомогательного намерения есть среди `additionalCatalogMutations`. Без исправления тест падает.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_intention_cascade_delete_test.dart`.
+  - **Зависимости:** 4.6.
+  - **Предполагаемые файлы:** `lib/src/graph/data/drift_personal_graph_repository_cascade_commands.dart`, `test/graph/data/drift_intention_cascade_delete_test.dart`.
+  - **Размер:** XS.
