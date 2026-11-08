@@ -151,8 +151,7 @@ final class RelationDetailsLifecycleCommandFailed
   @override
   bool get canRetry =>
       failure is LongTermRelationUnavailableFailure ||
-      (kind != RelationDetailsLifecycleKind.delete &&
-          failure is LongTermRelationCascadeConflictFailure);
+      failure is LongTermRelationCascadeConflictFailure;
 }
 
 /// Предпросмотр каскада, прочитанный при запуске операции, завершился

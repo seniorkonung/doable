@@ -1601,6 +1601,56 @@ void main() {
       semantics.dispose();
     });
 
+    testWidgets('после конфликта удаления повтор показывает обновлённый '
+        'состав каскада', (tester) async {
+      final repository = await openPanel(tester, relation());
+      final first = testIntentionId(3);
+      final second = testIntentionId(4);
+      var departing = [first];
+      repository.onPreviewCascade = (subject, operation) {
+        if (operation != CascadeOperation.delete) {
+          return givenCascadePreview(subject, operation, revision);
+        }
+        final composition = DeleteCascadeComposition(
+          departing: departing,
+          promoted: const [],
+          archivedByInvariant: const [],
+          mainsLosingRelation: const [],
+          deletedRelationCount: 1,
+          archivedRelationCount: 0,
+        );
+        return RelationDeleteCascadePreview(
+          revision: revision,
+          plan: CascadePlan(
+            withSupporting: composition,
+            onlyThis: composition,
+            asksQuestion: true,
+          ),
+          titles: {first: 'первое намерение', second: 'второе намерение'},
+        );
+      };
+
+      await choose(tester, 'Удалить');
+      expect(find.text('первое намерение'), findsOneWidget);
+      expect(find.text('второе намерение'), findsNothing);
+      await tester.tap(find.text('Удалить всё'));
+      await tester.pump();
+      repository.failRelationCommand(
+        0,
+        const LongTermRelationCascadeConflictFailure(),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Повторить'), findsOneWidget);
+      departing = [first, second];
+      await tester.tap(find.text('Повторить'));
+      await tester.pumpAndSettle();
+      expect(find.text('Удалить связь и 2 намерения?'), findsOneWidget);
+      expect(find.text('первое намерение'), findsOneWidget);
+      expect(find.text('второе намерение'), findsOneWidget);
+      expect(repository.relationCommands, hasLength(1));
+    });
+
     testWidgets('отказ удаления остаётся в панели с данными, а повтор '
         'закрывает панель до позднего снимка', (tester) async {
       final semantics = tester.ensureSemantics();
