@@ -173,9 +173,8 @@ void main() {
     );
     expect(archive.plan.asksQuestion, isTrue);
     expect(numbers(archive.plan.withSupporting.departing), [2]);
-    expect(numbers(archive.plan.withSupporting.mainsLosingRelation), [4]);
     expect(numbers(archive.plan.onlyThis.promoted), [2]);
-    expect(archive.titles, titlesOf([2, 4]));
+    expect(archive.titles, titlesOf([2]));
     expect(
       [
         for (final event in diagnostics.events)
@@ -269,7 +268,6 @@ void main() {
     final archivePlan = (archive as ArchiveCascadePreview).plan;
     expect(archivePlan.asksQuestion, isFalse);
     expect(archivePlan.withSupporting.departing, isEmpty);
-    expect(archivePlan.withSupporting.mainsLosingRelation, isEmpty);
     expect(archivePlan.withSupporting.archivedRelationCount, 0);
     expect(delete, isA<IntentionDeleteCascadePreview>());
     final deletePlan = (delete as IntentionDeleteCascadePreview).plan;

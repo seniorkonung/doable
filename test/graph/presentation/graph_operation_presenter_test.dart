@@ -68,7 +68,7 @@ void main() {
             for (var i = 0; i < count; i++) testDetailsIntentionId(i + 2),
           ],
           promoted: [],
-          mainsLosingRelation: [],
+
           archivedRelationCount: 0,
         ),
       );
@@ -90,7 +90,7 @@ void main() {
       composition: ArchiveCascadeComposition(
         departing: [],
         promoted: [testDetailsIntentionId(2)],
-        mainsLosingRelation: [],
+
         archivedRelationCount: 1,
       ),
     );
@@ -119,7 +119,6 @@ void main() {
         ],
         mainsLosingRelation: [],
         deletedRelationCount: 2,
-        archivedRelationCount: 2,
       ),
     );
     await tester.pumpAndSettle();
@@ -154,7 +153,6 @@ void main() {
           ],
           mainsLosingRelation: [],
           deletedRelationCount: 0,
-          archivedRelationCount: 0,
         ),
       );
       await tester.pumpAndSettle();
@@ -182,7 +180,6 @@ void main() {
         archivedByInvariant: [testDetailsIntentionId(3)],
         mainsLosingRelation: [],
         deletedRelationCount: 1,
-        archivedRelationCount: 0,
       ),
     );
     await tester.pumpAndSettle();
@@ -205,7 +202,6 @@ void main() {
         archivedByInvariant: [],
         mainsLosingRelation: [],
         deletedRelationCount: 1,
-        archivedRelationCount: 0,
       ),
     );
     await tester.pumpAndSettle();
@@ -273,7 +269,7 @@ void main() {
       ArchiveCascadeComposition(
         departing: [],
         promoted: [],
-        mainsLosingRelation: [],
+
         archivedRelationCount: 0,
       ),
     );
@@ -307,7 +303,6 @@ void main() {
           ],
           mainsLosingRelation: [],
           deletedRelationCount: 1,
-          archivedRelationCount: 0,
         ),
       );
       await tester.pumpAndSettle();
@@ -350,7 +345,7 @@ void main() {
       ArchiveCascadeComposition(
         departing: [testDetailsIntentionId(2)],
         promoted: [],
-        mainsLosingRelation: [],
+
         archivedRelationCount: 1,
       ),
     );

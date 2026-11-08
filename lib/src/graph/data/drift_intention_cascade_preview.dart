@@ -280,7 +280,6 @@ Iterable<IntentionId> _listedIntentions(CascadeComposition composition) =>
       ArchiveCascadeComposition() => [
         ...composition.departing,
         ...composition.promoted,
-        ...composition.mainsLosingRelation,
       ],
       DeleteCascadeComposition() => [
         ...composition.departing,

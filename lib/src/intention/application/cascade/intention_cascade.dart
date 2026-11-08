@@ -39,11 +39,9 @@ final class ArchiveCascadeComposition extends CascadeComposition {
   ArchiveCascadeComposition({
     required List<IntentionId> departing,
     required List<IntentionId> promoted,
-    required List<IntentionId> mainsLosingRelation,
     required this.archivedRelationCount,
   }) : departing = List.unmodifiable(departing),
-       promoted = List.unmodifiable(promoted),
-       mainsLosingRelation = List.unmodifiable(mainsLosingRelation);
+       promoted = List.unmodifiable(promoted);
 
   /// Вспомогательные намерения, которые уходят в архив вместе с предметом.
   final List<IntentionId> departing;
@@ -51,10 +49,6 @@ final class ArchiveCascadeComposition extends CascadeComposition {
   /// Вспомогательные намерения непосредственно ниже предмета, которые при
   /// «только это» становятся главными.
   final List<IntentionId> promoted;
-
-  /// Главные намерения на другом конце архивируемых связей, которые сами
-  /// остаются.
-  final List<IntentionId> mainsLosingRelation;
 
   /// Все связи, которые операция архивирует, включая связь-предмет.
   final int archivedRelationCount;
@@ -67,7 +61,6 @@ final class DeleteCascadeComposition extends CascadeComposition {
     required List<IntentionId> archivedByInvariant,
     required List<IntentionId> mainsLosingRelation,
     required this.deletedRelationCount,
-    required this.archivedRelationCount,
   }) : departing = List.unmodifiable(departing),
        promoted = List.unmodifiable(promoted),
        archivedByInvariant = List.unmodifiable(archivedByInvariant),
@@ -90,9 +83,6 @@ final class DeleteCascadeComposition extends CascadeComposition {
 
   /// Все связи, которые операция удаляет, включая связь-предмет.
   final int deletedRelationCount;
-
-  /// Связи, которые архивируются вместе с [archivedByInvariant].
-  final int archivedRelationCount;
 }
 
 final class RestoreCascadeComposition extends CascadeComposition {

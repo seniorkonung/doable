@@ -1636,7 +1636,7 @@
   - **Предполагаемые файлы:** `lib/src/intention/application/cascade/intention_cascade.dart`, `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/src/long_term_relation/presentation/details/relation_details_view_model.dart`, `test/support/intention_cascade_execution.dart`, затронутые тесты в `test/graph/data/`, `test/intention/` и `test/long_term_relation/presentation/details/`.
   - **Размер:** S.
 
-- [ ] 4.28 Состав каскада не несёт полей, которые никто не показывает
+- [x] 4.28 Состав каскада не несёт полей, которые никто не показывает
   - **Критерии приёмки:**
     - В `lib/src/intention/application/cascade/intention_cascade.dart` у `ArchiveCascadeComposition` нет поля `mainsLosingRelation`, а у `DeleteCascadeComposition` нет поля `archivedRelationCount`; их параметры конструкторов удалены.
     - `DeleteCascadeComposition.mainsLosingRelation` (список «Главные, теряют только связь · M» подтверждения удаления намерения) и `ArchiveCascadeComposition.archivedRelationCount` (подсказка архивирования в `lib/src/intention/presentation/details/intention_options.dart`) остаются без изменений.

@@ -40,7 +40,7 @@ void main() {
       final composition = ArchiveCascadeComposition(
         departing: children.map(testDetailsIntentionId).toList(),
         promoted: [],
-        mainsLosingRelation: [],
+
         archivedRelationCount: relations,
       );
       return ArchiveCascadePreview(
@@ -133,7 +133,6 @@ void main() {
       archivedByInvariant: [testDetailsIntentionId(3)],
       mainsLosingRelation: [],
       deletedRelationCount: 1,
-      archivedRelationCount: 1,
     );
     final preview = IntentionDeleteCascadePreview(
       revision: revision,
@@ -163,7 +162,6 @@ void main() {
         ],
         mainsLosingRelation: [],
         deletedRelationCount: 1,
-        archivedRelationCount: 2,
       );
       final preview = IntentionDeleteCascadePreview(
         revision: revision,

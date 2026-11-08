@@ -147,7 +147,7 @@ ArchiveCascadeComposition _emptyArchiveComposition() =>
     ArchiveCascadeComposition(
       departing: const [],
       promoted: const [],
-      mainsLosingRelation: const [],
+
       archivedRelationCount: 0,
     );
 
@@ -164,7 +164,6 @@ DeleteCascadeComposition _emptyDeleteComposition() => DeleteCascadeComposition(
   archivedByInvariant: const [],
   mainsLosingRelation: const [],
   deletedRelationCount: 0,
-  archivedRelationCount: 0,
 );
 
 /// Предпросмотр подставного репозитория: [operation] над [subject] не

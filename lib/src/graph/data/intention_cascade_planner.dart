@@ -57,7 +57,6 @@ final class IntentionCascadePlanner {
       final nothing = ArchiveCascadeComposition(
         departing: const [],
         promoted: const [],
-        mainsLosingRelation: const [],
         archivedRelationCount: 0,
       );
       return CascadePlan(
@@ -71,7 +70,6 @@ final class IntentionCascadePlanner {
         ArchiveCascadeComposition(
           departing: removal.departing(choice),
           promoted: removal.promoted(choice),
-          mainsLosingRelation: removal.mainsLosingRelation(choice),
           archivedRelationCount: removal.relationCount(choice),
         );
     return CascadePlan(
@@ -94,7 +92,6 @@ final class IntentionCascadePlanner {
         archivedByInvariant: const [],
         mainsLosingRelation: const [],
         deletedRelationCount: 0,
-        archivedRelationCount: 0,
       );
       return CascadePlan(
         withSupporting: nothing,
@@ -104,14 +101,12 @@ final class IntentionCascadePlanner {
     }
     final removal = _Removal(this, resolved, archiveScope: false);
     DeleteCascadeComposition variant(CascadeChoice choice) {
-      final archived = removal.archivedByInvariant(choice);
       return DeleteCascadeComposition(
         departing: removal.departing(choice),
         promoted: removal.promoted(choice),
-        archivedByInvariant: archived.intentions,
+        archivedByInvariant: removal.archivedByInvariant(choice),
         mainsLosingRelation: removal.mainsLosingRelation(choice),
         deletedRelationCount: removal.relationCount(choice),
-        archivedRelationCount: archived.relationCount,
       );
     }
 
@@ -647,9 +642,7 @@ final class _Removal {
   /// архивируются вместе со всем ниже них, что не удерживают активные
   /// главные. Такие намерения лежат в D: связи теряют только нижние
   /// намерения удаляемых.
-  ({List<IntentionId> intentions, int relationCount}) archivedByInvariant(
-    CascadeChoice choice,
-  ) {
+  List<IntentionId> archivedByInvariant(CascadeChoice choice) {
     final leaving = _leaving(choice);
     final promoted = _promoted(choice);
     bool remainsActiveSupporting(int intention) =>
@@ -689,7 +682,7 @@ final class _Removal {
     for (final intention in belowOrder) {
       check(intention);
     }
-    if (orphans.isEmpty) return (intentions: const [], relationCount: 0);
+    if (orphans.isEmpty) return const [];
 
     final heldAfter = Uint8List(planner._count);
     final queue = <int>[];
@@ -717,44 +710,10 @@ final class _Removal {
       remainsActiveRelation,
     );
 
-    var relationCount = 0;
-    for (final intention in archiving) {
-      for (
-        var edge = graph.childOffsets[intention];
-        edge < graph.childOffsets[intention + 1];
-        edge++
-      ) {
-        if (remainsActiveRelation(
-          intention,
-          graph.children[edge],
-          graph.childArchived[edge],
-        )) {
-          relationCount++;
-        }
-      }
-      for (
-        var edge = graph.parentOffsets[intention];
-        edge < graph.parentOffsets[intention + 1];
-        edge++
-      ) {
-        final parent = graph.parents[edge];
-        if (archived[parent] == 0 &&
-            remainsActiveRelation(
-              parent,
-              intention,
-              graph.parentArchived[edge],
-            )) {
-          relationCount++;
-        }
-      }
-    }
-    return (
-      intentions: [
-        for (final intention in belowOrder)
-          if (archived[intention] == 1) planner.ids[intention],
-      ],
-      relationCount: relationCount,
-    );
+    return [
+      for (final intention in belowOrder)
+        if (archived[intention] == 1) planner.ids[intention],
+    ];
   }
 
   /// Обход в ширину от [queue] по связям, которые допускает [relation], в

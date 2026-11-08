@@ -36,9 +36,6 @@ void main() {
 
       expect(plan.asksQuestion, isTrue);
       expect(graph.names(plan.withSupporting.departing), ['Много ходить']);
-      expect(graph.names(plan.withSupporting.mainsLosingRelation), [
-        'Высыпаться',
-      ]);
       expect(plan.withSupporting.archivedRelationCount, 3);
     });
 
@@ -157,7 +154,6 @@ void main() {
         'Хорошая обувь',
         'Шнуровка',
       ]);
-      expect(withSupporting.archivedRelationCount, 1);
       expect(withSupporting.mainsLosingRelation, isEmpty);
     });
 
@@ -494,9 +490,8 @@ void main() {
               departing: composition.departing.toSet(),
               promoted: composition.promoted.toSet(),
               archivedByInvariant: <IntentionId>{},
-              mainsLosingRelation: composition.mainsLosingRelation.toSet(),
+              mainsLosingRelation: null,
               removedRelationCount: composition.archivedRelationCount,
-              archivedByInvariantRelationCount: 0,
             ),
             referenceCascadeRemoval(
               reference,
@@ -514,7 +509,6 @@ void main() {
             archivedByInvariant: composition.archivedByInvariant.toSet(),
             mainsLosingRelation: composition.mainsLosingRelation.toSet(),
             removedRelationCount: composition.deletedRelationCount,
-            archivedByInvariantRelationCount: composition.archivedRelationCount,
           ),
           referenceCascadeRemoval(reference, subject.reference, delete: true),
           reason,
@@ -550,13 +544,12 @@ void _expectRemoval<C extends CascadeComposition>(
 
 /// Записи сравниваются по `==`, а множества внутри них — по ссылке, поэтому
 /// поля сравниваются отображением.
-Map<String, Object> _removalFields(CascadeReferenceRemoval removal) => {
+Map<String, Object?> _removalFields(CascadeReferenceRemoval removal) => {
   'departing': removal.departing,
   'promoted': removal.promoted,
   'archivedByInvariant': removal.archivedByInvariant,
   'mainsLosingRelation': removal.mainsLosingRelation,
   'removedRelationCount': removal.removedRelationCount,
-  'archivedByInvariantRelationCount': removal.archivedByInvariantRelationCount,
 };
 
 void _expectRestore(

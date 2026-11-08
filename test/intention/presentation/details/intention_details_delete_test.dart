@@ -46,7 +46,6 @@ void main() {
         archivedByInvariant: [],
         mainsLosingRelation: [main],
         deletedRelationCount: 3,
-        archivedRelationCount: 0,
       );
       final only = DeleteCascadeComposition(
         departing: [],
@@ -54,7 +53,6 @@ void main() {
         archivedByInvariant: [],
         mainsLosingRelation: [],
         deletedRelationCount: 1,
-        archivedRelationCount: 0,
       );
       final repository = ControlledDetailsRepository()
         ..onPreviewCascade = (subject, operation) =>
@@ -121,7 +119,6 @@ void main() {
       archivedByInvariant: [shoe, lacing],
       mainsLosingRelation: [],
       deletedRelationCount: 2,
-      archivedRelationCount: 1,
     );
     final only = DeleteCascadeComposition(
       departing: [],
@@ -129,7 +126,6 @@ void main() {
       archivedByInvariant: [],
       mainsLosingRelation: [],
       deletedRelationCount: 1,
-      archivedRelationCount: 0,
     );
     final repository = ControlledDetailsRepository()
       ..onPreviewCascade = (subject, operation) =>
@@ -190,7 +186,6 @@ void main() {
         archivedByInvariant: archived,
         mainsLosingRelation: mains,
         deletedRelationCount: 6,
-        archivedRelationCount: 5,
       );
       final only = DeleteCascadeComposition(
         departing: [],
@@ -198,7 +193,6 @@ void main() {
         archivedByInvariant: archived,
         mainsLosingRelation: [],
         deletedRelationCount: 1,
-        archivedRelationCount: 5,
       );
       final titles = <IntentionId, String>{
         for (var i = 0; i < children.length; i++)
@@ -293,7 +287,6 @@ void main() {
         archivedByInvariant: [archived],
         mainsLosingRelation: [main],
         deletedRelationCount: 21,
-        archivedRelationCount: 1,
       );
       final repository = ControlledDetailsRepository()
         ..onPreviewCascade = (subject, operation) =>

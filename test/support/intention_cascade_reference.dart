@@ -21,9 +21,8 @@ typedef CascadeReferenceRemoval = ({
   Set<IntentionId> departing,
   Set<IntentionId> promoted,
   Set<IntentionId> archivedByInvariant,
-  Set<IntentionId> mainsLosingRelation,
+  Set<IntentionId>? mainsLosingRelation,
   int removedRelationCount,
-  int archivedByInvariantRelationCount,
 });
 
 typedef CascadeReferenceRestore = ({
@@ -121,14 +120,15 @@ referenceCascadeRemoval(
       for (final relation in relations)
         if (removed(relation)) relation,
     ];
-    final mains = <IntentionId>{
-      for (final relation in removedRelations)
-        for (final end in [relation.source, relation.target])
-          if (!gone.contains(end) && !supporting(end)) end,
-    };
+    final mains = delete
+        ? <IntentionId>{
+            for (final relation in removedRelations)
+              for (final end in [relation.source, relation.target])
+                if (!gone.contains(end) && !supporting(end)) end,
+          }
+        : null;
 
     final archived = <IntentionId>{};
-    var archivedRelationCount = 0;
     if (delete) {
       bool mainAfter(IntentionId id) =>
           !supporting(id) || promoted.contains(id);
@@ -172,13 +172,6 @@ referenceCascadeRemoval(
         }
         return grew;
       });
-      archivedRelationCount = activeAfter
-          .where(
-            (relation) =>
-                archived.contains(relation.source) ||
-                archived.contains(relation.target),
-          )
-          .length;
     }
     return (
       departing: gone.difference({?x}),
@@ -186,7 +179,6 @@ referenceCascadeRemoval(
       archivedByInvariant: archived,
       mainsLosingRelation: mains,
       removedRelationCount: removedRelations.length,
-      archivedByInvariantRelationCount: archivedRelationCount,
     );
   }
 

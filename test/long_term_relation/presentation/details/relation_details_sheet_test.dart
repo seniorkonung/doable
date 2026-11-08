@@ -1012,13 +1012,13 @@ void main() {
         final cascade = ArchiveCascadeComposition(
           departing: [child],
           promoted: const [],
-          mainsLosingRelation: const [],
+
           archivedRelationCount: 1,
         );
         final single = ArchiveCascadeComposition(
           departing: const [],
           promoted: [child],
-          mainsLosingRelation: const [],
+
           archivedRelationCount: 1,
         );
         repository.onPreviewCascade = (subject, operation) =>
@@ -1257,7 +1257,6 @@ void main() {
           archivedByInvariant: [archived],
           mainsLosingRelation: const [],
           deletedRelationCount: 3,
-          archivedRelationCount: 1,
         );
         final single = DeleteCascadeComposition(
           departing: const [],
@@ -1265,7 +1264,6 @@ void main() {
           archivedByInvariant: const [],
           mainsLosingRelation: const [],
           deletedRelationCount: 1,
-          archivedRelationCount: 0,
         );
         repository.onPreviewCascade = (subject, operation) =>
             operation == CascadeOperation.delete
@@ -1308,7 +1306,6 @@ void main() {
         archivedByInvariant: [child],
         mainsLosingRelation: const [],
         deletedRelationCount: 1,
-        archivedRelationCount: 1,
       );
       repository.onPreviewCascade = (subject, operation) =>
           operation == CascadeOperation.delete
@@ -1341,7 +1338,6 @@ void main() {
           archivedByInvariant: archived,
           mainsLosingRelation: const [],
           deletedRelationCount: 6,
-          archivedRelationCount: 5,
         );
         repository.onPreviewCascade = (subject, operation) =>
             operation == CascadeOperation.delete
@@ -1617,7 +1613,6 @@ void main() {
           archivedByInvariant: const [],
           mainsLosingRelation: const [],
           deletedRelationCount: 1,
-          archivedRelationCount: 0,
         );
         return RelationDeleteCascadePreview(
           revision: revision,
