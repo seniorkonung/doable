@@ -1559,3 +1559,16 @@
   - **Зависимости:** 4.12, 4.13.
   - **Предполагаемые файлы:** `lib/src/long_term_relation/presentation/details/relation_details_state.dart`, `test/long_term_relation/presentation/details/relation_details_sheet_test.dart`.
   - **Размер:** XS.
+
+- [ ] 4.22 Каскадное удаление намерения и связи непредставимо без подтверждения человека
+  - **Критерии приёмки:**
+    - Функция подтверждения удаления — обязательный параметр `delete` в `IntentionDetailsViewModel` (`lib/src/intention/presentation/details/intention_details_view_model.dart`) и `RelationDetailsViewModel` (`lib/src/long_term_relation/presentation/details/relation_details_view_model.dart`); вызов `delete` без неё не компилируется.
+    - В `_startCascadeOperation` и `_startLifecycleChange` нет пути, на котором удаление без ответа подтверждения исполняется с вариантом по умолчанию `CascadeChoice.withSupporting`: команды `DeleteIntention` и `DeleteLongTermRelation` строятся только из варианта, выбранного в подтверждении. Отказ подтверждения (`null`) по-прежнему отменяет операцию без команды. Архивирование и восстановление не меняются.
+    - Если к моменту выполнения выполнение каскада уже строится фабрикой из плана предпросмотра и выбранного варианта, удаление строит его через неё.
+    - Страница намерения и панель связи уже передают подтверждение; поведение интерфейса не меняется.
+    - Тесты, вызывающие `delete` без подтверждения (`test/intention/presentation/details/intention_details_view_model_test.dart` и аналогичные для связи), передают подтверждение явно и проходят с прежними ожиданиями.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/details test/long_term_relation/presentation/details`.
+  - **Зависимости:** 4.11, 4.13.
+  - **Предполагаемые файлы:** `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/src/long_term_relation/presentation/details/relation_details_view_model.dart`, `test/intention/presentation/details/intention_details_view_model_test.dart`, тесты модели представления связи в `test/long_term_relation/presentation/details/`.
+  - **Размер:** S.
