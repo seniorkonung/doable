@@ -87,8 +87,14 @@ void main() {
       await chooseIntentionOption(tester, IntentionOption.delete);
       expect(find.text('Удалить 2 намерения?'), findsOneWidget);
       expect(find.textContaining('3 связи'), findsOneWidget);
-      expect(find.text('Много ходить'), findsOneWidget);
-      expect(find.text('Высыпаться'), findsOneWidget);
+      final supportingList = _listWithTitle(
+        'Вспомогательные, уходят вместе с ним · 1',
+      );
+      final mainsList = _listWithTitle('Главные, теряют только связь · 1');
+      expect(_inList(supportingList, 'Много ходить'), findsOneWidget);
+      expect(_inList(mainsList, 'Высыпаться'), findsOneWidget);
+      expect(find.text('Хорошая обувь'), findsNothing);
+      expect(find.text('Сходить в поход'), findsNothing);
       expect(find.text('Только это: 1 станет главным'), findsOneWidget);
       await tester.tap(find.text('Только это'));
       await tester.pump();
@@ -103,12 +109,81 @@ void main() {
     },
   );
 
+  testWidgets('подтверждение называет уходящие в архив намерения', (
+    tester,
+  ) async {
+    final child = testDetailsIntentionId(2);
+    final shoe = testDetailsIntentionId(3);
+    final lacing = testDetailsIntentionId(4);
+    final cascade = DeleteCascadeComposition(
+      departing: [child],
+      promoted: [],
+      archivedByInvariant: [shoe, lacing],
+      mainsLosingRelation: [],
+      deletedRelationCount: 2,
+      archivedRelationCount: 1,
+    );
+    final only = DeleteCascadeComposition(
+      departing: [],
+      promoted: [child],
+      archivedByInvariant: [],
+      mainsLosingRelation: [],
+      deletedRelationCount: 1,
+      archivedRelationCount: 0,
+    );
+    final repository = ControlledDetailsRepository()
+      ..onPreviewCascade = (subject, operation) =>
+          operation == CascadeOperation.delete
+          ? IntentionDeleteCascadePreview(
+              revision: const TestDetailsRevision(0),
+              plan: CascadePlan(
+                withSupporting: cascade,
+                onlyThis: only,
+                asksQuestion: true,
+              ),
+              titles: {
+                child: 'Много ходить',
+                shoe: 'Хорошая обувь',
+                lacing: 'Шнуровка',
+              },
+              isInActionPath: false,
+            )
+          : givenCascadePreview(
+              subject,
+              operation,
+              const TestDetailsRevision(0),
+            );
+    final intention = testDetailsIntention();
+    await _pumpDetailsPage(
+      tester,
+      repository,
+      intention.id,
+      locale: const Locale('ru'),
+    );
+    await waitForDetailRequests(repository, 1);
+    repository.detailRequests[0].add(ResultSuccess(intention));
+    await tester.pumpAndSettle();
+    await chooseIntentionOption(tester, IntentionOption.delete);
+    expect(find.text('Удалить 2 намерения?'), findsOneWidget);
+    expect(find.textContaining('2 связи'), findsOneWidget);
+    final supportingList = _listWithTitle(
+      'Вспомогательные, уходят вместе с ним · 1',
+    );
+    final archivedList = _listWithTitle('Уйдут в архив · 2');
+    expect(_inList(supportingList, 'Много ходить'), findsOneWidget);
+    expect(_inList(archivedList, 'Хорошая обувь'), findsOneWidget);
+    expect(_inList(archivedList, 'Шнуровка'), findsOneWidget);
+    expect(find.textContaining('Главные, теряют только связь'), findsNothing);
+    await tester.tap(intentionDeletionCancel);
+    await tester.pumpAndSettle();
+  });
+
   testWidgets(
     'длинные списки раскрываются независимо, главные видны полностью',
     (tester) async {
       final children = List.generate(5, (i) => testDetailsIntentionId(10 + i));
       final mains = List.generate(5, (i) => testDetailsIntentionId(20 + i));
-      final archived = List.generate(6, (i) => testDetailsIntentionId(30 + i));
+      final archived = List.generate(5, (i) => testDetailsIntentionId(30 + i));
       final cascade = DeleteCascadeComposition(
         departing: children,
         promoted: [],
@@ -160,20 +235,47 @@ void main() {
       repository.detailRequests[0].add(ResultSuccess(intention));
       await tester.pumpAndSettle();
       await chooseIntentionOption(tester, IntentionOption.delete);
-      expect(find.text('Удалить 6 намерений?'), findsOneWidget);
-      expect(find.text('Главное 4'), findsOneWidget);
-      expect(find.text('Вспомогательное 4'), findsNothing);
-      expect(find.text('Архивное 4'), findsNothing);
-      await tester.ensureVisible(find.text('Показать все 5'));
-      await tester.tap(find.text('Показать все 5'));
+      const dialogTitle = 'Удалить 6 намерений?';
+      const supportingTitle = 'Вспомогательные, уходят вместе с ним · 5';
+      const mainsTitle = 'Главные, теряют только связь · 5';
+      const archivedTitle = 'Уйдут в архив · 5';
+      final supportingList = _listWithTitle(supportingTitle);
+      final mainsList = _listWithTitle(mainsTitle);
+      final archivedList = _listWithTitle(archivedTitle);
+      expect(find.text(dialogTitle), findsOneWidget);
+      for (var i = 0; i < 5; i++) {
+        expect(_inList(mainsList, 'Главное $i'), findsOneWidget);
+        expect(
+          _inList(supportingList, 'Вспомогательное $i'),
+          i < 4 ? findsOneWidget : findsNothing,
+        );
+        expect(
+          _inList(archivedList, 'Архивное $i'),
+          i < 4 ? findsOneWidget : findsNothing,
+        );
+      }
+      await tester.ensureVisible(_inList(supportingList, 'Показать все 5'));
+      await tester.tap(_inList(supportingList, 'Показать все 5'));
       await tester.pumpAndSettle();
-      expect(find.text('Вспомогательное 4'), findsOneWidget);
-      expect(find.text('Архивное 4'), findsNothing);
-      await tester.ensureVisible(find.text('Показать все 6'));
-      await tester.tap(find.text('Показать все 6'));
+      expect(find.text(dialogTitle), findsOneWidget);
+      expect(find.text(supportingTitle), findsOneWidget);
+      expect(find.text(archivedTitle), findsOneWidget);
+      for (var i = 0; i < 5; i++) {
+        expect(_inList(supportingList, 'Вспомогательное $i'), findsOneWidget);
+        expect(
+          _inList(archivedList, 'Архивное $i'),
+          i < 4 ? findsOneWidget : findsNothing,
+        );
+      }
+      await tester.ensureVisible(_inList(archivedList, 'Показать все 5'));
+      await tester.tap(_inList(archivedList, 'Показать все 5'));
       await tester.pumpAndSettle();
-      expect(find.text('Архивное 5'), findsOneWidget);
-      expect(find.textContaining('в архив уйдут 6'), findsOneWidget);
+      expect(find.text(dialogTitle), findsOneWidget);
+      expect(find.text(archivedTitle), findsOneWidget);
+      for (var i = 0; i < 5; i++) {
+        expect(_inList(archivedList, 'Архивное $i'), findsOneWidget);
+      }
+      expect(find.textContaining('в архив уйдут 5'), findsOneWidget);
       await tester.tap(intentionDeletionCancel);
       await tester.pumpAndSettle();
       expect(repository.commands, isEmpty);
@@ -475,3 +577,9 @@ Future<void> _deleteFromOptions(WidgetTester tester) async {
   await tester.tap(intentionDeletionConfirm);
   await tester.pump();
 }
+
+Finder _listWithTitle(String title) =>
+    find.ancestor(of: find.text(title), matching: find.byType(Column)).first;
+
+Finder _inList(Finder list, String title) =>
+    find.descendant(of: list, matching: find.text(title));
