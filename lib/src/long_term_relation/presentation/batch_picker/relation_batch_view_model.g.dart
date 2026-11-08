@@ -78,7 +78,7 @@ final class RelationBatchViewModelProvider
 }
 
 String _$relationBatchViewModelHash() =>
-    r'5393e016d02cf48f57c4dd980cf556f700ff12f4';
+    r'1cad7a58bd4edae5645177aef47515eb8fed7af0';
 
 /// Отметки принадлежат экземпляру поиска и не зависят от его выдачи.
 ///
