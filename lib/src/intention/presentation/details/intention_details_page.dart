@@ -296,15 +296,7 @@ final class _IntentionDetailsPageState
                 ? Button.quietBlock(
                     key: const ValueKey('intention-details-head-restore'),
                     label: localizations.detailsRestoreFromArchiveAction,
-                    onPressed: loaded.isOperationRunning
-                        ? null
-                        : ref
-                              .read(
-                                intentionDetailsViewModelProvider(
-                                  widget.intentionId,
-                                ).notifier,
-                              )
-                              .restore,
+                    onPressed: loaded.isOperationRunning ? null : _restore,
                   )
                 : null,
           ),
@@ -370,11 +362,17 @@ final class _IntentionDetailsPageState
       case IntentionOption.archive:
         model.archive((count) => _chooseCascade(count, restoring: false));
       case IntentionOption.restore:
-        model.restore((count) => _chooseCascade(count, restoring: true));
+        _restore();
       case IntentionOption.delete:
         await _delete();
     }
   }
+
+  /// Восстановление из шапки и из параметров задаёт один вопрос о
+  /// вспомогательных.
+  void _restore() => ref
+      .read(intentionDetailsViewModelProvider(widget.intentionId).notifier)
+      .restore((count) => _chooseCascade(count, restoring: true));
 
   Future<CascadeChoice?> _chooseCascade(
     int count, {
