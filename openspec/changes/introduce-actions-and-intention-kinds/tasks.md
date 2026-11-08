@@ -1610,3 +1610,14 @@
   - **Зависимости:** 4.10, 4.12, 4.13.
   - **Предполагаемые файлы:** `lib/l10n/app_en.arb`, `app_ru.arb`, `app_localizations.dart`, `app_localizations_en.dart`, `app_localizations_ru.dart`, `lib/src/intention/presentation/details/intention_options.dart`, `lib/src/long_term_relation/presentation/details/relation_details_options.dart`, `test/intention/presentation/details/intention_options_test.dart`, тесты в `test/long_term_relation/presentation/details/`.
   - **Размер:** S.
+
+- [ ] 4.26 Проверка участника связи не содержит параметра, который не меняет поведение
+  - **Критерии приёмки:**
+    - В `lib/src/graph/data/drift_personal_graph_repository_relation_commands.dart` у `_requireRelationParticipant` нет параметра `mustBeActive`, а его вызовы при добавлении связи не передают этот аргумент.
+    - Отказ `_LongTermRelationParticipantArchived` для архивного участника проверяется безусловно; поведение добавления связей не меняется.
+    - Новые тесты не добавляются: существующие тесты добавления связей с архивным участником остаются зелёными.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/graph/data/drift_add_long_term_relations_test.dart`.
+  - **Зависимости:** 4.7.
+  - **Предполагаемые файлы:** `lib/src/graph/data/drift_personal_graph_repository_relation_commands.dart`.
+  - **Размер:** XS.
