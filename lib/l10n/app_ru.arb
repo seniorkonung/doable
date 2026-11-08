@@ -1015,5 +1015,17 @@
   "detailsDeleteOnlyEffects": "Только это: {effects}",
   "@detailsDeleteOnlyEffects": {"description": "Подтверждение удаления намерения", "placeholders": {"effects": {"type": "String"}}},
   "detailsDeleteCount": "Удалить {count}",
-  "@detailsDeleteCount": {"description": "Подтверждение удаления намерения", "placeholders": {"count": {"type": "int"}}}
+  "@detailsDeleteCount": {"description": "Подтверждение удаления намерения", "placeholders": {"count": {"type": "int"}}},
+  "relationDeleteCascadeTitle": "Удалить связь и {count, plural, one{{count} намерение} few{{count} намерения} many{{count} намерений} other{{count} намерения}}?",
+  "@relationDeleteCascadeTitle": {"description": "Подтверждение удаления связи", "placeholders": {"count": {"type": "int"}}},
+  "relationDeleteCascadeText": "Намерение «{title}» вспомогательное и после удаления связи больше не удерживается ни одним главным.",
+  "@relationDeleteCascadeText": {"description": "Подтверждение удаления связи", "placeholders": {"title": {"type": "String"}}},
+  "relationDeleteAndMore": "и ещё {count}",
+  "@relationDeleteAndMore": {"description": "Подтверждение удаления связи", "placeholders": {"count": {"type": "int"}}},
+  "relationDeleteKeepMainEffect": "Оставить главным: намерение станет главным",
+  "@relationDeleteKeepMainEffect": {"description": "Подтверждение удаления связи"},
+  "relationDeleteKeepMain": "Оставить главным",
+  "@relationDeleteKeepMain": {"description": "Подтверждение удаления связи"},
+  "relationDeleteAll": "Удалить всё",
+  "@relationDeleteAll": {"description": "Подтверждение удаления связи"}
 }

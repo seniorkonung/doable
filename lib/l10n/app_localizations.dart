@@ -5130,6 +5130,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete {count}'**
   String detailsDeleteCount(int count);
+
+  /// Подтверждение удаления связи
+  ///
+  /// In en, this message translates to:
+  /// **'Delete relation and {count, plural, one{{count} intention} other{{count} intentions}}?'**
+  String relationDeleteCascadeTitle(int count);
+
+  /// Подтверждение удаления связи
+  ///
+  /// In en, this message translates to:
+  /// **'“{title}” is a supporting intention and will no longer be held by any primary intention after deleting the relation.'**
+  String relationDeleteCascadeText(String title);
+
+  /// Подтверждение удаления связи
+  ///
+  /// In en, this message translates to:
+  /// **'and {count} more'**
+  String relationDeleteAndMore(int count);
+
+  /// Подтверждение удаления связи
+  ///
+  /// In en, this message translates to:
+  /// **'Keep as primary: the intention will become primary'**
+  String get relationDeleteKeepMainEffect;
+
+  /// Подтверждение удаления связи
+  ///
+  /// In en, this message translates to:
+  /// **'Keep as primary'**
+  String get relationDeleteKeepMain;
+
+  /// Подтверждение удаления связи
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all'**
+  String get relationDeleteAll;
 }
 
 class _AppLocalizationsDelegate

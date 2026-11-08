@@ -2305,5 +2305,17 @@
   "detailsDeleteOnlyEffects": "Only this: {effects}",
   "@detailsDeleteOnlyEffects": {"description": "Подтверждение удаления намерения", "placeholders": {"effects": {"type": "String"}}},
   "detailsDeleteCount": "Delete {count}",
-  "@detailsDeleteCount": {"description": "Подтверждение удаления намерения", "placeholders": {"count": {"type": "int"}}}
+  "@detailsDeleteCount": {"description": "Подтверждение удаления намерения", "placeholders": {"count": {"type": "int"}}},
+  "relationDeleteCascadeTitle": "Delete relation and {count, plural, one{{count} intention} other{{count} intentions}}?",
+  "@relationDeleteCascadeTitle": {"description": "Подтверждение удаления связи", "placeholders": {"count": {"type": "int"}}},
+  "relationDeleteCascadeText": "“{title}” is a supporting intention and will no longer be held by any primary intention after deleting the relation.",
+  "@relationDeleteCascadeText": {"description": "Подтверждение удаления связи", "placeholders": {"title": {"type": "String"}}},
+  "relationDeleteAndMore": "and {count} more",
+  "@relationDeleteAndMore": {"description": "Подтверждение удаления связи", "placeholders": {"count": {"type": "int"}}},
+  "relationDeleteKeepMainEffect": "Keep as primary: the intention will become primary",
+  "@relationDeleteKeepMainEffect": {"description": "Подтверждение удаления связи"},
+  "relationDeleteKeepMain": "Keep as primary",
+  "@relationDeleteKeepMain": {"description": "Подтверждение удаления связи"},
+  "relationDeleteAll": "Delete all",
+  "@relationDeleteAll": {"description": "Подтверждение удаления связи"}
 }

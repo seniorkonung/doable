@@ -203,11 +203,16 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
   /// Снимок без связи до исхода команды не показан, а после подтверждения
   /// состояние становится [RelationDetailsOwnDeletionConfirmed], прежнее
   /// содержимое которого показывает только [initiator].
-  Future<bool> delete(RelationDeletionInitiator initiator) async {
+  Future<bool> delete(
+    RelationDeletionInitiator initiator, {
+    Future<CascadeChoice?> Function(RelationDeleteCascadePreview preview)?
+    confirmDeletion,
+  }) async {
     final relationId = _relationId;
     final completion = await _startLifecycleChange(
       RelationDetailsLifecycleKind.delete,
       (token) => _Deletion(token, initiator),
+      confirmDeletion: confirmDeletion,
     );
     return switch (completion?.result) {
       GraphResultSuccess(value: LongTermRelationDeleted(:final relation)) =>
@@ -343,6 +348,8 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     RelationDetailsLifecycleKind kind,
     _Command Function(LongTermRelationOperationToken token) command, {
     Future<CascadeChoice?> Function(int count)? choose,
+    Future<CascadeChoice?> Function(RelationDeleteCascadePreview preview)?
+    confirmDeletion,
   }) async {
     final initial = state;
     if (initial is! RelationDetailsLoaded ||
@@ -382,7 +389,11 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
       _ => 0,
     };
     try {
-      if (count > 0) choice = await choose?.call(count);
+      if (preview is RelationDeleteCascadePreview && confirmDeletion != null) {
+        choice = await confirmDeletion(preview);
+      } else if (count > 0) {
+        choice = await choose?.call(count);
+      }
     } finally {
       _isReadingCascadePreview = false;
     }
@@ -425,7 +436,12 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
         start = _coordinator.acceptRelationDelete(
           DeleteLongTermRelation(
             relationId,
-            execution: CascadeExecution.withSupporting(plan),
+            execution: CascadeExecution(
+              choice: choice,
+              expected: choice == CascadeChoice.onlyThis
+                  ? plan.onlyThis
+                  : plan.withSupporting,
+            ),
           ),
         );
       // Предпросмотр связи не бывает предпросмотром удаления намерения.

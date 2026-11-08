@@ -1245,6 +1245,153 @@ void main() {
       semantics.dispose();
     });
 
+    testWidgets(
+      'подтверждение показывает последствия удаления и передаёт выбор',
+      (tester) async {
+        final repository = await openPanel(tester, relation());
+        final child = testIntentionId(2);
+        final archived = testIntentionId(3);
+        final cascade = DeleteCascadeComposition(
+          departing: [child],
+          promoted: const [],
+          archivedByInvariant: [archived],
+          mainsLosingRelation: const [],
+          deletedRelationCount: 3,
+          archivedRelationCount: 1,
+        );
+        final single = DeleteCascadeComposition(
+          departing: const [],
+          promoted: [child],
+          archivedByInvariant: const [],
+          mainsLosingRelation: const [],
+          deletedRelationCount: 1,
+          archivedRelationCount: 0,
+        );
+        repository.onPreviewCascade = (subject, operation) =>
+            operation == CascadeOperation.delete
+            ? RelationDeleteCascadePreview(
+                revision: revision,
+                plan: CascadePlan(
+                  withSupporting: cascade,
+                  onlyThis: single,
+                  asksQuestion: true,
+                ),
+                titles: {child: 'много ходить', archived: 'обувь'},
+              )
+            : givenCascadePreview(subject, operation, revision);
+        await choose(tester, 'Удалить');
+        expect(find.text('Удалить связь и 1 намерение?'), findsOneWidget);
+        expect(find.textContaining('3 связи'), findsOneWidget);
+        expect(find.text('Уйдут в архив · 1'), findsOneWidget);
+        expect(find.text('обувь'), findsOneWidget);
+        expect(
+          find.text('Оставить главным: намерение станет главным'),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('Оставить главным'));
+        await tester.pump();
+        final command =
+            repository.relationCommands.single as DeleteLongTermRelation;
+        expect(command.execution.choice, CascadeChoice.onlyThis);
+        expect(command.execution.expected.promoted, [child]);
+      },
+    );
+
+    testWidgets('подтверждение называет намерение, которое уйдёт в архив', (
+      tester,
+    ) async {
+      final repository = await openPanel(tester, relation());
+      final child = testIntentionId(3);
+      final composition = DeleteCascadeComposition(
+        departing: const [],
+        promoted: const [],
+        archivedByInvariant: [child],
+        mainsLosingRelation: const [],
+        deletedRelationCount: 1,
+        archivedRelationCount: 1,
+      );
+      repository.onPreviewCascade = (subject, operation) =>
+          operation == CascadeOperation.delete
+          ? RelationDeleteCascadePreview(
+              revision: revision,
+              plan: CascadePlan(
+                withSupporting: composition,
+                onlyThis: composition,
+                asksQuestion: false,
+              ),
+              titles: {child: 'обувь'},
+            )
+          : givenCascadePreview(subject, operation, revision);
+      await choose(tester, 'Удалить');
+      expect(find.text('Удалить связь?'), findsOneWidget);
+      expect(find.text('Уйдут в архив · 1'), findsOneWidget);
+      expect(find.text('обувь'), findsOneWidget);
+      expect(find.textContaining('Пути действий'), findsOneWidget);
+    });
+
+    testWidgets(
+      'длинные списки удаления и архива показывают четыре названия и остаток',
+      (tester) async {
+        final repository = await openPanel(tester, relation());
+        final departing = [for (var i = 2; i < 7; i++) testIntentionId(i)];
+        final archived = [for (var i = 7; i < 12; i++) testIntentionId(i)];
+        final cascade = DeleteCascadeComposition(
+          departing: departing,
+          promoted: const [],
+          archivedByInvariant: archived,
+          mainsLosingRelation: const [],
+          deletedRelationCount: 6,
+          archivedRelationCount: 5,
+        );
+        repository.onPreviewCascade = (subject, operation) =>
+            operation == CascadeOperation.delete
+            ? RelationDeleteCascadePreview(
+                revision: revision,
+                plan: CascadePlan(
+                  withSupporting: cascade,
+                  onlyThis: cascade,
+                  asksQuestion: true,
+                ),
+                titles: {
+                  for (var i = 0; i < 5; i++) departing[i]: 'Уходит $i',
+                  for (var i = 0; i < 5; i++) archived[i]: 'В архив $i',
+                },
+              )
+            : givenCascadePreview(subject, operation, revision);
+        await choose(tester, 'Удалить');
+        expect(find.text('Удалить связь и 5 намерений?'), findsOneWidget);
+        expect(find.text('Уходит 3'), findsOneWidget);
+        expect(find.text('Уходит 4'), findsNothing);
+        expect(find.text('В архив 3'), findsOneWidget);
+        expect(find.text('В архив 4'), findsNothing);
+        expect(find.text('и ещё 1'), findsNWidgets(2));
+        await tester.tap(find.text('Удалить всё'));
+        await tester.pump();
+        final command =
+            repository.relationCommands.single as DeleteLongTermRelation;
+        expect(command.execution.choice, CascadeChoice.withSupporting);
+        expect(command.execution.expected.departing, departing);
+      },
+    );
+
+    testWidgets('архивированную связь с архивным участником можно удалить', (
+      tester,
+    ) async {
+      final repository = await openPanel(
+        tester,
+        relation(
+          scope: RelationScope.archived,
+          relatedArchiveState: IntentionArchiveState.archived,
+        ),
+      );
+      await choose(tester, 'Удалить');
+      expect(find.text('Удалить связь?'), findsOneWidget);
+      expect(find.textContaining('Оба намерения сохранятся'), findsOneWidget);
+      await tester.tap(find.text('Удалить'));
+      await tester.pump();
+      expect(repository.relationCommands.single, isA<DeleteLongTermRelation>());
+    });
+
     /// Подтверждает удаление из меню; запись остаётся незавершённой.
     Future<void> startDeletion(WidgetTester tester) async {
       await choose(tester, 'Удалить');
@@ -1476,6 +1623,8 @@ void main() {
       expect(find.text('много ходить').hitTestable(), findsOneWidget);
 
       await tester.tap(find.text('Повторить'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Удалить'));
       await tester.pump();
       repository.completeRelationDelete(
         1,

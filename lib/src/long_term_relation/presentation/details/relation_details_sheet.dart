@@ -205,7 +205,7 @@ final class _RelationDetailsSheetState
       case RelationOption.restore:
         viewModel.restore((count) => _chooseCascade(count, restoring: true));
       case RelationOption.delete:
-        await _confirmDeletion();
+        await _delete();
     }
   }
 
@@ -236,27 +236,67 @@ final class _RelationDetailsSheetState
     };
   }
 
-  Future<void> _confirmDeletion() async {
+  Future<CascadeChoice?> _confirmDeletion(
+    RelationDeleteCascadePreview preview,
+  ) async {
+    if (!mounted || !(ModalRoute.isCurrentOf(context) ?? false)) return null;
     final loaded = ref.read(_provider);
-    if (loaded is! RelationDetailsLoaded) return;
-    final localizations = AppLocalizations.of(context);
-    final confirmed = await showConfirmDialog(
+    if (loaded is! RelationDetailsLoaded) return null;
+    final l = AppLocalizations.of(context);
+    final plan = preview.plan;
+    final cascade = plan.withSupporting;
+    final count = cascade.departing.length;
+    final answer = await showCascadeConfirmDialog(
       context: context,
-      title: localizations.relationSheetDeleteDialogTitle,
-      text: ConfirmDialogText(
-        before: localizations.relationSheetDeleteDialogTextBefore,
-        name: _relationPhrase(localizations, loaded.details),
-        after: localizations.relationSheetDeleteDialogTextAfter,
-      ),
-      cancelLabel: localizations.relationSheetDeleteDialogCancel,
-      actionLabel: localizations.relationSheetDeleteDialogConfirm,
+      title: plan.asksQuestion
+          ? l.relationDeleteCascadeTitle(count)
+          : l.relationSheetDeleteDialogTitle,
+      text: plan.asksQuestion
+          ? '${l.relationDeleteCascadeText(preview.titles[cascade.departing.first]!)} ${l.detailsDeleteRelations(cascade.deletedRelationCount)} ${l.detailsDeleteIrreversible}${cascade.archivedByInvariant.isNotEmpty ? ' ${l.detailsDeleteArchiveText}' : ''}'
+          : '${l.relationSheetDeleteDialogTextBefore}${_relationPhrase(l, loaded.details)}${l.relationSheetDeleteDialogTextAfter} ${l.detailsDeletePaths}${cascade.archivedByInvariant.isNotEmpty ? ' ${l.detailsDeleteArchiveText}' : ''}',
+      lists: [
+        if (cascade.departing.isNotEmpty)
+          CascadeDialogList(
+            title: '',
+            items: [for (final id in cascade.departing) preview.titles[id]!],
+            marker: CascadeListMarker.intention,
+            display: CascadeListSummary(l.relationDeleteAndMore(count - 4)),
+          ),
+        if (cascade.archivedByInvariant.isNotEmpty)
+          CascadeDialogList(
+            title: l.detailsDeleteArchivedList(
+              cascade.archivedByInvariant.length,
+            ),
+            items: [
+              for (final id in cascade.archivedByInvariant) preview.titles[id]!,
+            ],
+            marker: CascadeListMarker.intention,
+            display: CascadeListSummary(
+              l.relationDeleteAndMore(cascade.archivedByInvariant.length - 4),
+            ),
+          ),
+      ],
+      footer: plan.asksQuestion ? l.relationDeleteKeepMainEffect : null,
+      cascadeLabel: plan.asksQuestion
+          ? l.relationDeleteAll
+          : l.relationSheetDeleteDialogConfirm,
+      singleLabel: plan.asksQuestion ? l.relationDeleteKeepMain : null,
+      cancelLabel: l.relationSheetDeleteDialogCancel,
+      actionStyle: CascadeActionStyle.danger,
     );
-    if (confirmed && mounted) await _delete();
+    return switch (answer) {
+      CascadeDialogResult.cascade => CascadeChoice.withSupporting,
+      CascadeDialogResult.single => CascadeChoice.onlyThis,
+      CascadeDialogResult.cancel => null,
+    };
   }
 
   Future<void> _delete() async {
     final viewModel = ref.read(_provider.notifier);
-    final deleted = await viewModel.delete(_deletionInitiator);
+    final deleted = await viewModel.delete(
+      _deletionInitiator,
+      confirmDeletion: _confirmDeletion,
+    );
     // Закрытие принадлежит принявшей команду панели, а не общему Deleted. После
     // ожидания сброшенный или перекрытый маршрут теряет это право.
     // https://api.flutter.dev/flutter/widgets/Route/isCurrent.html

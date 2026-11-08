@@ -59,6 +59,78 @@ import '../support/intention_options.dart';
 
 void main() {
   testWidgets(
+    '«Оставить главным» удаляет только связь и сообщает об изменении',
+    (tester) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      tester.binding.platformDispatcher.localesTestValue = const [Locale('ru')];
+      addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+      tester.view.physicalSize = const Size(1200, 6000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final storage = (await tester.runAsync(LocalDatabaseHarness.fileBacked))!;
+      await tester.runAsync(() async {
+        final database = await storage.openReadyDatabase();
+        await seedDurabilityGraph(database);
+        await seedGraph(database, () async {
+          await database.customStatement(
+            "UPDATE intentions SET kind = 'supporting' WHERE id = ?",
+            [durabilityUuid(2)],
+          );
+        });
+        await storage.closePersistenceObjectGraph();
+      });
+      late sqlite.Database raw;
+      final runtime = _fileRuntime(
+        storage,
+        diagnostics: InMemoryDiagnosticsSink(),
+        setup: (db) => raw = db,
+      );
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await runtime.shutdown();
+        await storage.dispose();
+      });
+      final l10n = lookupAppLocalizations(const Locale('ru'));
+      await tester.pumpWidget(MainApp(runtime: runtime));
+      await openIntentionGraph(tester, waitFor: _pumpUntilFound);
+      await _pumpUntilFound(tester, find.text('Намерение 1'));
+      await _openIntention(tester, 'Намерение 1');
+      await _chooseDetailsTab(tester, l10n.detailsRelationsTab);
+      final phrase = l10n.relationNeighborhoodNeedPhrase(
+        'Намерение 1',
+        'Намерение 2',
+      );
+      await _tapWhenFound(tester, _relationRow(phrase));
+      await _pumpUntilRelationSheet(tester, phrase);
+      await _chooseRelationOption(tester, l10n, l10n.relationSheetOptionDelete);
+      await _tapWhenFound(tester, find.text('Оставить главным'));
+      await _pumpUntilAbsent(tester, _relationSheet);
+      await _pumpUntilFound(
+        tester,
+        find.textContaining('Связь удалена, намерение стало главным'),
+      );
+      expect(
+        raw.select('SELECT kind FROM intentions WHERE id = ?', [
+          durabilityUuid(2),
+        ]).single['kind'],
+        'main',
+      );
+      expect(
+        raw.select('SELECT id FROM long_term_relations WHERE id = ?', [
+          durabilityUuid(101),
+        ]),
+        isEmpty,
+      );
+      expect(
+        raw.select('SELECT id FROM long_term_relations WHERE id = ?', [
+          durabilityUuid(102),
+        ]),
+        hasLength(1),
+      );
+    },
+  );
+
+  testWidgets(
     'создаёт связь, согласует соседство и сохраняет поток после открытия файла',
     (tester) async {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);

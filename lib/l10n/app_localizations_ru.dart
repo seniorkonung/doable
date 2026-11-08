@@ -3560,4 +3560,37 @@ class AppLocalizationsRu extends AppLocalizations {
   String detailsDeleteCount(int count) {
     return 'Удалить $count';
   }
+
+  @override
+  String relationDeleteCascadeTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count намерения',
+      many: '$count намерений',
+      few: '$count намерения',
+      one: '$count намерение',
+    );
+    return 'Удалить связь и $_temp0?';
+  }
+
+  @override
+  String relationDeleteCascadeText(String title) {
+    return 'Намерение «$title» вспомогательное и после удаления связи больше не удерживается ни одним главным.';
+  }
+
+  @override
+  String relationDeleteAndMore(int count) {
+    return 'и ещё $count';
+  }
+
+  @override
+  String get relationDeleteKeepMainEffect =>
+      'Оставить главным: намерение станет главным';
+
+  @override
+  String get relationDeleteKeepMain => 'Оставить главным';
+
+  @override
+  String get relationDeleteAll => 'Удалить всё';
 }

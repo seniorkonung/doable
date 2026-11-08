@@ -3475,4 +3475,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String detailsDeleteCount(int count) {
     return 'Delete $count';
   }
+
+  @override
+  String relationDeleteCascadeTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions',
+      one: '$count intention',
+    );
+    return 'Delete relation and $_temp0?';
+  }
+
+  @override
+  String relationDeleteCascadeText(String title) {
+    return '“$title” is a supporting intention and will no longer be held by any primary intention after deleting the relation.';
+  }
+
+  @override
+  String relationDeleteAndMore(int count) {
+    return 'and $count more';
+  }
+
+  @override
+  String get relationDeleteKeepMainEffect =>
+      'Keep as primary: the intention will become primary';
+
+  @override
+  String get relationDeleteKeepMain => 'Keep as primary';
+
+  @override
+  String get relationDeleteAll => 'Delete all';
 }
