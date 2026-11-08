@@ -1012,13 +1012,11 @@ void main() {
         final cascade = ArchiveCascadeComposition(
           departing: [child],
           promoted: const [],
-
           archivedRelationCount: 1,
         );
         final single = ArchiveCascadeComposition(
           departing: const [],
           promoted: [child],
-
           archivedRelationCount: 1,
         );
         repository.onPreviewCascade = (subject, operation) =>

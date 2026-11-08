@@ -68,7 +68,6 @@ void main() {
             for (var i = 0; i < count; i++) testDetailsIntentionId(i + 2),
           ],
           promoted: [],
-
           archivedRelationCount: 0,
         ),
       );
@@ -90,7 +89,6 @@ void main() {
       composition: ArchiveCascadeComposition(
         departing: [],
         promoted: [testDetailsIntentionId(2)],
-
         archivedRelationCount: 1,
       ),
     );
@@ -269,7 +267,6 @@ void main() {
       ArchiveCascadeComposition(
         departing: [],
         promoted: [],
-
         archivedRelationCount: 0,
       ),
     );
@@ -345,7 +342,6 @@ void main() {
       ArchiveCascadeComposition(
         departing: [testDetailsIntentionId(2)],
         promoted: [],
-
         archivedRelationCount: 1,
       ),
     );

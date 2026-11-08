@@ -40,7 +40,6 @@ void main() {
       final composition = ArchiveCascadeComposition(
         departing: children.map(testDetailsIntentionId).toList(),
         promoted: [],
-
         archivedRelationCount: relations,
       );
       return ArchiveCascadePreview(

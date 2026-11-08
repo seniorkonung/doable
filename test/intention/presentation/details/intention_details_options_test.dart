@@ -37,13 +37,11 @@ void main() {
     final withSupporting = ArchiveCascadeComposition(
       departing: [child],
       promoted: [],
-
       archivedRelationCount: 1,
     );
     final onlyThis = ArchiveCascadeComposition(
       departing: [],
       promoted: [child],
-
       archivedRelationCount: 1,
     );
     final preview = ArchiveCascadePreview(
@@ -82,7 +80,6 @@ void main() {
     final composition = ArchiveCascadeComposition(
       departing: [child],
       promoted: [],
-
       archivedRelationCount: 1,
     );
     final repository = ControlledDetailsRepository()
@@ -121,7 +118,6 @@ void main() {
     final composition = ArchiveCascadeComposition(
       departing: [child],
       promoted: [],
-
       archivedRelationCount: 1,
     );
     final repository = ControlledDetailsRepository()
@@ -306,7 +302,6 @@ void main() {
     final composition = ArchiveCascadeComposition(
       departing: [],
       promoted: [],
-
       archivedRelationCount: 1,
     );
     final preview = ArchiveCascadePreview(

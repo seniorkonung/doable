@@ -147,7 +147,6 @@ ArchiveCascadeComposition _emptyArchiveComposition() =>
     ArchiveCascadeComposition(
       departing: const [],
       promoted: const [],
-
       archivedRelationCount: 0,
     );
 
