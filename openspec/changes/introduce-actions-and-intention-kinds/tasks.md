@@ -1596,3 +1596,17 @@
   - **Зависимости:** 4.8.
   - **Предполагаемые файлы:** `lib/src/graph/presentation/graph_operation_presenter.dart`, `lib/l10n/app_ru.arb`, `app_en.arb`, `app_localizations.dart`, `app_localizations_ru.dart`, `app_localizations_en.dart`, `test/graph/presentation/graph_operation_presenter_test.dart`.
   - **Размер:** XS.
+
+- [ ] 4.25 Тексты каскада называют главное намерение одним словом, а подсказки последствий читаются цельной фразой
+  - **Критерии приёмки:**
+    - В `lib/l10n/app_en.arb` строки каскада (`cascadeArchiveIntentionPromoted`, `cascadeArchiveRelationPromoted`, `cascadeDeleteIntentionPromoted`, `cascadeDeleteRelationPromoted`, `cascadeRestoreIntentionMain`, `cascadeRestoreIntentionMainSupporting`, `cascadeRestoreRelationMain`, `cascadeRestoreRelationMainOthers`, `detailsDeleteCascadeText`, `detailsDeleteMainsList`, `detailsDeletePromoted`, `relationDeleteCascadeText`, `relationDeleteKeepMainEffect`, `relationDeleteKeepMain` и другие строки каскада) называют главное намерение словом «main», как `intentionKindMain` («Main»); ни одна строка каскада не называет вид намерения словом «primary». Смысл текстов не меняется.
+    - Подсказки последствий под пунктами меню параметров намерения (`deleteHint` в `lib/src/intention/presentation/details/intention_options.dart`) и связи (`stateHint` и `deleteHint` в `lib/src/long_term_relation/presentation/details/relation_details_options.dart`) читаются цельной фразой при любом наборе последствий на русском и английском: каждое последствие — самостоятельное предложение с заглавной буквы либо для каждой комбинации есть отдельная строка ARB. Склейка через `'; '` фраз с разным регистром не остаётся.
+    - `detailsCascadeDeleteArchiveHint` не начинается со строчной буквы, когда показана одна, например «В архив уйдут намерения: K».
+    - Смысл подсказок не меняется. Строка «Только это: …» подтверждения удаления (`intention-cascade`, требование «Подтверждение удаления намерения») не меняется.
+    - Локализация перегенерирована (`flutter gen-l10n` из задачи `mise run codegen`), сгенерированные `lib/l10n/app_localizations*.dart` соответствуют ARB.
+    - Новый тест в `test/intention/presentation/details/intention_options_test.dart` закрепляет подсказку под «Удалить», когда по инварианту в архив уходят только намерения, без удаления вспомогательных: подсказка начинается с заглавной буквы и называет число K. Существующие ожидания подсказок с несколькими последствиями обновлены под новые тексты.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/intention/presentation/details test/long_term_relation/presentation/details`.
+  - **Зависимости:** 4.10, 4.12, 4.13.
+  - **Предполагаемые файлы:** `lib/l10n/app_en.arb`, `app_ru.arb`, `app_localizations.dart`, `app_localizations_en.dart`, `app_localizations_ru.dart`, `lib/src/intention/presentation/details/intention_options.dart`, `lib/src/long_term_relation/presentation/details/relation_details_options.dart`, `test/intention/presentation/details/intention_options_test.dart`, тесты в `test/long_term_relation/presentation/details/`.
+  - **Размер:** S.

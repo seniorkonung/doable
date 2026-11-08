@@ -4,11 +4,6 @@
 
 Файл ведёт оркестратор. Решения приняты пользователем в сессии решений и исполняются автономно, по одной finding за сессию. Сессия исполнения удаляет раздел своей finding в коммите её устранения.
 
-## F7 · Low — Тексты каскада называют вид намерения по-разному в разных местах интерфейса
-
-- **Решение:** Устранить
-- **Как устранить:** Устранить. Добавить в конец фазы 4 tasks.md новую задачу 4.<следующий свободный номер>. (1) В lib/l10n/app_en.arb в строках каскада (около 2229–2317: cascade*Promoted, cascadeRestore*Main*, detailsDeleteCascadeText, detailsDeleteMainsList, detailsDeletePromoted, relationDeleteCascadeText, relationDeleteKeepMain, relationDeleteKeepMainEffect и др.) называть главное намерение словом «main», как остальной интерфейс (intentionKindMain = «Main»), а не «primary». (2) Подсказки последствий в меню параметров (lib/src/intention/presentation/details/intention_options.dart, сборка deleteHint через join('; '), и lib/src/long_term_relation/presentation/details/relation_details_options.dart) читаются цельной фразой при любом наборе последствий: каждое последствие — самостоятельное предложение с заглавной буквы, либо отдельная строка ARB на комбинацию; строка detailsCascadeDeleteArchiveHint («в архив уйдут намерения: K») не начинается со строчной буквы, когда показана одна. Смысл текстов не меняется; строку «Только это: …» в подтверждении удаления не трогать. Добавить тест подсказки под «Удалить», когда в архив по инварианту уходят только намерения без удаления вспомогательных. Перегенерировать локализацию. Проверка: `mise exec --no-deps -- flutter test test/intention/presentation/details test/long_term_relation/presentation/details`. Ожидаемые артефакты: tasks.md, app_en.arb, app_ru.arb, сгенерированная локализация, intention_options.dart, relation_details_options.dart, их тесты.
-
 ## F8 · Low — После снятия блокировки восстановления остался мёртвый параметр `mustBeActive`
 
 - **Решение:** Устранить
