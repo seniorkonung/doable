@@ -149,7 +149,10 @@ final class RelationDetailsLifecycleCommandFailed
   final GraphInitiatorPresentationClaim? failurePresentation;
 
   @override
-  bool get canRetry => failure is LongTermRelationUnavailableFailure;
+  bool get canRetry =>
+      failure is LongTermRelationUnavailableFailure ||
+      (kind != RelationDetailsLifecycleKind.delete &&
+          failure is LongTermRelationCascadeConflictFailure);
 }
 
 /// Предпросмотр каскада, прочитанный при запуске операции, завершился

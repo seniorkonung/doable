@@ -3648,6 +3648,60 @@ abstract class AppLocalizations {
   /// **'Relation options'**
   String get relationSheetOptionsLabel;
 
+  /// Последствия операции со связью
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting intentions archived with the relation: {count}'**
+  String relationArchiveIntentionsHint(int count);
+
+  /// Последствия операции со связью
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting intentions deleted with the relation: {count}'**
+  String relationDeleteIntentionsHint(int count);
+
+  /// Последствия операции со связью
+  ///
+  /// In en, this message translates to:
+  /// **'Remains in saved paths marked as archived'**
+  String get relationArchivePathsHint;
+
+  /// Последствия операции со связью
+  ///
+  /// In en, this message translates to:
+  /// **'No longer marked as archived in saved paths and available for new paths again'**
+  String get relationRestorePathsHint;
+
+  /// Последствия операции со связью
+  ///
+  /// In en, this message translates to:
+  /// **'Intentions restored with the relation: {count}'**
+  String relationRestoreIntentionsHint(int count);
+
+  /// Последствия операции со связью
+  ///
+  /// In en, this message translates to:
+  /// **'Archive relation?'**
+  String get relationCascadeArchiveTitle;
+
+  /// Последствия операции со связью
+  ///
+  /// In en, this message translates to:
+  /// **'Restore relation?'**
+  String get relationCascadeRestoreTitle;
+
+  /// Последствия операции со связью
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting intentions archived with it: {count}.'**
+  String relationCascadeArchiveQuestion(int count);
+
+  /// Последствия операции со связью
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting intentions restored with it: {count}.'**
+  String relationCascadeRestoreQuestion(int count);
+
   /// Пункт параметров панели активной связи: архивировать
   ///
   /// In en, this message translates to:

@@ -2380,6 +2380,45 @@ class AppLocalizationsRu extends AppLocalizations {
   String get relationSheetOptionsLabel => 'Параметры связи';
 
   @override
+  String relationArchiveIntentionsHint(int count) {
+    return 'Вместе со связью в архив уйдут вспомогательные намерения: $count';
+  }
+
+  @override
+  String relationDeleteIntentionsHint(int count) {
+    return 'Вместе со связью будут удалены вспомогательные намерения: $count';
+  }
+
+  @override
+  String get relationArchivePathsHint =>
+      'Останется в сохранённых путях с отметкой архива';
+
+  @override
+  String get relationRestorePathsHint =>
+      'В сохранённых путях больше не отмечена архивной и снова доступна для новых путей';
+
+  @override
+  String relationRestoreIntentionsHint(int count) {
+    return 'Вместе со связью вернутся намерения: $count';
+  }
+
+  @override
+  String get relationCascadeArchiveTitle => 'Архивировать связь?';
+
+  @override
+  String get relationCascadeRestoreTitle => 'Восстановить связь?';
+
+  @override
+  String relationCascadeArchiveQuestion(int count) {
+    return 'Вместе с ней в архив уйдут вспомогательные намерения: $count.';
+  }
+
+  @override
+  String relationCascadeRestoreQuestion(int count) {
+    return 'Вместе с ней вернутся вспомогательные намерения: $count.';
+  }
+
+  @override
   String get relationSheetOptionArchive => 'Архивировать';
 
   @override

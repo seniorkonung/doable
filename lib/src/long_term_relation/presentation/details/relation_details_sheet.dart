@@ -201,12 +201,39 @@ final class _RelationDetailsSheetState
     final viewModel = ref.read(provider.notifier);
     switch (option) {
       case RelationOption.archive:
-        viewModel.archive();
+        viewModel.archive((count) => _chooseCascade(count, restoring: false));
       case RelationOption.restore:
-        viewModel.restore();
+        viewModel.restore((count) => _chooseCascade(count, restoring: true));
       case RelationOption.delete:
         await _confirmDeletion();
     }
+  }
+
+  Future<CascadeChoice?> _chooseCascade(
+    int count, {
+    required bool restoring,
+  }) async {
+    if (!mounted || !(ModalRoute.isCurrentOf(context) ?? false)) return null;
+    final l = AppLocalizations.of(context);
+    final answer = await showCascadeConfirmDialog(
+      context: context,
+      title: restoring
+          ? l.relationCascadeRestoreTitle
+          : l.relationCascadeArchiveTitle,
+      text: restoring
+          ? l.relationCascadeRestoreQuestion(count)
+          : l.relationCascadeArchiveQuestion(count),
+      lists: const [],
+      cascadeLabel: l.detailsCascadeWithSupporting,
+      singleLabel: l.detailsCascadeOnlyThis,
+      cancelLabel: l.detailsDeleteDialogCancel,
+      actionStyle: CascadeActionStyle.primary,
+    );
+    return switch (answer) {
+      CascadeDialogResult.cascade => CascadeChoice.withSupporting,
+      CascadeDialogResult.single => CascadeChoice.onlyThis,
+      CascadeDialogResult.cancel => null,
+    };
   }
 
   Future<void> _confirmDeletion() async {
@@ -254,7 +281,7 @@ final class _RelationDetailsSheetState
     )) {
       unawaited(_delete());
     } else {
-      ref.read(_provider.notifier).retryLifecycleChange();
+      ref.read(_provider.notifier).retryLifecycleChange(_chooseCascade);
     }
   }
 

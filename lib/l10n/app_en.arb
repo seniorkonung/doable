@@ -1668,6 +1668,24 @@
   "@relationSheetOptionsLabel": {
     "description": "Доступное название кнопки параметров в шапке панели связи"
   },
+  "relationArchiveIntentionsHint": "Supporting intentions archived with the relation: {count}",
+  "@relationArchiveIntentionsHint": {"description": "Последствия операции со связью", "placeholders": {"count": {"type": "int"}}},
+  "relationDeleteIntentionsHint": "Supporting intentions deleted with the relation: {count}",
+  "@relationDeleteIntentionsHint": {"description": "Последствия операции со связью", "placeholders": {"count": {"type": "int"}}},
+  "relationArchivePathsHint": "Remains in saved paths marked as archived",
+  "@relationArchivePathsHint": {"description": "Последствия операции со связью"},
+  "relationRestorePathsHint": "No longer marked as archived in saved paths and available for new paths again",
+  "@relationRestorePathsHint": {"description": "Последствия операции со связью"},
+  "relationRestoreIntentionsHint": "Intentions restored with the relation: {count}",
+  "@relationRestoreIntentionsHint": {"description": "Последствия операции со связью", "placeholders": {"count": {"type": "int"}}},
+  "relationCascadeArchiveTitle": "Archive relation?",
+  "@relationCascadeArchiveTitle": {"description": "Последствия операции со связью"},
+  "relationCascadeRestoreTitle": "Restore relation?",
+  "@relationCascadeRestoreTitle": {"description": "Последствия операции со связью"},
+  "relationCascadeArchiveQuestion": "Supporting intentions archived with it: {count}.",
+  "@relationCascadeArchiveQuestion": {"description": "Последствия операции со связью", "placeholders": {"count": {"type": "int"}}},
+  "relationCascadeRestoreQuestion": "Supporting intentions restored with it: {count}.",
+  "@relationCascadeRestoreQuestion": {"description": "Последствия операции со связью", "placeholders": {"count": {"type": "int"}}},
   "relationSheetOptionArchive": "Archive",
   "@relationSheetOptionArchive": {
     "description": "Пункт параметров панели активной связи: архивировать"

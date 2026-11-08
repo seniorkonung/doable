@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
+import 'package:doable/src/design_system/components/option_row.dart';
 import 'package:doable/src/design_system/components/priority_picker.dart';
 import 'package:doable/src/design_system/components/relation_head.dart';
 import 'package:doable/src/design_system/components/sheet.dart';
@@ -22,6 +23,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/ordinary_page_test_app.dart';
+import '../../../support/intention_cascade_execution.dart';
 import '../relation_graph_test_support.dart';
 import 'relation_details_test_support.dart';
 
@@ -977,6 +979,131 @@ void main() {
       semantics.dispose();
     });
 
+    testWidgets(
+      'отказ предпросмотра оставляет действия меню доступными без пояснений',
+      (tester) async {
+        final repository = await openPanel(
+          tester,
+          relation(
+            scope: RelationScope.archived,
+            relatedArchiveState: IntentionArchiveState.archived,
+          ),
+        );
+        repository.onPreviewCascade = (_, _) =>
+            const CascadePreviewUnavailable();
+        await openMenu(tester);
+        for (final name in ['Восстановить из архива', 'Удалить']) {
+          final row = tester.widget<OptionRow>(
+            find.byWidgetPredicate(
+              (widget) => widget is OptionRow && widget.name == name,
+            ),
+          );
+          expect(row.onPressed, isNotNull);
+          expect(row.hint, isNull);
+        }
+      },
+    );
+
+    testWidgets(
+      'меню показывает последствия, а отмена каскада не меняет связь',
+      (tester) async {
+        final repository = await openPanel(tester, relation());
+        final child = testIntentionId(2);
+        final cascade = ArchiveCascadeComposition(
+          departing: [child],
+          promoted: const [],
+          mainsLosingRelation: const [],
+          archivedRelationCount: 1,
+        );
+        final single = ArchiveCascadeComposition(
+          departing: const [],
+          promoted: [child],
+          mainsLosingRelation: const [],
+          archivedRelationCount: 1,
+        );
+        repository.onPreviewCascade = (subject, operation) =>
+            operation == CascadeOperation.archive
+            ? ArchiveCascadePreview(
+                revision: revision,
+                plan: CascadePlan(
+                  withSupporting: cascade,
+                  onlyThis: single,
+                  asksQuestion: true,
+                ),
+                titles: {child: 'много ходить'},
+              )
+            : givenCascadePreview(subject, operation, revision);
+        await openMenu(tester);
+        expect(
+          find.textContaining('в архив уйдут вспомогательные намерения: 1'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('с пометкой «Удалено»'), findsOneWidget);
+        await tester.tap(find.text('Архивировать'));
+        await tester.pumpAndSettle();
+        expect(find.text('Архивировать связь?'), findsOneWidget);
+        await tester.tap(find.text('Отмена'));
+        await tester.pumpAndSettle();
+        expect(repository.relationCommands, isEmpty);
+        await choose(tester, 'Архивировать');
+        await tester.tap(find.text('Только это'));
+        await tester.pumpAndSettle();
+        final command =
+            repository.relationCommands.single as ArchiveLongTermRelation;
+        expect(command.execution.choice, CascadeChoice.onlyThis);
+        expect(command.execution.expected.promoted, [child]);
+      },
+    );
+
+    testWidgets(
+      'восстановление спрашивает только о намерениях сверх архивного участника',
+      (tester) async {
+        final repository = await openPanel(
+          tester,
+          relation(
+            scope: RelationScope.archived,
+            relatedArchiveState: IntentionArchiveState.archived,
+          ),
+        );
+        final participant = testIntentionId(2);
+        final child = testIntentionId(3);
+        final cascade = RestoreCascadeComposition(
+          restored: [participant, child],
+          returnedAsMain: null,
+          restoredRelationCount: 2,
+        );
+        final single = RestoreCascadeComposition(
+          restored: [participant],
+          returnedAsMain: null,
+          restoredRelationCount: 1,
+        );
+        repository.onPreviewCascade = (subject, operation) =>
+            operation == CascadeOperation.restore
+            ? RestoreCascadePreview(
+                revision: revision,
+                plan: CascadePlan(
+                  withSupporting: cascade,
+                  onlyThis: single,
+                  asksQuestion: true,
+                ),
+                titles: {participant: 'много ходить', child: 'обувь'},
+              )
+            : givenCascadePreview(subject, operation, revision);
+        await choose(tester, 'Восстановить из архива');
+        expect(find.text('Восстановить связь?'), findsOneWidget);
+        expect(
+          find.textContaining('вспомогательные намерения: 1'),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('Со вспомогательными'));
+        await tester.pumpAndSettle();
+        final command =
+            repository.relationCommands.single as RestoreLongTermRelation;
+        expect(command.execution.choice, CascadeChoice.withSupporting);
+        expect(command.execution.expected.restored, [participant, child]);
+      },
+    );
+
     testWidgets('архивирование начинается после закрытия меню и отражается в '
         'панели без сообщения', (tester) async {
       final semantics = tester.ensureSemantics();
@@ -1437,7 +1564,7 @@ void main() {
     });
 
     testWidgets('конфликт состава при восстановлении объясняется в панели '
-        'без повтора', (tester) async {
+        'с повторным чтением предпросмотра', (tester) async {
       final semantics = tester.ensureSemantics();
       final repository = await openPanel(
         tester,
@@ -1458,7 +1585,10 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('Повторить'), findsNothing);
+      expect(find.text('Повторить'), findsOneWidget);
+      await tester.tap(find.text('Повторить'));
+      await tester.pump();
+      expect(repository.relationCommands, hasLength(2));
       expect(find.textContaining('Архивные связи остаются'), findsOneWidget);
       semantics.dispose();
     });

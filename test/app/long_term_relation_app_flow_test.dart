@@ -331,6 +331,8 @@ void main() {
       await _closeRelationSheet(tester);
 
       await _openIntentionOptions(tester);
+      // Предпросмотр читается асинхронно после открытия параметров.
+      await _pumpUntilFound(tester, find.text('Its tags stay'));
       // Связи не блокируют удаление намерения.
       final deletion = tester.widget<OptionRow>(
         intentionOption(IntentionOption.delete),
@@ -1622,6 +1624,7 @@ Future<void> _deleteCurrentIntention(WidgetTester tester) async {
     if (tester.widget<OptionRow>(delete).onPressed != null) break;
     await tester.pump(const Duration(milliseconds: 1));
   }
+  await _pumpUntilFound(tester, find.text('Its tags stay'));
   expect(tester.widget<OptionRow>(delete).hint, 'Its tags stay');
   await tester.tap(delete);
   await _tapWhenFound(tester, intentionDeletionConfirm);
@@ -1751,8 +1754,8 @@ Future<void> _pumpUntilHeadActive(WidgetTester tester) async {
     find.byKey(const ValueKey('intention-details-title')),
     -500,
     scrollable: find
-        .ancestor(
-          of: find.byType(ArchivedFold),
+        .descendant(
+          of: find.byType(IntentionDetailsPage).last,
           matching: find.byType(Scrollable),
         )
         .first,

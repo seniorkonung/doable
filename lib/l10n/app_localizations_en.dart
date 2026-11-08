@@ -2349,6 +2349,45 @@ class AppLocalizationsEn extends AppLocalizations {
   String get relationSheetOptionsLabel => 'Relation options';
 
   @override
+  String relationArchiveIntentionsHint(int count) {
+    return 'Supporting intentions archived with the relation: $count';
+  }
+
+  @override
+  String relationDeleteIntentionsHint(int count) {
+    return 'Supporting intentions deleted with the relation: $count';
+  }
+
+  @override
+  String get relationArchivePathsHint =>
+      'Remains in saved paths marked as archived';
+
+  @override
+  String get relationRestorePathsHint =>
+      'No longer marked as archived in saved paths and available for new paths again';
+
+  @override
+  String relationRestoreIntentionsHint(int count) {
+    return 'Intentions restored with the relation: $count';
+  }
+
+  @override
+  String get relationCascadeArchiveTitle => 'Archive relation?';
+
+  @override
+  String get relationCascadeRestoreTitle => 'Restore relation?';
+
+  @override
+  String relationCascadeArchiveQuestion(int count) {
+    return 'Supporting intentions archived with it: $count.';
+  }
+
+  @override
+  String relationCascadeRestoreQuestion(int count) {
+    return 'Supporting intentions restored with it: $count.';
+  }
+
+  @override
   String get relationSheetOptionArchive => 'Archive';
 
   @override
