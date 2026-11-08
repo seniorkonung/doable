@@ -3341,6 +3341,32 @@ class AppLocalizationsRu extends AppLocalizations {
       'Связь удалена, намерение стало главным';
 
   @override
+  String cascadeDeleteIntentionArchived(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'ушли $count намерения',
+      many: 'ушли $count намерений',
+      few: 'ушли $count намерения',
+      one: 'ушло $count намерение',
+    );
+    return 'Намерение удалено; в архив $_temp0';
+  }
+
+  @override
+  String cascadeDeleteRelationArchived(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'ушли $count намерения',
+      many: 'ушли $count намерений',
+      few: 'ушли $count намерения',
+      one: 'ушло $count намерение',
+    );
+    return 'Связь удалена; в архив $_temp0';
+  }
+
+  @override
   String cascadeDeleteArchived(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

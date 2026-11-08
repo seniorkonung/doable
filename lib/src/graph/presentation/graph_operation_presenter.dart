@@ -570,6 +570,13 @@ String? _cascadeMessage(
       :final archivedByInvariant,
     ) =>
       () {
+        if (departing.isEmpty &&
+            promoted.isEmpty &&
+            archivedByInvariant.isNotEmpty) {
+          return isRelation
+              ? l.cascadeDeleteRelationArchived(archivedByInvariant.length)
+              : l.cascadeDeleteIntentionArchived(archivedByInvariant.length);
+        }
         final message = departing.isNotEmpty
             ? (isRelation
                   ? l.cascadeDeleteRelationSupporting(departing.length)
@@ -580,10 +587,7 @@ String? _cascadeMessage(
                   : l.cascadeDeleteIntentionPromoted(promoted.length))
             : (isRelation ? l.relationDeleted : l.detailsDeleted);
         if (archivedByInvariant.isEmpty) return message;
-        final base = message.endsWith('.')
-            ? message.substring(0, message.length - 1)
-            : message;
-        return '$base${l.cascadeDeleteArchived(archivedByInvariant.length)}';
+        return '$message${l.cascadeDeleteArchived(archivedByInvariant.length)}';
       }(),
     RestoreCascadeComposition(:final restored, :final returnedAsMain) =>
       isRelation

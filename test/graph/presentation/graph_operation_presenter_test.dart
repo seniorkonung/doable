@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:doable/l10n/app_localizations.dart';
+import 'package:doable/l10n/app_localizations_ru.dart';
 import 'package:doable/src/action/application/action_command.dart';
 import 'package:doable/src/action/application/action_result.dart';
 import 'package:doable/src/action/domain/action.dart' as action_domain;
@@ -129,6 +130,66 @@ void main() {
       findsOneWidget,
     );
     expect(find.byType(SnackBar), findsOneWidget);
+  });
+
+  for (final (count, suffix) in [
+    (1, 'ушло 1 намерение'),
+    (2, 'ушли 2 намерения'),
+    (5, 'ушли 5 намерений'),
+  ]) {
+    testWidgets('удаление намерения с архивированием: $count', (tester) async {
+      final harness = await _pumpPresenterApp(
+        tester,
+        locale: const Locale('ru'),
+        alteredDeletionPunctuation: true,
+      );
+      final accepted = harness.startDelete(index: 1, title: 'Намерение');
+      harness.completeDeleted(
+        accepted,
+        composition: DeleteCascadeComposition(
+          departing: [],
+          promoted: [],
+          archivedByInvariant: [
+            for (var i = 0; i < count; i++) testDetailsIntentionId(i + 2),
+          ],
+          mainsLosingRelation: [],
+          deletedRelationCount: 0,
+          archivedRelationCount: 0,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Удаление — «Намерение»: Намерение удалено; в архив $suffix'),
+        findsOneWidget,
+      );
+    });
+  }
+
+  testWidgets('удаление связи с архивированием не зависит от другой строки', (
+    tester,
+  ) async {
+    final harness = await _pumpPresenterApp(
+      tester,
+      locale: const Locale('ru'),
+      alteredDeletionPunctuation: true,
+    );
+    final accepted = harness.startRelationDelete();
+    harness.completeRelationDeleted(
+      accepted,
+      composition: DeleteCascadeComposition(
+        departing: [],
+        promoted: [],
+        archivedByInvariant: [testDetailsIntentionId(3)],
+        mainsLosingRelation: [],
+        deletedRelationCount: 1,
+        archivedRelationCount: 0,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Удаление — «связь»: Связь удалена; в архив ушло 1 намерение'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('удаление связи объявляет оставленное главным намерение', (
@@ -2956,6 +3017,7 @@ final class _PresenterHarness {
 Future<_PresenterHarness> _pumpPresenterApp(
   WidgetTester tester, {
   Locale locale = const Locale('en'),
+  bool alteredDeletionPunctuation = false,
 }) async {
   final repository = ControlledDetailsRepository();
   final container = ProviderContainer(
@@ -2975,7 +3037,10 @@ Future<_PresenterHarness> _pumpPresenterApp(
         valueListenable: currentLocale,
         builder: (context, locale, _) => MaterialApp(
           locale: locale,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: [
+            if (alteredDeletionPunctuation) const _AlteredRussianDelegate(),
+            ...AppLocalizations.localizationsDelegates,
+          ],
           supportedLocales: AppLocalizations.supportedLocales,
           builder: (context, child) => ValueListenableBuilder<int>(
             valueListenable: presenterGeneration,
@@ -3001,4 +3066,26 @@ Future<_PresenterHarness> _pumpPresenterApp(
     presenterGeneration,
     currentLocale,
   );
+}
+
+class _AlteredRussianLocalizations extends AppLocalizationsRu {
+  @override
+  String get detailsDeleted => 'Намерение удалено!';
+
+  @override
+  String get relationDeleted => 'Связь удалена!';
+}
+
+class _AlteredRussianDelegate extends LocalizationsDelegate<AppLocalizations> {
+  const _AlteredRussianDelegate();
+
+  @override
+  bool isSupported(Locale locale) => locale.languageCode == 'ru';
+
+  @override
+  Future<AppLocalizations> load(Locale locale) async =>
+      _AlteredRussianLocalizations();
+
+  @override
+  bool shouldReload(_AlteredRussianDelegate old) => false;
 }

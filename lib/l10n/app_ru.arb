@@ -965,6 +965,8 @@
   "cascadeDeleteIntentionPromoted": "Намерение удалено, {count, plural, one{{count} намерение стало главным} few{{count} намерения стали главными} many{{count} намерений стали главными} other{{count} намерения стали главными}}",
   "cascadeDeleteRelationSupporting": "Связь удалена вместе с {count, plural, one{{count} вспомогательным} few{{count} вспомогательными} many{{count} вспомогательными} other{{count} вспомогательными}}",
   "cascadeDeleteRelationPromoted": "Связь удалена, намерение стало главным",
+  "cascadeDeleteIntentionArchived": "Намерение удалено; в архив {count, plural, one{ушло {count} намерение} few{ушли {count} намерения} many{ушли {count} намерений} other{ушли {count} намерения}}",
+  "cascadeDeleteRelationArchived": "Связь удалена; в архив {count, plural, one{ушло {count} намерение} few{ушли {count} намерения} many{ушли {count} намерений} other{ушли {count} намерения}}",
   "cascadeDeleteArchived": "; в архив {count, plural, one{ушло {count} намерение} few{ушли {count} намерения} many{ушли {count} намерений} other{ушли {count} намерения}}",
   "cascadeRestoreIntentionSupporting": "Восстановлено вместе с {count, plural, one{{count} вспомогательным} few{{count} вспомогательными} many{{count} вспомогательными} other{{count} вспомогательными}}",
   "cascadeRestoreIntentionMain": "Восстановлено как главное",

@@ -3280,6 +3280,28 @@ class AppLocalizationsEn extends AppLocalizations {
       'Relation deleted, intention became primary';
 
   @override
+  String cascadeDeleteIntentionArchived(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions were archived',
+      one: '$count intention was archived',
+    );
+    return 'Intention deleted; $_temp0';
+  }
+
+  @override
+  String cascadeDeleteRelationArchived(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions were archived',
+      one: '$count intention was archived',
+    );
+    return 'Relation deleted; $_temp0';
+  }
+
+  @override
   String cascadeDeleteArchived(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

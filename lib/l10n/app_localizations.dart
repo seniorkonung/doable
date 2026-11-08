@@ -4933,6 +4933,18 @@ abstract class AppLocalizations {
   /// **'Relation deleted, intention became primary'**
   String get cascadeDeleteRelationPromoted;
 
+  /// Удаление намерения с архивированием по инварианту
+  ///
+  /// In en, this message translates to:
+  /// **'Intention deleted; {count, plural, one{{count} intention was archived} other{{count} intentions were archived}}'**
+  String cascadeDeleteIntentionArchived(int count);
+
+  /// Удаление связи с архивированием по инварианту
+  ///
+  /// In en, this message translates to:
+  /// **'Relation deleted; {count, plural, one{{count} intention was archived} other{{count} intentions were archived}}'**
+  String cascadeDeleteRelationArchived(int count);
+
   /// Сообщение об исходе каскадной операции
   ///
   /// In en, this message translates to:
