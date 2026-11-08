@@ -73,10 +73,7 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
     if (_selected.containsKey(id)) {
       _selected.remove(id);
     } else {
-      _selected[id] = _BatchMark(
-        title,
-        becomesSupporting: _createdKinds[id] == IntentionKind.supporting,
-      );
+      _selected[id] = _BatchMark(title);
     }
     _publish(const RelationBatchIdle());
   }
@@ -89,10 +86,7 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
     if (!ref.mounted || !state.canEdit) return;
     _createdKinds[id] = kind;
     _selected.remove(id);
-    _selected[id] = _BatchMark(
-      title,
-      becomesSupporting: kind == IntentionKind.supporting,
-    );
+    _selected[id] = _BatchMark(title);
     _hasCreatedIntentions = true;
     _publish(const RelationBatchIdle());
   }
@@ -116,10 +110,11 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
           pageIntentionId: _pageId,
           type: _group.type,
           candidates: [
-            for (final MapEntry(key: id, value: mark) in _selected.entries)
+            for (final id in _selected.keys)
               OutgoingRelationCandidate(
                 id,
-                becomesSupporting: mark.becomesSupporting,
+                becomesSupporting:
+                    _createdKinds[id] == IntentionKind.supporting,
               ),
           ],
         ),
@@ -218,9 +213,7 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
               changed = true;
             } else if (previous.title != current.title &&
                 _selected[current.id]!.title != current.title) {
-              _selected[current.id] = _selected[current.id]!.withTitle(
-                current.title,
-              );
+              _selected[current.id] = _BatchMark(current.title);
               changed = true;
             }
           }
@@ -258,14 +251,9 @@ final class RelationBatchViewModel extends _$RelationBatchViewModel {
   );
 }
 
-/// Отметка поиска: актуальное название и вид, выбранный при создании
-/// намерения в этом поиске.
+/// Отметка поиска с актуальным названием намерения.
 final class _BatchMark {
-  const _BatchMark(this.title, {this.becomesSupporting = false});
+  const _BatchMark(this.title);
 
   final String title;
-  final bool becomesSupporting;
-
-  _BatchMark withTitle(String value) =>
-      _BatchMark(value, becomesSupporting: becomesSupporting);
 }
