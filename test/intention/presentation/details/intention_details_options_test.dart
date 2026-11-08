@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:doable/src/app/routing/app_router.gr.dart';
 import 'package:doable/src/design_system/components/badge.dart';
@@ -27,6 +29,240 @@ void main() {
       AppLifecycleState.resumed,
     );
   });
+
+  testWidgets('архивирование предлагает оставить вспомогательное главным', (
+    tester,
+  ) async {
+    final child = testDetailsIntentionId(2);
+    final withSupporting = ArchiveCascadeComposition(
+      departing: [child],
+      promoted: [],
+      mainsLosingRelation: [],
+      archivedRelationCount: 1,
+    );
+    final onlyThis = ArchiveCascadeComposition(
+      departing: [],
+      promoted: [child],
+      mainsLosingRelation: [],
+      archivedRelationCount: 1,
+    );
+    final preview = ArchiveCascadePreview(
+      revision: const TestDetailsRevision(0),
+      plan: CascadePlan(
+        withSupporting: withSupporting,
+        onlyThis: onlyThis,
+        asksQuestion: true,
+      ),
+      titles: {child: 'Много ходить'},
+    );
+    final repository = ControlledDetailsRepository()
+      ..onPreviewCascade = (subject, operation) =>
+          operation == CascadeOperation.archive
+          ? preview
+          : givenCascadePreview(
+              subject,
+              operation,
+              const TestDetailsRevision(0),
+            );
+    await _openLoaded(tester, repository, testDetailsIntention());
+    await _openOptions(tester);
+    await _choose(tester, 'Архивировать');
+    expect(find.byType(Dialog), findsOneWidget);
+    expect(repository.commands, isEmpty);
+    await tester.tap(find.text('Только это'));
+    await tester.pump();
+    final execution =
+        (repository.commands.single as ArchiveIntention).execution;
+    expect(execution.choice, CascadeChoice.onlyThis);
+    expect(execution.expected, same(onlyThis));
+  });
+
+  testWidgets('отмена вопроса не архивирует намерение', (tester) async {
+    final child = testDetailsIntentionId(2);
+    final composition = ArchiveCascadeComposition(
+      departing: [child],
+      promoted: [],
+      mainsLosingRelation: [],
+      archivedRelationCount: 1,
+    );
+    final repository = ControlledDetailsRepository()
+      ..onPreviewCascade = (subject, operation) =>
+          operation == CascadeOperation.archive
+          ? ArchiveCascadePreview(
+              revision: const TestDetailsRevision(0),
+              plan: CascadePlan(
+                withSupporting: composition,
+                onlyThis: composition,
+                asksQuestion: true,
+              ),
+              titles: {child: 'Много ходить'},
+            )
+          : givenCascadePreview(
+              subject,
+              operation,
+              const TestDetailsRevision(0),
+            );
+    await _openLoaded(tester, repository, testDetailsIntention());
+    await _openOptions(tester);
+    expect(
+      _rows(tester)[1].hint,
+      'Вместе с ним в архив уйдут вспомогательные намерения: 1',
+    );
+    await _choose(tester, 'Архивировать');
+    await tester.tap(find.text('Отмена'));
+    await tester.pumpAndSettle();
+    expect(repository.commands, isEmpty);
+  });
+
+  testWidgets('архивирование со вспомогательными передаёт состав каскада', (
+    tester,
+  ) async {
+    final child = testDetailsIntentionId(2);
+    final composition = ArchiveCascadeComposition(
+      departing: [child],
+      promoted: [],
+      mainsLosingRelation: [],
+      archivedRelationCount: 1,
+    );
+    final repository = ControlledDetailsRepository()
+      ..onPreviewCascade = (subject, operation) =>
+          operation == CascadeOperation.archive
+          ? ArchiveCascadePreview(
+              revision: const TestDetailsRevision(0),
+              plan: CascadePlan(
+                withSupporting: composition,
+                onlyThis: composition,
+                asksQuestion: true,
+              ),
+              titles: {child: 'Много ходить'},
+            )
+          : givenCascadePreview(
+              subject,
+              operation,
+              const TestDetailsRevision(0),
+            );
+    await _openLoaded(tester, repository, testDetailsIntention());
+    await _openOptions(tester);
+    await _choose(tester, 'Архивировать');
+    await tester.tap(find.text('Со вспомогательными'));
+    await tester.pump();
+    final execution =
+        (repository.commands.single as ArchiveIntention).execution;
+    expect(execution.choice, CascadeChoice.withSupporting);
+    expect(execution.expected, same(composition));
+  });
+
+  testWidgets('лист объясняет удаление намерения из сохранённого пути', (
+    tester,
+  ) async {
+    final repository = ControlledDetailsRepository()
+      ..onPreviewCascade = (subject, operation) {
+        final preview = givenCascadePreview(
+          subject,
+          operation,
+          const TestDetailsRevision(0),
+        );
+        if (preview is IntentionDeleteCascadePreview) {
+          return IntentionDeleteCascadePreview(
+            revision: preview.revision,
+            plan: preview.plan,
+            titles: const {},
+            isInActionPath: true,
+          );
+        }
+        return preview;
+      };
+    await _openLoaded(tester, repository, testDetailsIntention());
+    await _openOptions(tester);
+    expect(
+      _rows(tester).last.hint,
+      'В сохранённых путях останется с пометкой «Удалено»',
+    );
+  });
+
+  testWidgets(
+    'пока предпросмотр читается и после отказа пункты доступны без пояснений',
+    (tester) async {
+      final pending = Completer<CascadePreviewResult>();
+      final repository = ControlledDetailsRepository()
+        ..onPreviewCascade = (_, _) => pending.future;
+      await _openLoaded(tester, repository, testDetailsIntention());
+      await _openOptions(tester);
+      expect(
+        _rows(tester).skip(1).map((row) => row.hint),
+        everyElement(isNull),
+      );
+      expect(
+        _rows(tester).skip(1).map((row) => row.onPressed),
+        everyElement(isNotNull),
+      );
+      pending.complete(const CascadePreviewUnavailable());
+      await tester.pumpAndSettle();
+      expect(
+        _rows(tester).skip(1).map((row) => row.hint),
+        everyElement(isNull),
+      );
+      expect(
+        _rows(tester).skip(1).map((row) => row.onPressed),
+        everyElement(isNotNull),
+      );
+    },
+  );
+
+  testWidgets(
+    'восстановление только этого намерения оставляет вспомогательное в архиве',
+    (tester) async {
+      final child = testDetailsIntentionId(2);
+      final together = RestoreCascadeComposition(
+        restored: [child],
+        returnedAsMain: null,
+        restoredRelationCount: 1,
+      );
+      final alone = RestoreCascadeComposition(
+        restored: [],
+        returnedAsMain: null,
+        restoredRelationCount: 0,
+      );
+      final repository = ControlledDetailsRepository()
+        ..onPreviewCascade = (subject, operation) =>
+            operation == CascadeOperation.restore
+            ? RestoreCascadePreview(
+                revision: const TestDetailsRevision(0),
+                plan: CascadePlan(
+                  withSupporting: together,
+                  onlyThis: alone,
+                  asksQuestion: true,
+                ),
+                titles: {child: 'Много ходить'},
+              )
+            : givenCascadePreview(
+                subject,
+                operation,
+                const TestDetailsRevision(0),
+              );
+      await _openLoaded(
+        tester,
+        repository,
+        testDetailsIntention(archiveState: IntentionArchiveState.archived),
+      );
+      await _openOptions(tester);
+      expect(
+        _rows(tester)[1].hint,
+        'Вместе с ним вернутся вспомогательные намерения: 1',
+      );
+      await _choose(tester, 'Восстановить из архива');
+      expect(
+        find.text('Вместе с ним вернутся вспомогательные намерения: 1.'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Только это'));
+      await tester.pump();
+      final execution =
+          (repository.commands.single as RestoreIntention).execution;
+      expect(execution.choice, CascadeChoice.onlyThis);
+      expect(execution.expected, same(alone));
+    },
+  );
 
   testWidgets('кнопки параметров нет при загрузке и отказе чтения, а после '
       'получения подробных данных она есть', (tester) async {
@@ -67,12 +303,25 @@ void main() {
       title: 'Бегать',
       archiveState: IntentionArchiveState.archived,
     );
-    final preview = givenCascadePreview(
-      IntentionCascadeSubject(intention.id),
-      CascadeOperation.archive,
-      const TestDetailsRevision(0),
-    ) as ArchiveCascadePreview;
-    repository.onPreviewCascade = (_, _) => preview;
+    final composition = ArchiveCascadeComposition(
+      departing: [],
+      promoted: [],
+      mainsLosingRelation: [],
+      archivedRelationCount: 1,
+    );
+    final preview = ArchiveCascadePreview(
+      revision: const TestDetailsRevision(0),
+      plan: CascadePlan(
+        withSupporting: composition,
+        onlyThis: composition,
+        asksQuestion: false,
+      ),
+      titles: const {},
+    );
+    repository.onPreviewCascade = (subject, operation) =>
+        operation == CascadeOperation.archive
+        ? preview
+        : givenCascadePreview(subject, operation, const TestDetailsRevision(0));
     await _openLoaded(
       tester,
       repository,

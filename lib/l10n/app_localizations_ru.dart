@@ -853,7 +853,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get detailsOptionRestoreWithRelations =>
-      'Его связи останутся в архиве, пока вы их не восстановите';
+      'Его связи с активными намерениями восстановятся вместе с ним';
 
   @override
   String get detailsOptionRestoreAlone =>
@@ -3379,4 +3379,50 @@ class AppLocalizationsRu extends AppLocalizations {
     );
     return 'Связь восстановлена вместе с $_temp0, одно из них главным';
   }
+
+  @override
+  String get detailsCascadeArchiveTitle => 'Архивировать намерение?';
+
+  @override
+  String get detailsCascadeRestoreTitle => 'Восстановить намерение?';
+
+  @override
+  String detailsCascadeArchiveQuestion(int count) {
+    return 'Вместе с ним в архив уйдут вспомогательные намерения: $count.';
+  }
+
+  @override
+  String detailsCascadeRestoreQuestion(int count) {
+    return 'Вместе с ним вернутся вспомогательные намерения: $count.';
+  }
+
+  @override
+  String get detailsCascadeWithSupporting => 'Со вспомогательными';
+
+  @override
+  String get detailsCascadeOnlyThis => 'Только это';
+
+  @override
+  String detailsCascadeArchiveHint(int count) {
+    return 'Вместе с ним в архив уйдут вспомогательные намерения: $count';
+  }
+
+  @override
+  String detailsCascadeRestoreHint(int count) {
+    return 'Вместе с ним вернутся вспомогательные намерения: $count';
+  }
+
+  @override
+  String detailsCascadeDeleteHint(int count) {
+    return 'Вместе с ним будут удалены вспомогательные намерения: $count';
+  }
+
+  @override
+  String detailsCascadeDeleteArchiveHint(int count) {
+    return 'в архив уйдут намерения: $count';
+  }
+
+  @override
+  String get detailsOptionDeleteKeepsPaths =>
+      'В сохранённых путях останется с пометкой «Удалено»';
 }

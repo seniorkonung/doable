@@ -848,7 +848,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get detailsOptionRestoreWithRelations =>
-      'Its relations stay archived until you restore them';
+      'Its relations with active intentions will be restored with it';
 
   @override
   String get detailsOptionRestoreAlone => 'New paths can use it again';
@@ -3308,4 +3308,50 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return 'Relation restored with $_temp0, one as primary';
   }
+
+  @override
+  String get detailsCascadeArchiveTitle => 'Archive intention?';
+
+  @override
+  String get detailsCascadeRestoreTitle => 'Restore intention?';
+
+  @override
+  String detailsCascadeArchiveQuestion(int count) {
+    return 'Supporting intentions archived with it: $count.';
+  }
+
+  @override
+  String detailsCascadeRestoreQuestion(int count) {
+    return 'Supporting intentions restored with it: $count.';
+  }
+
+  @override
+  String get detailsCascadeWithSupporting => 'With supporting intentions';
+
+  @override
+  String get detailsCascadeOnlyThis => 'Only this';
+
+  @override
+  String detailsCascadeArchiveHint(int count) {
+    return 'Supporting intentions archived with it: $count';
+  }
+
+  @override
+  String detailsCascadeRestoreHint(int count) {
+    return 'Supporting intentions restored with it: $count';
+  }
+
+  @override
+  String detailsCascadeDeleteHint(int count) {
+    return 'Supporting intentions deleted with it: $count';
+  }
+
+  @override
+  String detailsCascadeDeleteArchiveHint(int count) {
+    return 'intentions archived: $count';
+  }
+
+  @override
+  String get detailsOptionDeleteKeepsPaths =>
+      'It stays in saved paths marked “Deleted”';
 }

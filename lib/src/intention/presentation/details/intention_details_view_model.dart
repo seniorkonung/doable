@@ -129,9 +129,15 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     );
   }
 
-  void archive() => unawaited(_startCascadeOperation(CascadeOperation.archive));
+  void archive([Future<CascadeChoice?> Function(int count)? choose]) =>
+      unawaited(
+        _startCascadeOperation(CascadeOperation.archive, choose: choose),
+      );
 
-  void restore() => unawaited(_startCascadeOperation(CascadeOperation.restore));
+  void restore([Future<CascadeChoice?> Function(int count)? choose]) =>
+      unawaited(
+        _startCascadeOperation(CascadeOperation.restore, choose: choose),
+      );
 
   /// Возвращает успех только собственной принятой команды удаления.
   /// Общее состояние данных по ID не передаёт право закрытия другим страницам.
@@ -236,12 +242,12 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
     }
   }
 
-  /// Читает предпросмотр каскада при запуске операции и передаёт вариант
-  /// «со вспомогательными» с его составом (D7). Отказ чтения координатор
-  /// принимает как отказ самой операции.
+  /// Читает состав при запуске и передаёт выбранный вариант. Отказ чтения
+  /// координатор принимает как отказ самой операции.
   Future<IntentionCommandCompletion?> _startCascadeOperation(
-    CascadeOperation operation,
-  ) async {
+    CascadeOperation operation, {
+    Future<CascadeChoice?> Function(int count)? choose,
+  }) async {
     final current = state;
     if (current is! IntentionDetailsLoaded ||
         _isReadingCascadePreview ||
@@ -258,20 +264,49 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
             IntentionCascadeSubject(intentionId),
             operation,
           );
-    } finally {
+    } catch (_) {
+      _isReadingCascadePreview = false;
+      rethrow;
+    }
+    CascadeChoice? choice = CascadeChoice.withSupporting;
+    final count = switch (preview) {
+      ArchiveCascadePreview(:final plan) when plan.asksQuestion =>
+        plan.withSupporting.departing.length,
+      RestoreCascadePreview(:final plan) when plan.asksQuestion =>
+        plan.withSupporting.restored.length,
+      _ => 0,
+    };
+    if (count > 0) {
+      try {
+        choice = await choose?.call(count);
+      } finally {
+        _isReadingCascadePreview = false;
+      }
+      if (choice == null) return null;
+    } else {
       _isReadingCascadePreview = false;
     }
     final start = switch (preview) {
       ArchiveCascadePreview(:final plan) => _CommandStart(
         ArchiveIntention(
           intentionId,
-          execution: CascadeExecution.withSupporting(plan),
+          execution: CascadeExecution(
+            choice: choice,
+            expected: choice == CascadeChoice.onlyThis
+                ? plan.onlyThis
+                : plan.withSupporting,
+          ),
         ),
       ),
       RestoreCascadePreview(:final plan) => _CommandStart(
         RestoreIntention(
           intentionId,
-          execution: CascadeExecution.withSupporting(plan),
+          execution: CascadeExecution(
+            choice: choice,
+            expected: choice == CascadeChoice.onlyThis
+                ? plan.onlyThis
+                : plan.withSupporting,
+          ),
         ),
       ),
       IntentionDeleteCascadePreview(:final plan) => _CommandStart(

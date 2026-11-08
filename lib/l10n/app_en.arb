@@ -547,7 +547,7 @@
   "@detailsOptionArchiveAlone": {
     "description": "Пояснение архивирования намерения без активных связей"
   },
-  "detailsOptionRestoreWithRelations": "Its relations stay archived until you restore them",
+  "detailsOptionRestoreWithRelations": "Its relations with active intentions will be restored with it",
   "@detailsOptionRestoreWithRelations": {
     "description": "Пояснение восстановления намерения, у которого есть связи"
   },
@@ -2243,5 +2243,27 @@
   "cascadeRestoreRelationMain": "Relation restored, intention returned as primary",
   "@cascadeRestoreRelationMain": {"description": "Сообщение об исходе каскадной операции"},
   "cascadeRestoreRelationMainOthers": "Relation restored with {count, plural, one{{count} intention} other{{count} intentions}}, one as primary",
-  "@cascadeRestoreRelationMainOthers": {"description": "Сообщение об исходе каскадной операции", "placeholders": {"count": {"type": "int"}}}
+  "@cascadeRestoreRelationMainOthers": {"description": "Сообщение об исходе каскадной операции", "placeholders": {"count": {"type": "int"}}},
+  "detailsCascadeArchiveTitle": "Archive intention?",
+  "@detailsCascadeArchiveTitle": {"description": "Каскад намерения"},
+  "detailsCascadeRestoreTitle": "Restore intention?",
+  "@detailsCascadeRestoreTitle": {"description": "Каскад намерения"},
+  "detailsCascadeArchiveQuestion": "Supporting intentions archived with it: {count}.",
+  "@detailsCascadeArchiveQuestion": {"description": "Каскад намерения", "placeholders": {"count": {"type": "int"}}},
+  "detailsCascadeRestoreQuestion": "Supporting intentions restored with it: {count}.",
+  "@detailsCascadeRestoreQuestion": {"description": "Каскад намерения", "placeholders": {"count": {"type": "int"}}},
+  "detailsCascadeWithSupporting": "With supporting intentions",
+  "@detailsCascadeWithSupporting": {"description": "Каскад намерения"},
+  "detailsCascadeOnlyThis": "Only this",
+  "@detailsCascadeOnlyThis": {"description": "Каскад намерения"},
+  "detailsCascadeArchiveHint": "Supporting intentions archived with it: {count}",
+  "@detailsCascadeArchiveHint": {"description": "Каскад намерения", "placeholders": {"count": {"type": "int"}}},
+  "detailsCascadeRestoreHint": "Supporting intentions restored with it: {count}",
+  "@detailsCascadeRestoreHint": {"description": "Каскад намерения", "placeholders": {"count": {"type": "int"}}},
+  "detailsCascadeDeleteHint": "Supporting intentions deleted with it: {count}",
+  "@detailsCascadeDeleteHint": {"description": "Каскад намерения", "placeholders": {"count": {"type": "int"}}},
+  "detailsCascadeDeleteArchiveHint": "intentions archived: {count}",
+  "@detailsCascadeDeleteArchiveHint": {"description": "Каскад намерения", "placeholders": {"count": {"type": "int"}}},
+  "detailsOptionDeleteKeepsPaths": "It stays in saved paths marked “Deleted”",
+  "@detailsOptionDeleteKeepsPaths": {"description": "Каскад намерения"}
 }

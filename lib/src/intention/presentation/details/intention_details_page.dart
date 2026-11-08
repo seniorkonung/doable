@@ -25,6 +25,8 @@ import '../../../design_system/components/top_bar.dart';
 import '../../../design_system/doable_icon.dart';
 import '../../../design_system/doable_metrics.dart';
 import '../../../graph/application/graph_command_coordinator.dart';
+import '../../../graph/application/personal_graph_repository_provider.dart';
+import '../../application/cascade/intention_cascade.dart';
 import '../../../shared/domain/calendar_date.dart';
 import '../../../shared/presentation/local_day/local_date_provider.dart';
 import '../../../shared/presentation/local_day/local_day_observer.dart';
@@ -366,12 +368,39 @@ final class _IntentionDetailsPageState
       case IntentionOption.edit:
         _openEdit(IntentionEditFocus.title);
       case IntentionOption.archive:
-        model.archive();
+        model.archive((count) => _chooseCascade(count, restoring: false));
       case IntentionOption.restore:
-        model.restore();
+        model.restore((count) => _chooseCascade(count, restoring: true));
       case IntentionOption.delete:
         await _confirmDeletion();
     }
+  }
+
+  Future<CascadeChoice?> _chooseCascade(
+    int count, {
+    required bool restoring,
+  }) async {
+    if (!mounted || !(ModalRoute.isCurrentOf(context) ?? false)) return null;
+    final l = AppLocalizations.of(context);
+    final answer = await showCascadeConfirmDialog(
+      context: context,
+      title: restoring
+          ? l.detailsCascadeRestoreTitle
+          : l.detailsCascadeArchiveTitle,
+      text: restoring
+          ? l.detailsCascadeRestoreQuestion(count)
+          : l.detailsCascadeArchiveQuestion(count),
+      lists: const [],
+      cascadeLabel: l.detailsCascadeWithSupporting,
+      singleLabel: l.detailsCascadeOnlyThis,
+      cancelLabel: l.detailsDeleteDialogCancel,
+      actionStyle: CascadeActionStyle.primary,
+    );
+    return switch (answer) {
+      CascadeDialogResult.cascade => CascadeChoice.withSupporting,
+      CascadeDialogResult.single => CascadeChoice.onlyThis,
+      CascadeDialogResult.cancel => null,
+    };
   }
 
   Future<void> _confirmDeletion() async {
@@ -497,28 +526,84 @@ final class _IntentionDetailsPageState
 
 /// Лист «Намерение» следит за снимком страницы: операция, начатая или
 /// завершённая при открытом листе, сразу меняет доступность пунктов.
-final class _IntentionOptionsSheet extends ConsumerWidget {
+final class _IntentionOptionsSheet extends ConsumerStatefulWidget {
   const _IntentionOptionsSheet({required this.sheet, required this.provider});
 
   final SheetPresentation sheet;
   final IntentionDetailsViewModelProvider provider;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_IntentionOptionsSheet> createState() =>
+      _IntentionOptionsSheetState();
+}
+
+final class _IntentionOptionsSheetState
+    extends ConsumerState<_IntentionOptionsSheet> {
+  CascadePreviewResult? statePreview;
+  CascadePreviewResult? deletePreview;
+  int _previewGeneration = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final loaded = ref.read(widget.provider);
+    if (loaded is IntentionDetailsLoaded) {
+      _readPreviews(loaded);
+    }
+  }
+
+  void _readPreviews(IntentionDetailsLoaded loaded) {
+    final generation = ++_previewGeneration;
+    final repository = ref.read(personalGraphRepositoryProvider);
+    final subject = IntentionCascadeSubject(loaded.intention.id);
+    final operation =
+        loaded.intention.archiveState == IntentionArchiveState.archived
+        ? CascadeOperation.restore
+        : CascadeOperation.archive;
+    repository.previewCurrentCascade(subject, operation).then((value) {
+      if (mounted && generation == _previewGeneration) {
+        setState(() => statePreview = value);
+      }
+    });
+    repository.previewCurrentCascade(subject, CascadeOperation.delete).then((
+      value,
+    ) {
+      if (mounted && generation == _previewGeneration) {
+        setState(() => deletePreview = value);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final route = ModalRoute.of(context);
-    ref.listen(provider, (_, next) {
+    ref.listen(widget.provider, (previous, next) {
       // Без подробных данных параметрам не к чему относиться. Лист, который
       // уже закрывается, не текущий, и страницу под ним это не закрывает.
       if (next is! IntentionDetailsLoaded && (route?.isCurrent ?? false)) {
         Navigator.of(context).pop();
+      } else if (next is IntentionDetailsLoaded &&
+          previous is IntentionDetailsLoaded &&
+          (next.revision != previous.revision ||
+              next.intention.archiveState != previous.intention.archiveState)) {
+        setState(() {
+          statePreview = null;
+          deletePreview = null;
+        });
+        _readPreviews(next);
       }
     });
     final localizations = AppLocalizations.of(context);
-    return switch (ref.watch(provider)) {
+    return switch (ref.watch(widget.provider)) {
       final IntentionDetailsLoaded loaded => OptionsMenu<IntentionOption>(
-        sheet,
+        widget.sheet,
         title: localizations.detailsOptionsTitle,
-        items: intentionOptions(localizations, loaded),
+        items: intentionOptions(
+          localizations,
+          loaded,
+          statePreview: statePreview,
+          deletePreview: deletePreview,
+        ),
       ),
       // Лист уже закрывается вслед за утратой данных.
       _ => const SizedBox.shrink(),

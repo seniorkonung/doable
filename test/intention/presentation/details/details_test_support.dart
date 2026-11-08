@@ -154,7 +154,7 @@ final class ControlledDetailsRepository
 
   /// Ответ на предпросмотр каскада; по умолчанию операция не затрагивает
   /// другие намерения.
-  CascadePreviewResult Function(
+  FutureOr<CascadePreviewResult> Function(
     CascadeSubject subject,
     CascadeOperation operation,
   )?

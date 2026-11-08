@@ -1325,7 +1325,7 @@ abstract class AppLocalizations {
   /// Пояснение восстановления намерения, у которого есть связи
   ///
   /// In en, this message translates to:
-  /// **'Its relations stay archived until you restore them'**
+  /// **'Its relations with active intentions will be restored with it'**
   String get detailsOptionRestoreWithRelations;
 
   /// Пояснение восстановления намерения без связей
@@ -4932,6 +4932,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Relation restored with {count, plural, one{{count} intention} other{{count} intentions}}, one as primary'**
   String cascadeRestoreRelationMainOthers(int count);
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Archive intention?'**
+  String get detailsCascadeArchiveTitle;
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Restore intention?'**
+  String get detailsCascadeRestoreTitle;
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting intentions archived with it: {count}.'**
+  String detailsCascadeArchiveQuestion(int count);
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting intentions restored with it: {count}.'**
+  String detailsCascadeRestoreQuestion(int count);
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'With supporting intentions'**
+  String get detailsCascadeWithSupporting;
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Only this'**
+  String get detailsCascadeOnlyThis;
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting intentions archived with it: {count}'**
+  String detailsCascadeArchiveHint(int count);
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting intentions restored with it: {count}'**
+  String detailsCascadeRestoreHint(int count);
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting intentions deleted with it: {count}'**
+  String detailsCascadeDeleteHint(int count);
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'intentions archived: {count}'**
+  String detailsCascadeDeleteArchiveHint(int count);
+
+  /// Каскад намерения
+  ///
+  /// In en, this message translates to:
+  /// **'It stays in saved paths marked “Deleted”'**
+  String get detailsOptionDeleteKeepsPaths;
 }
 
 class _AppLocalizationsDelegate
