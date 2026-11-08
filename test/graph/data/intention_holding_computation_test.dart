@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:doable/src/graph/data/intention_holding_computation.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -63,6 +64,49 @@ void main() {
     expect(held, {1});
   });
 
+  test('Исходящие и входящие связи упорядочены: «нужно» раньше «можно», '
+      'затем приоритет, затем последовательность создания', () {
+    final builder = IntentionHoldingGraphBuilder();
+    for (var number = 1; number <= 6; number++) {
+      builder.addIntention(
+        durabilityIntention(number),
+        IntentionKind.main,
+        IntentionArchiveState.active,
+      );
+    }
+    for (final (source, target, type, priority, sequence) in [
+      (1, 2, LongTermRelationType.can, RelationPriority.p1, 1),
+      (1, 5, LongTermRelationType.need, RelationPriority.p2, 5),
+      (1, 3, LongTermRelationType.need, RelationPriority.p2, 2),
+      (1, 4, LongTermRelationType.need, RelationPriority.p1, 3),
+      (2, 6, LongTermRelationType.can, RelationPriority.p1, 7),
+      (3, 6, LongTermRelationType.need, RelationPriority.p3, 8),
+      (4, 6, LongTermRelationType.need, RelationPriority.p3, 6),
+    ]) {
+      builder.addRelation(
+        durabilityIntention(source),
+        durabilityIntention(target),
+        RelationScope.active,
+        type: type,
+        priority: priority,
+        creationSequence: sequence,
+      );
+    }
+    final (:graph, :indexes, :ids) = builder.build();
+
+    List<int> numbers(Uint32List offsets, Uint32List ends, int intention) {
+      final index = indexes[durabilityIntention(intention)]!;
+      return [
+        for (var edge = offsets[index]; edge < offsets[index + 1]; edge++)
+          for (var number = 1; number <= 6; number++)
+            if (ids[ends[edge]] == durabilityIntention(number)) number,
+      ];
+    }
+
+    expect(numbers(graph.childOffsets, graph.children, 1), [4, 3, 5, 2]);
+    expect(numbers(graph.parentOffsets, graph.parents, 6), [4, 3, 2]);
+  });
+
   test('На случайных графах с циклами совпадает с эталоном', () {
     final random = Random(56);
     final states = [_main, _supporting, _archivedMain, _archivedSupporting];
@@ -114,14 +158,17 @@ Set<int> _held(
       value.archiveState,
     );
   }
-  for (final (source, target, scope) in relations) {
+  for (final (index, (source, target, scope)) in relations.indexed) {
     builder.addRelation(
       durabilityIntention(source),
       durabilityIntention(target),
       scope,
+      type: LongTermRelationType.need,
+      priority: RelationPriority.p2,
+      creationSequence: index + 1,
     );
   }
-  final (:graph, :indexes) = builder.build();
+  final (:graph, :indexes, ids: _) = builder.build();
   final held = computeIntentionHolding(graph);
   return {
     for (final number in intentions.keys)

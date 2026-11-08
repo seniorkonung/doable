@@ -11,6 +11,9 @@ import '../../long_term_relation/domain/long_term_relation.dart';
 /// [intentionFlags][i] битами [supportingFlag] и [archivedFlag]. Исходящие
 /// связи i занимают диапазон [childOffsets][i]..[childOffsets][i+1] массива
 /// [children], а [childArchived] того же диапазона хранит 1 у архивной связи.
+/// Входящие связи i так же лежат в [parentOffsets], [parents] и
+/// [parentArchived]. Оба диапазона упорядочены порядком связей: «нужно»
+/// раньше «можно», затем приоритет, затем последовательность создания.
 ///
 /// Массивы передаются в фоновый изолят без объектов предметной области;
 /// согласованность индексов обеспечивает [IntentionHoldingGraphBuilder].
@@ -20,10 +23,16 @@ final class IntentionHoldingGraph {
     required Uint32List childOffsets,
     required Uint32List children,
     required Uint8List childArchived,
+    required Uint32List parentOffsets,
+    required Uint32List parents,
+    required Uint8List parentArchived,
   }) : intentionFlags = intentionFlags.asUnmodifiableView(),
        childOffsets = childOffsets.asUnmodifiableView(),
        children = children.asUnmodifiableView(),
-       childArchived = childArchived.asUnmodifiableView();
+       childArchived = childArchived.asUnmodifiableView(),
+       parentOffsets = parentOffsets.asUnmodifiableView(),
+       parents = parents.asUnmodifiableView(),
+       parentArchived = parentArchived.asUnmodifiableView();
 
   static const supportingFlag = 1;
   static const archivedFlag = 2;
@@ -32,6 +41,9 @@ final class IntentionHoldingGraph {
   final Uint32List childOffsets;
   final Uint32List children;
   final Uint8List childArchived;
+  final Uint32List parentOffsets;
+  final Uint32List parents;
+  final Uint8List parentArchived;
 }
 
 /// Собирает [IntentionHoldingGraph]: сначала все намерения, затем связи между
@@ -39,10 +51,9 @@ final class IntentionHoldingGraph {
 /// [IntentionHoldingGraphIncomplete].
 final class IntentionHoldingGraphBuilder {
   final _indexes = <IntentionId, int>{};
+  final _ids = <IntentionId>[];
   final _flags = <int>[];
-  final _sources = <int>[];
-  final _targets = <int>[];
-  final _archived = <int>[];
+  final _relations = <_HoldingRelation>[];
   var _built = false;
 
   void addIntention(
@@ -52,6 +63,7 @@ final class IntentionHoldingGraphBuilder {
   ) {
     assert(!_built && !_indexes.containsKey(id));
     _indexes[id] = _flags.length;
+    _ids.add(id);
     _flags.add(
       (kind == IntentionKind.supporting
               ? IntentionHoldingGraph.supportingFlag
@@ -65,48 +77,92 @@ final class IntentionHoldingGraphBuilder {
   void addRelation(
     IntentionId source,
     IntentionId target,
-    RelationScope scope,
-  ) {
+    RelationScope scope, {
+    required LongTermRelationType type,
+    required RelationPriority priority,
+    required int creationSequence,
+  }) {
     assert(!_built);
     final sourceIndex = _indexes[source];
     final targetIndex = _indexes[target];
     if (sourceIndex == null || targetIndex == null) {
       throw const IntentionHoldingGraphIncomplete();
     }
-    _sources.add(sourceIndex);
-    _targets.add(targetIndex);
-    _archived.add(scope == RelationScope.archived ? 1 : 0);
+    _relations.add((
+      source: sourceIndex,
+      target: targetIndex,
+      archived: scope == RelationScope.archived ? 1 : 0,
+      rank: type.index * RelationPriority.values.length + priority.index,
+      creationSequence: creationSequence,
+    ));
   }
 
-  /// Граф и индексы намерений в нём. Строитель после этого не используется.
-  ({IntentionHoldingGraph graph, Map<IntentionId, int> indexes}) build() {
+  /// Граф, индексы намерений в нём и намерения по индексам. Строитель после
+  /// этого не используется.
+  ({
+    IntentionHoldingGraph graph,
+    Map<IntentionId, int> indexes,
+    List<IntentionId> ids,
+  })
+  build() {
     _built = true;
-    final offsets = Uint32List(_flags.length + 1);
-    for (final source in _sources) {
-      offsets[source + 1]++;
-    }
-    for (var i = 1; i < offsets.length; i++) {
-      offsets[i] += offsets[i - 1];
-    }
-    final positions = Uint32List.fromList(offsets);
-    final children = Uint32List(_targets.length);
-    final childArchived = Uint8List(_targets.length);
-    for (var edge = 0; edge < _sources.length; edge++) {
-      final position = positions[_sources[edge]]++;
-      children[position] = _targets[edge];
-      childArchived[position] = _archived[edge];
+    // Связи раскладываются по диапазонам в порядке связей, поэтому каждый
+    // диапазон исходящих и входящих связей получается упорядоченным.
+    _relations.sort(
+      (a, b) => a.rank != b.rank
+          ? a.rank - b.rank
+          : a.creationSequence.compareTo(b.creationSequence),
+    );
+    final childOffsets = _offsets((relation) => relation.source);
+    final parentOffsets = _offsets((relation) => relation.target);
+    final childPositions = Uint32List.fromList(childOffsets);
+    final parentPositions = Uint32List.fromList(parentOffsets);
+    final children = Uint32List(_relations.length);
+    final childArchived = Uint8List(_relations.length);
+    final parents = Uint32List(_relations.length);
+    final parentArchived = Uint8List(_relations.length);
+    for (final relation in _relations) {
+      final child = childPositions[relation.source]++;
+      children[child] = relation.target;
+      childArchived[child] = relation.archived;
+      final parent = parentPositions[relation.target]++;
+      parents[parent] = relation.source;
+      parentArchived[parent] = relation.archived;
     }
     return (
       graph: IntentionHoldingGraph._(
         intentionFlags: Uint8List.fromList(_flags),
-        childOffsets: offsets,
+        childOffsets: childOffsets,
         children: children,
         childArchived: childArchived,
+        parentOffsets: parentOffsets,
+        parents: parents,
+        parentArchived: parentArchived,
       ),
       indexes: Map.unmodifiable(_indexes),
+      ids: List.unmodifiable(_ids),
     );
   }
+
+  Uint32List _offsets(int Function(_HoldingRelation relation) intention) {
+    final offsets = Uint32List(_flags.length + 1);
+    for (final relation in _relations) {
+      offsets[intention(relation) + 1]++;
+    }
+    for (var i = 1; i < offsets.length; i++) {
+      offsets[i] += offsets[i - 1];
+    }
+    return offsets;
+  }
 }
+
+typedef _HoldingRelation = ({
+  int source,
+  int target,
+  int archived,
+  int rank,
+  int creationSequence,
+});
 
 /// Связь указывает на намерение, которого нет среди собранных.
 final class IntentionHoldingGraphIncomplete implements Exception {

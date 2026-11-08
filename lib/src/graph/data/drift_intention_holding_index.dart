@@ -123,7 +123,7 @@ extension _IntentionHoldingIndexReading on DriftPersonalGraphRepository {
       () => _readHoldingPages(
         sequence,
         '''SELECT creation_sequence AS page_key, source_intention_id,
-                  related_intention_id, is_archived
+                  related_intention_id, type, priority, is_archived
            FROM long_term_relations
            WHERE creation_sequence > ? ORDER BY creation_sequence LIMIT ?''',
         _database.longTermRelations,
@@ -138,10 +138,13 @@ extension _IntentionHoldingIndexReading on DriftPersonalGraphRepository {
             requiredStoredString(data, 'related_intention_id'),
           ),
           decodeStoredRelationScope(data),
+          type: decodeStoredRelationType(data),
+          priority: decodeStoredRelationPriority(data),
+          creationSequence: requiredStoredInteger(data, 'page_key'),
         ),
       ),
     );
-    final (:graph, :indexes) = builder.build();
+    final (:graph, :indexes, ids: _) = builder.build();
     final held = await _holdingIndexStage(
       IntentionHoldingIndexDiagnosticsStage.computation,
       () async {

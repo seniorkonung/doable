@@ -233,13 +233,7 @@ final class StoredLongTermRelation {
     final id = decodeStoredRelationId(requiredStoredString(data, 'id'));
     final ends = decodeStoredRelationEnds(data);
     final type = decodeStoredRelationType(data);
-    final priority = switch (requiredStoredInteger(data, 'priority')) {
-      1 => RelationPriority.p1,
-      2 => RelationPriority.p2,
-      3 => RelationPriority.p3,
-      4 => RelationPriority.p4,
-      _ => throw const StoredGraphCorruption(),
-    };
+    final priority = decodeStoredRelationPriority(data);
     final scope = decodeStoredRelationScope(data);
     final description = _nullableStoredString(data, 'description');
     final createdAt = _decodeStoredRelationTimestamp(data, 'created_at');
@@ -333,6 +327,16 @@ LongTermRelationType decodeStoredRelationType(Map<String, Object?> data) =>
     switch (requiredStoredString(data, 'type')) {
       'need' => LongTermRelationType.need,
       'can' => LongTermRelationType.can,
+      _ => throw const StoredGraphCorruption(),
+    };
+
+/// Приоритет связи из столбца `priority`.
+RelationPriority decodeStoredRelationPriority(Map<String, Object?> data) =>
+    switch (requiredStoredInteger(data, 'priority')) {
+      1 => RelationPriority.p1,
+      2 => RelationPriority.p2,
+      3 => RelationPriority.p3,
+      4 => RelationPriority.p4,
       _ => throw const StoredGraphCorruption(),
     };
 
