@@ -141,9 +141,15 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
 
   /// Возвращает успех только собственной принятой команды удаления.
   /// Общее состояние данных по ID не передаёт право закрытия другим страницам.
-  Future<bool> delete() async {
+  Future<bool> delete([
+    Future<CascadeChoice?> Function(IntentionDeleteCascadePreview preview)?
+    confirm,
+  ]) async {
     final intentionId = _intentionId;
-    final completion = await _startCascadeOperation(CascadeOperation.delete);
+    final completion = await _startCascadeOperation(
+      CascadeOperation.delete,
+      confirmDeletion: confirm,
+    );
     return switch (completion?.result) {
       ResultSuccess(value: IntentionDeleted(:final id)) => id == intentionId,
       _ => false,
@@ -247,6 +253,8 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
   Future<IntentionCommandCompletion?> _startCascadeOperation(
     CascadeOperation operation, {
     Future<CascadeChoice?> Function(int count)? choose,
+    Future<CascadeChoice?> Function(IntentionDeleteCascadePreview preview)?
+    confirmDeletion,
   }) async {
     final current = state;
     if (current is! IntentionDetailsLoaded ||
@@ -276,7 +284,14 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
         plan.withSupporting.restored.length,
       _ => 0,
     };
-    if (count > 0) {
+    if (preview is IntentionDeleteCascadePreview && confirmDeletion != null) {
+      try {
+        choice = await confirmDeletion(preview);
+      } finally {
+        _isReadingCascadePreview = false;
+      }
+      if (choice == null) return null;
+    } else if (count > 0) {
       try {
         choice = await choose?.call(count);
       } finally {
@@ -312,7 +327,12 @@ final class IntentionDetailsViewModel extends _$IntentionDetailsViewModel {
       IntentionDeleteCascadePreview(:final plan) => _CommandStart(
         DeleteIntention(
           intentionId,
-          execution: CascadeExecution.withSupporting(plan),
+          execution: CascadeExecution(
+            choice: choice,
+            expected: choice == CascadeChoice.onlyThis
+                ? plan.onlyThis
+                : plan.withSupporting,
+          ),
         ),
       ),
       // Предпросмотр намерения не бывает предпросмотром удаления связи.

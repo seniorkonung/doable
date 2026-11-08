@@ -324,7 +324,7 @@ Future<CascadeDialogResult> showCascadeConfirmDialog({
   required String text,
   required List<CascadeDialogList> lists,
   required String cascadeLabel,
-  required String singleLabel,
+  String? singleLabel,
   required String cancelLabel,
   required CascadeActionStyle actionStyle,
   String? footer,
@@ -366,7 +366,7 @@ final class _CascadeDialog extends StatelessWidget {
   final List<CascadeDialogList> lists;
   final String? footer;
   final String cascadeLabel;
-  final String singleLabel;
+  final String? singleLabel;
   final String cancelLabel;
   final CascadeActionStyle actionStyle;
 
@@ -444,6 +444,13 @@ final class _CascadeDialog extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: DoableMetrics.space4),
+                  if (singleLabel == null) ...[
+                    Button.textMedium(
+                      label: cancelLabel,
+                      onPressed: () => answer(CascadeDialogResult.cancel),
+                    ),
+                    const SizedBox(height: DoableMetrics.space1),
+                  ],
                   switch (actionStyle) {
                     CascadeActionStyle.danger => Button.danger(
                       label: cascadeLabel,
@@ -454,16 +461,20 @@ final class _CascadeDialog extends StatelessWidget {
                       onPressed: () => answer(CascadeDialogResult.cascade),
                     ),
                   },
-                  const SizedBox(height: DoableMetrics.space1),
-                  Button.quietBlock(
-                    label: singleLabel,
-                    onPressed: () => answer(CascadeDialogResult.single),
-                  ),
-                  const SizedBox(height: DoableMetrics.space1),
-                  Button.textMedium(
-                    label: cancelLabel,
-                    onPressed: () => answer(CascadeDialogResult.cancel),
-                  ),
+                  if (singleLabel case final label?) ...[
+                    const SizedBox(height: DoableMetrics.space1),
+                    Button.quietBlock(
+                      label: label,
+                      onPressed: () => answer(CascadeDialogResult.single),
+                    ),
+                  ],
+                  if (singleLabel != null) ...[
+                    const SizedBox(height: DoableMetrics.space1),
+                    Button.textMedium(
+                      label: cancelLabel,
+                      onPressed: () => answer(CascadeDialogResult.cancel),
+                    ),
+                  ],
                 ],
               ),
             ),

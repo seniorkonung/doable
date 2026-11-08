@@ -1352,18 +1352,6 @@ abstract class AppLocalizations {
   /// **'Delete intention?'**
   String get detailsDeleteDialogTitle;
 
-  /// Текст подтверждения удаления до выделенного названия намерения
-  ///
-  /// In en, this message translates to:
-  /// **'This removes the intention '**
-  String get detailsDeleteDialogTextBefore;
-
-  /// Текст подтверждения удаления после выделенного названия намерения
-  ///
-  /// In en, this message translates to:
-  /// **' with its description and cannot be undone. Its tags stay.'**
-  String get detailsDeleteDialogTextAfter;
-
   /// Отмена удаления намерения
   ///
   /// In en, this message translates to:
@@ -4998,6 +4986,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'It stays in saved paths marked “Deleted”'**
   String get detailsOptionDeleteKeepsPaths;
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {count, plural, one{{count} intention} other{{count} intentions}}?'**
+  String detailsDeleteCascadeTitle(int count);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting intentions no longer held by any primary intention will be deleted with “{title}”.'**
+  String detailsDeleteCascadeText(String title);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'The intention “{title}” and its description will be deleted. Its tags stay.'**
+  String detailsDeleteSingleText(String title);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{{count} relation will be deleted} other{{count} relations will be deleted}}.'**
+  String detailsDeleteRelations(int count);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Deletion cannot be undone.'**
+  String get detailsDeleteIrreversible;
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Action paths retain deleted items marked “Deleted”.'**
+  String get detailsDeletePaths;
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'These intentions and their relations will be archived.'**
+  String get detailsDeleteArchiveText;
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting, deleted with it · {count}'**
+  String detailsDeleteSupportingList(int count);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Primary, only lose their relation · {count}'**
+  String detailsDeleteMainsList(int count);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Will be archived · {count}'**
+  String detailsDeleteArchivedList(int count);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Show all {count}'**
+  String detailsDeleteShowAll(int count);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{{count} becomes primary} other{{count} become primary}}'**
+  String detailsDeletePromoted(int count);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'{count} will be archived'**
+  String detailsDeleteArchivedCount(int count);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Only this: {effects}'**
+  String detailsDeleteOnlyEffects(String effects);
+
+  /// Подтверждение удаления намерения
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {count}'**
+  String detailsDeleteCount(int count);
 }
 
 class _AppLocalizationsDelegate

@@ -536,11 +536,7 @@ void main() {
     expect(find.byType(Sheet), findsNothing);
     expect(find.text('Удалить намерение?'), findsOneWidget);
     expect(
-      find.text(
-        'Намерение Бегать будет безвозвратно удалено вместе с описанием. '
-        'Его теги сохранятся.',
-        findRichText: true,
-      ),
+      find.textContaining('Намерение «Бегать» и его описание будут удалены.'),
       findsOneWidget,
     );
 

@@ -358,10 +358,9 @@ void _registerAssignmentScenarios() {
 
         await _tap(tester, intentionOptionsButton);
         await _tap(tester, intentionOption(IntentionOption.delete));
+        await _until(tester, intentionDeletionConfirm);
         await tester.pumpAndSettle();
-        final message =
-            '${l10n.detailsDeleteDialogTextBefore}Намерение $number'
-            '${l10n.detailsDeleteDialogTextAfter}';
+        final message = l10n.detailsDeleteSingleText('Намерение $number');
         expect(
           tester.getSemantics(find.textContaining(message)).label,
           contains(message),

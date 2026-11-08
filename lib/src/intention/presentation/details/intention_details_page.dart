@@ -333,7 +333,7 @@ final class _IntentionDetailsPageState
     final intentionId = widget.intentionId;
     final deleted = await ref
         .read(intentionDetailsViewModelProvider(intentionId).notifier)
-        .delete();
+        .delete(_confirmDeletion);
     // Результат принадлежит принявшему удаление экземпляру страницы.
     // После ожидания сброшенный маршрут уже не вправе менять историю,
     // даже если обратная анимация ещё удерживает его виджет.
@@ -372,7 +372,7 @@ final class _IntentionDetailsPageState
       case IntentionOption.restore:
         model.restore((count) => _chooseCascade(count, restoring: true));
       case IntentionOption.delete:
-        await _confirmDeletion();
+        await _delete();
     }
   }
 
@@ -403,24 +403,79 @@ final class _IntentionDetailsPageState
     };
   }
 
-  Future<void> _confirmDeletion() async {
+  Future<CascadeChoice?> _confirmDeletion(
+    IntentionDeleteCascadePreview preview,
+  ) async {
+    if (!mounted || !(ModalRoute.isCurrentOf(context) ?? false)) return null;
+    final l = AppLocalizations.of(context);
     final details = ref.read(
       intentionDetailsViewModelProvider(widget.intentionId),
     );
-    if (details is! IntentionDetailsLoaded) return;
-    final localizations = AppLocalizations.of(context);
-    final confirmed = await showConfirmDialog(
-      context: context,
-      title: localizations.detailsDeleteDialogTitle,
-      text: ConfirmDialogText(
-        before: localizations.detailsDeleteDialogTextBefore,
-        name: details.intention.title,
-        after: localizations.detailsDeleteDialogTextAfter,
-      ),
-      cancelLabel: localizations.detailsDeleteDialogCancel,
-      actionLabel: localizations.detailsDeleteDialogConfirm,
+    if (details is! IntentionDetailsLoaded) return null;
+    final plan = preview.plan;
+    final cascade = plan.withSupporting;
+    final only = plan.onlyThis;
+    final count = cascade.departing.length + 1;
+    CascadeDialogList list(
+      String title,
+      List<IntentionId> ids, {
+      required bool expandable,
+    }) => CascadeDialogList(
+      title: title,
+      items: [for (final id in ids) preview.titles[id]!],
+      marker: CascadeListMarker.intention,
+      display: expandable
+          ? CascadeListExpandable(l.detailsDeleteShowAll(ids.length))
+          : const CascadeListAll(),
     );
-    if (confirmed) await _delete();
+    final effects = <String>[
+      if (only.promoted.isNotEmpty)
+        l.detailsDeletePromoted(only.promoted.length),
+      if (only.archivedByInvariant.isNotEmpty)
+        l.detailsDeleteArchivedCount(only.archivedByInvariant.length),
+    ];
+    final answer = await showCascadeConfirmDialog(
+      context: context,
+      title: plan.asksQuestion
+          ? l.detailsDeleteCascadeTitle(count)
+          : l.detailsDeleteDialogTitle,
+      text:
+          '${plan.asksQuestion ? l.detailsDeleteCascadeText(details.intention.title) : l.detailsDeleteSingleText(details.intention.title)} ${l.detailsDeleteRelations(cascade.deletedRelationCount)} ${l.detailsDeleteIrreversible} ${l.detailsDeletePaths}${cascade.archivedByInvariant.isNotEmpty ? ' ${l.detailsDeleteArchiveText}' : ''}',
+      lists: [
+        if (cascade.departing.isNotEmpty)
+          list(
+            l.detailsDeleteSupportingList(cascade.departing.length),
+            cascade.departing,
+            expandable: true,
+          ),
+        if (cascade.mainsLosingRelation.isNotEmpty)
+          list(
+            l.detailsDeleteMainsList(cascade.mainsLosingRelation.length),
+            cascade.mainsLosingRelation,
+            expandable: false,
+          ),
+        if (cascade.archivedByInvariant.isNotEmpty)
+          list(
+            l.detailsDeleteArchivedList(cascade.archivedByInvariant.length),
+            cascade.archivedByInvariant,
+            expandable: true,
+          ),
+      ],
+      footer: plan.asksQuestion && effects.isNotEmpty
+          ? l.detailsDeleteOnlyEffects(effects.join('; '))
+          : null,
+      cascadeLabel: plan.asksQuestion
+          ? l.detailsDeleteCount(count)
+          : l.detailsDeleteDialogConfirm,
+      singleLabel: plan.asksQuestion ? l.detailsCascadeOnlyThis : null,
+      cancelLabel: l.detailsDeleteDialogCancel,
+      actionStyle: CascadeActionStyle.danger,
+    );
+    return switch (answer) {
+      CascadeDialogResult.cascade => CascadeChoice.withSupporting,
+      CascadeDialogResult.single => CascadeChoice.onlyThis,
+      CascadeDialogResult.cancel => null,
+    };
   }
 
   @override

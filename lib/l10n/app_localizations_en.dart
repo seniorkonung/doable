@@ -863,13 +863,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailsDeleteDialogTitle => 'Delete intention?';
 
   @override
-  String get detailsDeleteDialogTextBefore => 'This removes the intention ';
-
-  @override
-  String get detailsDeleteDialogTextAfter =>
-      ' with its description and cannot be undone. Its tags stay.';
-
-  @override
   String get detailsDeleteDialogCancel => 'Cancel';
 
   @override
@@ -3354,4 +3347,93 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get detailsOptionDeleteKeepsPaths =>
       'It stays in saved paths marked “Deleted”';
+
+  @override
+  String detailsDeleteCascadeTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count intentions',
+      one: '$count intention',
+    );
+    return 'Delete $_temp0?';
+  }
+
+  @override
+  String detailsDeleteCascadeText(String title) {
+    return 'Supporting intentions no longer held by any primary intention will be deleted with “$title”.';
+  }
+
+  @override
+  String detailsDeleteSingleText(String title) {
+    return 'The intention “$title” and its description will be deleted. Its tags stay.';
+  }
+
+  @override
+  String detailsDeleteRelations(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count relations will be deleted',
+      one: '$count relation will be deleted',
+    );
+    return '$_temp0.';
+  }
+
+  @override
+  String get detailsDeleteIrreversible => 'Deletion cannot be undone.';
+
+  @override
+  String get detailsDeletePaths =>
+      'Action paths retain deleted items marked “Deleted”.';
+
+  @override
+  String get detailsDeleteArchiveText =>
+      'These intentions and their relations will be archived.';
+
+  @override
+  String detailsDeleteSupportingList(int count) {
+    return 'Supporting, deleted with it · $count';
+  }
+
+  @override
+  String detailsDeleteMainsList(int count) {
+    return 'Primary, only lose their relation · $count';
+  }
+
+  @override
+  String detailsDeleteArchivedList(int count) {
+    return 'Will be archived · $count';
+  }
+
+  @override
+  String detailsDeleteShowAll(int count) {
+    return 'Show all $count';
+  }
+
+  @override
+  String detailsDeletePromoted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count become primary',
+      one: '$count becomes primary',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String detailsDeleteArchivedCount(int count) {
+    return '$count will be archived';
+  }
+
+  @override
+  String detailsDeleteOnlyEffects(String effects) {
+    return 'Only this: $effects';
+  }
+
+  @override
+  String detailsDeleteCount(int count) {
+    return 'Delete $count';
+  }
 }

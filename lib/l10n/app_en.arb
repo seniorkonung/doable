@@ -567,14 +567,6 @@
   "@detailsDeleteDialogTitle": {
     "description": "Вопрос подтверждения удаления намерения из параметров"
   },
-  "detailsDeleteDialogTextBefore": "This removes the intention ",
-  "@detailsDeleteDialogTextBefore": {
-    "description": "Текст подтверждения удаления до выделенного названия намерения"
-  },
-  "detailsDeleteDialogTextAfter": " with its description and cannot be undone. Its tags stay.",
-  "@detailsDeleteDialogTextAfter": {
-    "description": "Текст подтверждения удаления после выделенного названия намерения"
-  },
   "detailsDeleteDialogCancel": "Cancel",
   "@detailsDeleteDialogCancel": {
     "description": "Отмена удаления намерения"
@@ -2265,5 +2257,35 @@
   "detailsCascadeDeleteArchiveHint": "intentions archived: {count}",
   "@detailsCascadeDeleteArchiveHint": {"description": "Каскад намерения", "placeholders": {"count": {"type": "int"}}},
   "detailsOptionDeleteKeepsPaths": "It stays in saved paths marked “Deleted”",
-  "@detailsOptionDeleteKeepsPaths": {"description": "Каскад намерения"}
+  "@detailsOptionDeleteKeepsPaths": {"description": "Каскад намерения"},
+  "detailsDeleteCascadeTitle": "Delete {count, plural, one{{count} intention} other{{count} intentions}}?",
+  "@detailsDeleteCascadeTitle": {"description": "Подтверждение удаления намерения", "placeholders": {"count": {"type": "int"}}},
+  "detailsDeleteCascadeText": "Supporting intentions no longer held by any primary intention will be deleted with “{title}”.",
+  "@detailsDeleteCascadeText": {"description": "Подтверждение удаления намерения", "placeholders": {"title": {"type": "String"}}},
+  "detailsDeleteSingleText": "The intention “{title}” and its description will be deleted. Its tags stay.",
+  "@detailsDeleteSingleText": {"description": "Подтверждение удаления намерения", "placeholders": {"title": {"type": "String"}}},
+  "detailsDeleteRelations": "{count, plural, one{{count} relation will be deleted} other{{count} relations will be deleted}}.",
+  "@detailsDeleteRelations": {"description": "Подтверждение удаления намерения", "placeholders": {"count": {"type": "int"}}},
+  "detailsDeleteIrreversible": "Deletion cannot be undone.",
+  "@detailsDeleteIrreversible": {"description": "Подтверждение удаления намерения"},
+  "detailsDeletePaths": "Action paths retain deleted items marked “Deleted”.",
+  "@detailsDeletePaths": {"description": "Подтверждение удаления намерения"},
+  "detailsDeleteArchiveText": "These intentions and their relations will be archived.",
+  "@detailsDeleteArchiveText": {"description": "Подтверждение удаления намерения"},
+  "detailsDeleteSupportingList": "Supporting, deleted with it · {count}",
+  "@detailsDeleteSupportingList": {"description": "Подтверждение удаления намерения", "placeholders": {"count": {"type": "int"}}},
+  "detailsDeleteMainsList": "Primary, only lose their relation · {count}",
+  "@detailsDeleteMainsList": {"description": "Подтверждение удаления намерения", "placeholders": {"count": {"type": "int"}}},
+  "detailsDeleteArchivedList": "Will be archived · {count}",
+  "@detailsDeleteArchivedList": {"description": "Подтверждение удаления намерения", "placeholders": {"count": {"type": "int"}}},
+  "detailsDeleteShowAll": "Show all {count}",
+  "@detailsDeleteShowAll": {"description": "Подтверждение удаления намерения", "placeholders": {"count": {"type": "int"}}},
+  "detailsDeletePromoted": "{count, plural, one{{count} becomes primary} other{{count} become primary}}",
+  "@detailsDeletePromoted": {"description": "Подтверждение удаления намерения", "placeholders": {"count": {"type": "int"}}},
+  "detailsDeleteArchivedCount": "{count} will be archived",
+  "@detailsDeleteArchivedCount": {"description": "Подтверждение удаления намерения", "placeholders": {"count": {"type": "int"}}},
+  "detailsDeleteOnlyEffects": "Only this: {effects}",
+  "@detailsDeleteOnlyEffects": {"description": "Подтверждение удаления намерения", "placeholders": {"effects": {"type": "String"}}},
+  "detailsDeleteCount": "Delete {count}",
+  "@detailsDeleteCount": {"description": "Подтверждение удаления намерения", "placeholders": {"count": {"type": "int"}}}
 }

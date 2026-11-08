@@ -869,13 +869,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get detailsDeleteDialogTitle => 'Удалить намерение?';
 
   @override
-  String get detailsDeleteDialogTextBefore => 'Намерение ';
-
-  @override
-  String get detailsDeleteDialogTextAfter =>
-      ' будет безвозвратно удалено вместе с описанием. Его теги сохранятся.';
-
-  @override
   String get detailsDeleteDialogCancel => 'Отмена';
 
   @override
@@ -3425,4 +3418,107 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get detailsOptionDeleteKeepsPaths =>
       'В сохранённых путях останется с пометкой «Удалено»';
+
+  @override
+  String detailsDeleteCascadeTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count намерения',
+      many: '$count намерений',
+      few: '$count намерения',
+      one: '$count намерение',
+    );
+    return 'Удалить $_temp0?';
+  }
+
+  @override
+  String detailsDeleteCascadeText(String title) {
+    return 'Вместе с намерением «$title» будут удалены вспомогательные намерения, которые больше не удерживаются ни одним главным.';
+  }
+
+  @override
+  String detailsDeleteSingleText(String title) {
+    return 'Намерение «$title» и его описание будут удалены. Теги сохранятся.';
+  }
+
+  @override
+  String detailsDeleteRelations(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count связи',
+      many: '$count связей',
+      few: '$count связи',
+      one: '$count связь',
+    );
+    return 'Связи, которые будут удалены: $_temp0.';
+  }
+
+  @override
+  String get detailsDeleteIrreversible => 'Удаление нельзя отменить.';
+
+  @override
+  String get detailsDeletePaths =>
+      'Пути действий сохранят удалённое с пометкой «Удалено».';
+
+  @override
+  String get detailsDeleteArchiveText =>
+      'Эти намерения уйдут в архив вместе со своими связями.';
+
+  @override
+  String detailsDeleteSupportingList(int count) {
+    return 'Вспомогательные, уходят вместе с ним · $count';
+  }
+
+  @override
+  String detailsDeleteMainsList(int count) {
+    return 'Главные, теряют только связь · $count';
+  }
+
+  @override
+  String detailsDeleteArchivedList(int count) {
+    return 'Уйдут в архив · $count';
+  }
+
+  @override
+  String detailsDeleteShowAll(int count) {
+    return 'Показать все $count';
+  }
+
+  @override
+  String detailsDeletePromoted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count станут главными',
+      many: '$count станут главными',
+      few: '$count станут главными',
+      one: '$count станет главным',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String detailsDeleteArchivedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'уйдут $count',
+      many: 'уйдут $count',
+      few: 'уйдут $count',
+      one: 'уйдёт $count',
+    );
+    return 'в архив $_temp0';
+  }
+
+  @override
+  String detailsDeleteOnlyEffects(String effects) {
+    return 'Только это: $effects';
+  }
+
+  @override
+  String detailsDeleteCount(int count) {
+    return 'Удалить $count';
+  }
 }

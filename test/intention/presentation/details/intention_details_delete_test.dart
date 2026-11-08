@@ -5,6 +5,10 @@ import 'package:doable/src/graph/application/graph_revision.dart';
 import 'package:doable/src/graph/application/personal_graph_repository_provider.dart';
 import 'package:doable/src/graph/presentation/graph_operation_presenter.dart';
 import 'package:doable/src/intention/application/intention_command.dart';
+import 'package:doable/src/intention/application/cascade/intention_cascade.dart';
+
+import '../../../support/intention_cascade_execution.dart';
+
 import 'package:doable/src/intention/application/intention_catalog.dart';
 import 'package:doable/src/intention/application/intention_result.dart';
 import 'package:doable/src/intention/domain/intention.dart';
@@ -30,6 +34,218 @@ void main() {
       AppLifecycleState.resumed,
     );
   });
+
+  testWidgets(
+    'подтверждение показывает последствия и передаёт выбранный состав',
+    (tester) async {
+      final child = testDetailsIntentionId(2);
+      final main = testDetailsIntentionId(3);
+      final departing = DeleteCascadeComposition(
+        departing: [child],
+        promoted: [],
+        archivedByInvariant: [],
+        mainsLosingRelation: [main],
+        deletedRelationCount: 3,
+        archivedRelationCount: 0,
+      );
+      final only = DeleteCascadeComposition(
+        departing: [],
+        promoted: [child],
+        archivedByInvariant: [],
+        mainsLosingRelation: [],
+        deletedRelationCount: 1,
+        archivedRelationCount: 0,
+      );
+      final repository = ControlledDetailsRepository()
+        ..onPreviewCascade = (subject, operation) =>
+            operation == CascadeOperation.delete
+            ? IntentionDeleteCascadePreview(
+                revision: const TestDetailsRevision(0),
+                plan: CascadePlan(
+                  withSupporting: departing,
+                  onlyThis: only,
+                  asksQuestion: true,
+                ),
+                titles: {child: 'Много ходить', main: 'Высыпаться'},
+                isInActionPath: true,
+              )
+            : givenCascadePreview(
+                subject,
+                operation,
+                const TestDetailsRevision(0),
+              );
+      final intention = testDetailsIntention();
+      await _pumpDetailsPage(
+        tester,
+        repository,
+        intention.id,
+        locale: const Locale('ru'),
+      );
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(ResultSuccess(intention));
+      await tester.pumpAndSettle();
+      await chooseIntentionOption(tester, IntentionOption.delete);
+      expect(find.text('Удалить 2 намерения?'), findsOneWidget);
+      expect(find.textContaining('3 связи'), findsOneWidget);
+      expect(find.text('Много ходить'), findsOneWidget);
+      expect(find.text('Высыпаться'), findsOneWidget);
+      expect(find.text('Только это: 1 станет главным'), findsOneWidget);
+      await tester.tap(find.text('Только это'));
+      await tester.pump();
+      final command = repository.commands.single as DeleteIntention;
+      expect(command.execution.choice, CascadeChoice.onlyThis);
+      expect(command.execution.expected, same(only));
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'длинные списки раскрываются независимо, главные видны полностью',
+    (tester) async {
+      final children = List.generate(5, (i) => testDetailsIntentionId(10 + i));
+      final mains = List.generate(5, (i) => testDetailsIntentionId(20 + i));
+      final archived = List.generate(6, (i) => testDetailsIntentionId(30 + i));
+      final cascade = DeleteCascadeComposition(
+        departing: children,
+        promoted: [],
+        archivedByInvariant: archived,
+        mainsLosingRelation: mains,
+        deletedRelationCount: 6,
+        archivedRelationCount: 5,
+      );
+      final only = DeleteCascadeComposition(
+        departing: [],
+        promoted: [children.first],
+        archivedByInvariant: archived,
+        mainsLosingRelation: [],
+        deletedRelationCount: 1,
+        archivedRelationCount: 5,
+      );
+      final titles = <IntentionId, String>{
+        for (var i = 0; i < children.length; i++)
+          children[i]: 'Вспомогательное $i',
+        for (var i = 0; i < mains.length; i++) mains[i]: 'Главное $i',
+        for (var i = 0; i < archived.length; i++) archived[i]: 'Архивное $i',
+      };
+      final repository = ControlledDetailsRepository()
+        ..onPreviewCascade = (subject, operation) =>
+            operation == CascadeOperation.delete
+            ? IntentionDeleteCascadePreview(
+                revision: const TestDetailsRevision(0),
+                plan: CascadePlan(
+                  withSupporting: cascade,
+                  onlyThis: only,
+                  asksQuestion: true,
+                ),
+                titles: titles,
+                isInActionPath: false,
+              )
+            : givenCascadePreview(
+                subject,
+                operation,
+                const TestDetailsRevision(0),
+              );
+      final intention = testDetailsIntention();
+      await _pumpDetailsPage(
+        tester,
+        repository,
+        intention.id,
+        locale: const Locale('ru'),
+      );
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(ResultSuccess(intention));
+      await tester.pumpAndSettle();
+      await chooseIntentionOption(tester, IntentionOption.delete);
+      expect(find.text('Удалить 6 намерений?'), findsOneWidget);
+      expect(find.text('Главное 4'), findsOneWidget);
+      expect(find.text('Вспомогательное 4'), findsNothing);
+      expect(find.text('Архивное 4'), findsNothing);
+      await tester.ensureVisible(find.text('Показать все 5'));
+      await tester.tap(find.text('Показать все 5'));
+      await tester.pumpAndSettle();
+      expect(find.text('Вспомогательное 4'), findsOneWidget);
+      expect(find.text('Архивное 4'), findsNothing);
+      await tester.ensureVisible(find.text('Показать все 6'));
+      await tester.tap(find.text('Показать все 6'));
+      await tester.pumpAndSettle();
+      expect(find.text('Архивное 5'), findsOneWidget);
+      expect(find.textContaining('в архив уйдут 6'), findsOneWidget);
+      await tester.tap(intentionDeletionCancel);
+      await tester.pumpAndSettle();
+      expect(repository.commands, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'без каскада подтверждение показывает связи и архивируемые намерения',
+    (tester) async {
+      final main = testDetailsIntentionId(2);
+      final archived = testDetailsIntentionId(3);
+      final composition = DeleteCascadeComposition(
+        departing: [],
+        promoted: [],
+        archivedByInvariant: [archived],
+        mainsLosingRelation: [main],
+        deletedRelationCount: 21,
+        archivedRelationCount: 1,
+      );
+      final repository = ControlledDetailsRepository()
+        ..onPreviewCascade = (subject, operation) =>
+            operation == CascadeOperation.delete
+            ? IntentionDeleteCascadePreview(
+                revision: const TestDetailsRevision(0),
+                plan: CascadePlan(
+                  withSupporting: composition,
+                  onlyThis: composition,
+                  asksQuestion: false,
+                ),
+                titles: {main: 'Главное', archived: 'В архив'},
+                isInActionPath: true,
+              )
+            : givenCascadePreview(
+                subject,
+                operation,
+                const TestDetailsRevision(0),
+              );
+      final intention = testDetailsIntention();
+      await _pumpDetailsPage(
+        tester,
+        repository,
+        intention.id,
+        locale: const Locale('ru'),
+      );
+      await waitForDetailRequests(repository, 1);
+      repository.detailRequests[0].add(ResultSuccess(intention));
+      await tester.pumpAndSettle();
+      await chooseIntentionOption(tester, IntentionOption.delete);
+      expect(find.text('Удалить намерение?'), findsOneWidget);
+      expect(find.textContaining('21 связь'), findsOneWidget);
+      expect(find.textContaining('Теги сохранятся'), findsOneWidget);
+      expect(find.textContaining('пометкой «Удалено»'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(Dialog),
+          matching: find.text('Главное'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('В архив'), findsOneWidget);
+      expect(find.text('Только это'), findsNothing);
+      await tester.tap(intentionDeletionConfirm);
+      await tester.pump();
+      final command = repository.commands.single as DeleteIntention;
+      expect(command.execution.expected, same(composition));
+      repository.completeCommand(
+        0,
+        const ResultFailure(IntentionUnavailableFailure()),
+      );
+      await tester.pumpAndSettle();
+    },
+  );
 
   testWidgets('удаляет архивированное намерение из параметров без '
       'восстановления и показывает выполнение на странице', (tester) async {
@@ -201,6 +417,7 @@ Future<void> _pumpDetailsPage(
   ControlledDetailsRepository repository,
   IntentionId intentionId, {
   RelationGroupPagingPolicy? pagingPolicy,
+  Locale locale = const Locale('en'),
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -211,7 +428,10 @@ Future<void> _pumpDetailsPage(
           relationGroupPagingPolicyProvider.overrideWithValue(policy),
       ],
       retry: (retryCount, error) => null,
-      child: _localizedApp(IntentionDetailsPage(intentionId: intentionId)),
+      child: _localizedApp(
+        IntentionDetailsPage(intentionId: intentionId),
+        locale: locale,
+      ),
     ),
   );
   await tester.pump();
@@ -226,12 +446,13 @@ ProviderContainer _detailsContainer(ControlledDetailsRepository repository) =>
       retry: (retryCount, error) => null,
     );
 
-Widget _localizedApp(Widget home) => OrdinaryPageTestApp(
-  locale: const Locale('en'),
-  builder: (context, child) =>
-      GraphOperationPresenter(child: child ?? const SizedBox.shrink()),
-  home: home,
-);
+Widget _localizedApp(Widget home, {Locale locale = const Locale('en')}) =>
+    OrdinaryPageTestApp(
+      locale: locale,
+      builder: (context, child) =>
+          GraphOperationPresenter(child: child ?? const SizedBox.shrink()),
+      home: home,
+    );
 
 Future<void> _closeOperationMessage(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 5));
