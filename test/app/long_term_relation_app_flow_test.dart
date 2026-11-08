@@ -523,6 +523,10 @@ void main() {
         await _chooseDetailsTab(tester, l10n.detailsRelationsTab);
         await _tapWhenFound(
           tester,
+          find.byKey(const ValueKey('intention-relations-group-needs')),
+        );
+        await _tapWhenFound(
+          tester,
           find.byKey(const ValueKey('intention-relations-add')),
         );
         for (final title in [_sleep, _swim, _walk]) {
@@ -541,6 +545,10 @@ void main() {
         await _chooseDetailsTab(tester, l10n.detailsRelationsTab);
         await _tapWhenFound(
           tester,
+          find.byKey(const ValueKey('intention-relations-group-needs')),
+        );
+        await _tapWhenFound(
+          tester,
           _relationRow(l10n.relationNeighborhoodNeedPhrase(_walk, _healthy)),
         );
         await _pumpUntilRelationSheet(
@@ -555,6 +563,10 @@ void main() {
         );
         await _pumpUntilDetailsTitle(tester, _healthy);
         await _chooseDetailsTab(tester, l10n.detailsRelationsTab);
+        await _tapWhenFound(
+          tester,
+          find.byKey(const ValueKey('intention-relations-group-needs')),
+        );
         await _tapWhenFound(
           tester,
           find.byKey(const ValueKey('intention-relations-add')),
@@ -939,6 +951,10 @@ void main() {
       await _chooseDetailsTab(tester, l10n.detailsRelationsTab);
       await _tapWhenFound(
         tester,
+        find.byKey(const ValueKey('intention-relations-group-needs')),
+      );
+      await _tapWhenFound(
+        tester,
         find.byKey(const ValueKey('intention-relations-add')),
       );
       final list = find.byKey(
@@ -984,6 +1000,10 @@ void main() {
       await _tapPickerArrow(tester, _walk);
       await _pumpUntilDetailsTitle(tester, _walk);
       await _chooseDetailsTab(tester, l10n.detailsRelationsTab);
+      await _tapWhenFound(
+        tester,
+        find.byKey(const ValueKey('intention-relations-group-needs')),
+      );
       await _expandArchive(tester);
       final archivedPhrase = l10n.relationNeighborhoodNeedPhrase(_walk, _swim);
       await _tapWhenFound(tester, _relationRow(archivedPhrase));
