@@ -805,12 +805,18 @@ final class _CommittedIntentionDeleteCascade
 
   @override
   IntentionCommandSuccess toSuccess(GraphRevision revision) {
-    // Предмет удалён первым, поэтому первая мутация каталога — его.
-    final [subject, ...others] = write.catalogMutations(revision);
+    final mutations = write.catalogMutations(revision);
+    final subject = mutations.singleWhere(
+      (mutation) =>
+          mutation is IntentionCatalogDeleted &&
+          mutation.entry.summary.id == id,
+    );
     return IntentionDeleted(
       id,
       catalogMutation: subject,
-      additionalCatalogMutations: others,
+      additionalCatalogMutations: mutations.where(
+        (mutation) => !identical(mutation, subject),
+      ),
       additionalChanges: [
         ...write.relationChanges(revision),
         IntentionHoldingChanged(revision: revision),

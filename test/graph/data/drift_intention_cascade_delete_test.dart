@@ -307,6 +307,24 @@ void main() {
     ]);
   });
 
+  test('основная мутация удаления описывает предмет, даже если '
+      'вспомогательное создано раньше', () async {
+    await seed(
+      intentions: [(1, 'supporting', 0), (2, 'main', 0)],
+      relations: [(101, 2, 1, 0)],
+    );
+
+    final confirmed = await confirm(await deleteIntention(2));
+    final deleted = confirmed.value as IntentionDeleted;
+
+    expect(deleted.catalogMutation, isA<IntentionCatalogDeleted>());
+    expect(deleted.catalogMutation.before!.summary.id, durabilityIntention(2));
+    expect(deleted.catalogMutations, hasLength(2));
+    final supportingMutation = deleted.catalogMutations.skip(1).single;
+    expect(supportingMutation, isA<IntentionCatalogDeleted>());
+    expect(supportingMutation.before!.summary.id, durabilityIntention(1));
+  });
+
   test('пакет несёт удаления каталога и связей, абсолютные количества, '
       'изменение удержания и исполненный состав', () async {
     await seed();

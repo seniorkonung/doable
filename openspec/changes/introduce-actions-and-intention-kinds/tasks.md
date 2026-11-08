@@ -1572,7 +1572,7 @@
   - **Зависимости:** 4.11, 4.13.
   - **Предполагаемые файлы:** `lib/src/intention/presentation/details/intention_details_view_model.dart`, `lib/src/long_term_relation/presentation/details/relation_details_view_model.dart`, `test/intention/presentation/details/intention_details_view_model_test.dart`, тесты модели представления связи в `test/long_term_relation/presentation/details/`.
   - **Размер:** S.
-- [ ] 4.23 Основная мутация каталога результата удаления намерения всегда описывает удалённый предмет
+- [x] 4.23 Основная мутация каталога результата удаления намерения всегда описывает удалённый предмет
   - **Критерии приёмки:**
     - В `toSuccess` результата удаления намерения (`_CommittedIntentionDeleteCascade` в `lib/src/graph/data/drift_personal_graph_repository_cascade_commands.dart`) мутация каталога предмета выбирается явно по идентификатору удаляемого намерения, а не по позиции в `write.catalogMutations(revision)`; все остальные мутации каталога идут в `additionalCatalogMutations`, ни одна не теряется и не повторяется.
     - `IntentionDeleted.catalogMutation` — `IntentionCatalogDeleted` записи самого предмета независимо от порядка строк хранилища и порядка создания намерений каскада.
