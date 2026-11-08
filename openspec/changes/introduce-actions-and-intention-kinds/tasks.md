@@ -1295,3 +1295,16 @@
   - **Зависимости:** 3.9, 3.17.
   - **Предполагаемые файлы:** `lib/src/long_term_relation/presentation/batch_picker/relation_batch_view_model.dart`, `test/long_term_relation/presentation/batch_picker/relation_batch_view_model_test.dart`.
   - **Размер:** S.
+
+- [ ] 3.19 Вид созданного в поиске участника намерения хранится только в записи сессии поиска
+  - **Критерии приёмки:**
+    - В `relation_batch_view_model.dart` решение «становится вспомогательным» для кандидата исходящей группы выводится только из записи сессии поиска `_createdKinds`: `submit` для `RelationDirection.outgoing` передаёт `OutgoingRelationCandidate(id, becomesSupporting: _createdKinds[id] == IntentionKind.supporting)`.
+    - Отметка поиска не хранит вид: флага `becomesSupporting` в `_BatchMark` больше нет, отметка содержит только актуальное название (класс с одним полем `title` или `Map<IntentionId, String>` — выбрать более простой вариант); doc-комментарий отметки описывает новое содержимое, комментарии остаются на русском.
+    - `toggle`, `acceptCreated` и обработка переименования в `_onPackage` не вычисляют и не переносят вид; `acceptCreated` по-прежнему записывает выбранный вид в `_createdKinds`. Входящие группы не меняются.
+    - Поведение продукта и требования не меняются: тесты «повторная отметка сохраняет выбранный при создании вид» и «снятая отметка оставляет созданное намерение главным» в `test/long_term_relation/presentation/batch_picker/relation_batch_picker_page_test.dart` проходят без изменения утверждений; новые тесты не нужны.
+  - **Проверка:**
+    - `mise exec --no-deps -- flutter test test/long_term_relation/presentation/batch_picker`.
+    - `mise exec --no-deps -- flutter analyze lib/src/long_term_relation/presentation/batch_picker/relation_batch_view_model.dart`.
+  - **Зависимости:** 3.18.
+  - **Предполагаемые файлы:** `lib/src/long_term_relation/presentation/batch_picker/relation_batch_view_model.dart`.
+  - **Размер:** XS.
