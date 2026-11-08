@@ -3450,18 +3450,6 @@ abstract class AppLocalizations {
   /// **'The related intention no longer exists. The relation wasn’t restored.'**
   String get relationRestoreRelatedNotFound;
 
-  /// Архивное состояние исходного участника при восстановлении связи
-  ///
-  /// In en, this message translates to:
-  /// **'Restore the source intention before restoring this relation.'**
-  String get relationRestoreSourceArchived;
-
-  /// Архивное состояние связанного участника при восстановлении связи
-  ///
-  /// In en, this message translates to:
-  /// **'Restore the related intention before restoring this relation.'**
-  String get relationRestoreRelatedArchived;
-
   /// Устранимая недоступность восстановления связи
   ///
   /// In en, this message translates to:
@@ -3689,12 +3677,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete'**
   String get relationSheetOptionDelete;
-
-  /// Причина недоступности восстановления связи, когда архивированы оба участника
-  ///
-  /// In en, this message translates to:
-  /// **'Restore the source and related intentions before restoring this relation.'**
-  String get relationSheetOptionRestoreBothArchived;
 
   /// Вопрос подтверждения удаления связи из параметров панели
   ///

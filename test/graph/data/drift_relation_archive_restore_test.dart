@@ -236,7 +236,7 @@ void main() {
     );
   });
 
-  test('отсутствие связи отличается от конфликта участника', () async {
+  test('отсутствие связи отличается от других отказов', () async {
     final missingId = _relationId(_uuid(999));
     final archiveFailure = _failure(
       await repository.execute(givenArchiveRelation(missingId)),
@@ -254,30 +254,10 @@ void main() {
       ),
     );
     expect(restoreFailure, isA<LongTermRelationNotFoundFailure>());
-
-    await _create(repository, sourceId, relatedId);
-    await repository.execute(
-      await previewedArchiveIntention(repository, sourceId),
-    );
-    final participantFailure = _failure(
-      await repository.execute(
-        await previewedRestoreRelation(repository, relationId),
-      ),
-    );
-    expect(
-      participantFailure,
-      isA<LongTermRelationParticipantArchivedFailure>()
-          .having(
-            (failure) => failure.role,
-            'роль',
-            RelationParticipantRole.source,
-          )
-          .having((failure) => failure.intentionId, 'участник', sourceId),
-    );
   });
 
   test(
-    'каскад требует восстановить участника раньше связи для обеих ролей',
+    'восстановление связи возвращает архивного участника в обеих ролях',
     () async {
       await _create(repository, sourceId, relatedId);
       await repository.execute(
@@ -285,19 +265,17 @@ void main() {
       );
 
       expect(
-        _failure(
+        _confirmedUpdated(
           await repository.execute(
             await previewedRestoreRelation(repository, relationId),
           ),
-        ),
-        isA<LongTermRelationParticipantArchivedFailure>().having(
-          (failure) => failure.role,
-          'роль',
-          RelationParticipantRole.source,
-        ),
+        ).value.relation.scope,
+        RelationScope.active,
       );
+      expect(await _isArchived(database, sourceId), isFalse);
+
       await repository.execute(
-        await previewedRestoreIntention(repository, sourceId),
+        await previewedArchiveIntention(repository, relatedId),
       );
       expect(
         _confirmedUpdated(
@@ -307,40 +285,7 @@ void main() {
         ).value.relation.scope,
         RelationScope.active,
       );
-
-      await repository.execute(
-        await previewedArchiveIntention(repository, relatedId),
-      );
-      await repository.execute(
-        await previewedRestoreIntention(repository, relatedId),
-      );
-      expect(
-        _confirmedUpdated(
-          await repository.execute(
-            await previewedRestoreRelation(repository, relationId),
-          ),
-        ).value.relation.scope,
-        RelationScope.active,
-      );
-
-      await repository.execute(
-        await previewedArchiveRelation(repository, relationId),
-      );
-      await repository.execute(
-        await previewedArchiveIntention(repository, relatedId),
-      );
-      expect(
-        _failure(
-          await repository.execute(
-            await previewedRestoreRelation(repository, relationId),
-          ),
-        ),
-        isA<LongTermRelationParticipantArchivedFailure>().having(
-          (failure) => failure.role,
-          'роль',
-          RelationParticipantRole.related,
-        ),
-      );
+      expect(await _isArchived(database, relatedId), isFalse);
     },
   );
 
@@ -531,6 +476,16 @@ Future<Map<String, Object?>> _storedRelation(
           .getSingle())
       .data,
 );
+
+Future<bool> _isArchived(AppDatabase database, IntentionId id) async =>
+    (await database
+            .customSelect(
+              'SELECT is_archived FROM intentions WHERE id = ?',
+              variables: [Variable<String>(id.toCanonicalString())],
+            )
+            .getSingle())
+        .read<int>('is_archived') ==
+    1;
 
 Future<List<Map<String, Object?>>> _storedIntentions(
   AppDatabase database,

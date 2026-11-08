@@ -1287,41 +1287,6 @@ void main() {
     expect(find.byType(SnackBar), findsNothing);
   });
 
-  for (final scenario in <({RelationParticipantRole role, String outcome})>[
-    (
-      role: RelationParticipantRole.source,
-      outcome: 'Restore the source intention before restoring this relation.',
-    ),
-    (
-      role: RelationParticipantRole.related,
-      outcome: 'Restore the related intention before restoring this relation.',
-    ),
-  ]) {
-    testWidgets(
-      'восстановление объясняет архивного участника ${scenario.role.name}',
-      (tester) async {
-        final harness = await _pumpPresenterApp(tester);
-        final restore = harness.startRelationRestore();
-        harness.completeRelationFailure(
-          restore,
-          LongTermRelationParticipantArchivedFailure(
-            role: scenario.role,
-            intentionId: testDetailsIntentionId(1),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        expect(
-          find.text(_relationRestoreOutcome(scenario.outcome)),
-          findsOneWidget,
-        );
-
-        await _closeMessage(tester);
-        expect(find.byType(SnackBar), findsNothing);
-      },
-    );
-  }
-
   testWidgets('восстановление связи предъявляется на русском языке', (
     tester,
   ) async {
@@ -1329,17 +1294,14 @@ void main() {
     final restore = harness.startRelationRestore();
     harness.completeRelationFailure(
       restore,
-      LongTermRelationParticipantArchivedFailure(
-        role: RelationParticipantRole.related,
-        intentionId: testDetailsIntentionId(2),
-      ),
+      const LongTermRelationCascadeConflictFailure(),
     );
     await tester.pumpAndSettle();
 
     expect(
       find.text(
-        'Восстановление — «связь»: Сначала восстановите связанное намерение, '
-        'затем восстановите эту связь.',
+        'Восстановление — «связь»: Связь не удалось восстановить из-за '
+        'конфликта актуального состояния.',
       ),
       findsOneWidget,
     );
@@ -1838,9 +1800,6 @@ String _notDeleted(String title) =>
     'Delete — “$title”: The intention couldn’t be deleted. Try again.';
 
 String _relationUpdateOutcome(String outcome) => 'Edit — “relation”: $outcome';
-
-String _relationRestoreOutcome(String outcome) =>
-    'Restore — “relation”: $outcome';
 
 String _relationDeleteOutcome(String outcome) =>
     'Delete — “relation”: $outcome';

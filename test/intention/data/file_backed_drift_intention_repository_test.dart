@@ -367,6 +367,15 @@ Future<void> _createFirstObjectGraph(
       const CreateIntention(title: 'Архивировать журнал', description: null),
     ),
   );
+  for (final command in [
+    () => previewedArchiveIntention(repository, archivedId),
+    () => previewedRestoreIntention(repository, archivedId),
+    () => previewedArchiveIntention(repository, archivedId),
+  ]) {
+    final saved = _saved(await repository.execute(await command()));
+    expect(saved.kind, IntentionKind.main);
+  }
+  // Архивное вспомогательное намерение может не иметь входящей связи.
   await seedGraph(
     database,
     () => database.customStatement(
@@ -374,14 +383,6 @@ Future<void> _createFirstObjectGraph(
       ['supporting', archivedId.toCanonicalString()],
     ),
   );
-  for (final command in [
-    () => previewedArchiveIntention(repository, archivedId),
-    () => previewedRestoreIntention(repository, archivedId),
-    () => previewedArchiveIntention(repository, archivedId),
-  ]) {
-    final saved = _saved(await repository.execute(await command()));
-    expect(saved.kind, IntentionKind.supporting);
-  }
 
   _saved(
     await repository.execute(

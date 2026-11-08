@@ -202,13 +202,28 @@ void main() {
       await _expandArchive(tester);
       await _pumpUntilFound(tester, _relationRow(renamedPhrase));
 
+      // Восстановление намерения возвращает его связь с активным намерением.
       await _chooseIntentionOption(tester, IntentionOption.restore);
       await _pumpUntilHeadActive(tester);
       await _dismissOperationMessage(tester);
       expect(_relationRow(renamedPhrase), findsOneWidget);
       expect(
-        find.bySemanticsLabel('Relations: 0 active, 1 archived'),
+        find.bySemanticsLabel('Relations: 1 active, 0 archived'),
         findsOneWidget,
+      );
+
+      await tester.tap(_relationRow(renamedPhrase));
+      await _pumpUntilRelationSheet(tester, renamedPhrase);
+      await _chooseRelationOption(
+        tester,
+        l10n,
+        l10n.relationSheetOptionArchive,
+      );
+      await _pumpUntilRelationHead<RelationHeadArchived>(tester);
+      await _closeRelationSheet(tester);
+      await _pumpUntilFound(
+        tester,
+        find.bySemanticsLabel('Relations: 0 active, 1 archived'),
       );
 
       await tester.pumpWidget(const SizedBox.shrink());
@@ -1023,14 +1038,14 @@ void main() {
         ),
       );
       await _pumpUntilDetailsTitle(tester, _swim);
+      // Восстановление «Плавать» возвращает его связи с активными
+      // намерениями, в том числе открытую в панели.
       await _chooseIntentionOption(tester, IntentionOption.restore);
       await _pumpUntilAbsent(tester, intentionHeadRestore);
       await _dismissOperationMessage(tester);
       await tester.binding.handlePopRoute();
-      await _pumpUntilRelationSheet(
-        tester,
-        l10n.relationSheetArchivedLabel(archivedPhrase),
-      );
+      await _pumpUntilRelationSheet(tester, archivedPhrase);
+      await _pumpUntilRelationHead<RelationHeadActive>(tester);
       await _closeRelationSheet(tester);
       await tester.binding.handlePopRoute();
       await _pumpUntilFound(tester, find.byType(CatalogHeader));
@@ -1046,7 +1061,7 @@ void main() {
         scrollable: scrollable,
       );
       expect(_pickerMarks(tester, l10n, _swim), [
-        l10n.relationPairAlreadyAddedArchived,
+        l10n.relationPairAlreadyAdded,
       ]);
       expect(find.text(l10n.batchAddCount(1)), findsOneWidget);
     },

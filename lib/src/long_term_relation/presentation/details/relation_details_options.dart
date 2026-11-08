@@ -6,8 +6,6 @@ import '../../../design_system/components/option_row.dart';
 import '../../../design_system/components/options_menu.dart';
 import '../../../design_system/components/sheet.dart';
 import '../../../design_system/doable_icon.dart';
-import '../../../intention/domain/intention.dart';
-import '../../application/long_term_relation_projection.dart';
 import '../../domain/long_term_relation.dart';
 import 'relation_details_state.dart';
 import 'relation_details_view_model.dart';
@@ -39,23 +37,17 @@ List<OptionsMenuItem<RelationOption>> relationOptions(
       icon: DoableIconData.archive,
       name: localizations.relationSheetOptionArchive,
     ),
-    RelationScope.archived => switch (_restoreBlocker(localizations, details)) {
-      final reason? => OptionsMenuItem<RelationOption>.unavailable(
-        icon: DoableIconData.unarchive,
-        name: localizations.relationSheetOptionRestore,
-        reason: reason,
-      ),
-      null when busy => OptionsMenuItem<RelationOption>.unavailable(
+    RelationScope.archived when busy =>
+      OptionsMenuItem<RelationOption>.unavailable(
         icon: DoableIconData.unarchive,
         name: localizations.relationSheetOptionRestore,
         reason: wait,
       ),
-      null => OptionsMenuItem(
-        value: RelationOption.restore,
-        icon: DoableIconData.unarchive,
-        name: localizations.relationSheetOptionRestore,
-      ),
-    },
+    RelationScope.archived => OptionsMenuItem(
+      value: RelationOption.restore,
+      icon: DoableIconData.unarchive,
+      name: localizations.relationSheetOptionRestore,
+    ),
   };
 
   final delete = busy
@@ -72,24 +64,6 @@ List<OptionsMenuItem<RelationOption>> relationOptions(
         );
 
   return [stateChange, delete];
-}
-
-/// Причина, по которой архивированную связь нельзя восстановить: пока
-/// архивирован участник, связь не может стать активной.
-String? _restoreBlocker(
-  AppLocalizations localizations,
-  LongTermRelationDetails details,
-) {
-  final sourceArchived =
-      details.source.archiveState == IntentionArchiveState.archived;
-  final relatedArchived =
-      details.related.archiveState == IntentionArchiveState.archived;
-  return switch ((sourceArchived, relatedArchived)) {
-    (true, true) => localizations.relationSheetOptionRestoreBothArchived,
-    (true, false) => localizations.relationRestoreSourceArchived,
-    (false, true) => localizations.relationRestoreRelatedArchived,
-    (false, false) => null,
-  };
 }
 
 /// Лист параметров следит за снимком панели: операция, начатая или

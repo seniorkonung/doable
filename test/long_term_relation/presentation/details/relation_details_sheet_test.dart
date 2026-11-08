@@ -1039,31 +1039,25 @@ void main() {
       semantics.dispose();
     });
 
-    for (final (title, source, related, reason) in const [
+    for (final (title, source, related) in const [
       (
-        'исходный',
+        'исходным',
         IntentionArchiveState.archived,
         IntentionArchiveState.active,
-        'Сначала восстановите исходное намерение, затем восстановите эту '
-            'связь.',
       ),
       (
-        'связанный',
+        'связанным',
         IntentionArchiveState.active,
         IntentionArchiveState.archived,
-        'Сначала восстановите связанное намерение, затем восстановите эту '
-            'связь.',
       ),
       (
-        'оба',
+        'обоими',
         IntentionArchiveState.archived,
         IntentionArchiveState.archived,
-        'Сначала восстановите исходное и связанное намерения, затем '
-            'восстановите эту связь.',
       ),
     ]) {
-      testWidgets('восстановление остаётся в меню с причиной, пока архивирован '
-          '$title участник', (tester) async {
+      testWidgets('восстановление связи с архивным $title участником '
+          'доступно и отправляет команду', (tester) async {
         final semantics = tester.ensureSemantics();
         final repository = await openPanel(
           tester,
@@ -1074,15 +1068,13 @@ void main() {
           ),
         );
 
-        await openMenu(tester);
-        expect(find.text('Восстановить из архива'), findsOneWidget);
-        expect(find.text(reason), findsOneWidget);
-
-        await tester.tap(find.text('Восстановить из архива'));
+        await choose(tester, 'Восстановить из архива');
         await tester.pumpAndSettle();
 
-        expect(repository.relationCommands, isEmpty);
-        expect(find.text(reason), findsOneWidget);
+        expect(
+          repository.relationCommands.single,
+          isA<RestoreLongTermRelation>(),
+        );
         semantics.dispose();
       });
     }
@@ -1444,26 +1436,25 @@ void main() {
       semantics.dispose();
     });
 
-    testWidgets('отказ восстановления из-за участника объясняется в панели '
+    testWidgets('конфликт состава при восстановлении объясняется в панели '
         'без повтора', (tester) async {
       final semantics = tester.ensureSemantics();
-      final details = relation(scope: RelationScope.archived);
-      final repository = await openPanel(tester, details);
+      final repository = await openPanel(
+        tester,
+        relation(scope: RelationScope.archived),
+      );
 
       await choose(tester, 'Восстановить из архива');
       repository.failRelationCommand(
         0,
-        LongTermRelationParticipantArchivedFailure(
-          role: RelationParticipantRole.related,
-          intentionId: details.related.id,
-        ),
+        const LongTermRelationCascadeConflictFailure(),
       );
       await tester.pumpAndSettle();
 
       expect(
         find.text(
-          'Сначала восстановите связанное намерение, затем восстановите эту '
-          'связь.',
+          'Связь не удалось восстановить из-за конфликта актуального '
+          'состояния.',
         ),
         findsOneWidget,
       );

@@ -10,7 +10,6 @@ import '../../../graph/application/graph_revision.dart';
 import '../../../graph/application/personal_graph_repository_provider.dart';
 import '../../../intention/application/cascade/intention_cascade.dart';
 import '../../../intention/application/intention_catalog.dart';
-import '../../../intention/domain/intention.dart';
 import '../../../intention/domain/intention_id.dart';
 import '../../application/long_term_relation_command.dart';
 import '../../application/long_term_relation_projection.dart';
@@ -419,9 +418,7 @@ final class RelationDetailsViewModel extends _$RelationDetailsViewModel {
     RelationDetailsLifecycleKind.archive =>
       loaded.details.relation.scope == RelationScope.active,
     RelationDetailsLifecycleKind.restore =>
-      loaded.details.relation.scope == RelationScope.archived &&
-          loaded.details.source.archiveState == IntentionArchiveState.active &&
-          loaded.details.related.archiveState == IntentionArchiveState.active,
+      loaded.details.relation.scope == RelationScope.archived,
     RelationDetailsLifecycleKind.delete => true,
   };
 

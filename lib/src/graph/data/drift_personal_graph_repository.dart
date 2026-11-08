@@ -575,7 +575,7 @@ final class DriftPersonalGraphRepository
           UpdateIntention() => _updateIntention(command, clock),
           ChangeIntentionKind() => _changeIntentionKind(command, clock),
           ArchiveIntention() => _archiveIntentionCascade(command, clock),
-          RestoreIntention() => _restoreIntention(command.id, clock),
+          RestoreIntention() => _restoreIntentionCascade(command, clock),
           DeleteIntention() => _deleteIntentionCascade(command, clock),
         },
       );
@@ -894,37 +894,6 @@ final class DriftPersonalGraphRepository
       ),
     );
     final stored = await _readCommandSnapshot(command.id);
-    if (stored == null) throw const StoredGraphCorruption();
-    return _CommittedIntentionUpdated(
-      changesHolding: true,
-      intention: stored.intention,
-      before: before,
-      after: await _catalogEntrySnapshot(stored),
-    );
-  }
-
-  Future<_CommittedIntentionCommand> _restoreIntention(
-    IntentionId id,
-    _GraphWriteClock clock,
-  ) async {
-    final storedBefore = await _readCommandSnapshot(id);
-    if (storedBefore == null) throw const _IntentionNotFound();
-
-    final existing = storedBefore.intention;
-    final before = await _catalogEntrySnapshot(storedBefore);
-    if (existing.archiveState == domain.IntentionArchiveState.active) {
-      return _CommittedIntentionUnchanged(intention: existing, entry: before);
-    }
-
-    await (_database.update(
-      _database.intentions,
-    )..where((row) => row.id.equals(id.toCanonicalString()))).write(
-      local.IntentionsCompanion(
-        isArchived: const Value(false),
-        updatedAt: Value(clock.read().microsecondsSinceEpoch),
-      ),
-    );
-    final stored = await _readCommandSnapshot(id);
     if (stored == null) throw const StoredGraphCorruption();
     return _CommittedIntentionUpdated(
       changesHolding: true,

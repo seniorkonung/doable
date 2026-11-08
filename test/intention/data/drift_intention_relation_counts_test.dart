@@ -243,15 +243,30 @@ void main() {
       ),
     );
 
+    // Восстановление возвращает все связи владельца с активными
+    // намерениями, в том числе отдельно архивированную 183.
+    final restoredCounts = {
+      for (final change
+          in restore.changes.whereType<IntentionRelationCountsChanged>())
+        change.intentionId: change.counts,
+    };
     expect(
-      restore.changes.whereType<IntentionRelationCountsChanged>(),
-      isEmpty,
+      restoredCounts.keys,
+      unorderedEquals([owner, firstNeighbor, secondNeighbor, archivedNeighbor]),
     );
+    expect(restoredCounts[owner]?.active, 3);
+    expect(restoredCounts[owner]?.archived, 0);
+    expect(restoredCounts[firstNeighbor]?.active, 2);
+    expect(restoredCounts[firstNeighbor]?.archived, 0);
+    expect(restoredCounts[secondNeighbor]?.active, 2);
+    expect(restoredCounts[secondNeighbor]?.archived, 0);
+    expect(restoredCounts[archivedNeighbor]?.active, 2);
+    expect(restoredCounts[archivedNeighbor]?.archived, 0);
     expect(await _relationArchiveStates(database), {
-      _uuid(180): true,
-      _uuid(181): true,
+      _uuid(180): false,
+      _uuid(181): false,
       _uuid(182): false,
-      _uuid(183): true,
+      _uuid(183): false,
       _uuid(184): false,
     });
     final restoredOwner = await (database.select(
@@ -348,30 +363,37 @@ void main() {
       expect(neighborSnapshot.value?.relationCounts.archived, 1);
       expect(published(), [2, 2, 1, 1]);
 
-      // Восстановление не возвращает связи: меняется только владелец.
+      // Восстановление возвращает обе связи с активными соседями, поэтому
+      // меняются владелец и оба соседа.
       final restored = _confirmedCommand(
         await repository.execute(
           await previewedRestoreIntention(repository, owner),
         ),
       );
       await untilPublished(owner, 3);
+      await untilPublished(activeNeighbor, 3);
+      await untilPublished(archivedNeighbor, 2);
       await pumpEventQueue();
+      final restoredOwner = _successfulSnapshot(snapshots[owner]!.last);
       expect(
-        _successfulSnapshot(snapshots[owner]!.last).revision
-            .compareTo(restored.revision),
+        restoredOwner.revision.compareTo(restored.revision),
         GraphRevisionOrder.same,
       );
-      expect(published(), [3, 2, 1, 1]);
+      expect(restoredOwner.value?.relationCounts.active, 2);
+      expect(restoredOwner.value?.relationCounts.archived, 0);
+      expect(published(), [3, 3, 2, 1]);
 
-      // Повторное архивирование без активных связей меняет только владельца.
-      final archivedWithoutActiveRelations = _confirmedCommand(
+      // Повторное архивирование уносит вернувшиеся связи.
+      final archivedAgain = _confirmedCommand(
         await repository.execute(
           await previewedArchiveIntention(repository, owner),
         ),
       );
       await untilPublished(owner, 4);
+      await untilPublished(activeNeighbor, 4);
+      await untilPublished(archivedNeighbor, 3);
       await pumpEventQueue();
-      expect(published(), [4, 2, 1, 1]);
+      expect(published(), [4, 4, 3, 1]);
 
       // Повтор без изменений ничего не публикует.
       final noOp = _confirmedCommand(
@@ -379,10 +401,10 @@ void main() {
       );
       await pumpEventQueue();
       expect(
-        archivedWithoutActiveRelations.revision.compareTo(noOp.revision),
+        archivedAgain.revision.compareTo(noOp.revision),
         GraphRevisionOrder.same,
       );
-      expect(published(), [4, 2, 1, 1]);
+      expect(published(), [4, 4, 3, 1]);
     },
   );
 }

@@ -66,19 +66,14 @@ String longTermRelationCommandFailureMessage(
       RelationParticipantRole.related =>
         localizations.relationRestoreRelatedNotFound,
     },
-    LongTermRelationParticipantArchivedFailure(:final role) => switch (role) {
-      RelationParticipantRole.source =>
-        localizations.relationRestoreSourceArchived,
-      RelationParticipantRole.related =>
-        localizations.relationRestoreRelatedArchived,
-    },
     LongTermRelationUnavailableFailure() =>
       localizations.relationRestoreUnavailable,
     LongTermRelationCorruptionFailure() =>
       localizations.relationRestoreCorruption,
     LongTermRelationCascadeConflictFailure() ||
     LongTermRelationPairOccupiedFailure() ||
-    LongTermRelationArchivedTypeChangeFailure() =>
+    LongTermRelationArchivedTypeChangeFailure() ||
+    LongTermRelationParticipantArchivedFailure() =>
       localizations.relationRestoreConflict,
     LongTermRelationUnexpectedFailure() =>
       localizations.relationRestoreUnexpected,

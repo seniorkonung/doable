@@ -275,16 +275,16 @@ void main() {
         candidateIds: [relatedId],
       ),
     );
+    // Восстановление связи теперь вернуло бы и архивированного участника.
+    final staleRestore = await previewedRestoreRelation(repository, relationId);
     await repository.execute(
       await previewedArchiveIntention(repository, sourceId),
     );
-    final archivedParticipant = await repository.execute(
-      await previewedRestoreRelation(repository, relationId),
-    );
+    final compositionConflict = await repository.execute(staleRestore);
 
     expect(archivedTypeChange, isA<GraphCommandFailed>());
     expect(occupiedPair, isA<GraphCommandFailed>());
-    expect(archivedParticipant, isA<GraphCommandFailed>());
+    expect(compositionConflict, isA<GraphCommandFailed>());
     expect(await _timestamps(database, relationId), before);
   });
 

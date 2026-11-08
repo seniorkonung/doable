@@ -1531,14 +1531,6 @@
   "@relationRestoreRelatedNotFound": {
     "description": "Отсутствие связанного участника при восстановлении связи"
   },
-  "relationRestoreSourceArchived": "Restore the source intention before restoring this relation.",
-  "@relationRestoreSourceArchived": {
-    "description": "Архивное состояние исходного участника при восстановлении связи"
-  },
-  "relationRestoreRelatedArchived": "Restore the related intention before restoring this relation.",
-  "@relationRestoreRelatedArchived": {
-    "description": "Архивное состояние связанного участника при восстановлении связи"
-  },
   "relationRestoreUnavailable": "The relation couldn’t be restored. Try again.",
   "@relationRestoreUnavailable": {
     "description": "Устранимая недоступность восстановления связи"
@@ -1695,10 +1687,6 @@
   "relationSheetOptionDelete": "Delete",
   "@relationSheetOptionDelete": {
     "description": "Пункт параметров панели связи: удалить"
-  },
-  "relationSheetOptionRestoreBothArchived": "Restore the source and related intentions before restoring this relation.",
-  "@relationSheetOptionRestoreBothArchived": {
-    "description": "Причина недоступности восстановления связи, когда архивированы оба участника"
   },
   "relationSheetDeleteDialogTitle": "Delete relation?",
   "@relationSheetDeleteDialogTitle": {

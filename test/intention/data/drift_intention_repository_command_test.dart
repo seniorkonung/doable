@@ -1560,10 +1560,13 @@ void main() {
       );
 
       // Сохранённая проекция расходится с названием, как после обновления
-      // данных Unicode без пересчёта: ключ следует проекции.
-      rawOverride.overrideSelect(const {
-        'title_search_key': 'читать',
-      }, column: 'title_search_key');
+      // данных Unicode без пересчёта: ключ следует проекции. Первое чтение
+      // строки проверяет архивное состояние, второе даёт снимок до записи.
+      rawOverride.overrideSelect(
+        const {'title_search_key': 'читать'},
+        column: 'title_search_key',
+        skippedReads: 1,
+      );
       final restored = _commandSuccess(
         await repository.execute(
           await previewedRestoreIntention(repository, walkId),

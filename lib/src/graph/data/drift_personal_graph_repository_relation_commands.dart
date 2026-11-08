@@ -1,31 +1,33 @@
 part of 'drift_personal_graph_repository.dart';
 
-/// Состояние связи до каскада и показание времени, записанное каскадом.
-/// Изменение получает ревизию только после подтверждения каскада.
-final class _CascadedRelationArchive {
-  const _CascadedRelationArchive(this.before, this.archivedAt);
+/// Состояние связи до каскада, архивное состояние и показание времени,
+/// записанные каскадом. Изменение получает ревизию только после
+/// подтверждения каскада.
+final class _CascadedRelationScopeChange {
+  const _CascadedRelationScopeChange(this.before, this.scope, this.changedAt);
 
   final relation_domain.LongTermRelation before;
-  final relation_domain.RelationTimestamp archivedAt;
+  final relation_domain.RelationScope scope;
+  final relation_domain.RelationTimestamp changedAt;
 
-  relation_domain.LongTermRelation get archived =>
+  relation_domain.LongTermRelation get after =>
       relation_domain.LongTermRelation(
         id: before.id,
         sourceIntentionId: before.sourceIntentionId,
         relatedIntentionId: before.relatedIntentionId,
         type: before.type,
         priority: before.priority,
-        scope: relation_domain.RelationScope.archived,
+        scope: scope,
         creationSequence: before.creationSequence,
         createdAt: before.createdAt,
-        updatedAt: archivedAt,
+        updatedAt: changedAt,
       );
 
   LongTermRelationUpdatedChange toChange(GraphRevision revision) =>
       LongTermRelationUpdatedChange(
         revision: revision,
         before: before,
-        after: archived,
+        after: after,
       );
 }
 
@@ -42,11 +44,7 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
           AddLongTermRelations() => _addLongTermRelations(command, clock),
           UpdateLongTermRelation() => _updateLongTermRelation(command, clock),
           ArchiveLongTermRelation() => _archiveRelationCascade(command, clock),
-          RestoreLongTermRelation() => _setLongTermRelationScope(
-            relationId: command.relationId,
-            scope: relation_domain.RelationScope.active,
-            clock: clock,
-          ),
+          RestoreLongTermRelation() => _restoreRelationCascade(command, clock),
           DeleteLongTermRelation() => _deleteRelationCascade(command, clock),
         },
       );
@@ -281,88 +279,6 @@ extension _LongTermRelationCommandExecution on DriftPersonalGraphRepository {
     if (!_sameStoredRelation(
       before: after,
       beforeDescription: description,
-      after: verifiedAfter,
-      afterDescription: storedAfter.description,
-    )) {
-      throw const StoredGraphCorruption();
-    }
-    final affectedCounts = await _readVerifiedRelationCountsFor({
-      before.sourceIntentionId,
-      before.relatedIntentionId,
-    });
-    return _CommittedLongTermRelationUpdate(
-      before: before,
-      relation: verifiedAfter,
-      description: storedAfter.description,
-      affectedCounts: affectedCounts,
-      didMutate: true,
-    );
-  }
-
-  Future<_CommittedLongTermRelationUpdate> _setLongTermRelationScope({
-    required LongTermRelationId relationId,
-    required relation_domain.RelationScope scope,
-    required _GraphWriteClock clock,
-  }) async {
-    final storedBefore = await _readStoredRelation(relationId);
-    if (storedBefore == null) {
-      throw _LongTermRelationNotFound(relationId);
-    }
-    final before = storedBefore.toDomain();
-
-    if (scope == relation_domain.RelationScope.active) {
-      await _requireRelationParticipant(
-        before.sourceIntentionId,
-        RelationParticipantRole.source,
-        mustBeActive: true,
-      );
-      await _requireRelationParticipant(
-        before.relatedIntentionId,
-        RelationParticipantRole.related,
-        mustBeActive: true,
-      );
-    }
-
-    final after = relation_domain.LongTermRelation(
-      id: before.id,
-      sourceIntentionId: before.sourceIntentionId,
-      relatedIntentionId: before.relatedIntentionId,
-      type: before.type,
-      priority: before.priority,
-      scope: scope,
-      creationSequence: before.creationSequence,
-      createdAt: before.createdAt,
-      updatedAt: before.updatedAt,
-    );
-    if (before.scope == scope) {
-      return _CommittedLongTermRelationUpdate(
-        before: before,
-        relation: after,
-        description: storedBefore.description,
-        affectedCounts: const {},
-        didMutate: false,
-      );
-    }
-
-    final updatedRows =
-        await (_database.update(
-          _database.longTermRelations,
-        )..where((row) => row.id.equals(relationId.toCanonicalString()))).write(
-          local.LongTermRelationsCompanion(
-            isArchived: Value(scope == relation_domain.RelationScope.archived),
-            updatedAt: Value(clock.read().microsecondsSinceEpoch),
-          ),
-        );
-    if (updatedRows != 1) {
-      throw _LongTermRelationNotFound(relationId);
-    }
-
-    final storedAfter = await _readStoredRelation(relationId);
-    if (storedAfter == null) throw const StoredGraphCorruption();
-    final verifiedAfter = storedAfter.toDomain();
-    if (!_sameStoredRelation(
-      before: after,
-      beforeDescription: storedBefore.description,
       after: verifiedAfter,
       afterDescription: storedAfter.description,
     )) {

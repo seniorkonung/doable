@@ -128,9 +128,11 @@ void main() {
         row('long_term_relations', 101),
         row('long_term_relations', 103),
       ];
-      // Каскад архива меняет показание изменения прямых связей один раз;
-      // восстановление намерения связи не восстанавливает.
+      // Архивирование и восстановление намерения меняют показание изменения
+      // прямых связей с активными намерениями; отдельно архивированная связь
+      // 102 с архивным намерением не меняется.
       var directRelationUpdatedAt = activeDirectRelations[0]['updated_at'];
+      var directRelationArchiveBefore = 0;
 
       Future<void> expectStep(
         IntentionCommand command, {
@@ -148,7 +150,10 @@ void main() {
         expect(intention['is_archived'], archived);
         expect(intention['created_at'], createdAt);
         expect(intention['updated_at'], now.microsecondsSinceEpoch);
-        if (archived == 1) directRelationUpdatedAt = now.microsecondsSinceEpoch;
+        if (directRelationArchive != directRelationArchiveBefore) {
+          directRelationUpdatedAt = now.microsecondsSinceEpoch;
+          directRelationArchiveBefore = directRelationArchive;
+        }
         expect(row('long_term_relations', 101), {
           ...activeDirectRelations[0],
           'is_archived': directRelationArchive,
@@ -226,7 +231,7 @@ void main() {
         title: 'Новое название',
         description: 'Новое описание',
         archived: 0,
-        directRelationArchive: 1,
+        directRelationArchive: 0,
       );
 
       final beforeUnchangedAndRejected = graph();

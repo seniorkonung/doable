@@ -2226,14 +2226,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'The related intention no longer exists. The relation wasn’t restored.';
 
   @override
-  String get relationRestoreSourceArchived =>
-      'Restore the source intention before restoring this relation.';
-
-  @override
-  String get relationRestoreRelatedArchived =>
-      'Restore the related intention before restoring this relation.';
-
-  @override
   String get relationRestoreUnavailable =>
       'The relation couldn’t be restored. Try again.';
 
@@ -2371,10 +2363,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get relationSheetOptionDelete => 'Delete';
-
-  @override
-  String get relationSheetOptionRestoreBothArchived =>
-      'Restore the source and related intentions before restoring this relation.';
 
   @override
   String get relationSheetDeleteDialogTitle => 'Delete relation?';

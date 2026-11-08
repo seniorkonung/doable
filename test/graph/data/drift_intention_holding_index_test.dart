@@ -396,6 +396,43 @@ void main() {
     expect(runner.calls, 2);
   });
 
+  test('восстановление намерения меняет состав и удержание по варианту, '
+      'переданному командой', () async {
+    await confirm(
+      await previewedArchiveIntention(previews, durabilityIntention(2)),
+    );
+    // Предпросмотр после команды читает проверяемый репозиторий: индекс
+    // отдельного репозитория не знает о его ревизиях.
+    final preview = await repository.previewCurrentCascade(
+      IntentionCascadeSubject(durabilityIntention(2)),
+      CascadeOperation.restore,
+    ) as RestoreCascadePreview;
+    final plan = preview.plan;
+    expect(plan.withSupporting.restored, [durabilityIntention(3)]);
+    expect(plan.onlyThis.restored, isEmpty);
+
+    final onlyThis = await confirm(
+      RestoreIntention(
+        durabilityIntention(2),
+        execution: CascadeExecution(
+          choice: CascadeChoice.onlyThis,
+          expected: plan.onlyThis,
+        ),
+      ),
+    );
+
+    final executed =
+        onlyThis.changes.whereType<CascadeOutcome>().single.executed
+            as RestoreCascadeComposition;
+    expect(executed.restored, isEmpty);
+    expect(executed.returnedAsMain, isNull);
+    // «2» вернулось со связью от «1», а «3» осталось в архиве.
+    expect(await holdings([2, 3]), {
+      2: IntentionHolding.held,
+      3: IntentionHolding.notHeld,
+    });
+  });
+
   test('восстановление связи и намерения сбрасывает индекс', () async {
     // «7» становится главным и удерживает «6» связью 106.
     final plan = await archivePlan(

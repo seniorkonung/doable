@@ -2257,14 +2257,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Связанное намерение больше не существует. Связь не восстановлена.';
 
   @override
-  String get relationRestoreSourceArchived =>
-      'Сначала восстановите исходное намерение, затем восстановите эту связь.';
-
-  @override
-  String get relationRestoreRelatedArchived =>
-      'Сначала восстановите связанное намерение, затем восстановите эту связь.';
-
-  @override
   String get relationRestoreUnavailable =>
       'Не удалось восстановить связь. Повторите попытку.';
 
@@ -2402,10 +2394,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get relationSheetOptionDelete => 'Удалить';
-
-  @override
-  String get relationSheetOptionRestoreBothArchived =>
-      'Сначала восстановите исходное и связанное намерения, затем восстановите эту связь.';
 
   @override
   String get relationSheetDeleteDialogTitle => 'Удалить связь?';

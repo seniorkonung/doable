@@ -16,17 +16,29 @@ final class _IntentionKindInvariantViolation implements Exception {
 /// часть дважды и остаётся под пределом переменных SQLite.
 const _cascadeChunkSize = 400;
 
+/// Связи, которые каскад читает у затронутых намерений.
+enum _CascadeRelationSelection {
+  /// Любого архивного состояния: удаление.
+  any,
+
+  /// Активные: архивирование.
+  active,
+
+  /// Архивные, оба участника которых активны: восстановление.
+  archivedBetweenActive,
+}
+
 /// Записанный каскад: удалённые намерения со строками каталога до удаления,
 /// строки каталога каждого оставшегося намерения, у которого изменились
-/// архивное состояние или вид, — в порядке записи, — удалённые и
-/// архивированные связи и абсолютные количества связей затронутых
-/// оставшихся намерений и соседей (ADR-0011).
+/// архивное состояние или вид, — в порядке записи, — удалённые связи, связи,
+/// у которых изменилось архивное состояние, и абсолютные количества связей
+/// затронутых оставшихся намерений и соседей (ADR-0011).
 final class _CascadeWrite {
   _CascadeWrite({
     required Map<IntentionId, IntentionCatalogEntrySnapshot> deleted,
     required Map<IntentionId, _IntentionCatalogChange> intentions,
     required List<relation_domain.LongTermRelation> deletedRelations,
-    required List<_CascadedRelationArchive> relations,
+    required List<_CascadedRelationScopeChange> relations,
     required Map<IntentionId, RelationCounts> counts,
   }) : deleted = Map.unmodifiable(deleted),
        intentions = Map.unmodifiable(intentions),
@@ -37,7 +49,7 @@ final class _CascadeWrite {
   final Map<IntentionId, IntentionCatalogEntrySnapshot> deleted;
   final Map<IntentionId, _IntentionCatalogChange> intentions;
   final List<relation_domain.LongTermRelation> deletedRelations;
-  final List<_CascadedRelationArchive> relations;
+  final List<_CascadedRelationScopeChange> relations;
   final Map<IntentionId, RelationCounts> counts;
 
   /// Удалённые намерения раньше изменённых, каждые — в порядке записи.
@@ -93,7 +105,7 @@ extension _CascadeCommandExecution on DriftPersonalGraphRepository {
     );
     final stored = await _readCommandSnapshot(command.id);
     if (stored == null) throw const StoredGraphCorruption();
-    return _CommittedIntentionArchiveCascade(
+    return _CommittedIntentionCascadeUpdate(
       intention: stored.intention,
       write: write,
       executed: executed,
@@ -137,7 +149,7 @@ extension _CascadeCommandExecution on DriftPersonalGraphRepository {
     );
     final archived = write.relations
         .singleWhere((relation) => relation.before.id == relationId)
-        .archived;
+        .after;
     final storedAfter = await _readStoredRelation(relationId);
     if (storedAfter == null ||
         !_sameStoredRelation(
@@ -148,7 +160,7 @@ extension _CascadeCommandExecution on DriftPersonalGraphRepository {
         )) {
       throw const StoredGraphCorruption();
     }
-    return _CommittedRelationArchiveCascade(
+    return _CommittedRelationCascadeUpdate(
       before: before,
       relation: archived,
       description: storedAfter.description,
@@ -220,6 +232,97 @@ extension _CascadeCommandExecution on DriftPersonalGraphRepository {
     );
   }
 
+  /// Восстанавливает намерение по выбранному варианту каскада. Уже активное
+  /// намерение не меняется.
+  Future<_CommittedIntentionCommand> _restoreIntentionCascade(
+    RestoreIntention command,
+    _GraphWriteClock clock,
+  ) async {
+    final storedBefore = await _readCommandSnapshot(command.id);
+    if (storedBefore == null) throw const _IntentionNotFound();
+    if (storedBefore.intention.archiveState ==
+        domain.IntentionArchiveState.active) {
+      return _CommittedIntentionUnchanged(
+        intention: storedBefore.intention,
+        entry: await _catalogEntrySnapshot(storedBefore),
+      );
+    }
+    final planner = await _cascadePlannerInTransaction();
+    final executed = _requireExpectedVariant(
+      planner.planRestore(PlannedIntention(command.id)),
+      command.execution,
+    );
+    final write = await _writeRestoreCascade(
+      restored: [command.id, ...executed.restored],
+      returnedAsMain: executed.returnedAsMain,
+      clock: clock,
+    );
+    final stored = await _readCommandSnapshot(command.id);
+    if (stored == null) throw const StoredGraphCorruption();
+    return _CommittedIntentionCascadeUpdate(
+      intention: stored.intention,
+      write: write,
+      executed: executed,
+    );
+  }
+
+  /// Восстанавливает связь по выбранному варианту каскада вместе с её
+  /// архивными участниками. Уже активная связь не меняется.
+  Future<_CommittedLongTermRelationCommand> _restoreRelationCascade(
+    RestoreLongTermRelation command,
+    _GraphWriteClock clock,
+  ) async {
+    final relationId = command.relationId;
+    final storedBefore = await _readStoredRelation(relationId);
+    if (storedBefore == null) throw _LongTermRelationNotFound(relationId);
+    final before = storedBefore.toDomain();
+    if (before.scope == relation_domain.RelationScope.active) {
+      return _CommittedLongTermRelationUpdate(
+        before: before,
+        relation: before,
+        description: storedBefore.description,
+        affectedCounts: const {},
+        didMutate: false,
+      );
+    }
+    final planner = await _cascadePlannerInTransaction();
+    final executed = _requireExpectedVariant(
+      planner.planRestore(
+        PlannedRelation(
+          source: before.sourceIntentionId,
+          related: before.relatedIntentionId,
+        ),
+      ),
+      command.execution,
+    );
+    final write = await _writeRestoreCascade(
+      restored: executed.restored,
+      restoredRelation: relationId,
+      returnedAsMain: executed.returnedAsMain,
+      clock: clock,
+    );
+    final restored = write.relations
+        .singleWhere((relation) => relation.before.id == relationId)
+        .after;
+    final storedAfter = await _readStoredRelation(relationId);
+    if (storedAfter == null ||
+        !_sameStoredRelation(
+          before: restored,
+          beforeDescription: storedBefore.description,
+          after: storedAfter.toDomain(),
+          afterDescription: storedAfter.description,
+        )) {
+      throw const StoredGraphCorruption();
+    }
+    return _CommittedRelationCascadeUpdate(
+      before: before,
+      relation: restored,
+      description: storedAfter.description,
+      write: write,
+      executed: executed,
+    );
+  }
+
   /// Планировщик над индексом удержания текущей ревизии. Вызывается в
   /// транзакции команды, поэтому состав относится к состоянию, которое
   /// команда меняет.
@@ -256,7 +359,7 @@ extension _CascadeCommandExecution on DriftPersonalGraphRepository {
 
     final deletedRelations = await _collectRelationsOf(
       deleted,
-      activeOnly: false,
+      _CascadeRelationSelection.any,
       also: deletedRelation,
     );
     await _deleteCascadeRows(
@@ -278,7 +381,7 @@ extension _CascadeCommandExecution on DriftPersonalGraphRepository {
     );
     final archivedRelations = await _collectRelationsOf(
       archived,
-      activeOnly: true,
+      _CascadeRelationSelection.active,
       also: archivedRelation,
     );
     await _updateCascadeRows(
@@ -313,22 +416,107 @@ extension _CascadeCommandExecution on DriftPersonalGraphRepository {
       deletedRelations: deletedRelations.values.toList(),
       relations: [
         for (final relation in archivedRelations.values)
-          _CascadedRelationArchive(relation, changedAt),
+          _CascadedRelationScopeChange(
+            relation,
+            relation_domain.RelationScope.archived,
+            changedAt,
+          ),
       ],
       counts: await _readVerifiedRelationCountsFor({...changed, ...ends}),
     );
   }
 
-  /// Связи намерений [intentions] и связь [also], только активные при
-  /// [activeOnly], в порядке их чтения.
+  /// Записывает восстановление в порядке, которого требуют триггеры (D8):
+  /// возвращает намерения [restored] и делает [returnedAsMain] главным, затем
+  /// возвращает архивные связи [restored] с активными намерениями и связь
+  /// [restoredRelation]. Каждая изменённая строка получает одно показание
+  /// [clock]. После записи проверяется инвариант вида по вернувшимся
+  /// намерениям и участникам вернувшихся связей.
+  Future<_CascadeWrite> _writeRestoreCascade({
+    required List<IntentionId> restored,
+    LongTermRelationId? restoredRelation,
+    required IntentionId? returnedAsMain,
+    required _GraphWriteClock clock,
+  }) async {
+    final restoredBefore = await _catalogEntrySnapshots(restored);
+    final changedAt = relation_domain.RelationTimestamp(clock.read());
+    final storedAt = changedAt.value.microsecondsSinceEpoch;
+
+    await _updateCascadeRows(
+      '''UPDATE intentions SET is_archived = 0, updated_at = ?
+         WHERE is_archived = 1 AND id IN''',
+      [for (final id in restored) id.toCanonicalString()],
+      storedAt,
+      _database.intentions,
+    );
+    await _updateCascadeRows(
+      '''UPDATE intentions SET kind = 'main', updated_at = ?
+         WHERE kind = 'supporting' AND id IN''',
+      [?returnedAsMain?.toCanonicalString()],
+      storedAt,
+      _database.intentions,
+    );
+    final restoredRelations = await _collectRelationsOf(
+      restored,
+      _CascadeRelationSelection.archivedBetweenActive,
+      also: restoredRelation,
+    );
+    await _updateCascadeRows(
+      '''UPDATE long_term_relations SET is_archived = 0, updated_at = ?
+         WHERE is_archived = 1 AND id IN''',
+      [for (final id in restoredRelations.keys) id.toCanonicalString()],
+      storedAt,
+      _database.longTermRelations,
+    );
+
+    final ends = <IntentionId>{
+      for (final relation in restoredRelations.values) ...[
+        relation.sourceIntentionId,
+        relation.relatedIntentionId,
+      ],
+    };
+    await _requireKindInvariant({...restored, ...ends});
+    final restoredAfter = await _catalogEntrySnapshots(restored);
+    return _CascadeWrite(
+      deleted: const {},
+      intentions: {
+        for (final id in restored)
+          id: (before: restoredBefore[id]!, after: restoredAfter[id]!),
+      },
+      deletedRelations: const [],
+      relations: [
+        for (final relation in restoredRelations.values)
+          _CascadedRelationScopeChange(
+            relation,
+            relation_domain.RelationScope.active,
+            changedAt,
+          ),
+      ],
+      counts: await _readVerifiedRelationCountsFor({...restored, ...ends}),
+    );
+  }
+
+  /// Связи намерений [intentions] и связь [also], отобранные по
+  /// [selection], в порядке их чтения.
   Future<Map<LongTermRelationId, relation_domain.LongTermRelation>>
   _collectRelationsOf(
-    List<IntentionId> intentions, {
-    required bool activeOnly,
+    List<IntentionId> intentions,
+    _CascadeRelationSelection selection, {
     required LongTermRelationId? also,
   }) async {
     final relations = <LongTermRelationId, relation_domain.LongTermRelation>{};
-    final scope = activeOnly ? 'relation.is_archived = 0 AND' : '';
+    final scope = switch (selection) {
+      _CascadeRelationSelection.any => '',
+      _CascadeRelationSelection.active => 'relation.is_archived = 0 AND',
+      _CascadeRelationSelection.archivedBetweenActive =>
+        '''relation.is_archived = 1 AND
+           EXISTS (SELECT 1 FROM intentions AS source
+                   WHERE source.id = relation.source_intention_id AND
+                         source.is_archived = 0) AND
+           EXISTS (SELECT 1 FROM intentions AS related
+                   WHERE related.id = relation.related_intention_id AND
+                         related.is_archived = 0) AND''',
+    };
     Future<void> collect(String where, List<String> ids) async {
       final rows = await _database
           .customSelect(
@@ -340,7 +528,7 @@ extension _CascadeCommandExecution on DriftPersonalGraphRepository {
                FROM long_term_relations AS relation
                WHERE $scope $where''',
             variables: [for (final id in ids) Variable<String>(id)],
-            readsFrom: {_database.longTermRelations},
+            readsFrom: {_database.longTermRelations, _database.intentions},
           )
           .get();
       for (final row in rows) {
@@ -526,9 +714,10 @@ Iterable<List<T>> _cascadeChunks<T>(List<T> ids) sync* {
 
 String _placeholders(int count) => List.filled(count, '?').join(', ');
 
-final class _CommittedIntentionArchiveCascade
+/// Архивирование или восстановление намерения по варианту каскада.
+final class _CommittedIntentionCascadeUpdate<C extends CascadeComposition>
     extends _CommittedIntentionCommand {
-  const _CommittedIntentionArchiveCascade({
+  const _CommittedIntentionCascadeUpdate({
     required this.intention,
     required this.write,
     required this.executed,
@@ -536,7 +725,7 @@ final class _CommittedIntentionArchiveCascade
 
   final domain.Intention intention;
   final _CascadeWrite write;
-  final ArchiveCascadeComposition executed;
+  final C executed;
 
   @override
   IntentionId get intentionId => intention.id;
@@ -561,9 +750,10 @@ final class _CommittedIntentionArchiveCascade
   }
 }
 
-final class _CommittedRelationArchiveCascade
+/// Архивирование или восстановление связи по варианту каскада.
+final class _CommittedRelationCascadeUpdate<C extends CascadeComposition>
     extends _CommittedLongTermRelationCommand {
-  const _CommittedRelationArchiveCascade({
+  const _CommittedRelationCascadeUpdate({
     required this.before,
     required this.relation,
     required this.description,
@@ -575,7 +765,7 @@ final class _CommittedRelationArchiveCascade
   final relation_domain.LongTermRelation relation;
   final LongTermRelationDescription? description;
   final _CascadeWrite write;
-  final ArchiveCascadeComposition executed;
+  final C executed;
 
   @override
   bool get didMutate => true;
