@@ -5,7 +5,6 @@ rules:
     - Use c4-diagrams when boundaries, dependencies, data flow, or runtime interactions benefit from visualization
   adr:
     - Must use domain-modeling skill for decision qualification and terminology; follow the schema-defined ADR format
-    - Use grill-with-docs skill before completing ADR review when the design contains consequential unresolved decisions
   specs:
     - Must use openspec-gherkin-authoring skill
   plan:
